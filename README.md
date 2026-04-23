@@ -1,67 +1,123 @@
 # Axiom
 
-Axiom is a personal external-brain backend.
+Axiom 是一个个人“外脑系统”的后端项目。
 
-Current focus is not fancy UI or complex agents. The goal of `v0.1` is to make the minimum backend loop stable:
+它不是普通笔记软件，也不是为了炫技而做的 agent 项目，而是一个长期可积累、可检索、可逐步接入 AI 的个人知识后端。
 
-`Input -> Storage -> Retrieval -> AI -> Decision`
+当前主链路是：
 
-At the current stage, only the first three parts are in scope:
+`输入 -> 存储 -> 检索 -> AI -> 决策`
 
-- receive input
-- persist reliably
-- retrieve basic records
+但在 `v0.1` 阶段，实际重点只有前三步：
 
-AI summary, classification, and weekly review come later.
+- 接收输入
+- 持久化存储
+- 基础检索
 
-## Current Stage
+AI 摘要、分类建议、周回顾等能力属于后续阶段，不是当前主线。
 
-Axiom currently uses a VPS as the main node.
+## 当前阶段定位
 
-Current deployment path:
+Axiom 当前处于 `v0.1 alpha` 阶段。
 
-`iPhone -> iOS Shortcuts -> VPS -> Flask receiver -> file system + SQLite`
+它已经不是纯概念项目，因为最小后端链路已经存在；但它也还没有进入“稳定可长期运行”的状态，因为服务常驻、写入一致性、备份闭环还没有完全补齐。
 
-This is a deliberate stage choice, not a final forever architecture.
+当前更准确的阶段判断是：
 
-## Core Principles
+- 最小链路已打通
+- 基础接口已存在
+- 数据已开始落盘和入库
+- 运行稳定性仍需优先修补
 
-- Files are the content source of truth.
-- SQLite is the index, not the content owner.
-- Make it runnable before making it elegant.
-- Keep changes small, clear, and testable.
-- Do not introduce heavy infrastructure too early.
+## 当前架构结论
 
-## Current Stack
+在当前阶段，`VPS` 是主节点，而不是本地设备。
+
+原因很明确：
+
+- 目前没有长期开机的本地设备
+- iPhone 只是输入端
+- 所以当前阶段最优架构是 `iPhone -> 快捷指令 -> VPS -> Flask -> 文件系统 + SQLite`
+
+这是一种阶段性最优，而不是永久最终形态。
+
+## 当前架构总览
+
+```text
+iPhone
+  -> iOS 快捷指令
+  -> VPS
+  -> Flask receiver
+  -> 文件系统存储
+  -> SQLite 索引
+```
+
+## 核心设计原则
+
+- 文件是内容本体
+- 数据库是索引，不是内容真相来源
+- 先保证“能收、能存、能查”
+- 先做可运行流，再做更精致的能力
+- 每次改动尽量小步、清晰、可验证
+- 不要为了工程高级感过早复杂化
+
+## 当前技术栈
 
 - Python
 - Flask
 - SQLite
-- File system storage
-- iPhone Shortcuts as input client
-- VPS as runtime environment
+- 文件系统存储
+- iPhone 快捷指令
+- VPS 部署运行
 
-## Current Capabilities
+当前阶段默认不引入：
+
+- FastAPI
+- PostgreSQL
+- Redis
+- Docker 重构
+- ORM
+- 前端框架
+
+## 当前已实现能力
 
 ### `/add`
 
-- validates `key`
-- accepts text input
-- writes a `.txt` file into `data/inbox`
-- inserts metadata into SQLite
+作用：
+接收快捷指令提交的文本内容，并完成文件落盘和数据库入库。
+
+当前行为：
+
+- 校验 `key`
+- 接收 `text`
+- 将文本写入 `data/inbox/*.txt`
+- 将元数据写入 SQLite `items` 表
 
 ### `/recent`
 
-- validates `key`
-- returns recent items from SQLite
+作用：
+读取最近写入的记录。
+
+当前行为：
+
+- 校验 `key`
+- 从 SQLite 查询最近记录
+- 以 JSON 返回结果
 
 ### `/search`
 
-- validates `key`
-- searches text content
-- supports pagination and sort modes
+作用：
+执行基础关键词检索。
 
-## Repository Structure
+当前行为：
+
+- 校验 `key`
+- 搜索 `content`
+- 支持 `page`
+- 支持 `page_size`
+- 支持排序模式
+
+## 当前仓库结构
 
 ```text
 core/
@@ -76,24 +132,56 @@ backup/
 docs/
 ```
 
-## Important Documents
+## 当前优先级
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Current State](docs/CURRENT_STATE.md)
-- [Architecture Mindmap](docs/ARCHITECTURE_MINDMAP.md)
+### 第一优先级
 
-## Near-Term Priorities
+- 保持 receiver 稳定
+- 提升持久化可靠性
+- 保证文件落盘和数据库入库一致
+- 补基础备份能力
 
-1. keep receiver stable
-2. make persistence more reliable
-3. add real backup flow
-4. make recent/search behavior clearer
+### 第二优先级
 
-## Current Non-Goals
+- 整理 `/recent`
+- 整理 `/search`
+- 完善分页、limit、排序
+- 统一错误处理
 
-- complex frontend
-- multi-agent architecture
-- vector database
-- distributed system
+### 第三优先级
+
+- 图片上传
+- 多类型 item 支持
+
+### 第四优先级
+
+- AI 摘要
+- 分类建议
+- inbox 自动处理
+- 周回顾脚本
+
+## 当前非目标
+
+- 复杂前端
+- 复杂 agent 架构
+- 向量数据库
+- 分布式系统
 - Kubernetes
-- backend framework migration
+- 多服务重构
+- 后端框架迁移
+
+## DeepWiki 推荐阅读顺序
+
+如果使用 DeepWiki 或其他自动文档工具，建议优先从下面这些文档理解项目：
+
+1. [文档总索引](docs/INDEX.md)
+2. [架构说明](docs/ARCHITECTURE.md)
+3. [当前状态](docs/CURRENT_STATE.md)
+4. [架构思维导图](docs/ARCHITECTURE_MINDMAP.md)
+
+## 重要文档
+
+- [文档总索引](docs/INDEX.md)
+- [架构说明](docs/ARCHITECTURE.md)
+- [当前状态](docs/CURRENT_STATE.md)
+- [架构思维导图](docs/ARCHITECTURE_MINDMAP.md)

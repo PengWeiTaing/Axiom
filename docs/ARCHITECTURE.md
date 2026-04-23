@@ -1,143 +1,189 @@
-# Axiom Architecture
+# 架构说明
 
-## System Goal
+## 项目目标
 
-Axiom is not a general note-taking app and not an agent demo project.
-It is a long-term personal knowledge backend.
+Axiom 是一个个人“外脑系统”的后端，而不是一个普通笔记应用，也不是一个以复杂 agent 为中心的实验项目。
 
-The intended long-running chain is:
+它的长期目标是形成下面这条稳定链路：
 
-`Input -> Storage -> Retrieval -> AI -> Decision`
+`输入 -> 存储 -> 检索 -> AI -> 决策`
 
-## v0.1 Scope
+其中：
 
-The current phase only targets:
+- 输入：接收来自 iPhone 快捷指令等入口的内容
+- 存储：把内容可靠地写入文件系统和索引数据库
+- 检索：支持最近记录和基础搜索
+- AI：后续接入摘要、分类、回顾等能力
+- 决策：最终服务个人判断与行动，而不是仅仅堆积笔记
 
-1. input reception
-2. persistent storage
-3. basic retrieval
+## v0.1 范围
 
-Later phases may add:
+当前阶段只关注三件事：
 
-- AI summary
-- classification suggestion
-- inbox processing scripts
-- weekly review scripts
+1. 接收输入
+2. 持久化存储
+3. 基础检索
 
-## Current Deployment Architecture
+当前阶段不追求：
 
-At the current stage, the VPS is the main node.
+- 复杂前端
+- 复杂 agent
+- 分布式系统
+- 向量数据库
+- 多服务拆分
+
+## 当前部署架构
+
+当前没有长期开机的本地设备，所以 VPS 是主节点。
+
+当前正确架构是：
 
 ```text
 iPhone
-  -> iOS Shortcuts
+  -> iOS 快捷指令
   -> VPS
   -> Flask receiver
-  -> file system storage
-  -> SQLite index
+  -> 文件系统
+  -> SQLite
 ```
 
-This is a stage-appropriate architecture because there is no always-on local machine.
+这意味着：
 
-## Storage Model
+- iPhone 负责输入
+- VPS 负责接收、存储、基础处理
+- 文件系统负责保存原始内容
+- SQLite 负责提供索引和检索能力
 
-### File System
+## 存储模型
 
-- `data/inbox/` stores raw captured content files
-- `data/archive/` is reserved for later organization
-- files are the primary content body
+### 文件系统
+
+文件是内容本体。
+
+当前目录：
+
+- `data/inbox/`：接收的新内容
+- `data/archive/`：后续归档内容
+
+文件系统的职责是保存原始内容，不依赖数据库也能保留主体数据。
 
 ### SQLite
 
-- `db/axiom.db` stores searchable metadata
-- database records point to file paths
-- database acts as index, not the final content authority
+数据库是索引，不是内容本体。
 
-## Main Runtime Components
+当前数据库文件：
 
-### Receiver
+- `db/axiom.db`
 
-`core/receiver.py` is the current main application entry.
+当前核心表：
 
-It currently contains:
+- `items`
 
-- request handling
-- key validation
-- file write logic
-- SQLite write logic
-- recent query logic
-- search logic
+当前字段思路：
 
-### Database Initialization
+- `id`
+- `type`
+- `content`
+- `file_path`
+- `source`
+- `created_at`
 
-`core/init_db.py` creates the `items` table if needed.
+数据库的职责是：
 
-## Current API Surface
+- 提供最近记录查询
+- 提供基础搜索
+- 提供后续分页、排序和筛选能力
+
+## 当前核心运行组件
+
+### receiver
+
+当前主入口是：
+
+- `core/receiver.py`
+
+当前集中在一个文件里，负责：
+
+- 请求处理
+- key 校验
+- 文件落盘
+- SQLite 入库
+- recent 查询
+- search 查询
+
+这不是长期最优结构，但符合当前“小步推进、先跑通”的阶段目标。
+
+### init_db
+
+数据库初始化文件是：
+
+- `core/init_db.py`
+
+作用：
+
+- 创建 `items` 表
+- 确保数据库存在基本结构
+
+## 当前接口
 
 ### `/add`
 
-Purpose:
-receive text from shortcut input and persist it.
+作用：
 
-Current behavior:
-
-- validate `key`
-- validate `text`
-- write text into inbox file
-- insert metadata into SQLite
+- 接收文本输入
+- 落盘到 inbox
+- 写入数据库索引
 
 ### `/recent`
 
-Purpose:
-read recent records from SQLite.
+作用：
 
-Current behavior:
-
-- validate `key`
-- read latest rows
-- return JSON
+- 查询最近写入的记录
+- 返回 JSON
 
 ### `/search`
 
-Purpose:
-perform basic keyword retrieval.
+作用：
 
-Current behavior:
+- 执行基础关键词搜索
+- 支持分页和排序
 
-- validate `key`
-- match content with `LIKE`
-- support `page`, `page_size`, `sort`
+## 当前设计边界
 
-## Design Constraints
+在 `v0.1` 阶段，默认遵守以下边界：
 
-- do not switch away from Flask + SQLite in this phase
-- do not replace file-plus-index storage design
-- do not over-split into services
-- do not optimize for long-term elegance at the cost of current reliability
+- 保持 Flask + SQLite
+- 保持文件系统 + 数据库索引模式
+- 不切换 PostgreSQL
+- 不引入 Redis
+- 不引入新框架
+- 不拆成复杂多服务
+- 不为了长期优雅而牺牲当前可运行性
 
-## Engineering Priority Order
+## 当前开发优先级
 
-### Priority 1
+### 第一优先级
 
-- receiver stability
-- reliable persistence
-- safe file writes
-- backup flow
+- receiver 稳定
+- 持久化可靠
+- 文件落盘安全
+- 备份闭环
 
-### Priority 2
+### 第二优先级
 
-- better `/search`
-- clearer `/recent`
-- pagination
-- error handling
+- `/search` 更清晰
+- `/recent` 更清晰
+- 分页和 limit 更规范
+- 错误返回更统一
 
-### Priority 3
+### 第三优先级
 
-- image upload support
-- multi-type item handling
+- 图片上传
+- 多类型 item
 
-### Priority 4
+### 第四优先级
 
-- AI summary
-- classification
-- automation scripts
+- AI 摘要
+- 分类建议
+- 自动处理脚本
+- 周回顾脚本

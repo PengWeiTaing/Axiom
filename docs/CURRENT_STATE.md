@@ -1,69 +1,86 @@
-# Current State
+# 当前状态
 
-Snapshot basis:
-pulled from VPS `/opt/axiom` on 2026-04-21.
+状态依据：
+2026-04-21 从 VPS 的 `/opt/axiom` 拉取项目快照后整理。
 
-## Stage Judgment
+## 当前阶段判断
 
-The project is beyond pure concept stage.
+这个项目已经不是“纯概念”阶段。
 
-It is best described as:
+更准确地说，它现在处于：
 
 `Axiom v0.1 alpha`
 
-Reason:
+原因是：
 
-- the minimum backend chain already exists
-- the receiver can already accept, store, and query data
-- but runtime stability and operational reliability are not finished
+- 最小后端链路已经存在
+- 系统已经可以接收、存储、查询部分数据
+- 但服务稳定性、写入一致性、备份能力还没有完全补齐
 
-## Implemented So Far
+## 当前已经实现的内容
 
-### Implemented endpoints
+### 已实现接口
 
 - `/add`
 - `/recent`
 - `/search`
 
-### Existing data snapshot at inspection time
+### 当前数据快照
 
-- `items` rows in SQLite: `3`
-- text files in `data/inbox`: `6`
+在检查时看到：
 
-### Existing supporting files
+- SQLite `items` 表记录数：`3`
+- `data/inbox` 文本文件数：`6`
+
+### 当前已有的相关文件
 
 - `core/receiver.py`
 - `core/init_db.py`
-- legacy backup receiver variants in `core/`
-- `backup/` directory exists but has no real backup files
+- `core/receiver_file_only_backup.py`
+- `core/receiver_with_db_backup.py`
+- `backup/` 目录已经存在
 
-## Main Risks
+## 当前主要风险
 
-### Runtime
+### 运行风险
 
-- port `5000` was not listening during inspection
-- historical `gunicorn` timeout logs exist
-- no confirmed dedicated `systemd` service was found
+- 检查时 `5000` 端口未监听
+- 历史日志中存在 `gunicorn timeout`
+- 暂未确认正式的 `systemd` 服务
 
-### Data consistency
+### 数据一致性风险
 
-- inbox file count does not match database row count
-- `/add` currently writes file first, then writes database row
-- there is no compensation logic if the second step fails
+- inbox 文件数量与数据库记录数不一致
+- `/add` 当前是先写文件，再写数据库
+- 如果数据库写入失败，当前没有补偿逻辑
 
-### Configuration
+### 配置风险
 
-- secret key is hardcoded
-- important paths are hardcoded
+- `SECRET_KEY` 当前写死在代码里
+- 关键路径当前写死在代码里
 
-### Maintainability
+### 可维护性风险
 
-- database init logic is duplicated
-- backup flow is not formalized yet
+- 数据库初始化逻辑有重复
+- 备份流程还没有正式落地
 
-## Recommended Next Step Order
+## 当前最小修复顺序
 
-1. make the receiver runtime stable
-2. improve write reliability and consistency
-3. add a real backup script or backup flow
-4. normalize `/recent` and `/search` behavior
+建议按下面顺序推进：
+
+1. 先让 receiver 稳定运行
+2. 再提升写入可靠性和一致性
+3. 再补真实可执行的备份流程
+4. 最后整理 `/recent` 和 `/search` 的行为边界
+
+## 当前结论
+
+当前 Axiom 的核心问题已经不是“功能有没有”，而是：
+
+- 服务是否稳定常驻
+- 文件和数据库是否一致
+- 备份是否真正可用
+
+所以当前最合理的主线仍然是：
+
+`先收稳 receiver，再扩功能`
