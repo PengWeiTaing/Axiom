@@ -53,7 +53,7 @@ flowchart TD
    如何用临时目录验证 receiver 的主链路
 6. `deploy/axiom-receiver.service` 和 `.env.example`
    需要掌握：
-   receiver 在 VPS 上如何启动，环境变量从哪里来
+   receiver 在 VPS 上如何启动，环境变量从哪里来，日志写到哪里
 7. `docs/SHORT_TERM.md`
    需要掌握：
    当前阶段边界、近期优先级、下一步顺序
@@ -85,3 +85,4 @@ flowchart TD
 - 服务如何在 VPS 上稳定启动
 - 文件和数据库如何检查一致性
 - 备份如何在 VPS 上形成固定流程
+- 日志如何同时通过 `journalctl` 和 `logs/receiver.log` 查看

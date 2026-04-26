@@ -57,6 +57,7 @@ flowchart LR
 - 新增文件和数据库一致性检查脚本
 - 一致性检查支持把数据库里的 `/opt/axiom/...` 映射到本地 `--root`
 - 新增 VPS systemd 服务模板和 `.env.example`
+- receiver 支持 `AXIOM_LOG_PATH` 文件日志
 
 ## 当前最重要的风险
 
@@ -90,8 +91,7 @@ flowchart LR
 
 第二优先级：
 
-- 给 receiver 加最小日志落盘方案
-- 观察 systemd journal 是否足够当前阶段使用
+- 在 VPS 上确认 `journalctl` 和 `/opt/axiom/logs/receiver.log` 都可用
 - 继续观察 `/recent` 和 `/search` 的实际使用感受
 
 第三优先级：

@@ -33,3 +33,4 @@
 - 重写 DeepWiki 生成脚本，把 Wiki 改成 8 页结构化阅读入口
 - 新增 `.env.example` 和 `deploy/axiom-receiver.service`
 - README 和 DeepWiki 补充 VPS systemd 运行闭环
+- receiver 支持 `AXIOM_LOG_PATH`，VPS 可写入 `/opt/axiom/logs/receiver.log`

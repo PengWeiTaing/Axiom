@@ -22,6 +22,7 @@ AXIOM_ROOT = Path(os.environ.get("AXIOM_ROOT", "/opt/axiom")).resolve()
 INBOX_PATH = Path(os.environ.get("AXIOM_INBOX_PATH", AXIOM_ROOT / "data" / "inbox")).resolve()
 DB_PATH = Path(os.environ.get("AXIOM_DB_PATH", AXIOM_ROOT / "db" / "axiom.db")).resolve()
 SECRET_KEY = os.environ.get("AXIOM_SECRET_KEY", os.environ.get("AXIOM_KEY", "axiom123"))
+LOG_PATH = os.environ.get("AXIOM_LOG_PATH", "")
 
 DEFAULT_PAGE = 1
 DEFAULT_PAGE_SIZE = 10
@@ -31,10 +32,20 @@ DEFAULT_SOURCE = "ios_shortcut"
 ITEM_TYPE_TEXT = "text"
 
 
-logging.basicConfig(
-    level=os.environ.get("AXIOM_LOG_LEVEL", "INFO").upper(),
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-)
+def configure_logging() -> None:
+    log_level = os.environ.get("AXIOM_LOG_LEVEL", "INFO").upper()
+    log_format = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+
+    if LOG_PATH:
+        log_path = Path(LOG_PATH).expanduser().resolve()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
+
+    logging.basicConfig(level=log_level, format=log_format, handlers=handlers)
+
+
+configure_logging()
 logger = logging.getLogger("axiom.receiver")
 
 

@@ -110,6 +110,7 @@ sudo systemctl enable --now axiom-receiver
 ```bash
 systemctl status axiom-receiver --no-pager
 journalctl -u axiom-receiver -f
+tail -f /opt/axiom/logs/receiver.log
 curl http://127.0.0.1:5000/health
 ```
 

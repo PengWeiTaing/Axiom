@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import tempfile
@@ -27,6 +28,7 @@ def main() -> None:
         root = Path(temp_dir)
         os.environ["AXIOM_ROOT"] = str(root)
         os.environ["AXIOM_SECRET_KEY"] = "test-key"
+        os.environ["AXIOM_LOG_PATH"] = str(root / "logs" / "receiver.log")
 
         from core.receiver import app  # noqa: WPS433
         from scripts.check_consistency import build_report  # noqa: WPS433
@@ -96,8 +98,13 @@ def main() -> None:
         if not consistency["ok"]:
             raise AssertionError(f"consistency check failed: {consistency}")
 
+        log_path = root / "logs" / "receiver.log"
+        if not log_path.exists():
+            raise AssertionError(f"expected log file to exist: {log_path}")
+
         print("receiver 冒烟测试通过")
         print(f"临时根目录: {root}")
+        logging.shutdown()
 
 
 if __name__ == "__main__":

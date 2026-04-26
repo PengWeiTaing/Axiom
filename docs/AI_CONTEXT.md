@@ -48,11 +48,13 @@ data/
   inbox/
   archive/
 backup/
+logs/
 ```
 
 ## 当前代码事实
 
 - `core/receiver.py` 是当前主入口
+- `core/receiver.py` 支持 `AXIOM_LOG_PATH`，配置后会同时输出到控制台和日志文件
 - 已有接口：`/health`、`/add`、`/recent`、`/search`
 - `core/init_db.py` 复用 `receiver.py` 的 `init_db()`
 - `scripts/backup_axiom.py` 已经存在
@@ -66,7 +68,7 @@ backup/
 ## 当前 receiver 行为
 
 - 默认根路径是 `/opt/axiom`
-- 可用 `AXIOM_ROOT`、`AXIOM_INBOX_PATH`、`AXIOM_DB_PATH`、`AXIOM_SECRET_KEY` 覆盖配置
+- 可用 `AXIOM_ROOT`、`AXIOM_INBOX_PATH`、`AXIOM_DB_PATH`、`AXIOM_SECRET_KEY`、`AXIOM_LOG_PATH` 覆盖配置
 - `/add` 支持 query/form/JSON 读取 `text`
 - `/add` 使用临时文件写入，再替换为正式 txt
 - SQLite 入库失败时会删除本次已写入的 txt
@@ -104,10 +106,10 @@ flowchart TD
 - 文件和数据库一致性可检查
 - 正式启动方式可复现
 - systemd 服务模板在 VPS 上验证通过
+- 最小日志落盘在 VPS 上验证通过
 
 第二优先级：
 
-- 最小日志落盘
 - 部署与重启命令文档化
 - 一致性检查脚本在 VPS 上跑通
 
