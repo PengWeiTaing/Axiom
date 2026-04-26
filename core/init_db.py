@@ -1,25 +1,20 @@
-import sqlite3
-import os
+from __future__ import annotations
 
-DB_PATH = "/opt/axiom/db/axiom.db"
+import sys
+from pathlib import Path
 
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-conn = sqlite3.connect(DB_PATH)
-c = conn.cursor()
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-c.execute("""
-CREATE TABLE IF NOT EXISTS items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL,
-    content TEXT,
-    file_path TEXT,
-    source TEXT,
-    created_at TEXT NOT NULL
-)
-""")
+from core.receiver import DB_PATH, init_db  # noqa: E402
 
-conn.commit()
-conn.close()
 
-print("database initialized:", DB_PATH)
+def main() -> None:
+    init_db(DB_PATH)
+    print(f"database initialized: {DB_PATH}")
+
+
+if __name__ == "__main__":
+    main()

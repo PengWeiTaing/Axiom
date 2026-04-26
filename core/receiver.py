@@ -1,329 +1,476 @@
-from flask import Flask, request, jsonify
-from datetime import datetime
+from __future__ import annotations
+
+import hmac
+import logging
 import os
 import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from uuid import uuid4
+
+from flask import Flask, jsonify, request
+from werkzeug.exceptions import HTTPException
+
 
 app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False
+app.config["JSON_AS_ASCII"] = False
+
+
 # ===== 基础配置 =====
-INBOX_PATH = "/opt/axiom/data/inbox"
-DB_PATH = "/opt/axiom/db/axiom.db"
-SECRET_KEY = "axiom123"
+# 默认保持 VPS 目录结构；环境变量用于本地测试或后续部署覆盖。
+AXIOM_ROOT = Path(os.environ.get("AXIOM_ROOT", "/opt/axiom")).resolve()
+INBOX_PATH = Path(os.environ.get("AXIOM_INBOX_PATH", AXIOM_ROOT / "data" / "inbox")).resolve()
+DB_PATH = Path(os.environ.get("AXIOM_DB_PATH", AXIOM_ROOT / "db" / "axiom.db")).resolve()
+SECRET_KEY = os.environ.get("AXIOM_SECRET_KEY", os.environ.get("AXIOM_KEY", "axiom123"))
 
-# 确保目录存在
-os.makedirs(INBOX_PATH, exist_ok=True)
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+DEFAULT_PAGE = 1
+DEFAULT_PAGE_SIZE = 10
+MAX_PAGE_SIZE = 50
 
-
-# ===== 数据库初始化 =====
-def init_db():
-    # 连接 SQLite 数据库
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # 创建 items 表（如果不存在）
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        content TEXT,
-        file_path TEXT,
-        source TEXT,
-        created_at TEXT NOT NULL
-    )
-    """)
-
-    conn.commit()
-    conn.close()
+DEFAULT_SOURCE = "ios_shortcut"
+ITEM_TYPE_TEXT = "text"
 
 
-# 程序启动时初始化数据库
-init_db()
+logging.basicConfig(
+    level=os.environ.get("AXIOM_LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger("axiom.receiver")
 
 
-# ===== 工具函数：统一鉴权 =====
-def check_key(key):
-    """
-    检查请求携带的 key 是否正确
-    正确返回 True，错误返回 False
-    """
-    return key == SECRET_KEY
+# ===== 响应工具 =====
+def ok_response(payload: dict | None = None, status: int = 200):
+    body = {"ok": True}
+    if payload:
+        body.update(payload)
+    return jsonify(body), status
 
 
-# ===== 工具函数：获取数据库连接 =====
-def get_db_connection():
-    """
-    创建数据库连接，并让查询结果支持按列名取值
-    """
-    conn = sqlite3.connect(DB_PATH)
+def error_response(status: int, code: str, message: str):
+    return jsonify({"ok": False, "error": {"code": code, "message": message}}), status
+
+
+# ===== 存储与数据库 =====
+def ensure_storage_dirs() -> None:
+    """服务接收请求前，先确保本地存储目录存在。"""
+    INBOX_PATH.mkdir(parents=True, exist_ok=True)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+
+def init_db(db_path: Path = DB_PATH) -> None:
+    """创建 v0.1 阶段最小表结构。"""
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                content TEXT,
+                file_path TEXT,
+                source TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at)"
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_items_source ON items(source)")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def init_app_storage() -> None:
+    ensure_storage_dirs()
+    init_db()
+
+
+def get_db_connection() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(DB_PATH), timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-# ===== 写入接口 /add =====
-@app.route("/add", methods=["GET"])
-def add_note():
-    # 读取 URL 参数里的 text 和 key
-    text = request.args.get("text", "")
-    key = request.args.get("key", "")
+# ===== 请求工具 =====
+def get_request_field(name: str, default: str = "") -> str:
+    """按 JSON、form、query string 的顺序读取字段。"""
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        value = data.get(name)
+        if value is not None:
+            return str(value)
 
-    # 校验密钥
-    if not check_key(key):
-        return "unauthorized", 403
+    value = request.values.get(name)
+    if value is not None:
+        return str(value)
 
-    # 校验内容不能为空
-    if not text:
-        return "no text provided", 400
+    return default
 
-    # 获取当前时间
-    now = datetime.now()
 
-    # 生成文件名时间戳
-    filename_time = now.strftime("%Y%m%d_%H%M%S")
+def get_request_key() -> str:
+    return get_request_field("key") or request.headers.get("X-Axiom-Key", "")
 
-    # 数据库存储时间
-    created_at = now.isoformat()
 
-    # 生成 txt 文件名和完整路径
-    filename = f"{filename_time}.txt"
-    filepath = os.path.join(INBOX_PATH, filename)
+def check_key(key: str) -> bool:
+    """使用固定时间比较校验共享 key。"""
+    if not SECRET_KEY:
+        logger.warning("AXIOM_SECRET_KEY is empty")
+        return False
+    return hmac.compare_digest(str(key), SECRET_KEY)
 
-    # 写入 txt 文件
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(text)
 
-    # 写入数据库
-    conn = get_db_connection()
-    c = conn.cursor()
+def require_key():
+    if check_key(get_request_key()):
+        return None
+    return error_response(403, "unauthorized", "key 无效")
 
-    c.execute(
-        """
-        INSERT INTO items (type, content, file_path, source, created_at)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        ("text", text, filepath, "ios_shortcut", created_at)
+
+def parse_positive_int(
+    value: str | None,
+    field_name: str,
+    default: int,
+    max_value: int | None = None,
+) -> int:
+    if value is None or value == "":
+        number = default
+    else:
+        try:
+            number = int(value)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} 必须是整数") from exc
+
+    if number <= 0:
+        raise ValueError(f"{field_name} 必须大于 0")
+
+    if max_value is not None and number > max_value:
+        return max_value
+
+    return number
+
+
+def read_pagination(default_page_size: int = DEFAULT_PAGE_SIZE) -> tuple[int, int]:
+    page = parse_positive_int(
+        request.args.get("page"),
+        "page",
+        DEFAULT_PAGE,
     )
 
-    conn.commit()
-    conn.close()
+    # 兼容 /recent?limit=10，同时把 page_size 作为标准分页参数。
+    page_size_value = request.args.get("page_size")
+    if page_size_value is None:
+        page_size_value = request.args.get("limit")
 
-    return f"saved: {filename}", 200
+    page_size = parse_positive_int(
+        page_size_value,
+        "page_size",
+        default_page_size,
+        MAX_PAGE_SIZE,
+    )
+
+    return page, page_size
 
 
-# ===== 最近记录接口 /recent =====
+def row_to_item(row: sqlite3.Row, include_score: bool = False) -> dict:
+    item = {
+        "id": row["id"],
+        "type": row["type"],
+        "content": row["content"],
+        "file_path": row["file_path"],
+        "source": row["source"],
+        "created_at": row["created_at"],
+    }
+    if include_score and "score" in row.keys():
+        item["score"] = row["score"]
+    return item
+
+
+def escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def build_text_file_path(now: datetime) -> Path:
+    timestamp = now.strftime("%Y%m%d_%H%M%S_%f")
+    return INBOX_PATH / f"{timestamp}_{uuid4().hex[:8]}.txt"
+
+
+def write_text_file_atomic(file_path: Path, text: str) -> None:
+    """先写临时文件，再替换成正式文件，避免留下半截 txt。"""
+    tmp_path = file_path.with_name(f"{file_path.name}.{uuid4().hex}.tmp")
+    try:
+        with tmp_path.open("w", encoding="utf-8", newline="\n") as file:
+            file.write(text)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(tmp_path, file_path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def insert_text_item(text: str, file_path: Path, source: str, created_at: str) -> int:
+    conn = get_db_connection()
+    try:
+        cursor = conn.execute(
+            """
+            INSERT INTO items (type, content, file_path, source, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (ITEM_TYPE_TEXT, text, str(file_path), source, created_at),
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+    finally:
+        conn.close()
+
+
+def cleanup_file(file_path: Path) -> None:
+    try:
+        file_path.unlink(missing_ok=True)
+    except OSError:
+        logger.exception("failed to clean up file after database error: %s", file_path)
+
+
+# ===== 路由 =====
+@app.route("/health", methods=["GET"])
+def health_check():
+    conn = None
+    try:
+        conn = get_db_connection()
+        conn.execute("SELECT 1")
+    except sqlite3.Error:
+        logger.exception("health check failed")
+        return error_response(500, "database_error", "数据库不可用")
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return ok_response(
+        {
+            "service": "axiom-receiver",
+            "db": "ok",
+            "inbox": "ok" if INBOX_PATH.exists() else "missing",
+        }
+    )
+
+
+@app.route("/add", methods=["GET", "POST"])
+def add_note():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    text = get_request_field("text")
+    if not text.strip():
+        return error_response(400, "empty_text", "text 不能为空")
+
+    source = get_request_field("source", DEFAULT_SOURCE).strip() or DEFAULT_SOURCE
+    now = utc_now()
+    created_at = now.isoformat(timespec="seconds")
+    file_path = build_text_file_path(now)
+
+    try:
+        write_text_file_atomic(file_path, text)
+    except OSError:
+        logger.exception("failed to write inbox file")
+        return error_response(500, "file_write_failed", "文件写入失败")
+
+    try:
+        item_id = insert_text_item(text, file_path, source, created_at)
+    except sqlite3.Error:
+        cleanup_file(file_path)
+        logger.exception("failed to insert item into database")
+        return error_response(500, "database_write_failed", "数据库写入失败")
+
+    logger.info("saved text item id=%s file=%s", item_id, file_path.name)
+    return ok_response(
+        {
+            "message": f"saved: {file_path.name}",
+            "item": {
+                "id": item_id,
+                "type": ITEM_TYPE_TEXT,
+                "content": text,
+                "file_path": str(file_path),
+                "source": source,
+                "created_at": created_at,
+            },
+        }
+    )
+
+
 @app.route("/recent", methods=["GET"])
 def recent_items():
-    # 读取参数
-    key = request.args.get("key", "")
-    limit = request.args.get("limit", "10")
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
 
-    # 校验密钥
-    if not check_key(key):
-        return "unauthorized", 403
-
-    # 校验 limit
     try:
-        limit = int(limit)
-    except ValueError:
-        return "invalid limit", 400
+        page, page_size = read_pagination()
+    except ValueError as exc:
+        return error_response(400, "invalid_pagination", str(exc))
 
-    if limit <= 0:
-        return "limit must be greater than 0", 400
+    sort = request.args.get("sort", "newest").strip().lower()
+    if sort not in {"newest", "oldest"}:
+        return error_response(400, "invalid_sort", "sort 只能是 newest 或 oldest")
 
-    conn = get_db_connection()
-    c = conn.cursor()
-
-    # 查询最近记录
-    c.execute(
-        """
-        SELECT id, type, content, file_path, source, created_at
-        FROM items
-        ORDER BY id DESC
-        LIMIT ?
-        """,
-        (limit,)
-    )
-
-    rows = c.fetchall()
-    conn.close()
-
-    # 整理成 JSON 返回
-    results = []
-    for row in rows:
-        results.append({
-            "id": row["id"],
-            "type": row["type"],
-            "content": row["content"],
-            "file_path": row["file_path"],
-            "source": row["source"],
-            "created_at": row["created_at"]
-        })
-
-    return jsonify(results), 200
-
-
-# ===== 搜索接口 /search =====
-@app.route("/search", methods=["GET"])
-def search_items():
-    """
-    支持：
-    - q: 搜索关键词
-    - page: 第几页（默认 1）
-    - page_size: 每页多少条（默认 10）
-    - sort:
-        relevance -> 按相关性排序（默认）
-        newest    -> 按最新时间排序
-        oldest    -> 按最旧时间排序
-    """
-    key = request.args.get("key", "")
-    q = request.args.get("q", "").strip()
-    page = request.args.get("page", "1")
-    page_size = request.args.get("page_size", "10")
-    sort = request.args.get("sort", "relevance").strip().lower()
-
-    # 校验密钥
-    if not check_key(key):
-        return "unauthorized", 403
-
-    # 校验搜索词
-    if not q:
-        return "no query provided", 400
-
-    # 校验分页参数
-    try:
-        page = int(page)
-        page_size = int(page_size)
-    except ValueError:
-        return "page and page_size must be integers", 400
-
-    if page <= 0:
-        return "page must be greater than 0", 400
-
-    if page_size <= 0:
-        return "page_size must be greater than 0", 400
-
-    # 防止一次查太多
-    if page_size > 50:
-        page_size = 50
-
+    order_clause = "id DESC" if sort == "newest" else "id ASC"
     offset = (page - 1) * page_size
 
-    # 构造 LIKE 模式
-    exact_match = q
-    prefix_match = f"{q}%"
-    fuzzy_match = f"%{q}%"
-
     conn = get_db_connection()
-    c = conn.cursor()
-
-    # 先查总数，便于分页
-    c.execute(
-        """
-        SELECT COUNT(*) AS total
-        FROM items
-        WHERE content LIKE ?
-        """,
-        (fuzzy_match,)
-    )
-    total = c.fetchone()["total"]
-
-    # 根据排序模式选择 SQL
-    if sort == "newest":
-        order_clause = "created_at DESC, id DESC"
-    elif sort == "oldest":
-        order_clause = "created_at ASC, id ASC"
-    else:
-        # relevance：手动做一个基础相关性评分
-        # 规则：
-        # 1. content 完全等于 q -> 分最高
-        # 2. content 以 q 开头 -> 次高
-        # 3. content 包含 q -> 基础命中
-        # 4. 文本越短，通常越像精准笔记标题/短想法，略加一点优势
-        # 5. 同分时按新记录优先
-        order_clause = """
-        score DESC,
-        created_at DESC,
-        id DESC
-        """
-
-    if sort in ["newest", "oldest"]:
-        c.execute(
+    try:
+        total = conn.execute("SELECT COUNT(*) AS total FROM items").fetchone()["total"]
+        rows = conn.execute(
             f"""
             SELECT id, type, content, file_path, source, created_at
             FROM items
-            WHERE content LIKE ?
             ORDER BY {order_clause}
             LIMIT ? OFFSET ?
             """,
-            (fuzzy_match, page_size, offset)
-        )
-    else:
-        c.execute(
-            f"""
-            SELECT
-                id,
-                type,
-                content,
-                file_path,
-                source,
-                created_at,
-                (
-                    CASE
-                        WHEN content = ? THEN 100
-                        WHEN content LIKE ? THEN 60
-                        WHEN content LIKE ? THEN 30
-                        ELSE 0
-                    END
-                    +
-                    CASE
-                        WHEN LENGTH(content) <= 20 THEN 8
-                        WHEN LENGTH(content) <= 50 THEN 4
-                        ELSE 0
-                    END
-                ) AS score
-            FROM items
-            WHERE content LIKE ?
-            ORDER BY {order_clause}
-            LIMIT ? OFFSET ?
-            """,
-            (exact_match, prefix_match, fuzzy_match, fuzzy_match, page_size, offset)
-        )
+            (page_size, offset),
+        ).fetchall()
+    finally:
+        conn.close()
 
-    rows = c.fetchall()
-    conn.close()
-
-    # 整理结果
-    items = []
-    for row in rows:
-        item = {
-            "id": row["id"],
-            "type": row["type"],
-            "content": row["content"],
-            "file_path": row["file_path"],
-            "source": row["source"],
-            "created_at": row["created_at"]
-        }
-
-        # relevance 模式下额外返回 score，方便你观察排序效果
-        if sort == "relevance":
-            item["score"] = row["score"]
-
-        items.append(item)
-
-    # 计算分页信息
     total_pages = (total + page_size - 1) // page_size
+    return ok_response(
+        {
+            "sort": sort,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+            "items": [row_to_item(row) for row in rows],
+        }
+    )
 
-    return jsonify({
-        "query": q,
-        "sort": sort,
-        "page": page,
-        "page_size": page_size,
-        "total": total,
-        "total_pages": total_pages,
-        "items": items
-    }), 200
+
+@app.route("/search", methods=["GET"])
+def search_items():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    query = request.args.get("q", "").strip()
+    if not query:
+        return error_response(400, "empty_query", "q 不能为空")
+
+    try:
+        page, page_size = read_pagination()
+    except ValueError as exc:
+        return error_response(400, "invalid_pagination", str(exc))
+
+    sort = request.args.get("sort", "relevance").strip().lower()
+    if sort not in {"relevance", "newest", "oldest"}:
+        return error_response(400, "invalid_sort", "sort 只能是 relevance、newest 或 oldest")
+
+    escaped_query = escape_like(query)
+    exact_match = query
+    prefix_match = f"{escaped_query}%"
+    fuzzy_match = f"%{escaped_query}%"
+    offset = (page - 1) * page_size
+
+    if sort == "newest":
+        order_clause = "id DESC"
+    elif sort == "oldest":
+        order_clause = "id ASC"
+    else:
+        order_clause = "score DESC, id DESC"
+
+    conn = get_db_connection()
+    try:
+        total = conn.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM items
+            WHERE content LIKE ? ESCAPE '\\'
+            """,
+            (fuzzy_match,),
+        ).fetchone()["total"]
+
+        if sort == "relevance":
+            rows = conn.execute(
+                f"""
+                SELECT
+                    id,
+                    type,
+                    content,
+                    file_path,
+                    source,
+                    created_at,
+                    (
+                        CASE
+                            WHEN content = ? THEN 100
+                            WHEN content LIKE ? ESCAPE '\\' THEN 60
+                            WHEN content LIKE ? ESCAPE '\\' THEN 30
+                            ELSE 0
+                        END
+                        +
+                        CASE
+                            WHEN LENGTH(content) <= 20 THEN 8
+                            WHEN LENGTH(content) <= 50 THEN 4
+                            ELSE 0
+                        END
+                    ) AS score
+                FROM items
+                WHERE content LIKE ? ESCAPE '\\'
+                ORDER BY {order_clause}
+                LIMIT ? OFFSET ?
+                """,
+                (exact_match, prefix_match, fuzzy_match, fuzzy_match, page_size, offset),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"""
+                SELECT id, type, content, file_path, source, created_at
+                FROM items
+                WHERE content LIKE ? ESCAPE '\\'
+                ORDER BY {order_clause}
+                LIMIT ? OFFSET ?
+                """,
+                (fuzzy_match, page_size, offset),
+            ).fetchall()
+    finally:
+        conn.close()
+
+    total_pages = (total + page_size - 1) // page_size
+    return ok_response(
+        {
+            "query": query,
+            "sort": sort,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+            "items": [row_to_item(row, include_score=(sort == "relevance")) for row in rows],
+        }
+    )
 
 
-# ===== 启动服务 =====
+# ===== 错误处理 =====
+@app.errorhandler(HTTPException)
+def handle_http_exception(exc: HTTPException):
+    code = exc.code or 500
+    return error_response(code, exc.name.lower().replace(" ", "_"), exc.description)
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(exc: Exception):
+    logger.exception("unexpected error: %s", exc)
+    return error_response(500, "internal_error", "服务内部错误")
+
+
+init_app_storage()
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    host = os.environ.get("AXIOM_HOST", "0.0.0.0")
+    port = int(os.environ.get("AXIOM_PORT", "5000"))
+    app.run(host=host, port=port)

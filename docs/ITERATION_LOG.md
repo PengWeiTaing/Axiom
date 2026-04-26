@@ -22,3 +22,12 @@
   - Project intro
   - Iteration log
   - DeepWiki
+- 重写 `core/receiver.py` 为 v0.1 稳定基底
+- `/add` 增加唯一文件名、临时文件写入、入库失败清理
+- `/recent` 和 `/search` 统一分页边界与 JSON 错误格式
+- 新增 `/health`
+- `core/init_db.py` 改为复用 receiver 的建表逻辑
+- 新增 `scripts/check_consistency.py`
+- 新增 `scripts/smoke_test_receiver.py`
+- 新增 `requirements.txt`
+- 重写 DeepWiki 生成脚本，把 Wiki 改成 8 页结构化阅读入口

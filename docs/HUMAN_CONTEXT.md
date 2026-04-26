@@ -2,39 +2,56 @@
 
 这份文档给人看。
 
-目标不是一次性讲完全部细节，而是让你快速知道：
+主要内容已经并入 DeepWiki 主入口；这份文件现在更接近 wiki 的底稿来源。
 
-- 这个项目现在到底处在哪一步
+目标是让你快速知道：
+
+- 项目现在处在哪一步
 - 你应该先掌握什么
 - 哪些地方可以先略读
 
 ## 一句话判断
 
-Axiom 现在已经不是概念稿，但也还不是稳定服务。
-
-它当前更像一个已经打通最小链路、正在补可靠性的 `v0.1 alpha` 后端。
+Axiom 当前是已经打通最小链路、正在补可靠性的 `v0.1 alpha` 后端。
 
 ## 你先要理解的四件事
 
-- 现在的主节点是 `VPS`，不是本地设备
+- 现在的主节点是 `VPS`
 - 当前主线只有 `输入 -> 存储 -> 检索`
 - 文件是内容本体，SQLite 是索引
-- 研究报告是长远方向，不是当前任务清单
+- 研究报告是长远方向，短期开发看 `docs/SHORT_TERM.md`
+
+## 当前状态图
+
+```mermaid
+flowchart TD
+    A["人或快捷指令输入"] --> B["VPS receiver"]
+    B --> C["txt 文件"]
+    B --> D["SQLite 索引"]
+    D --> E["最近记录"]
+    D --> F["关键词检索"]
+    C --> G["备份"]
+    D --> G
+```
 
 ## 需要完全掌握的位置
 
-下面这些位置，如果你准备继续开发，建议完整理解：
-
 1. `core/receiver.py`
    需要掌握：
-   `INBOX_PATH`、`DB_PATH`、`SECRET_KEY`、`init_db()`、`check_key()`、`add_note()`、`recent_items()`、`search_items()`
+   `AXIOM_ROOT`、`INBOX_PATH`、`DB_PATH`、`SECRET_KEY`、`init_db()`、`write_text_file_atomic()`、`insert_text_item()`、`add_note()`、`recent_items()`、`search_items()`
 2. `core/init_db.py`
    需要掌握：
-   当前 `items` 表结构，以及它和 `receiver.py` 中建表逻辑的重复关系
+   它如何复用 `receiver.py` 中的 `init_db()`
 3. `scripts/backup_axiom.py`
    需要掌握：
    备份范围、SQLite backup API、zip 输出、`--keep`、`--dry-run`
-4. `docs/SHORT_TERM.md`
+4. `scripts/check_consistency.py`
+   需要掌握：
+   如何检查 DB 记录缺文件、inbox 孤立 txt、缺失 file_path 的记录，以及 `/opt/axiom/...` 到本地 `--root` 的映射
+5. `scripts/smoke_test_receiver.py`
+   需要掌握：
+   如何用临时目录验证 receiver 的主链路
+6. `docs/SHORT_TERM.md`
    需要掌握：
    当前阶段边界、近期优先级、下一步顺序
 
@@ -52,13 +69,15 @@ Axiom 现在已经不是概念稿，但也还不是稳定服务。
 1. `README.md`
 2. `docs/SHORT_TERM.md`
 3. `core/receiver.py`
-4. `scripts/backup_axiom.py`
-5. `deep-research-report.md`
+4. `scripts/smoke_test_receiver.py`
+5. `scripts/check_consistency.py`
+6. `scripts/backup_axiom.py`
+7. `deep-research-report.md`
 
 ## 当前真正的核心问题
 
-当前最需要持续盯住的不是“还能加什么功能”，而是：
+当前最需要持续盯住的是：
 
-- 服务如何稳定启动
-- 文件和数据库如何保持一致
-- 备份如何在 VPS 上真正形成固定流程
+- 服务如何在 VPS 上稳定启动
+- 文件和数据库如何检查一致性
+- 备份如何在 VPS 上形成固定流程
