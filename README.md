@@ -69,6 +69,8 @@ iPhone
 - `scripts/check_consistency.py`：检查 inbox 文件和 SQLite 索引是否一致
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
 - `scripts/generate_deepwiki_cache.py`：本地 DeepWiki 缓存生成脚本
+- `deploy/axiom-receiver.service`：VPS 上的 systemd 服务模板
+- `.env.example`：环境变量示例，不包含真实 key
 - `requirements.txt`：当前 Python 运行依赖
 
 ## 本地验证
@@ -80,6 +82,36 @@ python scripts\check_consistency.py --root .
 ```
 
 `check_consistency.py` 默认会把数据库里的 `/opt/axiom/...` 路径映射到传入的 `--root` 下，方便本地检查从 VPS 拉下来的数据。
+
+## VPS 运行模板
+
+在 VPS 的 `/opt/axiom` 目录下准备 Python 环境：
+
+```bash
+cd /opt/axiom
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+编辑 `/opt/axiom/.env`，把 `AXIOM_SECRET_KEY` 改成真实 key。
+
+安装 systemd 服务模板：
+
+```bash
+sudo cp deploy/axiom-receiver.service /etc/systemd/system/axiom-receiver.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now axiom-receiver
+```
+
+常用检查命令：
+
+```bash
+systemctl status axiom-receiver --no-pager
+journalctl -u axiom-receiver -f
+curl http://127.0.0.1:5000/health
+```
 
 ## 文档结构
 

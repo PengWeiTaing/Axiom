@@ -1,0 +1,16 @@
+[Unit]
+Description=Axiom Flask receiver
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/axiom
+EnvironmentFile=/opt/axiom/.env
+ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/core/receiver.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

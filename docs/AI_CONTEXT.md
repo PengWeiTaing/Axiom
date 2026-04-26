@@ -25,6 +25,8 @@ scripts/
   check_consistency.py
   generate_deepwiki_cache.py
   smoke_test_receiver.py
+deploy/
+  axiom-receiver.service
 docs/
   AI_CONTEXT.md
   HUMAN_CONTEXT.md
@@ -34,6 +36,7 @@ docs/
 deep-research-report.md
 README.md
 requirements.txt
+.env.example
 ```
 
 部署运行时还会存在：
@@ -57,6 +60,8 @@ backup/
 - `scripts/check_consistency.py` 默认把 DB 中 `/opt/axiom/...` 映射到传入的 `--root`
 - `scripts/smoke_test_receiver.py` 可做本地冒烟测试
 - `scripts/generate_deepwiki_cache.py` 用于生成本地中文 DeepWiki 缓存
+- `deploy/axiom-receiver.service` 是 VPS systemd 服务模板
+- `.env.example` 是环境变量示例，真实 `.env` 不进仓库
 
 ## 当前 receiver 行为
 
@@ -98,6 +103,7 @@ flowchart TD
 - 备份脚本在 VPS 上可执行
 - 文件和数据库一致性可检查
 - 正式启动方式可复现
+- systemd 服务模板在 VPS 上验证通过
 
 第二优先级：
 

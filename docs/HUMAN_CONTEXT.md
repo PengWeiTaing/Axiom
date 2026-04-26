@@ -51,7 +51,10 @@ flowchart TD
 5. `scripts/smoke_test_receiver.py`
    需要掌握：
    如何用临时目录验证 receiver 的主链路
-6. `docs/SHORT_TERM.md`
+6. `deploy/axiom-receiver.service` 和 `.env.example`
+   需要掌握：
+   receiver 在 VPS 上如何启动，环境变量从哪里来
+7. `docs/SHORT_TERM.md`
    需要掌握：
    当前阶段边界、近期优先级、下一步顺序
 
@@ -72,7 +75,8 @@ flowchart TD
 4. `scripts/smoke_test_receiver.py`
 5. `scripts/check_consistency.py`
 6. `scripts/backup_axiom.py`
-7. `deep-research-report.md`
+7. `deploy/axiom-receiver.service`
+8. `deep-research-report.md`
 
 ## 当前真正的核心问题
 

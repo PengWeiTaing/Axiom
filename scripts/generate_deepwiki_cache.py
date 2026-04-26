@@ -269,6 +269,8 @@ python scripts\\check_consistency.py --root . --json
         "05 运维：怎么验证、备份、刷新 Wiki",
         [
             "requirements.txt",
+            ".env.example",
+            "deploy/axiom-receiver.service",
             "scripts/smoke_test_receiver.py",
             "scripts/backup_axiom.py",
             "scripts/check_consistency.py",
@@ -292,6 +294,36 @@ python scripts\\check_consistency.py --root . --json
 pip install -r requirements.txt
 python -m py_compile core\\receiver.py core\\init_db.py scripts\\smoke_test_receiver.py scripts\\backup_axiom.py scripts\\check_consistency.py scripts\\generate_deepwiki_cache.py
 python scripts\\smoke_test_receiver.py
+```
+
+## VPS systemd 运行
+
+在 VPS 的 `/opt/axiom` 下准备虚拟环境和环境变量：
+
+```bash
+cd /opt/axiom
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+`/opt/axiom/.env` 里必须设置真实的 `AXIOM_SECRET_KEY`。`.env.example` 只放可公开模板。
+
+安装并启动服务：
+
+```bash
+sudo cp deploy/axiom-receiver.service /etc/systemd/system/axiom-receiver.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now axiom-receiver
+```
+
+检查服务：
+
+```bash
+systemctl status axiom-receiver --no-pager
+journalctl -u axiom-receiver -f
+curl http://127.0.0.1:5000/health
 ```
 
 ## 一致性检查
@@ -326,6 +358,10 @@ python scripts\\generate_deepwiki_cache.py
 
 ## 关键脚本证据
 
+{snippet(".env.example", 1, 20, "text")}
+
+{snippet("deploy/axiom-receiver.service", 1, 40, "ini")}
+
 {snippet("scripts/smoke_test_receiver.py", 25, 102)}
 
 {snippet("scripts/backup_axiom.py", 122, 208)}
@@ -344,6 +380,8 @@ python scripts\\generate_deepwiki_cache.py
             "scripts/check_consistency.py",
             "scripts/smoke_test_receiver.py",
             "scripts/generate_deepwiki_cache.py",
+            "deploy/axiom-receiver.service",
+            ".env.example",
         ],
         [
             "page-api",
@@ -366,6 +404,8 @@ python scripts\\generate_deepwiki_cache.py
 | `scripts/check_consistency.py` | 检查文件和 DB 是否同步 | 数据诊断、恢复演练前检查 |
 | `scripts/smoke_test_receiver.py` | 本地跑主链路测试 | 改 receiver 后验证 |
 | `scripts/generate_deepwiki_cache.py` | 生成本地 DeepWiki 缓存 | 改 wiki 内容和结构 |
+| `deploy/axiom-receiver.service` | systemd 服务模板 | VPS 启动、重启、查看日志 |
+| `.env.example` | 环境变量模板 | 新部署时创建真实 `.env` |
 
 ## receiver 修改地图
 
@@ -421,7 +461,7 @@ python scripts\\generate_deepwiki_cache.py
 
 | 风险 | 当前状态 | 下一步 |
 | --- | --- | --- |
-| 正式启动方式 | 仓库里还没有固化 | 补 systemd 或启动说明 |
+| 正式启动方式 | 已有 systemd 模板 | 在 VPS 上真实启用 |
 | 数据一致性 | 已有检查脚本 | 在 VPS 上跑真实数据 |
 | 备份闭环 | 已有备份脚本 | 做真实备份和恢复演练 |
 | 日志 | 目前主要输出到控制台 | 补最小日志落盘 |

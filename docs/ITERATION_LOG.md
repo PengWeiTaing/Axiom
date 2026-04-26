@@ -31,3 +31,5 @@
 - 新增 `scripts/smoke_test_receiver.py`
 - 新增 `requirements.txt`
 - 重写 DeepWiki 生成脚本，把 Wiki 改成 8 页结构化阅读入口
+- 新增 `.env.example` 和 `deploy/axiom-receiver.service`
+- README 和 DeepWiki 补充 VPS systemd 运行闭环
