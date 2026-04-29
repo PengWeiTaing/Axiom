@@ -111,3 +111,9 @@
 - days-offset 会同时影响时间窗口计算与默认输出文件名
 - 本地已验证 offset 后锚点会落到 `2026-04-29`，且保存路径同步变为 `2026-04-29.md`
 - VPS 已验证 `--days-offset -1` 可生成昨天的 daily review，并成功写入 `/tmp/axiom_daily_yesterday.md`
+- 新增 `deploy/axiom-daily-review.service` / `.timer`
+- 新增 `deploy/axiom-weekly-review.service` / `.timer`
+- daily timer 使用 `--window day --days-offset -1`，计划在每天 `16:10 UTC` 运行，对应北京时间次日 `00:10`
+- weekly timer 使用 `--window week --days-offset -1`，计划在每周日 `16:20 UTC` 运行，对应北京时间周一 `00:20`
+- VPS 已启用 `axiom-daily-review.timer` 与 `axiom-weekly-review.timer`
+- 手动触发 service 后，VPS 已生成 `2026-04-28` 的 daily / weekly 快照文件，当前因生产数据尚无该窗口内容，所以结果为空底稿

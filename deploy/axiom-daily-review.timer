@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Axiom daily review snapshot
+
+[Timer]
+OnCalendar=*-*-* 16:10:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=axiom-daily-review.service
+
+[Install]
+WantedBy=timers.target

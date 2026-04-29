@@ -1,0 +1,8 @@
+[Unit]
+Description=Axiom daily review snapshot
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/axiom
+EnvironmentFile=/opt/axiom/.env
+ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/save_review_snapshot.py --root /opt/axiom --window day --days-offset -1 --utc-offset +08:00 --force
