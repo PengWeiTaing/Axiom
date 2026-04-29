@@ -125,3 +125,11 @@
 - inbox processing timer 计划在每天 `15:50 UTC` 运行，对应北京时间 `23:50`
 - VPS 已启用 `axiom-inbox-processing.timer`
 - VPS 已验证真实处理报告：当前生产数据中，图片 `id=5` 被识别为 `补描述`，文本 `id=4` 被识别为 `继续保留`
+- 新增 `scripts/apply_inbox_actions.py`，把 inbox 处理报告推进到“可执行但默认安全”的半自动阶段
+- `apply_inbox_actions.py` 默认只做 dry-run，并且默认只执行 `归档候选`
+- 若要把 `补描述后归档` 也纳入执行范围，需要显式加 `--include-describe-then-archive`
+- 若要真正改动文件和数据库，需要显式加 `--apply`
+- 新增 `scripts/smoke_test_inbox_processing.py`，覆盖处理报告、dry-run、真执行、归档落盘、数据库路径更新和一致性检查
+- 本地已验证：`归档候选` 与 `补描述后归档` 的筛选范围符合预期，执行后文件会进入 `data/archive/YYYYMM/`，数据库 `items.file_path` 同步更新
+- 本地已验证：执行后重新生成 inbox 处理报告时，已归档条目会从 inbox 报告中消失，一致性检查继续通过
+- VPS 已部署 `apply_inbox_actions.py`，并完成生产 dry-run：当前 `2026-04-29` 的真实数据命中 `0` 个可执行动作
