@@ -87,8 +87,14 @@ def build_execution_entries(
 ) -> list[ExecutionEntry]:
     entries: list[ExecutionEntry] = []
     now = datetime.now(timezone.utc)
+    only_ids = set(args.only_ids or [])
+    exclude_ids = set(args.exclude_ids or [])
 
     for item in items:
+        if only_ids and item.item_id not in only_ids:
+            continue
+        if item.item_id in exclude_ids:
+            continue
         if not should_execute_action(item.action, args.include_describe_then_archive):
             continue
 
@@ -193,6 +199,8 @@ def build_markdown(args: argparse.Namespace, entries: list[ExecutionEntry]) -> s
         f"- days_offset: {args.days_offset}",
         f"- stale_days: {args.stale_days}",
         f"- include_describe_then_archive: {args.include_describe_then_archive}",
+        f"- only_ids: {args.only_ids or 'None'}",
+        f"- exclude_ids: {args.exclude_ids or 'None'}",
         f"- total_candidates: {len(entries)}",
         "- by_status: " + (", ".join(f"{key}={value}" for key, value in sorted(status_counts.items())) or "None"),
         "",
@@ -285,6 +293,20 @@ def parse_args() -> argparse.Namespace:
         help="Also execute items tagged as 补描述后归档.",
     )
     parser.add_argument(
+        "--only-id",
+        dest="only_ids",
+        action="append",
+        type=int,
+        help="Only execute the selected item id. Repeat this flag for multiple ids.",
+    )
+    parser.add_argument(
+        "--exclude-id",
+        dest="exclude_ids",
+        action="append",
+        type=int,
+        help="Skip the selected item id. Repeat this flag for multiple ids.",
+    )
+    parser.add_argument(
         "--apply",
         action="store_true",
         help="Really apply archive actions. Default is dry-run.",
@@ -300,6 +322,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--limit must be greater than 0")
     if args.stale_days <= 0:
         parser.error("--stale-days must be greater than 0")
+    if args.only_ids and any(item_id <= 0 for item_id in args.only_ids):
+        parser.error("--only-id must be greater than 0")
+    if args.exclude_ids and any(item_id <= 0 for item_id in args.exclude_ids):
+        parser.error("--exclude-id must be greater than 0")
 
     local_tz = report_tools.review_tools.parse_utc_offset(args.utc_offset)
     report_date = report_tools.review_tools.parse_anchor_date(args.date, local_tz)

@@ -133,3 +133,5 @@
 - 本地已验证：`归档候选` 与 `补描述后归档` 的筛选范围符合预期，执行后文件会进入 `data/archive/YYYYMM/`，数据库 `items.file_path` 同步更新
 - 本地已验证：执行后重新生成 inbox 处理报告时，已归档条目会从 inbox 报告中消失，一致性检查继续通过
 - VPS 已部署 `apply_inbox_actions.py`，并完成生产 dry-run：当前 `2026-04-29` 的真实数据命中 `0` 个可执行动作
+- `apply_inbox_actions.py` 新增 `--only-id` / `--exclude-id`，可按 item id 精确挑选或跳过候选条目
+- VPS 已用模拟日期 `2026-05-03` 完成只读 dry-run，验证 `--include-describe-then-archive --only-id 5` 会单独命中图片 `id=5`

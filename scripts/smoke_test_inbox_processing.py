@@ -193,6 +193,29 @@ def main() -> None:
         assert_contains(dry_run_with_image_output, "- total_candidates: 2", "dry run include count")
         assert_contains(dry_run_with_image_output, f"[item {stale_image_id}]", "dry run include image")
 
+        dry_run_only_image_output = run_command(
+            [
+                sys.executable,
+                "scripts/apply_inbox_actions.py",
+                "--root",
+                str(root),
+                "--date",
+                "2026-04-29",
+                "--utc-offset",
+                "+08:00",
+                "--stale-days",
+                "3",
+                "--include-describe-then-archive",
+                "--only-id",
+                str(stale_image_id),
+            ]
+        )
+        assert_contains(dry_run_only_image_output, f"- only_ids: [{stale_image_id}]", "only id header")
+        assert_contains(dry_run_only_image_output, "- total_candidates: 1", "only id count")
+        assert_contains(dry_run_only_image_output, f"[item {stale_image_id}]", "only id image")
+        if f"[item {stale_text_id}]" in dry_run_only_image_output:
+            raise AssertionError("only-id run should exclude other candidates")
+
         apply_output = run_command(
             [
                 sys.executable,
