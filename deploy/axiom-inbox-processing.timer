@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Axiom inbox processing snapshot
+
+[Timer]
+OnCalendar=*-*-* 15:50:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=axiom-inbox-processing.service
+
+[Install]
+WantedBy=timers.target

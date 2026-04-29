@@ -117,3 +117,11 @@
 - weekly timer 使用 `--window week --days-offset -1`，计划在每周日 `16:20 UTC` 运行，对应北京时间周一 `00:20`
 - VPS 已启用 `axiom-daily-review.timer` 与 `axiom-weekly-review.timer`
 - 手动触发 service 后，VPS 已生成 `2026-04-28` 的 daily / weekly 快照文件，当前因生产数据尚无该窗口内容，所以结果为空底稿
+- 新增 `scripts/build_inbox_processing_report.py`，生成规则化 inbox 处理报告
+- inbox 处理规则当前包括：`补描述后归档`、`补描述`、`归档候选`、`继续保留`
+- 图片如果只有文件名或日期时间型弱描述，也会被判定为需要补描述
+- 新增 `scripts/save_inbox_processing_snapshot.py`，可将 inbox 处理报告保存到 `data/reviews/inbox/<year>/<date>.md`
+- 新增 `deploy/axiom-inbox-processing.service` / `.timer`
+- inbox processing timer 计划在每天 `15:50 UTC` 运行，对应北京时间 `23:50`
+- VPS 已启用 `axiom-inbox-processing.timer`
+- VPS 已验证真实处理报告：当前生产数据中，图片 `id=5` 被识别为 `补描述`，文本 `id=4` 被识别为 `继续保留`

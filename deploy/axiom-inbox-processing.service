@@ -1,0 +1,8 @@
+[Unit]
+Description=Axiom inbox processing snapshot
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/axiom
+EnvironmentFile=/opt/axiom/.env
+ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/save_inbox_processing_snapshot.py --root /opt/axiom --utc-offset +08:00 --stale-days 3 --force
