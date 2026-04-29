@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-生成 Axiom 的日回顾/周回顾 Markdown 底稿。
+生成 Axiom 的日回顾 / 周回顾 Markdown 底稿。
 当前阶段只做时间窗口计算、汇总和分组展示，不接 AI。
 """
 
@@ -36,6 +36,7 @@ def parse_utc_offset(value: str) -> timezone:
 
     if sample.tzinfo is None:
         raise ValueError("utc-offset 必须带时区偏移")
+
     return sample.tzinfo
 
 
@@ -47,6 +48,10 @@ def parse_anchor_date(value: str | None, local_tz: timezone) -> date:
         return date.fromisoformat(value)
     except ValueError as exc:
         raise ValueError("date 必须是 YYYY-MM-DD") from exc
+
+
+def apply_days_offset(anchor_date: date, days_offset: int) -> date:
+    return anchor_date + timedelta(days=days_offset)
 
 
 def build_window(
@@ -102,7 +107,12 @@ def build_markdown(
         local_created_at = to_local_datetime(row["created_at"], local_tz)
         day_key = local_created_at.date().isoformat()
         grouped_rows.setdefault(day_key, []).append((local_created_at, row))
-        resolved_path = export_tools.resolve_file_path(args.root, row["file_path"], args.deploy_root)
+
+        resolved_path = export_tools.resolve_file_path(
+            args.root,
+            row["file_path"],
+            args.deploy_root,
+        )
         storage = export_tools.detect_storage(args.root, resolved_path) or "unknown"
         storage_counter[storage] += 1
 
@@ -113,6 +123,7 @@ def build_markdown(
         f"- window: {args.window}",
         f"- local_timezone: {args.utc_offset}",
         f"- anchor_date: {args.date}",
+        f"- days_offset: {args.days_offset}",
         f"- local_range: {start_local.isoformat()} -> {end_local.isoformat()}",
         f"- utc_range: {args.created_from} -> {args.created_to}",
         f"- total: {len(rows)}",
@@ -148,7 +159,11 @@ def build_markdown(
         )
 
         for index, (local_created_at, row) in enumerate(day_rows, start=1):
-            resolved_path = export_tools.resolve_file_path(args.root, row["file_path"], args.deploy_root)
+            resolved_path = export_tools.resolve_file_path(
+                args.root,
+                row["file_path"],
+                args.deploy_root,
+            )
             storage = export_tools.detect_storage(args.root, resolved_path) or "unknown"
             file_size = resolved_path.stat().st_size if resolved_path and resolved_path.exists() else None
             content = (row["content"] or "").strip() or "_空_"
@@ -201,6 +216,12 @@ def parse_args() -> argparse.Namespace:
         help="Anchor local date in YYYY-MM-DD. Defaults to today in the chosen timezone.",
     )
     parser.add_argument(
+        "--days-offset",
+        type=int,
+        default=0,
+        help="Shift the anchor date by N days. Example: -1 means yesterday.",
+    )
+    parser.add_argument(
         "--utc-offset",
         default="+08:00",
         help="Local timezone offset, default +08:00.",
@@ -237,6 +258,7 @@ def parse_args() -> argparse.Namespace:
 
     local_tz = parse_utc_offset(args.utc_offset)
     anchor_date = parse_anchor_date(args.date, local_tz)
+    anchor_date = apply_days_offset(anchor_date, args.days_offset)
     start_local, end_local = build_window(args.window, anchor_date, local_tz)
 
     args.date = anchor_date.isoformat()

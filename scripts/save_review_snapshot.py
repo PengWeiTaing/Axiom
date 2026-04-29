@@ -51,6 +51,12 @@ def parse_args() -> argparse.Namespace:
         help="Anchor local date in YYYY-MM-DD. Defaults to today in the chosen timezone.",
     )
     parser.add_argument(
+        "--days-offset",
+        type=int,
+        default=0,
+        help="Shift the anchor date by N days. Example: -1 means yesterday.",
+    )
+    parser.add_argument(
         "--utc-offset",
         default="+08:00",
         help="Local timezone offset, default +08:00.",
@@ -92,6 +98,7 @@ def parse_args() -> argparse.Namespace:
 
     local_tz = review_tools.parse_utc_offset(args.utc_offset)
     anchor_date = review_tools.parse_anchor_date(args.date, local_tz)
+    anchor_date = review_tools.apply_days_offset(anchor_date, args.days_offset)
     start_local, end_local = review_tools.build_window(args.window, anchor_date, local_tz)
 
     args.date = anchor_date.isoformat()

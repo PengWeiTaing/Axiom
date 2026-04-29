@@ -106,3 +106,8 @@
 - 保存脚本默认不覆盖已有文件，需显式加 `--force` 才会重写
 - 本地已验证 review snapshot 的默认落盘路径与重复写入拦截
 - VPS 已真实生成 `/opt/axiom/data/reviews/daily/2026/2026-04-29.md` 与 `/opt/axiom/data/reviews/weekly/2026/2026-04-29.md`
+- `build_review_markdown.py` 与 `save_review_snapshot.py` 新增 `--days-offset`
+- 可通过 `--date 2026-04-30 --days-offset -1` 这类组合显式生成“昨天”的回顾
+- days-offset 会同时影响时间窗口计算与默认输出文件名
+- 本地已验证 offset 后锚点会落到 `2026-04-29`，且保存路径同步变为 `2026-04-29.md`
+- VPS 已验证 `--days-offset -1` 可生成昨天的 daily review，并成功写入 `/tmp/axiom_daily_yesterday.md`
