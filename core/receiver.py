@@ -220,10 +220,62 @@ def read_source_filter() -> str | None:
     return source or None
 
 
+def parse_datetime_filter(
+    value: str,
+    field_name: str,
+    *,
+    end_of_day: bool = False,
+) -> str:
+    text = value.strip()
+    if not text:
+        raise ValueError(f"{field_name} 不能为空")
+
+    try:
+        if len(text) == 10:
+            dt = datetime.fromisoformat(text)
+            if end_of_day:
+                dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field_name} 必须是 ISO 时间或 YYYY-MM-DD") from exc
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def read_created_range() -> tuple[str | None, str | None]:
+    created_from_value = request.args.get("created_from", "").strip()
+    created_to_value = request.args.get("created_to", "").strip()
+
+    created_from = None
+    if created_from_value:
+        created_from = parse_datetime_filter(created_from_value, "created_from")
+
+    created_to = None
+    if created_to_value:
+        created_to = parse_datetime_filter(
+            created_to_value,
+            "created_to",
+            end_of_day=(len(created_to_value) == 10),
+        )
+
+    if created_from and created_to and created_from > created_to:
+        raise ValueError("created_from 不能晚于 created_to")
+
+    return created_from, created_to
+
+
 def build_item_filter_conditions(
     item_type: str | None,
     storage: str | None,
     source: str | None,
+    created_from: str | None,
+    created_to: str | None,
 ) -> tuple[list[str], list[str]]:
     conditions: list[str] = []
     params: list[str] = []
@@ -240,6 +292,14 @@ def build_item_filter_conditions(
     if source:
         conditions.append("source = ?")
         params.append(source)
+
+    if created_from:
+        conditions.append("created_at >= ?")
+        params.append(created_from)
+
+    if created_to:
+        conditions.append("created_at <= ?")
+        params.append(created_to)
 
     return conditions, params
 
@@ -789,11 +849,18 @@ def recent_items():
     except ValueError as exc:
         return error_response(400, "invalid_storage", str(exc))
 
+    try:
+        created_from, created_to = read_created_range()
+    except ValueError as exc:
+        return error_response(400, "invalid_created_range", str(exc))
+
     source = read_source_filter()
     filter_conditions, filter_params = build_item_filter_conditions(
         item_type,
         storage,
         source,
+        created_from,
+        created_to,
     )
     where_clause = join_conditions(filter_conditions, "WHERE")
 
@@ -826,6 +893,8 @@ def recent_items():
             "type": item_type,
             "storage": storage,
             "source": source,
+            "created_from": created_from,
+            "created_to": created_to,
             "page": page,
             "page_size": page_size,
             "total": total,
@@ -864,6 +933,11 @@ def search_items():
     except ValueError as exc:
         return error_response(400, "invalid_storage", str(exc))
 
+    try:
+        created_from, created_to = read_created_range()
+    except ValueError as exc:
+        return error_response(400, "invalid_created_range", str(exc))
+
     source = read_source_filter()
     escaped_query = escape_like(query)
     exact_match = query
@@ -882,6 +956,8 @@ def search_items():
         item_type,
         storage,
         source,
+        created_from,
+        created_to,
     )
     filter_clause = join_conditions(filter_conditions, "AND")
 
@@ -960,6 +1036,8 @@ def search_items():
             "type": item_type,
             "storage": storage,
             "source": source,
+            "created_from": created_from,
+            "created_to": created_to,
             "page": page,
             "page_size": page_size,
             "total": total,

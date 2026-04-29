@@ -84,3 +84,8 @@
 - VPS 已验证真实文本 `id=4` 从 archive 恢复到 inbox，并可继续通过 `/file/4` 与 `/item/4` 访问
 - VPS 当前存储分布更新为 `inbox=2`、`archive=0`
 - VPS 生产一致性检查通过：`db_file_count=2`，`inbox_file_count=2`，`archive_file_count=0`
+- `/recent` 与 `/search` 新增 `created_from` / `created_to` 时间范围过滤，支持 ISO 时间与 `YYYY-MM-DD`
+- 时间范围过滤统一基于现有 `created_at` 字段，不新增表结构
+- 非法时间范围返回 `400 invalid_created_range`
+- 本地与 VPS 冒烟测试均覆盖时间过滤与非法区间校验
+- VPS 已验证真实数据的时间窗口查询：可分别按 `created_to=2026-04-29T04:12:13+00:00` 与 `created_from=2026-04-29T05:27:01+00:00` 命中单条记录
