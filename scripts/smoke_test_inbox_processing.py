@@ -154,6 +154,9 @@ def main() -> None:
         assert_contains(report_output, "补描述=1", "report summary")
         assert_contains(report_output, "继续保留=1", "report summary")
         assert_contains(report_output, "检查空内容=1", "report summary")
+        assert_contains(report_output, "scripts/apply_inbox_actions.py", "report command section")
+        assert_contains(report_output, f"--only-id {stale_text_id}", "report command stale text")
+        assert_contains(report_output, f"--only-id {stale_image_id}", "report command stale image")
 
         dry_run_output = run_command(
             [

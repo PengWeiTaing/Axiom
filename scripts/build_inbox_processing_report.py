@@ -156,6 +156,40 @@ def build_processing_items(args: argparse.Namespace, rows: list) -> list[Process
     return items
 
 
+def build_apply_command(
+    args: argparse.Namespace,
+    *,
+    apply: bool,
+    include_describe_then_archive: bool = False,
+    only_ids: list[int] | None = None,
+) -> str:
+    command_parts = [
+        "python",
+        "scripts/apply_inbox_actions.py",
+        "--date",
+        args.date,
+        "--utc-offset",
+        args.utc_offset,
+        "--stale-days",
+        str(args.stale_days),
+    ]
+
+    if args.item_type:
+        command_parts.extend(["--type", args.item_type])
+    if args.source:
+        command_parts.extend(["--source", args.source])
+    if args.limit:
+        command_parts.extend(["--limit", str(args.limit)])
+    if include_describe_then_archive:
+        command_parts.append("--include-describe-then-archive")
+    for item_id in only_ids or []:
+        command_parts.extend(["--only-id", str(item_id)])
+    if apply:
+        command_parts.append("--apply")
+
+    return " ".join(command_parts)
+
+
 def build_markdown(args: argparse.Namespace, items: list[ProcessingItem]) -> str:
     generated_at = datetime.now(timezone.utc).isoformat()
     action_counter = Counter(item.action for item in items)
@@ -165,6 +199,9 @@ def build_markdown(args: argparse.Namespace, items: list[ProcessingItem]) -> str
     grouped: dict[str, list[ProcessingItem]] = {}
     for item in items:
         grouped.setdefault(item.action, []).append(item)
+
+    archive_candidate_ids = [item.item_id for item in grouped.get("归档候选", [])]
+    describe_then_archive_ids = [item.item_id for item in grouped.get("补描述后归档", [])]
 
     lines: list[str] = [
         "# Axiom Inbox 处理报告",
@@ -221,6 +258,44 @@ def build_markdown(args: argparse.Namespace, items: list[ProcessingItem]) -> str
                 ]
             )
 
+    lines.extend(
+        [
+            "## 建议命令",
+            "",
+            "- 先做安全预览：",
+            f"  `{build_apply_command(args, apply=False)}`",
+        ]
+    )
+
+    if archive_candidate_ids:
+        lines.extend(
+            [
+                "- 预览当前全部归档候选：",
+                f"  `{build_apply_command(args, apply=False, only_ids=archive_candidate_ids)}`",
+                "- 真正执行当前全部归档候选：",
+                f"  `{build_apply_command(args, apply=True)}`",
+            ]
+        )
+
+    if describe_then_archive_ids:
+        lines.extend(
+            [
+                "- 若确认“补描述后归档”也可直接归档，先预览：",
+                f"  `{build_apply_command(args, apply=False, include_describe_then_archive=True, only_ids=describe_then_archive_ids)}`",
+            ]
+        )
+
+    selected_ids = archive_candidate_ids + describe_then_archive_ids
+    if selected_ids:
+        only_id_parts = " ".join(f"--only-id {item_id}" for item_id in selected_ids)
+        lines.extend(
+            [
+                "- 若只想处理其中几个 item，可按 id 组合：",
+                f"  `python scripts/apply_inbox_actions.py --date {args.date} --utc-offset {args.utc_offset} --stale-days {args.stale_days} {only_id_parts}`",
+            ]
+        )
+
+    lines.append("")
     lines.extend(
         [
             "## 说明",
