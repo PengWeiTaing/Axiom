@@ -94,3 +94,9 @@
 - 导出脚本支持 `--output` 写入文件，也可直接输出到终端
 - 本地已验证按 `created_from` 导出临时数据窗口
 - VPS 已验证真实导出：`/opt/axiom` 当前 2 条数据可完整导出，且 `created_from=2026-04-29T05:27:01+00:00` 可只导出图片 `id=5`
+- 新增 `scripts/build_review_markdown.py`，可直接生成日回顾与周回顾 Markdown 底稿
+- 回顾脚本支持 `--window day|week`、`--date`、`--utc-offset`，并沿用现有 type、storage、source、limit 过滤
+- 周回顾当前定义为“以指定日期结尾的最近 7 个自然日”
+- 回顾脚本会按本地日期分组展示条目，并附带每日计数
+- 本地已验证跨两天数据的 weekly review 分组与时区换算
+- VPS 已验证真实 daily review 与 weekly review 输出，当前生产数据均落在 `2026-04-29` 分组下
