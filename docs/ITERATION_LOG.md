@@ -89,3 +89,8 @@
 - 非法时间范围返回 `400 invalid_created_range`
 - 本地与 VPS 冒烟测试均覆盖时间过滤与非法区间校验
 - VPS 已验证真实数据的时间窗口查询：可分别按 `created_to=2026-04-29T04:12:13+00:00` 与 `created_from=2026-04-29T05:27:01+00:00` 命中单条记录
+- 新增 `scripts/export_items_markdown.py`，可按时间窗口、type、storage、source 导出 Markdown
+- 导出脚本默认按时间正序输出，适合作为日回顾或周回顾的人工阅读底稿
+- 导出脚本支持 `--output` 写入文件，也可直接输出到终端
+- 本地已验证按 `created_from` 导出临时数据窗口
+- VPS 已验证真实导出：`/opt/axiom` 当前 2 条数据可完整导出，且 `created_from=2026-04-29T05:27:01+00:00` 可只导出图片 `id=5`
