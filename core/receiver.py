@@ -328,6 +328,19 @@ def build_inbox_file_path(now: datetime, extension: str) -> Path:
     return INBOX_PATH / f"{timestamp}_{uuid4().hex[:8]}{extension}"
 
 
+def build_unique_file_path(target_dir: Path, filename: str) -> Path:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    candidate = target_dir / filename
+    source_path = Path(filename)
+    counter = 1
+
+    while candidate.exists():
+        candidate = target_dir / f"{source_path.stem}_{counter}{source_path.suffix}"
+        counter += 1
+
+    return candidate
+
+
 def build_text_file_path(now: datetime) -> Path:
     return build_inbox_file_path(now, ".txt")
 
@@ -338,15 +351,11 @@ def build_image_file_path(now: datetime, filename: str) -> Path:
 
 def build_archive_file_path(now: datetime, file_path: Path) -> Path:
     archive_dir = ARCHIVE_PATH / now.strftime("%Y%m")
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = archive_dir / file_path.name
-    counter = 1
+    return build_unique_file_path(archive_dir, file_path.name)
 
-    while archive_path.exists():
-        archive_path = archive_dir / f"{file_path.stem}_{counter}{file_path.suffix}"
-        counter += 1
 
-    return archive_path
+def build_restore_file_path(file_path: Path) -> Path:
+    return build_unique_file_path(INBOX_PATH, file_path.name)
 
 
 def write_text_file_atomic(file_path: Path, text: str) -> None:
@@ -713,6 +722,46 @@ def archive_item(item_id: int):
     updated_row = get_item_by_id(item_id)
     logger.info("archived item id=%s file=%s", item_id, archive_path.name)
     return ok_response({"message": "archived", "item": row_to_item(updated_row)})
+
+
+@app.route("/restore/<int:item_id>", methods=["POST"])
+def restore_item(item_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    row = get_item_by_id(item_id)
+    if row is None:
+        return error_response(404, "item_not_found", "item 不存在")
+
+    file_path = resolve_stored_file_path(row["file_path"])
+    if file_path is None:
+        return error_response(404, "file_not_found", "文件不存在")
+
+    if not is_path_under(file_path, AXIOM_ROOT):
+        logger.warning("blocked restore outside root: item_id=%s path=%s", item_id, file_path)
+        return error_response(403, "forbidden_file_path", "文件路径不允许访问")
+
+    if is_path_under(file_path, INBOX_PATH):
+        return ok_response({"message": "already restored", "item": row_to_item(row)})
+
+    if not is_path_under(file_path, ARCHIVE_PATH):
+        return error_response(400, "invalid_storage", "当前文件不在 archive 中")
+
+    if not file_path.is_file():
+        return error_response(404, "file_not_found", "文件不存在")
+
+    restore_path = build_restore_file_path(file_path)
+    try:
+        os.replace(file_path, restore_path)
+        update_item_file_path(item_id, restore_path)
+    except OSError:
+        logger.exception("failed to restore item: item_id=%s", item_id)
+        return error_response(500, "restore_failed", "恢复失败")
+
+    updated_row = get_item_by_id(item_id)
+    logger.info("restored item id=%s file=%s", item_id, restore_path.name)
+    return ok_response({"message": "restored", "item": row_to_item(updated_row)})
 
 
 @app.route("/recent", methods=["GET"])

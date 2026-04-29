@@ -78,3 +78,9 @@
 - VPS 已验证 `gunicorn` 仅监听 `127.0.0.1:5000`，公网仍只暴露 Nginx 的 `80/443`
 - 归档后生成真实备份 `/opt/axiom/backup/axiom_backup_20260429_060457.zip`
 - 已验证归档后备份可恢复：恢复目录中 `inbox=1`，`archive=1`，一致性检查通过
+- 新增 `/restore/<id>` 恢复接口，可将 archive 中的文件移回 inbox 并更新 `items.file_path`
+- `/restore/<id>` 对已在 inbox 的条目返回 `already restored`
+- 本地与 VPS 冒烟测试均覆盖 `archive -> restore -> file/item/recent/search/stats` 闭环
+- VPS 已验证真实文本 `id=4` 从 archive 恢复到 inbox，并可继续通过 `/file/4` 与 `/item/4` 访问
+- VPS 当前存储分布更新为 `inbox=2`、`archive=0`
+- VPS 生产一致性检查通过：`db_file_count=2`，`inbox_file_count=2`，`archive_file_count=0`
