@@ -1,0 +1,8 @@
+[Unit]
+Description=Axiom daily backup
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/axiom
+EnvironmentFile=/opt/axiom/.env
+ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/backup_axiom.py --root /opt/axiom --keep 14

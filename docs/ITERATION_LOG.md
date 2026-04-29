@@ -34,3 +34,47 @@
 - 新增 `.env.example` 和 `deploy/axiom-receiver.service`
 - README 和 DeepWiki 补充 VPS systemd 运行闭环
 - receiver 支持 `AXIOM_LOG_PATH`，VPS 可写入 `/opt/axiom/logs/receiver.log`
+
+## 2026-04-29
+
+- 将 `pengweitai.me` 和 `www.pengweitai.me` 接入 VPS 上的 Axiom receiver
+- 在 VPS 上配置 Nginx 反向代理，公网只暴露 `80/443`
+- 使用 Let's Encrypt 为主域名签发 HTTPS 证书
+- 将 receiver 改为只监听 `127.0.0.1:5000`
+- 将运行 key 从默认值切换为 `axiomnb`
+- 用 iPhone 快捷指令完成一次真实 `/add` 写入
+- VPS 一致性检查通过：`db_file_count=1`，`inbox_file_count=1`
+- 生成真实备份 `/opt/axiom/backup/axiom_backup_20260429_041507.zip`
+- 完成一次备份恢复演练：将备份解压到 `/tmp` 后再次跑一致性检查并通过
+- 新增 `deploy/axiom-backup.service` 和 `deploy/axiom-backup.timer`
+- VPS 已启用每日自动备份，当前保留最近 14 份备份
+- 手动触发 `axiom-backup.service` 成功，生成 `/opt/axiom/backup/axiom_backup_20260429_041835.zip`
+- 新增 `/upload` 图片上传接口，支持 `file` 或 `image` 表单字段
+- 图片上传沿用 `data/inbox` 文件落盘和 SQLite `items` 索引
+- 一致性检查从只检查 txt 扩展为检查 inbox 下所有入库文件
+- `.env.example` 新增 `AXIOM_MAX_UPLOAD_BYTES` 上传大小上限示例
+- 本地和 VPS 冒烟测试均覆盖图片上传
+- 新增 `/file/<id>` 文件取回接口，可按 item id 取回文本或图片文件
+- `/file/<id>` 增加 key 校验和路径边界检查，限制只能访问 `AXIOM_ROOT` 下的文件
+- VPS 已部署 `/file/<id>`，真实文本 `id=4` 和真实图片 `id=5` 均可通过 HTTPS 取回
+- VPS 生产一致性检查通过：`db_file_count=2`，`inbox_file_count=2`
+- 所有 item 返回增加 `file_url`，指向对应的 `/file/<id>`
+- 新增 `/item/<id>` 元数据接口，真实图片 `id=5` 已通过 HTTPS 验证
+- `/recent` 和 `/search` 支持 `type=text` / `type=image` 过滤
+- VPS 已验证类型过滤：文本、图片和图片范围搜索均可正常返回
+- 新增 `/stats` 统计接口，返回总数、按类型计数、按来源计数和首末写入时间
+- VPS 已验证 `/stats`：当前生产库共 2 条，`text=1`，`image=1`
+- 新增 `/archive/<id>` 归档接口，将文件从 inbox 移入 archive 并更新 `items.file_path`
+- item 返回增加 `storage` 字段，用于区分 `inbox`、`archive` 等存储位置
+- 一致性检查扩展到 `data/archive`，可同时发现 inbox 和 archive 的孤立文件
+- VPS 已验证归档：文本 `id=4` 进入 archive 后仍可通过 `/file/4` 取回
+- `/recent` 和 `/search` 支持 `storage=inbox` / `storage=archive` 过滤
+- VPS 已验证存储区过滤：inbox 只返回未归档图片，archive 只返回已归档文本
+- `/recent` 和 `/search` 支持 `source` 过滤
+- VPS 已验证来源过滤：`source=ios_shortcut` 返回真实数据，缺失来源返回空列表
+- `/stats` 增加 `by_storage`，可查看 inbox 与 archive 的文件分布
+- VPS 已验证 `by_storage`：当前生产库 `inbox=1`，`archive=1`
+- receiver systemd 服务从 Flask 开发服务器切换为 `gunicorn`
+- VPS 已验证 `gunicorn` 仅监听 `127.0.0.1:5000`，公网仍只暴露 Nginx 的 `80/443`
+- 归档后生成真实备份 `/opt/axiom/backup/axiom_backup_20260429_060457.zip`
+- 已验证归档后备份可恢复：恢复目录中 `inbox=1`，`archive=1`，一致性检查通过

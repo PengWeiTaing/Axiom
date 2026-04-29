@@ -4,7 +4,7 @@
 
 当前检查范围：
 - 数据库 items.file_path 指向的文件是否存在
-- data/inbox 下的 txt 文件是否都有数据库记录
+- data/inbox 和 data/archive 下的文件是否都有数据库记录
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def read_db_file_paths(
             """
             SELECT id, type, file_path
             FROM items
-            WHERE type = 'text'
+            WHERE file_path IS NOT NULL AND file_path != ''
             """
         ).fetchall()
     finally:
@@ -99,14 +99,14 @@ def read_db_file_paths(
     return db_files, missing_path_rows
 
 
-def read_inbox_files(inbox_path: Path) -> set[Path]:
-    if not inbox_path.exists():
+def read_storage_files(storage_path: Path) -> set[Path]:
+    if not storage_path.exists():
         return set()
 
     return {
         path.resolve()
-        for path in inbox_path.rglob("*.txt")
-        if path.is_file()
+        for path in storage_path.rglob("*")
+        if path.is_file() and not path.name.endswith(".tmp")
     }
 
 
@@ -114,15 +114,18 @@ def build_report(root: Path, deploy_root: str = DEFAULT_DEPLOY_ROOT) -> dict:
     root = root.resolve()
     db_path = root / "db" / "axiom.db"
     inbox_path = root / "data" / "inbox"
+    archive_path = root / "data" / "archive"
 
     db_files, missing_path_rows = read_db_file_paths(db_path, root, deploy_root)
-    inbox_files = read_inbox_files(inbox_path)
+    inbox_files = read_storage_files(inbox_path)
+    archive_files = read_storage_files(archive_path)
+    storage_files = inbox_files | archive_files
 
     missing_files = sorted(
         str(path) for path in db_files if not path.exists()
     )
     orphan_files = sorted(
-        str(path) for path in inbox_files if path not in db_files
+        str(path) for path in storage_files if path not in db_files
     )
 
     return {
@@ -130,9 +133,12 @@ def build_report(root: Path, deploy_root: str = DEFAULT_DEPLOY_ROOT) -> dict:
         "root": str(root),
         "db_path": str(db_path),
         "inbox_path": str(inbox_path),
+        "archive_path": str(archive_path),
         "deploy_root": deploy_root,
         "db_file_count": len(db_files),
         "inbox_file_count": len(inbox_files),
+        "archive_file_count": len(archive_files),
+        "storage_file_count": len(storage_files),
         "missing_files": missing_files,
         "orphan_files": orphan_files,
         "missing_path_rows": missing_path_rows,
@@ -143,7 +149,8 @@ def print_text_report(report: dict) -> None:
     print(f"Root: {report['root']}")
     print(f"Deploy root mapping: {report['deploy_root']}")
     print(f"DB files: {report['db_file_count']}")
-    print(f"Inbox txt files: {report['inbox_file_count']}")
+    print(f"Inbox files: {report['inbox_file_count']}")
+    print(f"Archive files: {report['archive_file_count']}")
 
     if report["ok"]:
         print("Consistency check passed.")
