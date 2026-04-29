@@ -4,6 +4,7 @@ __pycache__/
 db/*.db
 data/inbox/*
 data/archive/*
+data/reviews/*
 *.log
 logs/
 backup/

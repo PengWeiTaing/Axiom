@@ -100,3 +100,9 @@
 - 回顾脚本会按本地日期分组展示条目，并附带每日计数
 - 本地已验证跨两天数据的 weekly review 分组与时区换算
 - VPS 已验证真实 daily review 与 weekly review 输出，当前生产数据均落在 `2026-04-29` 分组下
+- `.gitignore` 新增 `data/reviews/*`，避免把运行期回顾产物提交到仓库
+- 新增 `scripts/save_review_snapshot.py`，可将 daily / weekly review 直接保存到 `data/reviews`
+- 默认落盘路径为 `data/reviews/daily/<year>/<date>.md` 与 `data/reviews/weekly/<year>/<date>.md`
+- 保存脚本默认不覆盖已有文件，需显式加 `--force` 才会重写
+- 本地已验证 review snapshot 的默认落盘路径与重复写入拦截
+- VPS 已真实生成 `/opt/axiom/data/reviews/daily/2026/2026-04-29.md` 与 `/opt/axiom/data/reviews/weekly/2026/2026-04-29.md`
