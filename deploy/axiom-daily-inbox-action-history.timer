@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Axiom daily inbox action history snapshot
+
+[Timer]
+OnCalendar=*-*-* 16:30:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=axiom-daily-inbox-action-history.service
+
+[Install]
+WantedBy=timers.target

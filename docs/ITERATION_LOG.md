@@ -168,3 +168,13 @@
 - VPS 已部署 action history 构建 / 保存脚本
 - VPS 已生成真实 daily history 快照：`/opt/axiom/data/reviews/inbox-action-history/daily/2026/2026-04-30.md`
 - VPS 已验证 weekly history 聚合：以 `2026-05-03` 为锚点时，可汇总出图片 `id=5` 的 `补描述后归档` dry-run 历史
+- 新增 `deploy/axiom-daily-inbox-action.service` / `.timer`，每日自动生成 inbox action dry-run 快照
+- 新增 `deploy/axiom-daily-inbox-action-history.service` / `.timer`，每日自动生成 inbox action history 汇总
+- 新增 `deploy/axiom-weekly-inbox-action-history.service` / `.timer`，每周自动生成 inbox action history 汇总
+- daily inbox action timer 计划在每天 `16:00 UTC` 运行，对应北京时间次日 `00:00`，生成“昨天”的 dry-run action 快照
+- daily inbox action history timer 计划在每天 `16:30 UTC` 运行，对应北京时间次日 `00:30`，生成“昨天”的 action history 汇总
+- weekly inbox action history timer 计划在每周日 `16:40 UTC` 运行，对应北京时间周一 `00:40`，生成以上周日为锚点的周汇总
+- VPS 已启用以上 3 个 timer，并在 `systemctl list-timers` 中可见下一次计划触发时间
+- VPS 已手动触发生成真实 dry-run action 快照：`/opt/axiom/data/reviews/inbox-actions/dry-run/2026/2026-04-29/20260430_111158_013408.md`
+- VPS 已手动触发生成真实 daily action history 快照：`/opt/axiom/data/reviews/inbox-action-history/daily/2026/2026-04-29.md`
+- VPS 已手动触发生成真实 weekly action history 快照：`/opt/axiom/data/reviews/inbox-action-history/weekly/2026/2026-04-29.md`
