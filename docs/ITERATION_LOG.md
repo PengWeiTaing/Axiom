@@ -138,3 +138,18 @@
 - `build_inbox_processing_report.py` 新增“建议命令”区块，会直接给出 route A 下一步可执行命令
 - 建议命令会根据当前报告中的候选条目，自动拼出 `--only-id`、`--include-describe-then-archive` 等参数
 - VPS 已刷新 `2026-04-29` 的 inbox 处理快照，使当前云端报告也带上了建议命令
+
+## 2026-04-30
+
+- 新增 `scripts/save_inbox_action_snapshot.py`，将 inbox 半自动执行结果标准化保存到 `data/reviews/inbox-actions`
+- inbox action 快照会按 `dry-run` / `apply` 分目录落盘，并带上报告日期与生成时间，便于回看每次处理动作
+- action 快照在原始执行报告后追加 `Post Checks`，记录当次执行后的文件 / 数据库一致性摘要
+- `apply_inbox_actions.py` 的参数解析拆为可复用结构，供执行脚本与保存脚本共用，减少后续维护分叉
+- `scripts/smoke_test_inbox_processing.py` 新增对 action 快照保存链路的覆盖，验证 dry-run / apply 快照都会落盘并携带一致性摘要
+- 本地已验证：保存脚本生成的 dry-run 与 apply 快照均可正确写入，且归档后数据库路径与一致性检查保持正确
+- VPS 已部署 `apply_inbox_actions.py` 与 `save_inbox_action_snapshot.py`
+- VPS 已生成真实 dry-run action 快照：`/opt/axiom/data/reviews/inbox-actions/dry-run/2026/2026-04-30/20260430_105602_200204.md`
+- VPS 已生成模拟日期 `2026-05-03` 的候选 action 快照：`/opt/axiom/data/reviews/inbox-actions/dry-run/2026/2026-05-03/20260430_105603_787289.md`
+- `build_inbox_processing_report.py` 的建议命令默认切换为 `save_inbox_action_snapshot.py`，优先引导走“执行并留痕”的入口
+- 本地已验证：处理报告中的建议命令区块会引用 `save_inbox_action_snapshot.py`
+- VPS 已刷新 `/opt/axiom/data/reviews/inbox/2026/2026-04-30.md`，当前云端 inbox 处理报告已默认给出带留痕的下一步命令

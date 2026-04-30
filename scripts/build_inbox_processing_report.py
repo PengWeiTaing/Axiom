@@ -156,16 +156,17 @@ def build_processing_items(args: argparse.Namespace, rows: list) -> list[Process
     return items
 
 
-def build_apply_command(
+def build_action_command(
     args: argparse.Namespace,
     *,
+    script_name: str,
     apply: bool,
     include_describe_then_archive: bool = False,
     only_ids: list[int] | None = None,
 ) -> str:
     command_parts = [
         "python",
-        "scripts/apply_inbox_actions.py",
+        f"scripts/{script_name}",
         "--date",
         args.date,
         "--utc-offset",
@@ -263,7 +264,7 @@ def build_markdown(args: argparse.Namespace, items: list[ProcessingItem]) -> str
             "## 建议命令",
             "",
             "- 先做安全预览：",
-            f"  `{build_apply_command(args, apply=False)}`",
+            f"  `{build_action_command(args, script_name='save_inbox_action_snapshot.py', apply=False)}`",
         ]
     )
 
@@ -271,9 +272,9 @@ def build_markdown(args: argparse.Namespace, items: list[ProcessingItem]) -> str
         lines.extend(
             [
                 "- 预览当前全部归档候选：",
-                f"  `{build_apply_command(args, apply=False, only_ids=archive_candidate_ids)}`",
+                f"  `{build_action_command(args, script_name='save_inbox_action_snapshot.py', apply=False, only_ids=archive_candidate_ids)}`",
                 "- 真正执行当前全部归档候选：",
-                f"  `{build_apply_command(args, apply=True)}`",
+                f"  `{build_action_command(args, script_name='save_inbox_action_snapshot.py', apply=True)}`",
             ]
         )
 
@@ -281,7 +282,7 @@ def build_markdown(args: argparse.Namespace, items: list[ProcessingItem]) -> str
         lines.extend(
             [
                 "- 若确认“补描述后归档”也可直接归档，先预览：",
-                f"  `{build_apply_command(args, apply=False, include_describe_then_archive=True, only_ids=describe_then_archive_ids)}`",
+                f"  `{build_action_command(args, script_name='save_inbox_action_snapshot.py', apply=False, include_describe_then_archive=True, only_ids=describe_then_archive_ids)}`",
             ]
         )
 
@@ -291,7 +292,7 @@ def build_markdown(args: argparse.Namespace, items: list[ProcessingItem]) -> str
         lines.extend(
             [
                 "- 若只想处理其中几个 item，可按 id 组合：",
-                f"  `python scripts/apply_inbox_actions.py --date {args.date} --utc-offset {args.utc_offset} --stale-days {args.stale_days} {only_id_parts}`",
+                f"  `python scripts/save_inbox_action_snapshot.py --date {args.date} --utc-offset {args.utc_offset} --stale-days {args.stale_days} {only_id_parts}`",
             ]
         )
 

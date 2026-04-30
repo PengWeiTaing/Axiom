@@ -236,7 +236,7 @@ def build_markdown(args: argparse.Namespace, entries: list[ExecutionEntry]) -> s
     return "\n".join(lines) + "\n"
 
 
-def parse_args() -> argparse.Namespace:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Apply safe inbox actions based on the processing report.",
     )
@@ -316,7 +316,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Write markdown report to file instead of stdout.",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def finalize_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> argparse.Namespace:
+    args.root = args.root.expanduser().resolve()
 
     if args.limit is not None and args.limit <= 0:
         parser.error("--limit must be greater than 0")
@@ -333,9 +337,15 @@ def parse_args() -> argparse.Namespace:
     report_end_local = datetime.combine(report_date, time.max, tzinfo=local_tz)
 
     args.date = report_date.isoformat()
-    args.root = args.root.expanduser().resolve()
     args.created_to = report_end_local.astimezone(timezone.utc).isoformat()
+    args.local_tz = local_tz
     return args
+
+
+def parse_args() -> argparse.Namespace:
+    parser = build_parser()
+    args = parser.parse_args()
+    return finalize_args(args, parser)
 
 
 def main() -> int:

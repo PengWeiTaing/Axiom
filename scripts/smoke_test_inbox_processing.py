@@ -33,6 +33,14 @@ def assert_contains(text: str, expected: str, label: str) -> None:
         raise AssertionError(f"{label}: expected to find {expected!r}\n{text}")
 
 
+def extract_saved_snapshot_path(output: str) -> Path:
+    prefix = "saved inbox action snapshot: "
+    for line in output.splitlines():
+        if line.startswith(prefix):
+            return Path(line[len(prefix) :].strip())
+    raise AssertionError(f"snapshot path not found in output:\n{output}")
+
+
 def init_test_root(root: Path) -> None:
     os.environ["AXIOM_ROOT"] = str(root)
     os.environ["AXIOM_SECRET_KEY"] = "test-key"
@@ -154,7 +162,7 @@ def main() -> None:
         assert_contains(report_output, "补描述=1", "report summary")
         assert_contains(report_output, "继续保留=1", "report summary")
         assert_contains(report_output, "检查空内容=1", "report summary")
-        assert_contains(report_output, "scripts/apply_inbox_actions.py", "report command section")
+        assert_contains(report_output, "scripts/save_inbox_action_snapshot.py", "report command section")
         assert_contains(report_output, f"--only-id {stale_text_id}", "report command stale text")
         assert_contains(report_output, f"--only-id {stale_image_id}", "report command stale image")
 
@@ -219,6 +227,30 @@ def main() -> None:
         if f"[item {stale_text_id}]" in dry_run_only_image_output:
             raise AssertionError("only-id run should exclude other candidates")
 
+        saved_dry_run_output = run_command(
+            [
+                sys.executable,
+                "scripts/save_inbox_action_snapshot.py",
+                "--root",
+                str(root),
+                "--date",
+                "2026-04-29",
+                "--utc-offset",
+                "+08:00",
+                "--stale-days",
+                "3",
+                "--only-id",
+                str(stale_text_id),
+            ]
+        )
+        saved_dry_run_path = extract_saved_snapshot_path(saved_dry_run_output)
+        if not saved_dry_run_path.exists():
+            raise AssertionError(f"saved dry-run snapshot missing: {saved_dry_run_path}")
+        saved_dry_run_markdown = saved_dry_run_path.read_text(encoding="utf-8")
+        assert_contains(saved_dry_run_markdown, "- mode: dry-run", "saved dry-run mode")
+        assert_contains(saved_dry_run_markdown, "## Post Checks", "saved dry-run checks")
+        assert_contains(saved_dry_run_markdown, "- consistency_ok: True", "saved dry-run consistency")
+
         apply_output = run_command(
             [
                 sys.executable,
@@ -270,10 +302,10 @@ def main() -> None:
         if f"[item {stale_text_id}]" in report_output_after_apply:
             raise AssertionError("stale text should disappear from inbox report after apply")
 
-        apply_with_image_output = run_command(
+        saved_apply_output = run_command(
             [
                 sys.executable,
-                "scripts/apply_inbox_actions.py",
+                "scripts/save_inbox_action_snapshot.py",
                 "--root",
                 str(root),
                 "--date",
@@ -283,10 +315,18 @@ def main() -> None:
                 "--stale-days",
                 "3",
                 "--include-describe-then-archive",
+                "--only-id",
+                str(stale_image_id),
                 "--apply",
             ]
         )
-        assert_contains(apply_with_image_output, f"[item {stale_image_id}]", "apply include image")
+        saved_apply_path = extract_saved_snapshot_path(saved_apply_output)
+        if not saved_apply_path.exists():
+            raise AssertionError(f"saved apply snapshot missing: {saved_apply_path}")
+        saved_apply_markdown = saved_apply_path.read_text(encoding="utf-8")
+        assert_contains(saved_apply_markdown, "- mode: apply", "saved apply mode")
+        assert_contains(saved_apply_markdown, f"[item {stale_image_id}]", "saved apply image")
+        assert_contains(saved_apply_markdown, "- consistency_ok: True", "saved apply consistency")
 
         stale_image_path = fetch_file_path(root, stale_image_id)
         if "data\\archive" not in str(stale_image_path) and "data/archive" not in str(stale_image_path):
