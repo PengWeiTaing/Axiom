@@ -430,6 +430,101 @@ def main() -> None:
             assert stats["by_storage"].get("archive", 0) == 0
             assert stats["by_storage"]["inbox"] == 3
 
+            review_daily_path = root / "data" / "reviews" / "daily" / "2026" / "2026-04-29.md"
+            review_daily_path.parent.mkdir(parents=True, exist_ok=True)
+            review_daily_path.write_text("# daily review\n", encoding="utf-8")
+
+            inbox_report_path = root / "data" / "reviews" / "inbox" / "2026" / "2026-04-29.md"
+            inbox_report_path.parent.mkdir(parents=True, exist_ok=True)
+            inbox_report_path.write_text("# inbox report\n", encoding="utf-8")
+
+            action_snapshot_path = (
+                root
+                / "data"
+                / "reviews"
+                / "inbox-actions"
+                / "dry-run"
+                / "2026"
+                / "2026-04-30"
+                / "20260430_120000_000001.md"
+            )
+            action_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            action_snapshot_path.write_text("# action snapshot\n", encoding="utf-8")
+
+            action_history_path = (
+                root
+                / "data"
+                / "reviews"
+                / "inbox-action-history"
+                / "daily"
+                / "2026"
+                / "2026-04-29.md"
+            )
+            action_history_path.parent.mkdir(parents=True, exist_ok=True)
+            action_history_path.write_text("# action history\n", encoding="utf-8")
+
+            artifacts = assert_status(
+                client.get("/artifacts", query_string={"key": "test-key", "limit": "100"}),
+                200,
+                "artifacts",
+            )
+            assert artifacts["total"] == 4
+            assert len(artifacts["items"]) == 4
+            assert all(item["file_url"].startswith("/artifacts/file/") for item in artifacts["items"])
+
+            review_artifacts = assert_status(
+                client.get(
+                    "/artifacts",
+                    query_string={
+                        "key": "test-key",
+                        "group": "review",
+                        "window": "daily",
+                    },
+                ),
+                200,
+                "review artifacts filter",
+            )
+            assert review_artifacts["group"] == "review"
+            assert review_artifacts["window"] == "daily"
+            assert review_artifacts["total"] == 1
+            assert review_artifacts["items"][0]["relative_path"] == "data/reviews/daily/2026/2026-04-29.md"
+
+            action_artifacts = assert_status(
+                client.get(
+                    "/artifacts",
+                    query_string={
+                        "key": "test-key",
+                        "group": "inbox-actions",
+                        "mode": "dry-run",
+                        "date_from": "2026-04-30",
+                        "date_to": "2026-04-30",
+                    },
+                ),
+                200,
+                "action artifact filter",
+            )
+            assert action_artifacts["group"] == "inbox-actions"
+            assert action_artifacts["mode"] == "dry-run"
+            assert action_artifacts["total"] == 1
+            assert action_artifacts["items"][0]["report_date"] == "2026-04-30"
+
+            invalid_artifact_filter = assert_status(
+                client.get(
+                    "/artifacts",
+                    query_string={"key": "test-key", "group": "unknown"},
+                ),
+                400,
+                "invalid artifact filter",
+            )
+            assert invalid_artifact_filter["ok"] is False
+            assert invalid_artifact_filter["error"]["code"] == "invalid_artifact_filter"
+
+            artifact_file = client.get(
+                "/artifacts/file/data/reviews/daily/2026/2026-04-29.md",
+                query_string={"key": "test-key"},
+            )
+            assert_file_body(artifact_file, b"# daily review", "artifact file")
+
             inbox_text_files = list((root / "data" / "inbox").glob("*.txt"))
             if len(inbox_text_files) != 2:
                 raise AssertionError(

@@ -4,8 +4,9 @@ import hmac
 import logging
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 from uuid import uuid4
 
 from flask import Flask, jsonify, request, send_file
@@ -38,6 +39,10 @@ ITEM_TYPE_IMAGE = "image"
 ITEM_TYPES = {ITEM_TYPE_TEXT, ITEM_TYPE_IMAGE}
 STORAGE_AREAS = {"inbox": INBOX_PATH, "archive": ARCHIVE_PATH}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
+REVIEWS_PATH = Path(os.environ.get("AXIOM_REVIEWS_PATH", AXIOM_ROOT / "data" / "reviews")).resolve()
+ARTIFACT_GROUPS = {"review", "inbox", "inbox-actions", "inbox-action-history"}
+ARTIFACT_WINDOWS = {"daily", "weekly"}
+ARTIFACT_MODES = {"dry-run", "apply"}
 
 
 def configure_logging() -> None:
@@ -74,6 +79,7 @@ def ensure_storage_dirs() -> None:
     """服务接收请求前，先确保本地存储目录存在。"""
     INBOX_PATH.mkdir(parents=True, exist_ok=True)
     ARCHIVE_PATH.mkdir(parents=True, exist_ok=True)
+    REVIEWS_PATH.mkdir(parents=True, exist_ok=True)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -220,6 +226,16 @@ def read_source_filter() -> str | None:
     return source or None
 
 
+def parse_date_filter(value: str, field_name: str) -> date:
+    text = value.strip()
+    if not text:
+        raise ValueError(f"{field_name} 不能为空")
+    try:
+        return date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} 必须是 YYYY-MM-DD") from exc
+
+
 def parse_datetime_filter(
     value: str,
     field_name: str,
@@ -270,6 +286,49 @@ def read_created_range() -> tuple[str | None, str | None]:
     return created_from, created_to
 
 
+def read_artifact_group_filter() -> str | None:
+    group = request.args.get("group", "").strip().lower()
+    if not group:
+        return None
+    if group not in ARTIFACT_GROUPS:
+        allowed = "、".join(sorted(ARTIFACT_GROUPS))
+        raise ValueError(f"group 只能是 {allowed}")
+    return group
+
+
+def read_artifact_window_filter() -> str | None:
+    window = request.args.get("window", "").strip().lower()
+    if not window:
+        return None
+    if window not in ARTIFACT_WINDOWS:
+        allowed = "、".join(sorted(ARTIFACT_WINDOWS))
+        raise ValueError(f"window 只能是 {allowed}")
+    return window
+
+
+def read_artifact_mode_filter() -> str | None:
+    mode = request.args.get("mode", "").strip().lower()
+    if not mode:
+        return None
+    if mode not in ARTIFACT_MODES:
+        allowed = "、".join(sorted(ARTIFACT_MODES))
+        raise ValueError(f"mode 只能是 {allowed}")
+    return mode
+
+
+def read_artifact_date_range() -> tuple[date | None, date | None]:
+    date_from_value = request.args.get("date_from", "").strip()
+    date_to_value = request.args.get("date_to", "").strip()
+
+    date_from = parse_date_filter(date_from_value, "date_from") if date_from_value else None
+    date_to = parse_date_filter(date_to_value, "date_to") if date_to_value else None
+
+    if date_from and date_to and date_from > date_to:
+        raise ValueError("date_from 不能晚于 date_to")
+
+    return date_from, date_to
+
+
 def build_item_filter_conditions(
     item_type: str | None,
     storage: str | None,
@@ -312,6 +371,11 @@ def join_conditions(conditions: list[str], prefix: str) -> str:
 
 def build_file_url(item_id: int) -> str:
     return f"/file/{item_id}"
+
+
+def build_artifact_file_url(relative_path: Path) -> str:
+    relative_text = quote(relative_path.as_posix(), safe="/")
+    return f"/artifacts/file/{relative_text}"
 
 
 def get_storage_area(file_path: str | Path | None) -> str | None:
@@ -381,6 +445,10 @@ def is_path_under(path: Path, parent: Path) -> bool:
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def isoformat_timestamp(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec="seconds")
 
 
 def build_inbox_file_path(now: datetime, extension: str) -> Path:
@@ -525,6 +593,133 @@ def resolve_stored_file_path(file_path_value: str | None) -> Path | None:
     if not file_path.is_absolute():
         file_path = AXIOM_ROOT / file_path
     return file_path.resolve()
+
+
+def resolve_review_artifact_path(artifact_path_value: str) -> Path:
+    artifact_path = (AXIOM_ROOT / artifact_path_value).resolve()
+    if not is_path_under(artifact_path, REVIEWS_PATH):
+        raise ValueError("artifact 路径不允许访问")
+    return artifact_path
+
+
+def build_artifact_payload(file_path: Path) -> dict | None:
+    try:
+        relative_path = file_path.resolve().relative_to(AXIOM_ROOT)
+    except ValueError:
+        return None
+
+    parts = relative_path.parts
+    if len(parts) < 5 or parts[:2] != ("data", "reviews") or file_path.suffix.lower() != ".md":
+        return None
+
+    stat_result = file_path.stat()
+    payload = {
+        "name": file_path.name,
+        "relative_path": relative_path.as_posix(),
+        "file_url": build_artifact_file_url(relative_path),
+        "size_bytes": stat_result.st_size,
+        "modified_at": isoformat_timestamp(stat_result.st_mtime),
+    }
+
+    group_dir = parts[2]
+    if group_dir in ARTIFACT_WINDOWS and len(parts) == 5:
+        payload.update(
+            {
+                "group": "review",
+                "window": group_dir,
+                "mode": None,
+                "report_date": Path(parts[4]).stem,
+            }
+        )
+        return payload
+
+    if group_dir == "inbox" and len(parts) == 5:
+        payload.update(
+            {
+                "group": "inbox",
+                "window": None,
+                "mode": None,
+                "report_date": Path(parts[4]).stem,
+            }
+        )
+        return payload
+
+    if group_dir == "inbox-actions" and len(parts) == 7:
+        mode = parts[3]
+        if mode not in ARTIFACT_MODES:
+            return None
+        payload.update(
+            {
+                "group": "inbox-actions",
+                "window": None,
+                "mode": mode,
+                "report_date": parts[5],
+                "generated_name": Path(parts[6]).stem,
+            }
+        )
+        return payload
+
+    if group_dir == "inbox-action-history" and len(parts) == 6:
+        window = parts[3]
+        if window not in ARTIFACT_WINDOWS:
+            return None
+        payload.update(
+            {
+                "group": "inbox-action-history",
+                "window": window,
+                "mode": None,
+                "report_date": Path(parts[5]).stem,
+            }
+        )
+        return payload
+
+    return None
+
+
+def list_review_artifacts() -> list[dict]:
+    if not REVIEWS_PATH.exists():
+        return []
+
+    artifacts: list[dict] = []
+    for file_path in REVIEWS_PATH.rglob("*.md"):
+        if not file_path.is_file():
+            continue
+        payload = build_artifact_payload(file_path)
+        if payload is not None:
+            artifacts.append(payload)
+    return artifacts
+
+
+def artifact_matches_filters(
+    artifact: dict,
+    *,
+    group: str | None,
+    window: str | None,
+    mode: str | None,
+    date_from: date | None,
+    date_to: date | None,
+) -> bool:
+    if group and artifact["group"] != group:
+        return False
+    if window and artifact.get("window") != window:
+        return False
+    if mode and artifact.get("mode") != mode:
+        return False
+
+    report_date_text = artifact.get("report_date")
+    if date_from or date_to:
+        if not report_date_text:
+            return False
+        try:
+            report_date = date.fromisoformat(report_date_text)
+        except ValueError:
+            return False
+        if date_from and report_date < date_from:
+            return False
+        if date_to and report_date > date_to:
+            return False
+
+    return True
 
 
 def cleanup_file(file_path: Path) -> None:
@@ -745,6 +940,86 @@ def get_item_file(item_id: int):
         return error_response(404, "file_not_found", "文件不存在")
 
     return send_file(file_path, download_name=file_path.name)
+
+
+@app.route("/artifacts", methods=["GET"])
+def list_artifacts():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        page, page_size = read_pagination()
+        group = read_artifact_group_filter()
+        window = read_artifact_window_filter()
+        mode = read_artifact_mode_filter()
+        date_from, date_to = read_artifact_date_range()
+    except ValueError as exc:
+        return error_response(400, "invalid_artifact_filter", str(exc))
+
+    sort = request.args.get("sort", "newest").strip().lower()
+    if sort not in {"newest", "oldest"}:
+        return error_response(400, "invalid_sort", "sort 只能是 newest 或 oldest")
+
+    artifacts = [
+        artifact
+        for artifact in list_review_artifacts()
+        if artifact_matches_filters(
+            artifact,
+            group=group,
+            window=window,
+            mode=mode,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    ]
+
+    artifacts.sort(
+        key=lambda artifact: (artifact["modified_at"], artifact["relative_path"]),
+        reverse=(sort == "newest"),
+    )
+
+    total = len(artifacts)
+    offset = (page - 1) * page_size
+    page_items = artifacts[offset : offset + page_size]
+    total_pages = (total + page_size - 1) // page_size
+
+    return ok_response(
+        {
+            "group": group,
+            "window": window,
+            "mode": mode,
+            "date_from": date_from.isoformat() if date_from else None,
+            "date_to": date_to.isoformat() if date_to else None,
+            "sort": sort,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+            "items": page_items,
+        }
+    )
+
+
+@app.route("/artifacts/file/<path:artifact_path>", methods=["GET"])
+def get_artifact_file(artifact_path: str):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        file_path = resolve_review_artifact_path(artifact_path)
+    except ValueError:
+        logger.warning("blocked artifact access outside reviews: path=%s", artifact_path)
+        return error_response(403, "forbidden_artifact_path", "artifact 路径不允许访问")
+
+    if not file_path.is_file():
+        return error_response(404, "artifact_not_found", "artifact 不存在")
+
+    if file_path.suffix.lower() != ".md":
+        return error_response(400, "invalid_artifact_type", "当前只支持读取 markdown artifact")
+
+    return send_file(file_path, download_name=file_path.name, mimetype="text/markdown")
 
 
 @app.route("/archive/<int:item_id>", methods=["POST"])

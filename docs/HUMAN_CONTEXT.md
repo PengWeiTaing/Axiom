@@ -10,7 +10,7 @@ Axiom 当前已经有可运行的 VPS 后端基线，重点正在从“能收、
 
 - VPS 是当前线上运行节点，路径是 `/opt/axiom`。
 - 文件系统保存内容本体，SQLite 保存索引。
-- receiver 已支持文本、图片、检索、文件取回、归档、恢复和统计。
+- receiver 已支持文本、图片、检索、文件取回、归档、恢复、统计，以及自动化产物读取。
 - 早期技术边界已经松绑，以后可以改架构，但大改必须先做决策说明、备份、迁移和回滚设计。
 
 ## 当前状态图
@@ -33,7 +33,7 @@ flowchart TD
 ## 需要完全掌握的位置
 
 1. `core/receiver.py`
-   需要掌握：配置区、`init_db()`、`build_item_payload()`、`write_text_file_atomic()`、`write_binary_file_atomic()`、`insert_item()`、`get_item_file()`、`archive_item()`、`restore_item()`、`recent_items()`、`search_items()`。
+   需要掌握：配置区、`init_db()`、`build_item_payload()`、`build_artifact_payload()`、`write_text_file_atomic()`、`write_binary_file_atomic()`、`insert_item()`、`get_item_file()`、`list_artifacts()`、`get_artifact_file()`、`archive_item()`、`restore_item()`、`recent_items()`、`search_items()`。
 2. `scripts/check_consistency.py`
    需要掌握：如何检查 DB 记录缺文件、storage 孤立文件、缺失 `file_path` 的记录，以及 `/opt/axiom/...` 到本地 `--root` 的映射。
 3. `scripts/backup_axiom.py`
