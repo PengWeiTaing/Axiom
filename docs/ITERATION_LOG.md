@@ -178,3 +178,7 @@
 - VPS 已手动触发生成真实 dry-run action 快照：`/opt/axiom/data/reviews/inbox-actions/dry-run/2026/2026-04-29/20260430_111158_013408.md`
 - VPS 已手动触发生成真实 daily action history 快照：`/opt/axiom/data/reviews/inbox-action-history/daily/2026/2026-04-29.md`
 - VPS 已手动触发生成真实 weekly action history 快照：`/opt/axiom/data/reviews/inbox-action-history/weekly/2026/2026-04-29.md`
+- 项目治理前提更新：早期技术边界不再作为硬约束，当前 Flask / SQLite / VPS / 文件系统只作为已验证运行基线
+- README、AI Context、Human Context、Short Term、DeepWiki 说明统一改为“可演进但需谋定而后动”的架构决策规则
+- 新规则要求大改前先说明痛点证据、影响范围、迁移路径、回滚路径、本地验证、VPS 验证和备份 / dry-run 需求
+- DeepWiki 生成脚本同步到当前真实能力，覆盖文本、图片、文件取回、归档恢复、统计、备份、回顾、inbox 处理、action snapshot 和 action history

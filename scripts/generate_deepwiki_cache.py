@@ -49,7 +49,7 @@ def build_cache():
         pages,
         generated_pages,
         "page-overview",
-        "01 总览：Axiom 当前是什么",
+        "01 总览：当前运行基线",
         [
             "README.md",
             "docs/HUMAN_CONTEXT.md",
@@ -60,44 +60,58 @@ def build_cache():
             "page-architecture",
             "page-api",
             "page-operations",
-            "page-roadmap",
+            "page-evolution",
         ],
         f"""
-# 01 总览：Axiom 当前是什么
+# 01 总览：当前运行基线
 
-Axiom 当前是个人知识后端的 `v0.1 alpha`。这一阶段只抓住一条主线：输入进入 VPS，内容落成文件，索引进入 SQLite，然后用基础接口查回来。
+Axiom 当前已经有可运行的 VPS 后端基线。它能接收文本和图片，能落盘，能入库，能检索，能取回文件，能归档恢复，能备份，也能自动生成回顾、inbox 处理报告和 action history。
 
 ## 一屏判断
 
 | 项 | 当前答案 |
 | --- | --- |
-| 当前主节点 | VPS |
-| 输入端 | iPhone + iOS 快捷指令 |
-| 技术栈 | Python + Flask + SQLite + 文件系统 |
-| 当前目标 | 接收、存储、检索、备份 |
-| 当前节奏 | 小步修可靠性 |
-| 当前暂缓 | 复杂前端、复杂 agent、向量检索、多服务化 |
+| 当前阶段 | `v0.1 alpha` |
+| 线上入口 | `https://pengweitai.me` |
+| 运行目录 | `/opt/axiom` |
+| 部署链路 | Nginx -> gunicorn -> Flask receiver |
+| 数据策略 | 文件系统保存内容本体，SQLite 保存索引 |
+| 当前输入端 | iPhone + iOS 快捷指令 |
+| 当前重点 | 稳定运行、可备份恢复、可回顾、可安全处理 inbox |
 
-## 最小链路
+当前技术栈是已验证基线。早期硬约束已经取消，后续可以调整架构；大改前需要先写清收益、风险、迁移、回滚和验证。
+
+## 当前全链路
 
 ```mermaid
-flowchart LR
-    A["iPhone 快捷指令"] --> B["VPS Flask receiver"]
-    B --> C["data/inbox txt 文件"]
-    B --> D["SQLite items 索引"]
-    D --> E["/recent"]
-    D --> F["/search"]
-    C --> G["备份 zip"]
-    D --> G
+flowchart TD
+    A["iPhone 快捷指令"] --> B["HTTPS / Nginx"]
+    B --> C["gunicorn + receiver"]
+    C --> D["/add 文本"]
+    C --> E["/upload 图片"]
+    D --> F["data/inbox"]
+    E --> F
+    D --> G["SQLite items"]
+    E --> G
+    G --> H["/recent / /search"]
+    G --> I["/item / /file"]
+    F --> I
+    I --> J["/archive / /restore"]
+    J --> K["data/archive"]
+    F --> L["backup zip"]
+    K --> L
+    G --> L
+    G --> M["review / inbox processing"]
+    M --> N["action snapshots / history"]
 ```
 
-## 人类接手阅读顺序
+## 接手阅读顺序
 
-1. 先读本页，建立当前阶段判断。
-2. 再读 `02 架构：数据怎么流动`，理解文件和数据库的关系。
-3. 然后读 `03 接口：receiver 提供什么`，知道系统对外暴露的能力。
-4. 接着读 `05 运维：怎么验证和备份`，掌握本地与 VPS 的检查方式。
-5. 最后按任务进入 `06 代码导览` 或 `07 短期路线`。
+1. 先读本页，建立当前状态判断。
+2. 再读 `02 架构：数据怎么流动`，理解文件和 SQLite 的关系。
+3. 然后读 `03 接口：receiver 提供什么`，知道公网后端能力。
+4. 接着读 `04 可靠性` 和 `05 运维`，掌握备份、校验和 VPS 运行方式。
+5. 最后读 `08 演进规则`，理解以后怎么安全改变架构。
 
 ## 原始上下文底稿
 
@@ -116,50 +130,62 @@ flowchart LR
         [
             "page-overview",
             "page-api",
-            "page-consistency",
-            "page-operations",
+            "page-reliability",
+            "page-code",
         ],
         f"""
 # 02 架构：数据怎么流动
 
-当前架构很小，但有一个必须长期守住的原则：文件保存内容本体，SQLite 保存索引。这样做的好处是内容不会被锁死在数据库里，后续备份、迁移、AI 处理都更直接。
-
-## 当前部署形态
-
-```mermaid
-flowchart TD
-    A["快捷指令 text + key"] --> B["/add"]
-    B --> C["生成唯一 txt 文件名"]
-    C --> D["写临时文件"]
-    D --> E["替换为 inbox 正式文件"]
-    E --> F["写入 SQLite items"]
-    F --> G["/recent 和 /search"]
-    E --> H["backup_axiom.py"]
-    F --> H
-    H --> I["zip + manifest"]
-```
+当前数据层的核心判断：文件系统保存内容本体，SQLite 保存索引。这个策略已经覆盖文本、图片、inbox、archive、备份和一致性检查。
 
 ## 数据边界
 
 | 位置 | 角色 | 当前内容 |
 | --- | --- | --- |
-| `data/inbox/*.txt` | 内容本体 | 用户输入的原始文本 |
-| `db/axiom.db` | 索引 | `items` 表，包含类型、内容、文件路径、来源、时间 |
+| `data/inbox/` | 活跃内容本体 | 文本 txt、图片文件 |
+| `data/archive/` | 归档内容本体 | 已归档文件，按月份目录组织 |
+| `db/axiom.db` | 索引 | `items` 表，记录类型、内容、文件路径、来源、时间 |
+| `data/reviews/` | 自动化产物 | review、inbox report、action snapshots、history |
 | `backup/*.zip` | 离线备份 | SQLite 快照、inbox、archive、manifest |
-| `logs/receiver.log` | 文件日志 | receiver 运行日志 |
-| `docs/*` | 项目上下文 | 给人和 AI 的阶段说明 |
+| `logs/` | 运行日志 | receiver 文件日志 |
+
+## 写入与读取链路
+
+```mermaid
+flowchart TD
+    A["请求 + key"] --> B["receiver 鉴权"]
+    B --> C["文本或图片"]
+    C --> D["临时文件"]
+    D --> E["原子替换为正式文件"]
+    E --> F["SQLite items 入库"]
+    F --> G["/recent / /search"]
+    F --> H["/item / /file"]
+    E --> H
+```
+
+## 配置与存储根
+
+receiver 默认使用 `/opt/axiom`，本地测试可以通过环境变量覆盖。这里是运行基线的入口。
+
+{snippet("core/receiver.py", 20, 40)}
 
 ## `items` 表
 
-当前表结构保持最小，只覆盖 v0.1 的文本记录。后续图片上传会在这个表上扩展多类型 item，继续保持 SQLite 单机后端路线。
+当前 `items` 表保持小而稳定，已经支撑文本、图片、归档、恢复、过滤和统计。
 
-{snippet("core/receiver.py", 71, 95)}
+{snippet("core/receiver.py", 72, 116)}
 
-## 配置入口
+## item 返回结构
 
-receiver 默认以 `/opt/axiom` 作为部署根目录，同时允许本地通过环境变量覆盖路径。这个设计让 VPS 运行和 Windows 本地测试共用一份代码。
+所有 item 返回都会带 `file_url` 和 `storage`，所以调用方可以直接知道文件在哪个存储区，以及如何取回文件。
 
-{snippet("core/receiver.py", 17, 50)}
+{snippet("core/receiver.py", 313, 367)}
+
+## 原子写入
+
+文本和图片都先写临时文件，再替换为正式文件，减少半截文件进入 inbox 的概率。
+
+{snippet("core/receiver.py", 421, 448)}
 """,
     )
 
@@ -172,94 +198,128 @@ receiver 默认以 `/opt/axiom` 作为部署根目录，同时允许本地通过
         [
             "page-overview",
             "page-architecture",
-            "page-consistency",
+            "page-reliability",
             "page-code",
         ],
         f"""
 # 03 接口：receiver 提供什么
 
-receiver 是当前后端主入口。它的职责很集中：检查 key，接收文本，落文件，写索引，提供最近记录和关键词检索。
+receiver 是当前公网后端主入口。它负责鉴权、接收、落盘、入库、查询、文件取回、归档、恢复和统计。
 
 ## 接口总表
 
-| 接口 | 方法 | 用途 | 鉴权 | 返回 |
-| --- | --- | --- | --- | --- |
-| `/health` | GET | 检查服务和数据库是否可用 | 否 | JSON |
-| `/add` | GET/POST | 接收文本并持久化 | 是 | JSON |
-| `/recent` | GET | 分页读取最近记录 | 是 | JSON |
-| `/search` | GET | 基础关键词检索 | 是 | JSON |
+| 接口 | 方法 | 用途 |
+| --- | --- | --- |
+| `/health` | GET | 检查服务和数据库 |
+| `/stats` | GET | 统计总量、类型、来源和存储区 |
+| `/add` | GET/POST | 写入文本 |
+| `/upload` | POST | 上传图片 |
+| `/item/<id>` | GET | 读取单条元数据 |
+| `/file/<id>` | GET | 取回文本或图片文件 |
+| `/archive/<id>` | POST | 将文件移动到 archive |
+| `/restore/<id>` | POST | 将 archive 文件恢复到 inbox |
+| `/recent` | GET | 分页读取最近记录 |
+| `/search` | GET | 关键词检索 |
 
-## 统一返回形态
+除 `/health` 外，接口都需要 key。key 可通过 `key` 字段或 `X-Axiom-Key` header 传入。
 
-成功返回含 `ok: true`，失败返回含 `ok: false` 和 `error`。这个约定让快捷指令、命令行测试、后续 AI 脚本都能用同一套判断方式。
+## 统一响应和鉴权
 
-{snippet("core/receiver.py", 53, 61)}
+{snippet("core/receiver.py", 60, 69)}
 
-## `/add`
+{snippet("core/receiver.py", 135, 150)}
 
-`/add` 支持 query、form、JSON 三种输入来源。写入时先创建临时文件，再替换为正式 txt；数据库写入失败时，会清理本次已经写入的文件。
+## 健康检查和统计
 
-{snippet("core/receiver.py", 216, 246)}
+{snippet("core/receiver.py", 537, 612)}
 
-{snippet("core/receiver.py", 276, 317)}
+## 文本和图片写入
 
-## `/recent`
+{snippet("core/receiver.py", 615, 710)}
 
-`/recent` 支持 `page`、`page_size`，同时兼容旧的 `limit`。`page_size` 会被限制在 50 以内，避免一次查太多。
+## 元数据、文件取回、归档和恢复
 
-{snippet("core/receiver.py", 167, 187)}
+{snippet("core/receiver.py", 713, 824)}
 
-{snippet("core/receiver.py", 320, 364)}
+## 最近记录和检索
 
-## `/search`
+`/recent` 和 `/search` 支持分页、类型、存储区、来源、时间范围过滤。`/search` 还支持 `relevance`、`newest`、`oldest` 排序。
 
-`/search` 当前使用 SQLite `LIKE` 做基础检索，支持 `relevance`、`newest`、`oldest`。相关性排序是轻量规则，用于 v0.1 阶段的可用检索。
+{snippet("core/receiver.py", 827, 904)}
 
-{snippet("core/receiver.py", 366, 467)}
+{snippet("core/receiver.py", 907, 1047)}
+
+## 冒烟测试覆盖
+
+{snippet("scripts/smoke_test_receiver.py", 36, 120)}
+
+{snippet("scripts/smoke_test_receiver.py", 198, 260)}
 """,
     )
 
     add_page(
         pages,
         generated_pages,
-        "page-consistency",
-        "04 一致性：文件和索引怎么互相校验",
-        ["scripts/check_consistency.py", "core/receiver.py", "docs/SHORT_TERM.md"],
+        "page-reliability",
+        "04 可靠性：一致性、备份和恢复",
+        ["scripts/check_consistency.py", "scripts/backup_axiom.py", "docs/ITERATION_LOG.md"],
         [
             "page-architecture",
             "page-api",
             "page-operations",
-            "page-roadmap",
+            "page-automation",
         ],
         f"""
-# 04 一致性：文件和索引怎么互相校验
+# 04 可靠性：一致性、备份和恢复
 
-Axiom 当前最需要盯住的风险是文件和数据库不同步。`scripts/check_consistency.py` 就是为这个阶段准备的诊断工具。
+当前最重要的可靠性目标是：真实数据可备份、可恢复、可校验。Axiom 已有两类基础工具：一致性检查和备份脚本。
 
-## 它检查什么
+## 一致性检查
 
-| 检查项 | 含义 | 常见原因 |
-| --- | --- | --- |
-| DB 记录缺文件 | `items.file_path` 指向的 txt 不存在 | 只拉了数据库，没拉 inbox；手工误删 |
-| inbox 孤立文件 | txt 文件没有对应 DB 记录 | 写入中断；手工放入文件 |
-| 缺 `file_path` 的记录 | DB 里记录不完整 | 早期数据或手工写入 |
+检查范围：
 
-## 本地检查 VPS 数据
+- DB 记录里的 `file_path` 是否存在
+- `data/inbox` 和 `data/archive` 下的文件是否都有 DB 记录
+- DB 记录是否缺少 `file_path`
+- 本地检查时，把 DB 里的 `/opt/axiom/...` 映射到当前 `--root`
 
-数据库里可能保存 `/opt/axiom/...` 这样的绝对路径。脚本默认会把它映射到当前 `--root`，所以本地从 VPS 拉下数据后可以直接检查。
+{snippet("scripts/check_consistency.py", 35, 60)}
+
+{snippet("scripts/check_consistency.py", 113, 145)}
+
+## 备份
+
+备份范围：
+
+- `db/axiom.db`
+- `data/inbox`
+- `data/archive`
+- `manifest.json`
+
+SQLite 使用 backup API 复制，减少读到半写入数据库文件的风险。
+
+{snippet("scripts/backup_axiom.py", 51, 91)}
+
+{snippet("scripts/backup_axiom.py", 122, 208)}
+
+## 推荐操作
 
 ```powershell
 python scripts\\check_consistency.py --root .
-python scripts\\check_consistency.py --root . --json
+python scripts\\backup_axiom.py --root . --dry-run
 ```
 
-## 关键实现
+VPS 上：
 
-{snippet("scripts/check_consistency.py", 20, 60)}
+```bash
+cd /opt/axiom
+python3 scripts/check_consistency.py --root /opt/axiom
+python3 scripts/backup_axiom.py --root /opt/axiom --keep 14
+```
 
-{snippet("scripts/check_consistency.py", 113, 140)}
+## 已完成的可靠性节点
 
-{snippet("scripts/check_consistency.py", 193, 219)}
+{snippet("docs/ITERATION_LOG.md", 45, 95, "markdown")}
 """,
     )
 
@@ -267,106 +327,156 @@ python scripts\\check_consistency.py --root . --json
         pages,
         generated_pages,
         "page-operations",
-        "05 运维：怎么验证、备份、刷新 Wiki",
+        "05 运维：VPS 服务和定时任务",
         [
-            "requirements.txt",
-            ".env.example",
             "deploy/axiom-receiver.service",
-            "scripts/smoke_test_receiver.py",
-            "scripts/backup_axiom.py",
-            "scripts/check_consistency.py",
-            "scripts/generate_deepwiki_cache.py",
-            "docs/DEEPWIKI.md",
+            "deploy/axiom-backup.timer",
+            "deploy/axiom-daily-review.timer",
+            "deploy/axiom-inbox-processing.timer",
+            "deploy/axiom-daily-inbox-action.timer",
+            "deploy/axiom-daily-inbox-action-history.timer",
+            "deploy/axiom-weekly-inbox-action-history.timer",
+            ".env.example",
         ],
         [
             "page-overview",
-            "page-consistency",
+            "page-reliability",
+            "page-automation",
             "page-code",
-            "page-roadmap",
         ],
         f"""
-# 05 运维：怎么验证、备份、刷新 Wiki
+# 05 运维：VPS 服务和定时任务
 
-这一页给日常操作用。它优先回答“我改完代码后怎么确认没坏”“数据怎么备份”“Wiki 怎么刷新”。
+当前 VPS 负责真实运行。公网只暴露 Nginx 的 `80/443`，receiver 通过 gunicorn 监听 `127.0.0.1:5000`。
 
-## 本地最小验证
+## receiver systemd 服务
 
-```powershell
-pip install -r requirements.txt
-python -m py_compile core\\receiver.py core\\init_db.py scripts\\smoke_test_receiver.py scripts\\backup_axiom.py scripts\\check_consistency.py scripts\\generate_deepwiki_cache.py
-python scripts\\smoke_test_receiver.py
-```
+{snippet("deploy/axiom-receiver.service", 1, 16, "ini")}
 
-## VPS systemd 运行
-
-在 VPS 的 `/opt/axiom` 下准备虚拟环境和环境变量：
+常用命令：
 
 ```bash
-cd /opt/axiom
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-```
-
-`/opt/axiom/.env` 里必须设置真实的 `AXIOM_SECRET_KEY`。`.env.example` 只放可公开模板。
-
-安装并启动服务：
-
-```bash
-sudo cp deploy/axiom-receiver.service /etc/systemd/system/axiom-receiver.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now axiom-receiver
-```
-
-检查服务：
-
-```bash
-systemctl status axiom-receiver --no-pager
-journalctl -u axiom-receiver -f
+sudo systemctl status axiom-receiver --no-pager
+sudo journalctl -u axiom-receiver -f
 tail -f /opt/axiom/logs/receiver.log
 curl http://127.0.0.1:5000/health
 ```
 
-## 一致性检查
+## 环境变量模板
 
-```powershell
-python scripts\\check_consistency.py --root .
-python scripts\\check_consistency.py --root . --json
-```
+{snippet(".env.example", 1, 30, "text")}
 
-当前本地如果只同步了 `db/axiom.db`，没有同步 `data/inbox`，一致性检查会报告缺失文件。这是诊断信号，不代表脚本坏了。
+## 当前定时任务
 
-## 备份
+| 任务 | 用途 |
+| --- | --- |
+| `axiom-backup.timer` | 自动备份 |
+| `axiom-daily-review.timer` | 每日回顾 |
+| `axiom-weekly-review.timer` | 每周回顾 |
+| `axiom-inbox-processing.timer` | inbox 处理报告 |
+| `axiom-daily-inbox-action.timer` | 每日 action dry-run 快照 |
+| `axiom-daily-inbox-action-history.timer` | 每日 action history 汇总 |
+| `axiom-weekly-inbox-action-history.timer` | 每周 action history 汇总 |
 
-```powershell
-python scripts\\backup_axiom.py --root . --dry-run
-```
+## action 自动化服务示例
 
-VPS 上建议在 `/opt/axiom` 下执行：
+{snippet("deploy/axiom-daily-inbox-action.service", 1, 8, "ini")}
+
+{snippet("deploy/axiom-daily-inbox-action-history.timer", 1, 11, "ini")}
+
+{snippet("deploy/axiom-weekly-inbox-action-history.timer", 1, 11, "ini")}
+
+## 部署更新顺序
 
 ```bash
 cd /opt/axiom
-python3 scripts/backup_axiom.py --keep 7
+git pull
+. .venv/bin/activate
+pip install -r requirements.txt
+python3 scripts/check_consistency.py --root /opt/axiom
+sudo systemctl restart axiom-receiver
+curl http://127.0.0.1:5000/health
+```
+""",
+    )
+
+    add_page(
+        pages,
+        generated_pages,
+        "page-automation",
+        "06 自动化：回顾、inbox 处理和 action history",
+        [
+            "scripts/build_review_markdown.py",
+            "scripts/save_review_snapshot.py",
+            "scripts/build_inbox_processing_report.py",
+            "scripts/apply_inbox_actions.py",
+            "scripts/save_inbox_action_snapshot.py",
+            "scripts/build_inbox_action_history_markdown.py",
+            "scripts/save_inbox_action_history_snapshot.py",
+        ],
+        [
+            "page-overview",
+            "page-reliability",
+            "page-operations",
+            "page-code",
+        ],
+        f"""
+# 06 自动化：回顾、inbox 处理和 action history
+
+这一层把 Axiom 从“只存东西”推进到“能回看、能提出处理建议、能记录处理动作”。当前阶段仍以规则和留痕为主，AI 能力后续再接。
+
+## 自动化链路
+
+```mermaid
+flowchart TD
+    A["SQLite items"] --> B["review markdown"]
+    A --> C["inbox processing report"]
+    C --> D["action dry-run / apply"]
+    D --> E["action snapshot"]
+    E --> F["action history"]
 ```
 
-## 刷新 DeepWiki
+## inbox 处理规则
 
-```powershell
-python scripts\\generate_deepwiki_cache.py
-```
+当前规则包括：
 
-刷新后打开 DeepWiki，主入口应该显示 8 个结构化页面。
+- `补描述后归档`
+- `补描述`
+- `归档候选`
+- `继续保留`
+- `检查空内容`
 
-## 关键脚本证据
+{snippet("scripts/build_inbox_processing_report.py", 27, 101)}
 
-{snippet(".env.example", 1, 20, "text")}
+## 建议命令
 
-{snippet("deploy/axiom-receiver.service", 1, 40, "ini")}
+处理报告会自动生成下一步建议命令，默认引导走 `save_inbox_action_snapshot.py`，优先保留执行痕迹。
 
-{snippet("scripts/smoke_test_receiver.py", 25, 108)}
+{snippet("scripts/build_inbox_processing_report.py", 159, 191)}
 
-{snippet("scripts/backup_axiom.py", 122, 208)}
+## action 执行安全开关
+
+默认 dry-run；真执行需要显式 `--apply`。可以用 `--only-id`、`--exclude-id`、`--max-items` 降低误操作范围。
+
+{snippet("scripts/apply_inbox_actions.py", 72, 149)}
+
+{snippet("scripts/apply_inbox_actions.py", 139, 190)}
+
+## action 快照
+
+action 快照会把 dry-run 或 apply 结果落盘，并追加一致性检查摘要。
+
+{snippet("scripts/save_inbox_action_snapshot.py", 23, 61)}
+
+{snippet("scripts/save_inbox_action_snapshot.py", 87, 112)}
+
+## action history
+
+history 汇总基于已保存的 action snapshots 聚合，不重新执行任何数据动作。
+
+{snippet("scripts/build_inbox_action_history_markdown.py", 38, 86)}
+
+{snippet("scripts/build_inbox_action_history_markdown.py", 140, 149)}
 """,
     )
 
@@ -374,150 +484,115 @@ python scripts\\generate_deepwiki_cache.py
         pages,
         generated_pages,
         "page-code",
-        "06 代码导览：该从哪里改",
+        "07 代码导览：该从哪里改",
         [
             "core/receiver.py",
             "core/init_db.py",
             "scripts/backup_axiom.py",
             "scripts/check_consistency.py",
             "scripts/smoke_test_receiver.py",
+            "scripts/smoke_test_inbox_processing.py",
             "scripts/generate_deepwiki_cache.py",
-            "deploy/axiom-receiver.service",
-            ".env.example",
         ],
         [
             "page-api",
-            "page-consistency",
-            "page-operations",
-            "page-roadmap",
+            "page-reliability",
+            "page-automation",
+            "page-evolution",
         ],
         f"""
-# 06 代码导览：该从哪里改
+# 07 代码导览：该从哪里改
 
-这个项目当前代码很少，真正需要掌握的是每个文件的职责边界。
+这个项目目前仍然是小型后端工程。改代码时先判断要动哪一层。
 
-## 文件职责表
+## 修改入口
 
-| 文件 | 职责 | 常见修改场景 |
-| --- | --- | --- |
-| `core/receiver.py` | Flask 主入口，API、鉴权、落盘、入库、查询 | 改接口、修写入可靠性、加日志 |
-| `core/init_db.py` | 独立初始化数据库 | 初始化 VPS 数据库 |
-| `scripts/backup_axiom.py` | 打包数据库和数据目录 | 备份策略、保留数量、manifest |
-| `scripts/check_consistency.py` | 检查文件和 DB 是否同步 | 数据诊断、恢复演练前检查 |
-| `scripts/smoke_test_receiver.py` | 本地跑主链路测试 | 改 receiver 后验证 |
-| `scripts/generate_deepwiki_cache.py` | 生成本地 DeepWiki 缓存 | 改 wiki 内容和结构 |
-| `deploy/axiom-receiver.service` | systemd 服务模板 | VPS 启动、重启、查看日志 |
-| `.env.example` | 环境变量模板 | 新部署时创建真实 `.env` |
-
-## receiver 修改地图
-
-| 位置 | 关注点 |
+| 目标 | 优先看 |
 | --- | --- |
-| 配置区 | `/opt/axiom` 默认路径、环境变量覆盖 |
-| 日志区 | 控制台输出、可选文件日志 |
-| 响应工具 | 统一 JSON 返回 |
-| 存储与数据库 | 建表、连接、目录创建 |
-| 请求工具 | key、分页、JSON/form/query 读取 |
-| 文件写入 | 临时文件、原子替换 |
-| 路由 | `/health`、`/add`、`/recent`、`/search` |
+| 改 API | `core/receiver.py` |
+| 改数据库初始化 | `core/init_db.py` |
+| 改备份 | `scripts/backup_axiom.py` |
+| 改一致性检查 | `scripts/check_consistency.py` |
+| 改 receiver 测试 | `scripts/smoke_test_receiver.py` |
+| 改 inbox 自动化 | `build_inbox_processing_report.py`、`apply_inbox_actions.py` |
+| 改 action history | `list_inbox_action_snapshots.py`、`build_inbox_action_history_markdown.py` |
+| 改 Wiki | `scripts/generate_deepwiki_cache.py` |
+| 改 VPS 自动运行 | `deploy/*.service` 和 `deploy/*.timer` |
+
+## receiver 地图
+
+| 区块 | 作用 |
+| --- | --- |
+| 基础配置 | 路径、key、上传上限、日志 |
+| 响应工具 | 统一 JSON 成功和错误 |
+| 存储与数据库 | 建表、连接、目录初始化 |
+| 请求工具 | key、分页、过滤条件 |
+| 文件工具 | 原子写文本、原子写图片、归档路径、恢复路径 |
+| 路由 | API 实现 |
 | 错误处理 | Flask 异常统一 JSON 化 |
 
-## 关键代码块
+{snippet("core/receiver.py", 20, 69)}
 
-{snippet("core/receiver.py", 17, 61)}
-
-{snippet("core/receiver.py", 65, 106)}
-
-{snippet("core/receiver.py", 111, 187)}
+{snippet("core/receiver.py", 153, 304)}
 
 {snippet("core/init_db.py", 1, 19)}
+
+## 测试入口
+
+{snippet("scripts/smoke_test_receiver.py", 36, 70)}
+
+{snippet("scripts/smoke_test_inbox_processing.py", 1, 80)}
 """,
     )
 
     add_page(
         pages,
         generated_pages,
-        "page-roadmap",
-        "07 短期路线：下一步做什么",
-        ["docs/SHORT_TERM.md", "docs/ITERATION_LOG.md"],
+        "page-evolution",
+        "08 演进规则：长期目标和架构决策",
         [
-            "page-overview",
-            "page-operations",
-            "page-consistency",
-            "page-long-term",
+            "docs/AI_CONTEXT.md",
+            "docs/SHORT_TERM.md",
+            "deep-research-report.md",
+            "docs/ITERATION_LOG.md",
         ],
-        f"""
-# 07 短期路线：下一步做什么
-
-当前代码已经把 receiver 基底、冒烟测试、一致性检查和备份脚本放到位。下一步重点转向 VPS 真实运行闭环。
-
-## 当前优先级
-
-1. 在 VPS 上确认 receiver 正式启动方式。
-2. 用真实快捷指令打一次 `/add`。
-3. 在 VPS 上调用 `/health`、`/recent`、`/search`。
-4. 跑一次真实备份。
-5. 做一次恢复演练。
-6. 在 VPS 上跑一致性检查。
-
-## 当前仍要盯住的风险
-
-| 风险 | 当前状态 | 下一步 |
-| --- | --- | --- |
-| 正式启动方式 | 已有 systemd 模板 | 在 VPS 上真实启用 |
-| 数据一致性 | 已有检查脚本 | 在 VPS 上跑真实数据 |
-| 备份闭环 | 已有备份脚本 | 做真实备份和恢复演练 |
-| 日志 | 已支持 journal 和文件日志 | 在 VPS 上验证 |
-
-## 迭代记录
-
-{snippet("docs/SHORT_TERM.md", 1, 120, "markdown")}
-
-{snippet("docs/ITERATION_LOG.md", 1, 80, "markdown")}
-""",
-    )
-
-    add_page(
-        pages,
-        generated_pages,
-        "page-long-term",
-        "08 长期目标：研究报告怎么用",
-        ["deep-research-report.md", "docs/SHORT_TERM.md"],
         [
             "page-overview",
-            "page-roadmap",
             "page-architecture",
+            "page-code",
         ],
         f"""
-# 08 长期目标：研究报告怎么用
+# 08 演进规则：长期目标和架构决策
 
-`deep-research-report.md` 是 Axiom 的长期方向来源。它负责给出远景，但当前开发仍以 v0.1 的可靠性闭环为准。
+早期硬约束已经取消。Axiom 可以改变架构，但每次大改都要先证明值得，并且能迁移、能回滚、能验证。
 
-## 当前用法
+## 当前决策规则
 
-- 用研究报告确定长期方向。
-- 用 `docs/SHORT_TERM.md` 决定本周和本轮要做什么。
-- 当前只取底层能力：采集、存储、检索、备份、可恢复。
-- AI 摘要、分类建议、周回顾等能力放在后续阶段。
+大改前先回答：
 
-## 长期目标与当前阶段的关系
+1. 当前痛点是什么，有什么证据。
+2. 方案改动范围是什么。
+3. 对真实数据、部署、脚本、文档的影响是什么。
+4. 迁移路径是什么。
+5. 回滚路径是什么。
+6. 本地如何验证，VPS 如何验证。
+7. 是否需要先备份或先 dry-run。
 
-```mermaid
-flowchart TD
-    A["长期目标研究报告"] --> B["能力方向"]
-    B --> C["采集"]
-    B --> D["存储"]
-    B --> E["检索"]
-    B --> F["AI 处理"]
-    C --> G["v0.1 当前主线"]
-    D --> G
-    E --> G
-    F --> H["后续阶段"]
-```
+{snippet("docs/AI_CONTEXT.md", 23, 52, "markdown")}
 
-## 报告开头
+## 短期目标
 
-{snippet("deep-research-report.md", 1, 100, "markdown")}
+{snippet("docs/SHORT_TERM.md", 1, 80, "markdown")}
+
+## 长期目标来源
+
+`deep-research-report.md` 负责长期方向。当前工程仍以稳定可运行的数据底座为优先。
+
+{snippet("deep-research-report.md", 1, 80, "markdown")}
+
+## 最近迭代
+
+{snippet("docs/ITERATION_LOG.md", 160, 230, "markdown")}
 """,
     )
 
@@ -529,15 +604,15 @@ flowchart TD
             "subsections": [],
         },
         {
-            "id": "section-reliability",
-            "title": "可靠性与操作",
-            "pages": ["page-consistency", "page-operations", "page-code"],
+            "id": "section-run",
+            "title": "可靠运行",
+            "pages": ["page-reliability", "page-operations", "page-automation"],
             "subsections": [],
         },
         {
-            "id": "section-direction",
-            "title": "目标与演进",
-            "pages": ["page-roadmap", "page-long-term"],
+            "id": "section-change",
+            "title": "继续开发",
+            "pages": ["page-code", "page-evolution"],
             "subsections": [],
         },
     ]
@@ -546,7 +621,7 @@ flowchart TD
         "wiki_structure": {
             "id": "wiki",
             "title": "Axiom 项目 Wiki",
-            "description": "面向阅读和接手的中文 Wiki：先理解当前阶段，再进入架构、接口、可靠性、运维和路线图。",
+            "description": "面向接手和持续开发的中文 Wiki：先理解当前运行基线，再进入架构、接口、可靠性、运维、自动化和演进规则。",
             "pages": pages,
             "sections": sections,
             "rootSections": [section["id"] for section in sections],

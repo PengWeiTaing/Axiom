@@ -1,10 +1,8 @@
 # Short Term
 
-这份文档只讲短期目标。
+这份文档只讲短期目标。它回答一个问题：
 
-它负责回答一个问题：
-
-`Axiom 现在最应该做什么？`
+`Axiom 现在最应该推进什么？`
 
 ## 当前阶段
 
@@ -13,106 +11,123 @@
 当前主线：
 
 ```text
-接收输入 -> 持久化存储 -> 基础检索 -> 手动备份
+稳定接收 -> 可靠存储 -> 可查可取 -> 可备份恢复 -> 可回顾 -> 可安全处理 inbox
 ```
+
+当前已经不再把早期技术边界作为硬约束。Flask、SQLite、文件系统和 VPS 是已验证基线；如果后续有明确收益，可以调整架构，但必须先完成决策说明、迁移方案、回滚方案和验证方案。
 
 ## 当前状态图
 
 ```mermaid
 flowchart LR
-    A["输入"] --> B["/add"]
-    B --> C["data/inbox/*.txt"]
+    A["输入"] --> B["receiver"]
+    B --> C["文件系统"]
     B --> D["SQLite items"]
-    D --> E["/recent"]
-    D --> F["/search"]
-    C --> G["backup zip"]
-    D --> G
+    D --> E["查询 / 检索"]
+    C --> F["备份"]
+    D --> F
+    D --> G["回顾底稿"]
+    D --> H["inbox 处理报告"]
+    H --> I["action 快照"]
+    I --> J["action history"]
 ```
 
 ## 当前已经有的东西
 
+- HTTPS 域名入口：`pengweitai.me`
+- Nginx 反向代理
+- gunicorn + systemd receiver 服务
 - `/health`
+- `/stats`
 - `/add`
+- `/upload`
+- `/item/<id>`
+- `/file/<id>`
+- `/archive/<id>`
+- `/restore/<id>`
 - `/recent`
 - `/search`
 - SQLite `items` 表
-- `data/inbox` 文件落盘
-- `scripts/backup_axiom.py` 手动备份脚本
-- `scripts/check_consistency.py` 一致性检查脚本
-- `scripts/smoke_test_receiver.py` receiver 冒烟测试
-- `deploy/axiom-receiver.service` systemd 服务模板
-- `.env.example` 环境变量示例
+- `data/inbox` 和 `data/archive`
+- 每日自动备份
+- 一致性检查脚本
+- receiver 冒烟测试
+- inbox processing 冒烟测试
+- Markdown 导出
+- daily / weekly review
+- inbox processing report
+- inbox action snapshot
+- inbox action history
+- 对应的 VPS systemd timers
 
-## 本轮已稳住的点
+## 当前已稳住的点
 
-- `/add` 支持 GET 和 POST JSON
-- `/add` 文件名加入微秒和短 UUID，降低碰撞风险
-- `/add` 写文件先落临时文件，再替换为正式 txt
-- `/add` 入库失败时会清理已经写入的 txt 文件
-- `/recent` 支持 `page`、`page_size`，兼容 `limit`
-- `/recent` 和 `/search` 的 `page_size` 上限统一为 `50`
-- `/search` 支持 `relevance`、`newest`、`oldest`
-- 错误返回统一为 JSON
-- `core/init_db.py` 复用 `receiver.py` 的建表逻辑
-- 新增文件和数据库一致性检查脚本
-- 一致性检查支持把数据库里的 `/opt/axiom/...` 映射到本地 `--root`
-- 新增 VPS systemd 服务模板和 `.env.example`
-- receiver 支持 `AXIOM_LOG_PATH` 文件日志
+- 文本和图片都能进入 inbox 并写入 SQLite。
+- 文件取回、元数据读取、统计、类型过滤、来源过滤、存储区过滤、时间范围过滤已经验证。
+- 归档和恢复不会破坏 `/file/<id>` 的取回路径。
+- 备份包含 SQLite、inbox、archive 和 manifest。
+- 一致性检查覆盖 inbox 与 archive。
+- review、inbox processing、action snapshot、action history 都已经能落盘。
+- 自动处理默认 dry-run，真正执行需要显式 `--apply`。
+- action 执行支持 `--only-id`、`--exclude-id`、`--max-items`，用于降低误操作风险。
 
 ## 当前最重要的风险
 
-### 运行稳定性
+### 数据安全
 
-- 仓库中已有 `systemd` 服务模板
-- 暂未在 VPS 上真实启用并验证
-- VPS 上还需要用真实路径跑一次 `/health`
+- 涉及真实数据的操作要先备份。
+- 真执行前优先 dry-run。
+- 归档、恢复、自动处理后都要跑一致性检查。
 
-### 数据一致性
+### 自动化误操作
 
-- `/add` 已补受控失败清理逻辑
-- 进程崩溃等非受控中断仍可能留下孤立文件
-- 已有 `scripts/check_consistency.py` 可发现孤立文件和缺失文件
-- 本地旧数据库可能会暴露 VPS 文件未同步的问题，这是正常诊断信号
+- `apply_inbox_actions.py` 默认 dry-run。
+- `--apply` 只在确认候选条目后使用。
+- 大批量处理前加 `--max-items`。
+- 对单条数据处理时优先使用 `--only-id`。
 
-### 备份闭环
+### 文档漂移
 
-- 手动备份脚本已经落地
-- 本地尚未替代 VPS 真实验证
-- 还没有做恢复演练
+- 小改动只更新 `docs/ITERATION_LOG.md`。
+- 大改动同步 README、DeepWiki、AI/Human/Short Term 上下文。
+- DeepWiki 生成脚本要和真实代码保持一致。
+
+### 架构升级
+
+- 解除硬约束不等于马上迁移。
+- 每次升级都要先证明当前基线在哪里挡住了进展。
+- 影响持久化和部署的改动必须有回滚路径。
 
 ## 短期优先级
 
 第一优先级：
 
-- 在 VPS 上安装并确认 receiver systemd 服务
-- 在 VPS 上跑 `scripts/backup_axiom.py`
-- 做一次恢复演练
-- 在 VPS 上跑 `scripts/check_consistency.py`
+- 保持 VPS 运行稳定。
+- 保持备份、恢复、一致性检查可用。
+- 保持 action snapshot 和 history 可回看。
+- 把新治理规则写入项目文档和 DeepWiki。
 
 第二优先级：
 
-- 在 VPS 上确认 `journalctl` 和 `/opt/axiom/logs/receiver.log` 都可用
-- 继续观察 `/recent` 和 `/search` 的实际使用感受
+- 改善人类阅读层，让 review、inbox report、action history 更容易消费。
+- 为图片补描述和后续 AI 摘要准备更清晰的数据入口。
+- 梳理需要架构升级时的决策模板。
 
 第三优先级：
 
-- 图片上传
-- 多类型 item 支持
+- 在证据足够时评估数据模型、检索层或服务结构升级。
+- 引入 AI 摘要、分类建议、周回顾增强。
 
 ## 当前建议顺序
 
-1. 把新 receiver 部署到 VPS
-2. 按 `deploy/axiom-receiver.service` 启动 systemd 服务
-3. 用真实快捷指令打一次 `/add`
-4. 在 VPS 上调用 `/health`、`/recent` 和 `/search`
-5. 跑一次真实备份
-6. 做恢复演练
-7. 跑一致性检查脚本
+1. 同步 README、AI/Human/Short Term 和 DeepWiki，明确新架构决策规则。
+2. 重新生成 DeepWiki 缓存。
+3. 跑本地冒烟测试和 `compileall`。
+4. 提交并推送。
+5. 下一轮优先做读取层体验或架构评估模板。
 
-## 当前明确暂缓
+## 最近操作习惯
 
-- 切换数据库
-- 引入新框架
-- 复杂 agent
-- 向量检索
-- 多服务化
+- 能一起做且不耽误推进的测试，集中放在一轮功能末尾执行。
+- 小功能做完后继续推进。
+- 需要用户消化或拍板的节点再停下来。

@@ -1,143 +1,178 @@
 # Axiom
 
-Axiom 是一个个人“外脑系统”的最小后端。
+Axiom 是个人“外脑系统”的后端工程。它先把输入、存储、检索、备份、回顾底稿和安全处理链路跑通，再逐步接入更复杂的 AI 能力。
 
-当前阶段围绕 `输入 -> 存储 -> 检索` 打基础，先把 VPS 单机后端做稳。
+## 当前运行基线
 
-## 当前定位
+当前线上基线已经部署在 VPS：
 
-当前阶段：`v0.1 alpha`
+```text
+iPhone / iOS 快捷指令
+  -> https://pengweitai.me
+  -> Nginx
+  -> gunicorn
+  -> Flask receiver
+  -> 文件系统 + SQLite
+  -> 备份 / 回顾 / inbox 处理自动化
+```
 
-当前只做：
+当前技术栈：
 
-- 接收输入
-- 持久化存储
-- 基础检索
-- 手动备份
+- Python
+- Flask
+- SQLite
+- 文件系统
+- Nginx + gunicorn + systemd
+- iOS 快捷指令作为输入端
 
-当前暂缓：
+这些是已经验证过的运行基线，不再作为永久硬约束。以后如果有明确收益，可以调整数据库、框架、部署形态或数据结构，但每次大改都要先写清收益、风险、迁移路径、回滚方案和验证办法。
 
-- 复杂前端
-- 复杂 agent
-- 向量数据库
-- 多服务拆分
+## 当前能力
+
+receiver 已提供：
+
+- `/health`：服务和数据库健康检查
+- `/stats`：总量、类型、来源、存储区统计
+- `/add`：文本写入
+- `/upload`：图片上传
+- `/item/<id>`：读取单条元数据
+- `/file/<id>`：按 item id 取回文件
+- `/archive/<id>`：归档 item 文件
+- `/restore/<id>`：从 archive 恢复到 inbox
+- `/recent`：分页读取最近记录，支持类型、存储区、来源、时间过滤
+- `/search`：关键词检索，支持相关性、时间和过滤条件
+
+脚本侧已提供：
+
+- 备份与恢复演练基础
+- 文件和数据库一致性检查
+- Markdown 导出
+- 日回顾 / 周回顾底稿
+- inbox 处理报告
+- inbox action dry-run / apply 留痕
+- action history 日 / 周汇总
+- VPS systemd 定时任务模板
 
 ## 当前状态图
 
 ```mermaid
 flowchart TD
-    A["iPhone 快捷指令"] -->|"text + key"| B["VPS / Flask receiver"]
-    B --> C["/add"]
-    C --> D["写入临时 txt 文件"]
-    D --> E["替换为 inbox 正式文件"]
-    E --> F["SQLite items 入库"]
+    A["iPhone 快捷指令"] --> B["HTTPS / Nginx"]
+    B --> C["gunicorn + Flask receiver"]
 
-    B --> G["/recent"]
-    G --> H["按 id 分页读取"]
+    C --> D["/add 文本"]
+    C --> E["/upload 图片"]
+    D --> F["data/inbox"]
+    E --> F
+    D --> G["SQLite items"]
+    E --> G
 
-    B --> I["/search"]
-    I --> J["SQLite LIKE 基础检索"]
+    G --> H["/recent / /search"]
+    G --> I["/item / /file"]
+    F --> I
 
-    E --> K["scripts/backup_axiom.py"]
-    F --> K
-    K --> L["backup zip + manifest"]
+    I --> J["/archive / /restore"]
+    J --> F
+    J --> K["data/archive"]
+
+    F --> L["backup zip"]
+    K --> L
+    G --> L
+
+    G --> M["review / inbox processing"]
+    M --> N["action snapshots / history"]
 ```
 
-## 当前链路
+## 架构决策规则
 
-```text
-iPhone
-  -> iOS 快捷指令
-  -> VPS
-  -> Flask receiver
-  -> 文件系统
-  -> SQLite
-```
+以后可以改架构，但按下面顺序推进：
 
-当前原则：
-
-- VPS 是主节点
-- 文件是内容本体
-- 数据库是索引
-- 先把最小后端做稳，再谈 AI
+1. 先说明当前痛点和证据。
+2. 再说明准备改什么，以及为什么值得改。
+3. 明确会影响哪些真实数据、脚本、部署配置和文档。
+4. 准备迁移步骤和回滚步骤。
+5. 本地测试通过后，再考虑 VPS 部署。
+6. 涉及真实数据前先备份。
+7. 大变动提交前同步 README、DeepWiki 和上下文文档；小变动只更新 `docs/ITERATION_LOG.md`。
 
 ## 关键代码
 
-- `core/receiver.py`：当前主入口，负责 `/health`、`/add`、`/recent`、`/search`
-- `core/init_db.py`：独立数据库初始化脚本，复用 `receiver.py` 的建表逻辑
-- `scripts/backup_axiom.py`：手动备份脚本
-- `scripts/check_consistency.py`：检查 inbox 文件和 SQLite 索引是否一致
+- `core/receiver.py`：receiver 主入口，负责 API、鉴权、落盘、入库、查询、归档和恢复
+- `core/init_db.py`：独立数据库初始化脚本，复用 receiver 的建表逻辑
+- `scripts/backup_axiom.py`：备份 SQLite、inbox、archive 并生成 manifest
+- `scripts/check_consistency.py`：检查文件系统和 SQLite 索引是否一致
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
-- `scripts/generate_deepwiki_cache.py`：本地 DeepWiki 缓存生成脚本
-- `deploy/axiom-receiver.service`：VPS 上的 systemd 服务模板
-- `.env.example`：环境变量示例，不包含真实 key
-- `requirements.txt`：当前 Python 运行依赖
+- `scripts/build_review_markdown.py`：生成日 / 周回顾 Markdown
+- `scripts/save_review_snapshot.py`：保存日 / 周回顾快照
+- `scripts/build_inbox_processing_report.py`：生成 inbox 处理建议
+- `scripts/apply_inbox_actions.py`：dry-run 或执行 inbox 动作
+- `scripts/save_inbox_action_snapshot.py`：保存 inbox action 快照并附带一致性检查
+- `scripts/list_inbox_action_snapshots.py`：读取历史 action snapshots
+- `scripts/build_inbox_action_history_markdown.py`：聚合 action history
+- `scripts/save_inbox_action_history_snapshot.py`：保存 action history 快照
+- `scripts/generate_deepwiki_cache.py`：生成本地 DeepWiki 缓存
+- `deploy/*.service` / `deploy/*.timer`：VPS systemd 服务和定时任务模板
 
 ## 本地验证
 
 ```powershell
 pip install -r requirements.txt
+python -m compileall -q core scripts
 python scripts\smoke_test_receiver.py
+python scripts\smoke_test_inbox_processing.py
 python scripts\check_consistency.py --root .
 ```
 
-`check_consistency.py` 默认会把数据库里的 `/opt/axiom/...` 路径映射到传入的 `--root` 下，方便本地检查从 VPS 拉下来的数据。
+如果本地没有同步 VPS 的真实 `data/inbox` 或 `data/archive`，一致性检查可能会报告缺文件。这是诊断结果，不代表脚本损坏。
 
-## VPS 运行模板
-
-在 VPS 的 `/opt/axiom` 目录下准备 Python 环境：
+## VPS 常用命令
 
 ```bash
 cd /opt/axiom
-python3 -m venv .venv
+sudo systemctl status axiom-receiver --no-pager
+sudo journalctl -u axiom-receiver -f
+tail -f /opt/axiom/logs/receiver.log
+curl http://127.0.0.1:5000/health
+python3 scripts/check_consistency.py --root /opt/axiom
+python3 scripts/backup_axiom.py --root /opt/axiom --keep 14
+```
+
+部署更新的常规顺序：
+
+```bash
+cd /opt/axiom
+git pull
 . .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-```
-
-编辑 `/opt/axiom/.env`，把 `AXIOM_SECRET_KEY` 改成真实 key。
-
-安装 systemd 服务模板：
-
-```bash
-sudo cp deploy/axiom-receiver.service /etc/systemd/system/axiom-receiver.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now axiom-receiver
-```
-
-常用检查命令：
-
-```bash
-systemctl status axiom-receiver --no-pager
-journalctl -u axiom-receiver -f
-tail -f /opt/axiom/logs/receiver.log
+python3 scripts/check_consistency.py --root /opt/axiom
+sudo systemctl restart axiom-receiver
 curl http://127.0.0.1:5000/health
 ```
 
 ## 文档结构
 
-仓库里的文档只保留这几类：
-
-- `docs/AI_CONTEXT.md`：给 AI 协作代理看的上下文
-- `docs/HUMAN_CONTEXT.md`：给人看的上下文，附需要完全掌握的位置
-- `deep-research-report.md`：长远目标研究报告
-- `docs/SHORT_TERM.md`：短期目标和当前阶段主线
+- `docs/AI_CONTEXT.md`：给 AI 协作代理看的当前事实和决策规则
+- `docs/HUMAN_CONTEXT.md`：给人看的接手路径和必须掌握的位置
+- `deep-research-report.md`：长期目标研究报告
+- `docs/SHORT_TERM.md`：短期推进方向
 - `README.md`：项目简介
 - `docs/ITERATION_LOG.md`：迭代记录
-- `docs/DEEPWIKI.md`：DeepWiki 说明
+- `docs/DEEPWIKI.md`：DeepWiki 使用说明
 
-## 先读哪几份
+## 推荐阅读顺序
 
-人类接手时先读：
+人类接手：
 
 1. `README.md`
-2. `DeepWiki 主入口`
-3. `docs/SHORT_TERM.md`
-4. `deep-research-report.md`
+2. DeepWiki 主入口
+3. `docs/HUMAN_CONTEXT.md`
+4. `docs/SHORT_TERM.md`
+5. `deep-research-report.md`
 
-AI 协作代理接手时先读：
+AI 协作代理接手：
 
 1. `docs/AI_CONTEXT.md`
 2. `docs/SHORT_TERM.md`
 3. `core/receiver.py`
-4. `scripts/backup_axiom.py`
+4. `scripts/check_consistency.py`
+5. `scripts/backup_axiom.py`
