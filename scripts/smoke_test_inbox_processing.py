@@ -33,6 +33,25 @@ def assert_contains(text: str, expected: str, label: str) -> None:
         raise AssertionError(f"{label}: expected to find {expected!r}\n{text}")
 
 
+def assert_command_fails(args: list[str], expected: str, label: str) -> None:
+    env = os.environ.copy()
+    env["PYTHONUTF8"] = "1"
+    result = subprocess.run(
+        args,
+        cwd=str(REPO_ROOT),
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=env,
+    )
+    if result.returncode == 0:
+        raise AssertionError(f"{label}: command should fail but succeeded\n{result.stdout}")
+    combined_output = (result.stdout or "") + (result.stderr or "")
+    if expected not in combined_output:
+        raise AssertionError(f"{label}: expected to find {expected!r}\n{combined_output}")
+
+
 def extract_saved_snapshot_path(output: str) -> Path:
     prefix = "saved inbox action snapshot: "
     for line in output.splitlines():
@@ -165,6 +184,7 @@ def main() -> None:
         assert_contains(report_output, "scripts/save_inbox_action_snapshot.py", "report command section")
         assert_contains(report_output, f"--only-id {stale_text_id}", "report command stale text")
         assert_contains(report_output, f"--only-id {stale_image_id}", "report command stale image")
+        assert_contains(report_output, "--max-items 1", "report max-items note")
 
         dry_run_output = run_command(
             [
@@ -203,6 +223,25 @@ def main() -> None:
         )
         assert_contains(dry_run_with_image_output, "- total_candidates: 2", "dry run include count")
         assert_contains(dry_run_with_image_output, f"[item {stale_image_id}]", "dry run include image")
+        assert_command_fails(
+            [
+                sys.executable,
+                "scripts/apply_inbox_actions.py",
+                "--root",
+                str(root),
+                "--date",
+                "2026-04-29",
+                "--utc-offset",
+                "+08:00",
+                "--stale-days",
+                "3",
+                "--include-describe-then-archive",
+                "--max-items",
+                "1",
+            ],
+            "超过 --max-items=1",
+            "max-items guard",
+        )
 
         dry_run_only_image_output = run_command(
             [
@@ -250,6 +289,21 @@ def main() -> None:
         assert_contains(saved_dry_run_markdown, "- mode: dry-run", "saved dry-run mode")
         assert_contains(saved_dry_run_markdown, "## Post Checks", "saved dry-run checks")
         assert_contains(saved_dry_run_markdown, "- consistency_ok: True", "saved dry-run consistency")
+        dry_run_history_output = run_command(
+            [
+                sys.executable,
+                "scripts/list_inbox_action_snapshots.py",
+                "--root",
+                str(root),
+                "--mode",
+                "dry-run",
+                "--date",
+                "2026-04-29",
+                "--details",
+            ]
+        )
+        assert_contains(dry_run_history_output, str(saved_dry_run_path), "dry-run history path")
+        assert_contains(dry_run_history_output, f"item {stale_text_id} | text | 归档候选 | dry-run", "dry-run history entry")
 
         apply_output = run_command(
             [
@@ -327,6 +381,21 @@ def main() -> None:
         assert_contains(saved_apply_markdown, "- mode: apply", "saved apply mode")
         assert_contains(saved_apply_markdown, f"[item {stale_image_id}]", "saved apply image")
         assert_contains(saved_apply_markdown, "- consistency_ok: True", "saved apply consistency")
+        apply_history_output = run_command(
+            [
+                sys.executable,
+                "scripts/list_inbox_action_snapshots.py",
+                "--root",
+                str(root),
+                "--mode",
+                "apply",
+                "--item-id",
+                str(stale_image_id),
+                "--details",
+            ]
+        )
+        assert_contains(apply_history_output, str(saved_apply_path), "apply history path")
+        assert_contains(apply_history_output, f"item {stale_image_id} | image | 补描述后归档 | applied", "apply history entry")
 
         stale_image_path = fetch_file_path(root, stale_image_id)
         if "data\\archive" not in str(stale_image_path) and "data/archive" not in str(stale_image_path):

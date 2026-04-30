@@ -303,6 +303,7 @@ def build_markdown(args: argparse.Namespace, items: list[ProcessingItem]) -> str
             "",
             "- 这是规则化处理报告，只给出建议动作，不会自动改动存储状态。",
             "- 当前默认只检查 storage=inbox 的条目。",
+            "- 若想给执行再加一层保险，可在建议命令后手动补 `--max-items 1` 这类限制。",
             "",
         ]
     )

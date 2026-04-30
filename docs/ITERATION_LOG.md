@@ -153,3 +153,11 @@
 - `build_inbox_processing_report.py` 的建议命令默认切换为 `save_inbox_action_snapshot.py`，优先引导走“执行并留痕”的入口
 - 本地已验证：处理报告中的建议命令区块会引用 `save_inbox_action_snapshot.py`
 - VPS 已刷新 `/opt/axiom/data/reviews/inbox/2026/2026-04-30.md`，当前云端 inbox 处理报告已默认给出带留痕的下一步命令
+- 新增 `scripts/list_inbox_action_snapshots.py`，可按 `mode`、`date`、`date_from`、`date_to`、`item_id`、`status` 读取并汇总历史 action snapshots
+- action history 脚本支持 `--details` 展开条目细节，支持 `--latest-per-date` 只保留每个日期的最新快照
+- 本地已验证：history 脚本能正确读出 dry-run / apply 快照，并按 item 过滤出对应记录
+- VPS 已验证：history 脚本能读取 `2026-04-30` 与模拟日期 `2026-05-03` 的 dry-run 快照，并识别图片 `id=5` 的候选记录
+- `apply_inbox_actions.py` 新增 `--max-items`，当命中的候选条目数超过阈值时会中止执行
+- `build_inbox_processing_report.py` 已提示可在建议命令后手动补 `--max-items 1` 这类保险参数
+- 本地已验证：当 `补描述后归档` 与 `归档候选` 同时命中时，`--max-items 1` 会拒绝继续执行
+- VPS 已验证：对模拟日期 `2026-05-03` 执行 `--include-describe-then-archive --max-items 1` 时，会返回“命中 2 个候选条目，超过 --max-items=1”

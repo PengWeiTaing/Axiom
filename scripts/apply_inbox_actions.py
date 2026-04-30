@@ -137,6 +137,11 @@ def build_execution_entries(
 
 
 def execute_entries(args: argparse.Namespace, entries: list[ExecutionEntry]) -> None:
+    if args.max_items is not None and len(entries) > args.max_items:
+        raise ValueError(
+            f"命中 {len(entries)} 个候选条目，超过 --max-items={args.max_items}"
+        )
+
     if not args.apply:
         for entry in entries:
             entry.status = "dry-run"
@@ -201,6 +206,7 @@ def build_markdown(args: argparse.Namespace, entries: list[ExecutionEntry]) -> s
         f"- include_describe_then_archive: {args.include_describe_then_archive}",
         f"- only_ids: {args.only_ids or 'None'}",
         f"- exclude_ids: {args.exclude_ids or 'None'}",
+        f"- max_items: {args.max_items if args.max_items is not None else 'None'}",
         f"- total_candidates: {len(entries)}",
         "- by_status: " + (", ".join(f"{key}={value}" for key, value in sorted(status_counts.items())) or "None"),
         "",
@@ -307,6 +313,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip the selected item id. Repeat this flag for multiple ids.",
     )
     parser.add_argument(
+        "--max-items",
+        type=int,
+        help="Abort when matched candidates exceed this count.",
+    )
+    parser.add_argument(
         "--apply",
         action="store_true",
         help="Really apply archive actions. Default is dry-run.",
@@ -330,6 +341,8 @@ def finalize_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
         parser.error("--only-id must be greater than 0")
     if args.exclude_ids and any(item_id <= 0 for item_id in args.exclude_ids):
         parser.error("--exclude-id must be greater than 0")
+    if args.max_items is not None and args.max_items <= 0:
+        parser.error("--max-items must be greater than 0")
 
     local_tz = report_tools.review_tools.parse_utc_offset(args.utc_offset)
     report_date = report_tools.review_tools.parse_anchor_date(args.date, local_tz)
