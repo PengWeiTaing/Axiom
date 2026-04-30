@@ -187,3 +187,5 @@
 - 新增 `/artifacts/file/<path>` 接口，可安全取回 `data/reviews` 下的 markdown 文件
 - `/artifacts` 支持 `group`、`window`、`mode`、`date_from`、`date_to`、分页和排序过滤
 - 本地冒烟测试新增自动化产物读取覆盖，验证 artifact 列表、summary、过滤、错误参数和文件取回
+- 新增 `/overview` 接口，聚合返回 stats、最近记录和最新自动化产物摘要
+- `/overview` 支持 `recent_limit` 和 `preview_chars`，适合作为手机端和轻前端总览接口

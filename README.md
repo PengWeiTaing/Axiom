@@ -41,6 +41,7 @@ receiver 已提供：
 - `/restore/<id>`：从 archive 恢复到 inbox
 - `/recent`：分页读取最近记录，支持类型、存储区、来源、时间过滤
 - `/search`：关键词检索，支持相关性、时间和过滤条件
+- `/overview`：聚合返回统计、最近记录和最新自动化产物摘要
 - `/artifacts`：列出 `data/reviews` 下的自动化产物
 - `/artifacts/summary`：直接读取各类自动化产物的最新摘要
 - `/artifacts/file/<path>`：取回 markdown artifact 文件

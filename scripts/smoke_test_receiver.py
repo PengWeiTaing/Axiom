@@ -430,6 +430,25 @@ def main() -> None:
             assert stats["by_storage"].get("archive", 0) == 0
             assert stats["by_storage"]["inbox"] == 3
 
+            overview = assert_status(
+                client.get(
+                    "/overview",
+                    query_string={
+                        "key": "test-key",
+                        "recent_limit": "2",
+                        "preview_chars": "120",
+                    },
+                ),
+                200,
+                "overview",
+            )
+            assert overview["service"] == "axiom-receiver"
+            assert overview["stats"]["total"] == 3
+            assert overview["recent"]["limit"] == 2
+            assert len(overview["recent"]["items"]) == 2
+            assert overview["recent"]["items"][0]["id"] == 3
+            assert overview["recent"]["items"][1]["id"] == 2
+
             review_daily_path = root / "data" / "reviews" / "daily" / "2026" / "2026-04-29.md"
             review_daily_path.parent.mkdir(parents=True, exist_ok=True)
             review_daily_path.write_text(
@@ -488,6 +507,12 @@ def main() -> None:
                 "Action history preview line.\n",
                 encoding="utf-8",
             )
+
+            base_mtime = 1_700_000_000
+            os.utime(review_daily_path, (base_mtime + 10, base_mtime + 10))
+            os.utime(inbox_report_path, (base_mtime + 20, base_mtime + 20))
+            os.utime(action_history_path, (base_mtime + 30, base_mtime + 30))
+            os.utime(action_snapshot_path, (base_mtime + 40, base_mtime + 40))
 
             artifacts = assert_status(
                 client.get("/artifacts", query_string={"key": "test-key", "limit": "100"}),
@@ -556,6 +581,29 @@ def main() -> None:
                 == "Entries Action snapshot preview line."
             )
 
+            overview_with_artifacts = assert_status(
+                client.get(
+                    "/overview",
+                    query_string={
+                        "key": "test-key",
+                        "recent_limit": "2",
+                        "preview_chars": "120",
+                    },
+                ),
+                200,
+                "overview with artifacts",
+            )
+            assert overview_with_artifacts["artifacts"]["total"] == 4
+            assert overview_with_artifacts["artifacts"]["counts"]["review"]["daily"] == 1
+            assert (
+                overview_with_artifacts["artifacts"]["latest"]["review"]["daily"]["preview"]
+                == "Summary Daily review summary line."
+            )
+            assert (
+                overview_with_artifacts["artifacts"]["latest_overall"]["relative_path"]
+                == "data/reviews/inbox-actions/dry-run/2026/2026-04-30/20260430_120000_000001.md"
+            )
+
             review_artifact_summary = assert_status(
                 client.get(
                     "/artifacts/summary",
@@ -584,6 +632,16 @@ def main() -> None:
             )
             assert invalid_artifact_filter["ok"] is False
             assert invalid_artifact_filter["error"]["code"] == "invalid_artifact_filter"
+
+            invalid_overview = assert_status(
+                client.get(
+                    "/overview",
+                    query_string={"key": "test-key", "recent_limit": "0"},
+                ),
+                400,
+                "invalid overview",
+            )
+            assert invalid_overview["error"]["code"] == "invalid_overview_param"
 
             artifact_file = client.get(
                 "/artifacts/file/data/reviews/daily/2026/2026-04-29.md",

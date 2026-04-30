@@ -338,6 +338,15 @@ def read_preview_chars(default: int = 240) -> int:
     )
 
 
+def read_recent_limit(default: int = 10) -> int:
+    return parse_positive_int(
+        request.args.get("recent_limit"),
+        "recent_limit",
+        default,
+        MAX_PAGE_SIZE,
+    )
+
+
 def build_item_filter_conditions(
     item_type: str | None,
     storage: str | None,
@@ -592,6 +601,70 @@ def count_storage_areas(rows: list[sqlite3.Row]) -> dict:
         storage = get_storage_area(row["file_path"]) or "unknown"
         counts[storage] = counts.get(storage, 0) + 1
     return counts
+
+
+def build_stats_payload() -> dict:
+    conn = get_db_connection()
+    try:
+        summary = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total,
+                MIN(created_at) AS first_created_at,
+                MAX(created_at) AS latest_created_at
+            FROM items
+            """
+        ).fetchone()
+        type_rows = conn.execute(
+            """
+            SELECT type, COUNT(*) AS count
+            FROM items
+            GROUP BY type
+            ORDER BY type
+            """
+        ).fetchall()
+        source_rows = conn.execute(
+            """
+            SELECT source, COUNT(*) AS count
+            FROM items
+            GROUP BY source
+            ORDER BY source
+            """
+        ).fetchall()
+        storage_rows = conn.execute(
+            """
+            SELECT file_path
+            FROM items
+            WHERE file_path IS NOT NULL AND file_path != ''
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return {
+        "total": summary["total"],
+        "first_created_at": summary["first_created_at"],
+        "latest_created_at": summary["latest_created_at"],
+        "by_type": rows_to_count_map(type_rows, "type"),
+        "by_source": rows_to_count_map(source_rows, "source"),
+        "by_storage": count_storage_areas(storage_rows),
+    }
+
+
+def fetch_recent_item_rows(limit: int) -> list[sqlite3.Row]:
+    conn = get_db_connection()
+    try:
+        return conn.execute(
+            """
+            SELECT id, type, content, file_path, source, created_at
+            FROM items
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    finally:
+        conn.close()
 
 
 def resolve_stored_file_path(file_path_value: str | None) -> Path | None:
@@ -897,51 +970,41 @@ def stats():
     if auth_error:
         return auth_error
 
-    conn = get_db_connection()
+    return ok_response(build_stats_payload())
+
+
+@app.route("/overview", methods=["GET"])
+def overview():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
     try:
-        summary = conn.execute(
-            """
-            SELECT
-                COUNT(*) AS total,
-                MIN(created_at) AS first_created_at,
-                MAX(created_at) AS latest_created_at
-            FROM items
-            """
-        ).fetchone()
-        type_rows = conn.execute(
-            """
-            SELECT type, COUNT(*) AS count
-            FROM items
-            GROUP BY type
-            ORDER BY type
-            """
-        ).fetchall()
-        source_rows = conn.execute(
-            """
-            SELECT source, COUNT(*) AS count
-            FROM items
-            GROUP BY source
-            ORDER BY source
-            """
-        ).fetchall()
-        storage_rows = conn.execute(
-            """
-            SELECT file_path
-            FROM items
-            WHERE file_path IS NOT NULL AND file_path != ''
-            """
-        ).fetchall()
-    finally:
-        conn.close()
+        recent_limit = read_recent_limit()
+        preview_chars = read_preview_chars()
+    except ValueError as exc:
+        return error_response(400, "invalid_overview_param", str(exc))
+
+    recent_rows = fetch_recent_item_rows(recent_limit)
+    artifacts = list_review_artifacts()
+    latest_overall = max(artifacts, key=artifact_sort_key) if artifacts else None
 
     return ok_response(
         {
-            "total": summary["total"],
-            "first_created_at": summary["first_created_at"],
-            "latest_created_at": summary["latest_created_at"],
-            "by_type": rows_to_count_map(type_rows, "type"),
-            "by_source": rows_to_count_map(source_rows, "source"),
-            "by_storage": count_storage_areas(storage_rows),
+            "service": "axiom-receiver",
+            "generated_at": utc_now().isoformat(timespec="seconds"),
+            "recent": {
+                "limit": recent_limit,
+                "items": [row_to_item(row) for row in recent_rows],
+            },
+            "stats": build_stats_payload(),
+            "artifacts": {
+                "preview_chars": preview_chars,
+                "total": len(artifacts),
+                "counts": build_artifact_counts(artifacts),
+                "latest_overall": build_artifact_summary_payload(latest_overall, preview_chars),
+                "latest": build_artifact_latest_summary(artifacts, preview_chars),
+            },
         }
     )
 
