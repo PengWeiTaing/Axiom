@@ -33,7 +33,7 @@ flowchart TD
 ## 需要完全掌握的位置
 
 1. `core/receiver.py`
-   需要掌握：配置区、`init_db()`、`build_item_payload()`、`build_artifact_payload()`、`write_text_file_atomic()`、`write_binary_file_atomic()`、`insert_item()`、`get_item_file()`、`list_artifacts()`、`get_artifact_file()`、`archive_item()`、`restore_item()`、`recent_items()`、`search_items()`。
+   需要掌握：配置区、`init_db()`、`build_item_payload()`、`build_artifact_payload()`、`build_artifact_latest_summary()`、`write_text_file_atomic()`、`write_binary_file_atomic()`、`insert_item()`、`get_item_file()`、`list_artifacts()`、`artifact_summary()`、`get_artifact_file()`、`archive_item()`、`restore_item()`、`recent_items()`、`search_items()`。
 2. `scripts/check_consistency.py`
    需要掌握：如何检查 DB 记录缺文件、storage 孤立文件、缺失 `file_path` 的记录，以及 `/opt/axiom/...` 到本地 `--root` 的映射。
 3. `scripts/backup_axiom.py`

@@ -432,11 +432,24 @@ def main() -> None:
 
             review_daily_path = root / "data" / "reviews" / "daily" / "2026" / "2026-04-29.md"
             review_daily_path.parent.mkdir(parents=True, exist_ok=True)
-            review_daily_path.write_text("# daily review\n", encoding="utf-8")
+            review_daily_path.write_text(
+                "# daily review\n\n"
+                "- generated_at: 2026-04-29T00:00:00+00:00\n"
+                "- report_date: 2026-04-29\n\n"
+                "## Summary\n\n"
+                "Daily review summary line.\n",
+                encoding="utf-8",
+            )
 
             inbox_report_path = root / "data" / "reviews" / "inbox" / "2026" / "2026-04-29.md"
             inbox_report_path.parent.mkdir(parents=True, exist_ok=True)
-            inbox_report_path.write_text("# inbox report\n", encoding="utf-8")
+            inbox_report_path.write_text(
+                "# inbox report\n\n"
+                "- generated_at: 2026-04-29T00:10:00+00:00\n\n"
+                "## Summary\n\n"
+                "Inbox report summary line.\n",
+                encoding="utf-8",
+            )
 
             action_snapshot_path = (
                 root
@@ -449,7 +462,14 @@ def main() -> None:
                 / "20260430_120000_000001.md"
             )
             action_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-            action_snapshot_path.write_text("# action snapshot\n", encoding="utf-8")
+            action_snapshot_path.write_text(
+                "# action snapshot\n\n"
+                "- generated_at: 2026-04-30T12:00:00+00:00\n"
+                "- mode: dry-run\n\n"
+                "## Entries\n\n"
+                "Action snapshot preview line.\n",
+                encoding="utf-8",
+            )
 
             action_history_path = (
                 root
@@ -461,7 +481,13 @@ def main() -> None:
                 / "2026-04-29.md"
             )
             action_history_path.parent.mkdir(parents=True, exist_ok=True)
-            action_history_path.write_text("# action history\n", encoding="utf-8")
+            action_history_path.write_text(
+                "# action history\n\n"
+                "- generated_at: 2026-04-29T18:00:00+00:00\n\n"
+                "## Summary\n\n"
+                "Action history preview line.\n",
+                encoding="utf-8",
+            )
 
             artifacts = assert_status(
                 client.get("/artifacts", query_string={"key": "test-key", "limit": "100"}),
@@ -507,6 +533,46 @@ def main() -> None:
             assert action_artifacts["mode"] == "dry-run"
             assert action_artifacts["total"] == 1
             assert action_artifacts["items"][0]["report_date"] == "2026-04-30"
+
+            artifact_summary = assert_status(
+                client.get(
+                    "/artifacts/summary",
+                    query_string={"key": "test-key", "preview_chars": "120"},
+                ),
+                200,
+                "artifact summary",
+            )
+            assert artifact_summary["total"] == 4
+            assert artifact_summary["counts"]["review"]["daily"] == 1
+            assert artifact_summary["counts"]["inbox"] == 1
+            assert artifact_summary["counts"]["inbox-actions"]["dry-run"] == 1
+            assert artifact_summary["counts"]["inbox-action-history"]["daily"] == 1
+            assert (
+                artifact_summary["latest"]["review"]["daily"]["preview"]
+                == "Summary Daily review summary line."
+            )
+            assert (
+                artifact_summary["latest"]["inbox-actions"]["dry-run"]["preview"]
+                == "Entries Action snapshot preview line."
+            )
+
+            review_artifact_summary = assert_status(
+                client.get(
+                    "/artifacts/summary",
+                    query_string={
+                        "key": "test-key",
+                        "group": "review",
+                        "window": "daily",
+                    },
+                ),
+                200,
+                "review artifact summary",
+            )
+            assert review_artifact_summary["total"] == 1
+            assert review_artifact_summary["latest"]["review"]["daily"]["relative_path"] == (
+                "data/reviews/daily/2026/2026-04-29.md"
+            )
+            assert review_artifact_summary["latest"]["inbox"] is None
 
             invalid_artifact_filter = assert_status(
                 client.get(

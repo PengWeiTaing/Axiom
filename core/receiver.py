@@ -329,6 +329,15 @@ def read_artifact_date_range() -> tuple[date | None, date | None]:
     return date_from, date_to
 
 
+def read_preview_chars(default: int = 240) -> int:
+    return parse_positive_int(
+        request.args.get("preview_chars"),
+        "preview_chars",
+        default,
+        1000,
+    )
+
+
 def build_item_filter_conditions(
     item_type: str | None,
     storage: str | None,
@@ -690,6 +699,10 @@ def list_review_artifacts() -> list[dict]:
     return artifacts
 
 
+def artifact_sort_key(artifact: dict) -> tuple[str, str]:
+    return artifact["modified_at"], artifact["relative_path"]
+
+
 def artifact_matches_filters(
     artifact: dict,
     *,
@@ -720,6 +733,132 @@ def artifact_matches_filters(
             return False
 
     return True
+
+
+def select_latest_artifact(
+    artifacts: list[dict],
+    *,
+    group: str,
+    window: str | None = None,
+    mode: str | None = None,
+) -> dict | None:
+    matches = [
+        artifact
+        for artifact in artifacts
+        if artifact["group"] == group
+        and (window is None or artifact.get("window") == window)
+        and (mode is None or artifact.get("mode") == mode)
+    ]
+    if not matches:
+        return None
+    return max(matches, key=artifact_sort_key)
+
+
+def extract_markdown_preview(file_path: Path, max_chars: int) -> str:
+    text = file_path.read_text(encoding="utf-8")
+    preview_lines: list[str] = []
+    skip_metadata = True
+
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("# "):
+            continue
+        if skip_metadata and stripped.startswith("- ") and ":" in stripped:
+            continue
+
+        cleaned = stripped.lstrip("#").strip()
+        if cleaned:
+            preview_lines.append(cleaned)
+            skip_metadata = False
+
+        preview = " ".join(preview_lines).strip()
+        if len(preview) >= max_chars:
+            break
+
+    preview = " ".join(preview_lines).strip()
+    if len(preview) > max_chars:
+        return preview[: max_chars - 3].rstrip() + "..."
+    return preview
+
+
+def build_artifact_summary_payload(artifact: dict | None, preview_chars: int) -> dict | None:
+    if artifact is None:
+        return None
+
+    payload = dict(artifact)
+    try:
+        file_path = resolve_review_artifact_path(artifact["relative_path"])
+        if file_path.is_file():
+            payload["preview"] = extract_markdown_preview(file_path, preview_chars)
+        else:
+            payload["preview"] = ""
+    except (OSError, UnicodeError, ValueError):
+        payload["preview"] = ""
+
+    return payload
+
+
+def build_artifact_counts(artifacts: list[dict]) -> dict:
+    counts = {
+        "review": {"daily": 0, "weekly": 0},
+        "inbox": 0,
+        "inbox-actions": {"dry-run": 0, "apply": 0},
+        "inbox-action-history": {"daily": 0, "weekly": 0},
+    }
+
+    for artifact in artifacts:
+        group = artifact["group"]
+        if group == "review":
+            counts["review"][artifact["window"]] += 1
+        elif group == "inbox":
+            counts["inbox"] += 1
+        elif group == "inbox-actions":
+            counts["inbox-actions"][artifact["mode"]] += 1
+        elif group == "inbox-action-history":
+            counts["inbox-action-history"][artifact["window"]] += 1
+
+    return counts
+
+
+def build_artifact_latest_summary(artifacts: list[dict], preview_chars: int) -> dict:
+    return {
+        "review": {
+            "daily": build_artifact_summary_payload(
+                select_latest_artifact(artifacts, group="review", window="daily"),
+                preview_chars,
+            ),
+            "weekly": build_artifact_summary_payload(
+                select_latest_artifact(artifacts, group="review", window="weekly"),
+                preview_chars,
+            ),
+        },
+        "inbox": build_artifact_summary_payload(
+            select_latest_artifact(artifacts, group="inbox"),
+            preview_chars,
+        ),
+        "inbox-actions": {
+            "dry-run": build_artifact_summary_payload(
+                select_latest_artifact(artifacts, group="inbox-actions", mode="dry-run"),
+                preview_chars,
+            ),
+            "apply": build_artifact_summary_payload(
+                select_latest_artifact(artifacts, group="inbox-actions", mode="apply"),
+                preview_chars,
+            ),
+        },
+        "inbox-action-history": {
+            "daily": build_artifact_summary_payload(
+                select_latest_artifact(artifacts, group="inbox-action-history", window="daily"),
+                preview_chars,
+            ),
+            "weekly": build_artifact_summary_payload(
+                select_latest_artifact(artifacts, group="inbox-action-history", window="weekly"),
+                preview_chars,
+            ),
+        },
+    }
 
 
 def cleanup_file(file_path: Path) -> None:
@@ -997,6 +1136,52 @@ def list_artifacts():
             "total": total,
             "total_pages": total_pages,
             "items": page_items,
+        }
+    )
+
+
+@app.route("/artifacts/summary", methods=["GET"])
+def artifact_summary():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        group = read_artifact_group_filter()
+        window = read_artifact_window_filter()
+        mode = read_artifact_mode_filter()
+        date_from, date_to = read_artifact_date_range()
+        preview_chars = read_preview_chars()
+    except ValueError as exc:
+        return error_response(400, "invalid_artifact_filter", str(exc))
+
+    artifacts = [
+        artifact
+        for artifact in list_review_artifacts()
+        if artifact_matches_filters(
+            artifact,
+            group=group,
+            window=window,
+            mode=mode,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    ]
+
+    latest_overall = max(artifacts, key=artifact_sort_key) if artifacts else None
+
+    return ok_response(
+        {
+            "group": group,
+            "window": window,
+            "mode": mode,
+            "date_from": date_from.isoformat() if date_from else None,
+            "date_to": date_to.isoformat() if date_to else None,
+            "preview_chars": preview_chars,
+            "total": len(artifacts),
+            "counts": build_artifact_counts(artifacts),
+            "latest_overall": build_artifact_summary_payload(latest_overall, preview_chars),
+            "latest": build_artifact_latest_summary(artifacts, preview_chars),
         }
     )
 

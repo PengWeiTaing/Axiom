@@ -127,6 +127,7 @@ logs/
 - `/recent`
 - `/search`
 - `/artifacts`
+- `/artifacts/summary`
 - `/artifacts/file/<path>`
 
 重要行为：
@@ -140,6 +141,7 @@ logs/
 - `/file/<id>` 会限制路径只能在 `AXIOM_ROOT` 下
 - `/recent` 和 `/search` 支持分页、类型、存储区、来源、时间范围过滤
 - `/artifacts` 支持按 group、window、mode、日期范围分页读取自动化产物
+- `/artifacts/summary` 返回最新 review、inbox report、action snapshot、action history 及其文本预览
 - `/artifacts/file/<path>` 只允许读取 `data/reviews` 下的 markdown 文件
 - API 错误统一返回 JSON
 

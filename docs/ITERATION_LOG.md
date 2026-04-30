@@ -183,6 +183,7 @@
 - 新规则要求大改前先说明痛点证据、影响范围、迁移路径、回滚路径、本地验证、VPS 验证和备份 / dry-run 需求
 - DeepWiki 生成脚本同步到当前真实能力，覆盖文本、图片、文件取回、归档恢复、统计、备份、回顾、inbox 处理、action snapshot 和 action history
 - 新增 `/artifacts` 接口，可分页列出 `data/reviews` 下的 review、inbox report、action snapshot、action history 等 markdown 产物
+- 新增 `/artifacts/summary` 接口，可直接返回各类自动化产物的最新摘要与预览
 - 新增 `/artifacts/file/<path>` 接口，可安全取回 `data/reviews` 下的 markdown 文件
 - `/artifacts` 支持 `group`、`window`、`mode`、`date_from`、`date_to`、分页和排序过滤
-- 本地冒烟测试新增自动化产物读取覆盖，验证 artifact 列表、过滤、错误参数和文件取回
+- 本地冒烟测试新增自动化产物读取覆盖，验证 artifact 列表、summary、过滤、错误参数和文件取回
