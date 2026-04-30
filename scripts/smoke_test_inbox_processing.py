@@ -52,8 +52,7 @@ def assert_command_fails(args: list[str], expected: str, label: str) -> None:
         raise AssertionError(f"{label}: expected to find {expected!r}\n{combined_output}")
 
 
-def extract_saved_snapshot_path(output: str) -> Path:
-    prefix = "saved inbox action snapshot: "
+def extract_saved_path(output: str, prefix: str) -> Path:
     for line in output.splitlines():
         if line.startswith(prefix):
             return Path(line[len(prefix) :].strip())
@@ -282,7 +281,10 @@ def main() -> None:
                 str(stale_text_id),
             ]
         )
-        saved_dry_run_path = extract_saved_snapshot_path(saved_dry_run_output)
+        saved_dry_run_path = extract_saved_path(
+            saved_dry_run_output,
+            "saved inbox action snapshot: ",
+        )
         if not saved_dry_run_path.exists():
             raise AssertionError(f"saved dry-run snapshot missing: {saved_dry_run_path}")
         saved_dry_run_markdown = saved_dry_run_path.read_text(encoding="utf-8")
@@ -374,7 +376,10 @@ def main() -> None:
                 "--apply",
             ]
         )
-        saved_apply_path = extract_saved_snapshot_path(saved_apply_output)
+        saved_apply_path = extract_saved_path(
+            saved_apply_output,
+            "saved inbox action snapshot: ",
+        )
         if not saved_apply_path.exists():
             raise AssertionError(f"saved apply snapshot missing: {saved_apply_path}")
         saved_apply_markdown = saved_apply_path.read_text(encoding="utf-8")
@@ -396,6 +401,48 @@ def main() -> None:
         )
         assert_contains(apply_history_output, str(saved_apply_path), "apply history path")
         assert_contains(apply_history_output, f"item {stale_image_id} | image | 补描述后归档 | applied", "apply history entry")
+
+        history_markdown_output = run_command(
+            [
+                sys.executable,
+                "scripts/build_inbox_action_history_markdown.py",
+                "--root",
+                str(root),
+                "--window",
+                "day",
+                "--date",
+                "2026-04-29",
+                "--details",
+            ]
+        )
+        assert_contains(history_markdown_output, "# Axiom Daily Inbox Action History", "history title")
+        assert_contains(history_markdown_output, str(saved_dry_run_path), "history includes dry-run snapshot")
+        assert_contains(history_markdown_output, str(saved_apply_path), "history includes apply snapshot")
+        assert_contains(history_markdown_output, f"item {stale_text_id} | text | 归档候选 | dry-run", "history dry-run item")
+        assert_contains(history_markdown_output, f"item {stale_image_id} | image | 补描述后归档 | applied", "history apply item")
+
+        saved_history_output = run_command(
+            [
+                sys.executable,
+                "scripts/save_inbox_action_history_snapshot.py",
+                "--root",
+                str(root),
+                "--window",
+                "day",
+                "--date",
+                "2026-04-29",
+                "--details",
+            ]
+        )
+        saved_history_path = extract_saved_path(
+            saved_history_output,
+            "saved inbox action history snapshot: ",
+        )
+        if not saved_history_path.exists():
+            raise AssertionError(f"saved history snapshot missing: {saved_history_path}")
+        saved_history_markdown = saved_history_path.read_text(encoding="utf-8")
+        assert_contains(saved_history_markdown, "# Axiom Daily Inbox Action History", "saved history title")
+        assert_contains(saved_history_markdown, str(saved_apply_path), "saved history includes apply snapshot")
 
         stale_image_path = fetch_file_path(root, stale_image_id)
         if "data\\archive" not in str(stale_image_path) and "data/archive" not in str(stale_image_path):
