@@ -254,3 +254,18 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮手动自动化中心部署到 VPS，当前线上代码更新到 `c3fff11`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260505_104941_c3fff11.tar.gz`
 - 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常、鉴权 `/automation/jobs` 正常，公网 `/app` 已可读到 4 个手动自动化任务卡片
+- SQLite 新增 `automation_runs` 表，用于持久化每次手动自动化的任务、日期、状态、返回码、stdout/stderr 尾部输出、产物路径和耗时
+- 新增 `/automation/runs` 接口，支持按 `job`、`status` 过滤，并返回分页后的运行历史
+- `/automation/run` 现在会先写入运行记录，再在完成、失败或超时后回填状态与摘要信息
+- `/app` 的“最近运行”区块已接入 `/automation/runs`，支持查看状态、耗时、返回码、产物预览和运行日志详情
+- `scripts/smoke_test_receiver.py` 新增自动化运行历史覆盖，验证 `/automation/runs` 列表、任务过滤和状态过滤
+- `scripts/smoke_test_web_app.py` 新增运行记录查看覆盖，验证 `/app` 中的运行历史卡片和运行日志查看器
+- 已用 `scripts/deploy_to_vps.py` 将这轮运行历史能力部署到 VPS，当前线上代码更新到 `ffa68dc`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260505_110717_ffa68dc.tar.gz`
+- 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常、鉴权 `/automation/jobs` 正常、鉴权 `/automation/runs` 正常；由于生产环境尚未手动触发新任务，当前 `total=0`
+- `/app` 的“最近运行”区块新增任务筛选、状态筛选和“再次运行”入口
+- 从运行历史卡片或运行详情查看器都可以按原任务和原日期直接重跑一次自动化
+- `scripts/smoke_test_web_app.py` 新增自动化历史筛选和重跑覆盖，验证 `/app` 中 `review_day + success` 过滤与同日重跑链路
+- 已用 `scripts/deploy_to_vps.py` 将这轮自动化历史筛选与重跑能力部署到 VPS，当前线上代码更新到 `d9d2a38`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260505_111438_d9d2a38.tar.gz`
+- 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常、鉴权 `/automation/jobs` 正常、鉴权 `/automation/runs` 正常，公网 `/app` 已可读到运行历史筛选字段“任务 / 状态”
