@@ -95,15 +95,16 @@ def create_release_archive(commit_ref: str, archive_path: Path) -> None:
         )
 
 
-def run_remote_script(host: str, script: str, *, capture_output: bool = False) -> subprocess.CompletedProcess[str]:
+def run_remote_script(host: str, script: str, *, capture_output: bool = False) -> subprocess.CompletedProcess:
+    script_text = script.strip() + "\n"
     print("$ ssh", host, "bash -s <<'EOF'")
-    print(script.rstrip())
+    print(script_text.rstrip())
     print("EOF")
-    return run_command(
+    return subprocess.run(
         ["ssh", host, "bash", "-s"],
+        check=True,
         capture_output=capture_output,
-        input_text=script,
-        echo_command=False,
+        input=script_text.encode("utf-8"),
     )
 
 
