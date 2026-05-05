@@ -344,6 +344,7 @@ body::before {
 .stat-card,
 .summary-card,
 .automation-job-card,
+.automation-run-card,
 .artifact-card,
 .item-card {
     border-radius: var(--radius-lg);
@@ -359,6 +360,38 @@ body::before {
 .automation-job-card h3 {
     margin: 10px 0 6px;
     font-size: 1rem;
+}
+
+.automation-run-card h3 {
+    margin: 6px 0;
+    font-size: 1rem;
+}
+
+.status-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.status-tag[data-status="success"] {
+    background: rgba(36, 111, 74, 0.12);
+    color: #1c5f43;
+}
+
+.status-tag[data-status="failed"],
+.status-tag[data-status="timeout"] {
+    background: rgba(153, 58, 44, 0.12);
+    color: #8f3427;
+}
+
+.status-tag[data-status="running"] {
+    background: rgba(161, 114, 29, 0.14);
+    color: #7a5418;
 }
 
 .stat-card strong {

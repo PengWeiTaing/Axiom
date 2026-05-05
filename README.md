@@ -46,6 +46,7 @@ receiver 已提供：
 - `/overview/text`：返回适合快捷指令直接显示的纯文本总览
 - `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口
 - `/automation/jobs`：返回当前允许手动触发的安全自动化任务
+- `/automation/runs`：读取手动自动化的最近运行记录、状态、产物和输出尾部
 - `/automation/run`：手动生成 review / inbox report / dry-run artifact
 - `/artifacts`：列出 `data/reviews` 下的自动化产物
 - `/artifacts/summary`：直接读取各类自动化产物的最新摘要
@@ -68,7 +69,7 @@ receiver 已提供：
 现在仓库里已经有一个移动优先前端壳：
 
 - 页面入口：`https://pengweitai.me/app`
-- 页面职责：文本写入、图片上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、自动化产物浏览
+- 页面职责：文本写入、图片上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看、自动化产物浏览
 - 鉴权方式：浏览器本地保存 key，前端请求统一走 `X-Axiom-Key`
 - PWA 资源：`manifest.webmanifest`、`/sw.js`、应用图标
 

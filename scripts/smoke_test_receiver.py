@@ -633,6 +633,44 @@ def main() -> None:
             assert action_run["artifact"]["group"] == "inbox-actions"
             assert action_run["artifact"]["mode"] == "dry-run"
             assert action_run["artifact"]["report_date"] == run_date
+            assert action_run["run"]["status"] == "success"
+
+            automation_runs = assert_status(
+                client.get(
+                    "/automation/runs",
+                    query_string={"key": "test-key", "page_size": "8"},
+                ),
+                200,
+                "automation runs",
+            )
+            assert automation_runs["total"] == 2
+            assert len(automation_runs["items"]) == 2
+            assert automation_runs["items"][0]["job_id"] == "inbox_action_dry_run"
+            assert automation_runs["items"][0]["status"] == "success"
+            assert automation_runs["items"][0]["artifact"]["group"] == "inbox-actions"
+            assert automation_runs["items"][1]["job_id"] == "review_day"
+            assert automation_runs["items"][1]["artifact"]["group"] == "review"
+
+            review_run_history = assert_status(
+                client.get(
+                    "/automation/runs",
+                    query_string={"key": "test-key", "job": "review_day"},
+                ),
+                200,
+                "automation runs by job",
+            )
+            assert review_run_history["total"] == 1
+            assert review_run_history["items"][0]["job_id"] == "review_day"
+
+            success_run_history = assert_status(
+                client.get(
+                    "/automation/runs",
+                    query_string={"key": "test-key", "status": "success"},
+                ),
+                200,
+                "automation runs by status",
+            )
+            assert success_run_history["total"] == 2
 
             review_daily_path = root / "data" / "reviews" / "daily" / "2026" / "2026-04-29.md"
             review_daily_path.parent.mkdir(parents=True, exist_ok=True)

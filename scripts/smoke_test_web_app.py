@@ -194,6 +194,21 @@ def main() -> None:
                     )
                     page.get_by_role("button", name="关闭").click()
 
+                    page.locator("#automation-runs .automation-run-card").first.wait_for(
+                        timeout=15_000
+                    )
+                    page.locator("#automation-runs").get_by_text("生成今日日回顾", exact=False).first.wait_for(
+                        timeout=15_000
+                    )
+                    page.locator("#automation-runs [data-action='view-automation-run']").first.click()
+                    page.locator("#viewer-title").get_by_text("生成今日日回顾", exact=False).wait_for(
+                        timeout=15_000
+                    )
+                    page.locator("#viewer-content").get_by_text("completed", exact=False).wait_for(
+                        timeout=15_000
+                    )
+                    page.get_by_role("button", name="关闭").click()
+
                     page.locator("#artifact-summary-cards").get_by_role("button", name="查看最新").first.click()
                     page.locator("#viewer-content").get_by_text("Summary", exact=False).wait_for(
                         timeout=15_000

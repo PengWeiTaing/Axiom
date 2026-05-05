@@ -27,7 +27,10 @@ const state = {
     },
     automation: {
         jobs: [],
-        loaded: false,
+        jobsLoaded: false,
+        runs: [],
+        runsPage: 1,
+        runsTotalPages: 1,
     },
     objectUrls: new Set(),
     viewerObjectUrl: null,
@@ -67,6 +70,9 @@ const elements = {
     automationDateInput: document.getElementById("automation-date-input"),
     automationFeedback: document.getElementById("automation-feedback"),
     automationJobs: document.getElementById("automation-jobs"),
+    automationRuns: document.getElementById("automation-runs"),
+    refreshAutomationRunsButton: document.getElementById("refresh-automation-runs-button"),
+    loadMoreAutomationRunsButton: document.getElementById("load-more-automation-runs-button"),
     refreshArtifactsButton: document.getElementById("refresh-artifacts-button"),
     artifactFilterForm: document.getElementById("artifact-filter-form"),
     resetArtifactFiltersButton: document.getElementById("reset-artifact-filters-button"),
@@ -163,6 +169,32 @@ function formatArtifactLabel(artifact) {
         return artifact.window === "weekly" ? "动作历史周报" : "动作历史日报";
     }
     return artifact.group;
+}
+
+function formatAutomationStatus(status) {
+    if (status === "success") {
+        return "成功";
+    }
+    if (status === "failed") {
+        return "失败";
+    }
+    if (status === "timeout") {
+        return "超时";
+    }
+    if (status === "running") {
+        return "运行中";
+    }
+    return status || "未知";
+}
+
+function formatDuration(durationMs) {
+    if (durationMs === null || durationMs === undefined) {
+        return "未知";
+    }
+    if (durationMs < 1000) {
+        return `${durationMs} ms`;
+    }
+    return `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)} s`;
 }
 
 function pickLatestArtifact(...artifacts) {
@@ -535,6 +567,43 @@ function renderAutomationJobs(jobs) {
         .join("");
 }
 
+function renderAutomationRuns(runs) {
+    if (!runs.length) {
+        renderEmptyState(elements.automationRuns, "还没有自动化运行记录。");
+        return;
+    }
+
+    elements.automationRuns.innerHTML = runs
+        .map((run) => {
+            const previewSource = run.message || run.stderr_tail?.join(" ") || run.stdout_tail?.join(" ");
+            const preview = summarizeText(previewSource, 140) || "没有更多输出。";
+            return `
+                <article class="automation-run-card">
+                    <div class="item-meta">
+                        <span class="status-tag" data-status="${escapeHtml(run.status)}">${escapeHtml(formatAutomationStatus(run.status))}</span>
+                        <span>${escapeHtml(run.run_date)}</span>
+                        <span>${escapeHtml(formatDateTime(run.started_at))}</span>
+                    </div>
+                    <h3>${escapeHtml(run.job_label)}</h3>
+                    <p class="item-preview">${escapeHtml(preview)}</p>
+                    <div class="item-meta">
+                        <span>耗时 ${escapeHtml(formatDuration(run.duration_ms))}</span>
+                        <span>返回码 ${escapeHtml(run.return_code ?? "-")}</span>
+                    </div>
+                    <div class="card-actions">
+                        <button class="secondary-button" type="button" data-action="view-automation-run" data-run-id="${escapeHtml(run.id)}">查看记录</button>
+                        ${
+                            run.artifact?.relative_path
+                                ? `<button class="text-button" type="button" data-action="view-artifact" data-artifact-path="${escapeHtml(run.artifact.relative_path)}">查看产物</button>`
+                                : ""
+                        }
+                    </div>
+                </article>
+            `;
+        })
+        .join("");
+}
+
 function renderArtifactList(items) {
     if (!items.length) {
         renderEmptyState(elements.artifactList, "还没有匹配的自动化产物。");
@@ -727,6 +796,11 @@ function findItemById(itemId) {
     );
 }
 
+function findAutomationRunById(runId) {
+    const targetId = Number(runId);
+    return state.automation.runs.find((run) => run.id === targetId) || null;
+}
+
 function findArtifactByPath(relativePath) {
     return state.artifacts.items.find((artifact) => artifact.relative_path === relativePath);
 }
@@ -785,6 +859,53 @@ async function openArtifactViewer(relativePath) {
                     artifactName: artifact?.name || "artifact.md",
                 },
             },
+        ],
+    );
+}
+
+async function openAutomationRunViewer(runId) {
+    const run = findAutomationRunById(runId);
+    if (!run) {
+        throw new Error("当前运行记录未加载，请先刷新运行记录");
+    }
+
+    state.viewerContext = { kind: "automation-run", runId: run.id };
+    const sections = [
+        `状态: ${formatAutomationStatus(run.status)}`,
+        `消息: ${run.message || "无"}`,
+        "",
+        "stdout",
+        run.stdout_tail?.length ? run.stdout_tail.join("\n") : "(无)",
+        "",
+        "stderr",
+        run.stderr_tail?.length ? run.stderr_tail.join("\n") : "(无)",
+    ];
+    if (run.artifact?.preview) {
+        sections.push("", "产物预览", run.artifact.preview);
+    }
+
+    openViewerWithText(
+        `${run.job_label} #${run.id}`,
+        sections.join("\n"),
+        [
+            { label: "状态", value: formatAutomationStatus(run.status) },
+            { label: "运行日期", value: run.run_date },
+            { label: "开始时间", value: formatDateTime(run.started_at) },
+            { label: "结束时间", value: run.finished_at ? formatDateTime(run.finished_at) : "未结束" },
+            { label: "耗时", value: formatDuration(run.duration_ms) },
+            { label: "返回码", value: run.return_code ?? "-" },
+            { label: "产物路径", value: run.artifact?.relative_path || "无" },
+        ],
+        [
+            run.artifact?.relative_path
+                ? {
+                    label: "查看产物",
+                    dataset: {
+                        action: "view-artifact",
+                        artifactPath: run.artifact.relative_path,
+                    },
+                }
+                : null,
         ],
     );
 }
@@ -1112,20 +1233,43 @@ async function loadArtifactPanels({ reset = false } = {}) {
 }
 
 async function loadAutomationJobs({ force = false } = {}) {
-    if (state.automation.loaded && !force) {
+    if (state.automation.jobsLoaded && !force) {
         renderAutomationJobs(state.automation.jobs);
         return;
     }
 
     const payload = await apiRequest("/automation/jobs");
     state.automation.jobs = payload.jobs || [];
-    state.automation.loaded = true;
+    state.automation.jobsLoaded = true;
 
     if (!elements.automationDateInput.value && state.automation.jobs[0]?.default_date) {
         elements.automationDateInput.value = state.automation.jobs[0].default_date;
     }
 
     renderAutomationJobs(state.automation.jobs);
+}
+
+async function loadAutomationRuns({ reset = false } = {}) {
+    const nextPage = reset ? 1 : state.automation.runsPage + 1;
+    const payload = await apiRequest("/automation/runs", {
+        query: {
+            page: nextPage,
+            page_size: 8,
+        },
+    });
+
+    state.automation.runsPage = payload.page;
+    state.automation.runsTotalPages = payload.total_pages || 1;
+    state.automation.runs = reset
+        ? (payload.items || [])
+        : [...state.automation.runs, ...(payload.items || [])];
+
+    renderAutomationRuns(state.automation.runs);
+    updateLoadMoreButton(
+        elements.loadMoreAutomationRunsButton,
+        state.automation.runsPage,
+        state.automation.runsTotalPages,
+    );
 }
 
 async function syncDashboard({ showMessage = false } = {}) {
@@ -1135,6 +1279,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadOverview();
         await loadRecentPage({ reset: true });
         await loadAutomationJobs();
+        await loadAutomationRuns({ reset: true });
         await loadArtifactPanels({ reset: true });
         if (state.search.active) {
             await loadSearchPage({ reset: true });
@@ -1328,6 +1473,7 @@ async function handleAutomationRun(jobId, button) {
             },
         });
         await loadOverview();
+        await loadAutomationRuns({ reset: true });
         await loadArtifactPanels({ reset: true });
         setConnectionState("ready", elements.lastSyncIndicator.textContent);
         setFeedback(
@@ -1340,6 +1486,11 @@ async function handleAutomationRun(jobId, button) {
             await openArtifactViewer(payload.artifact.relative_path);
         }
     } catch (error) {
+        try {
+            await loadAutomationRuns({ reset: true });
+        } catch (historyError) {
+            console.warn("load automation runs failed", historyError);
+        }
         setConnectionState("error", error.message);
         setFeedback(elements.automationFeedback, error.message, "error");
         showToast(error.message);
@@ -1390,6 +1541,8 @@ function bindDelegatedActions() {
             showToast("Markdown 下载已开始");
         } else if (action === "view-artifact") {
             await openArtifactViewer(target.getAttribute("data-artifact-path"));
+        } else if (action === "view-automation-run") {
+            await openAutomationRunViewer(target.getAttribute("data-run-id"));
         } else if (action === "run-automation-job") {
             await handleAutomationRun(target.getAttribute("data-job-id"), target);
         }
@@ -1434,7 +1587,7 @@ function bindForms() {
         state.recent = { page: 1, totalPages: 1, items: [], total: 0 };
         state.search = { page: 1, totalPages: 1, items: [], active: false, total: 0 };
         state.artifacts = { page: 1, totalPages: 1, items: [] };
-        state.automation = { jobs: [], loaded: false };
+        state.automation = { jobs: [], jobsLoaded: false, runs: [], runsPage: 1, runsTotalPages: 1 };
         elements.automationDateInput.value = "";
         setFeedback(elements.keyFeedback, "本地 key 已清除。", "ok");
         setFeedback(elements.recentFeedback, "", "muted");
@@ -1449,10 +1602,12 @@ function bindForms() {
         renderEmptyState(elements.recentList, "保存 key 后即可读取最近记录。");
         renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
         renderEmptyState(elements.automationJobs, "保存 key 后即可读取可执行任务。");
+        renderEmptyState(elements.automationRuns, "还没有自动化运行记录。");
         renderEmptyState(elements.artifactSummaryCards, "保存 key 后即可读取自动化摘要。");
         renderEmptyState(elements.artifactList, "保存 key 后即可读取自动化产物。");
         updateLoadMoreButton(elements.loadMoreRecentButton, 1, 1);
         updateLoadMoreButton(elements.loadMoreSearchButton, 1, 1, "还没有结果");
+        updateLoadMoreButton(elements.loadMoreAutomationRunsButton, 1, 1);
         updateLoadMoreButton(elements.loadMoreArtifactsButton, 1, 1);
         showToast("已清除本地 key");
     });
@@ -1465,6 +1620,26 @@ function bindForms() {
     elements.imageCaptureForm.addEventListener("submit", handleImageCaptureSubmit);
     elements.automationRunForm.addEventListener("submit", (event) => {
         event.preventDefault();
+    });
+
+    elements.refreshAutomationRunsButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "正在刷新自动化运行记录");
+            await loadAutomationRuns({ reset: true });
+            setConnectionState("ready", elements.lastSyncIndicator.textContent);
+            showToast("运行记录已刷新");
+        } catch (error) {
+            setConnectionState("error", error.message);
+            showToast(error.message);
+        }
+    });
+
+    elements.loadMoreAutomationRunsButton.addEventListener("click", async () => {
+        try {
+            await loadAutomationRuns();
+        } catch (error) {
+            showToast(error.message);
+        }
     });
 
     elements.refreshOverviewButton.addEventListener("click", async () => {
@@ -1639,10 +1814,12 @@ function renderInitialEmptyStates() {
     renderEmptyState(elements.recentList, "保存 key 后即可读取最近记录。");
     renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
     renderEmptyState(elements.automationJobs, "保存 key 后即可读取可执行任务。");
+    renderEmptyState(elements.automationRuns, "还没有自动化运行记录。");
     renderEmptyState(elements.artifactSummaryCards, "保存 key 后即可读取自动化摘要。");
     renderEmptyState(elements.artifactList, "保存 key 后即可读取自动化产物。");
     updateLoadMoreButton(elements.loadMoreRecentButton, 1, 1);
     updateLoadMoreButton(elements.loadMoreSearchButton, 1, 1, "还没有结果");
+    updateLoadMoreButton(elements.loadMoreAutomationRunsButton, 1, 1);
     updateLoadMoreButton(elements.loadMoreArtifactsButton, 1, 1);
 }
 
