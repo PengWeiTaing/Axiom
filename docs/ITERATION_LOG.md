@@ -208,3 +208,8 @@
 - receiver 新增 `/sw.js` 路由，使 service worker 以根路径作用于 `/app`
 - `scripts/smoke_test_receiver.py` 新增 `/app`、静态资源和 `/sw.js` 的冒烟覆盖
 - README、AI Context、Human Context、Short Term、DeepWiki 说明已同步到 Web App / PWA 当前状态
+- 本地安装了 Playwright + Chromium，用于补足 Web 端真实浏览器验证
+- 新增 `requirements-dev.txt`
+- 新增 `scripts/install_playwright_chromium.py`，统一本地 Chromium 安装入口
+- 新增 `scripts/smoke_test_web_app.py`，会真跑 `/app` 的 key 保存、总览同步、文本写入、图片上传、搜索和 service worker 注册
+- `.gitignore` 新增 `.venv/`、`playwright-report/`、`test-results/`

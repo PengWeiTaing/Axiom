@@ -522,9 +522,12 @@ history 汇总基于已保存的 action snapshots 聚合，不重新执行任何
             "core/static/app.js",
             "core/static/manifest.webmanifest",
             "core/static/sw.js",
+            "requirements-dev.txt",
+            "scripts/install_playwright_chromium.py",
             "scripts/backup_axiom.py",
             "scripts/check_consistency.py",
             "scripts/smoke_test_receiver.py",
+            "scripts/smoke_test_web_app.py",
             "scripts/smoke_test_inbox_processing.py",
             "scripts/generate_deepwiki_cache.py",
         ],
@@ -547,6 +550,7 @@ history 汇总基于已保存的 action snapshots 聚合，不重新执行任何
 | 改数据库初始化 | `core/init_db.py` |
 | 改 Web App 页面 | `core/templates/app.html`、`core/static/app.css`、`core/static/app.js` |
 | 改 PWA 壳 | `core/static/manifest.webmanifest`、`core/static/sw.js`、`core/static/icons/axiom-mark.svg` |
+| 改浏览器级前端验证 | `requirements-dev.txt`、`scripts/install_playwright_chromium.py`、`scripts/smoke_test_web_app.py` |
 | 改备份 | `scripts/backup_axiom.py` |
 | 改一致性检查 | `scripts/check_consistency.py` |
 | 改 receiver 测试 | `scripts/smoke_test_receiver.py` |
@@ -584,6 +588,8 @@ history 汇总基于已保存的 action snapshots 聚合，不重新执行任何
 ## 测试入口
 
 {snippet("scripts/smoke_test_receiver.py", 36, 100)}
+
+{snippet("scripts/smoke_test_web_app.py", 1, 140)}
 
 {snippet("scripts/smoke_test_inbox_processing.py", 1, 80)}
 """,

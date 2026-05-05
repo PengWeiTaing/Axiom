@@ -127,6 +127,7 @@ flowchart TD
 - `scripts/backup_axiom.py`：备份 SQLite、inbox、archive 并生成 manifest
 - `scripts/check_consistency.py`：检查文件系统和 SQLite 索引是否一致
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
+- `scripts/smoke_test_web_app.py`：Web App 浏览器级冒烟测试
 - `scripts/build_review_markdown.py`：生成日 / 周回顾 Markdown
 - `scripts/save_review_snapshot.py`：保存日 / 周回顾快照
 - `scripts/build_inbox_processing_report.py`：生成 inbox 处理建议
@@ -146,6 +147,14 @@ python -m compileall -q core scripts
 python scripts\smoke_test_receiver.py
 python scripts\smoke_test_inbox_processing.py
 python scripts\check_consistency.py --root .
+```
+
+如果要补浏览器级验证，再执行：
+
+```powershell
+pip install -r requirements-dev.txt
+python scripts\install_playwright_chromium.py
+python scripts\smoke_test_web_app.py
 ```
 
 如果本地没有同步 VPS 的真实 `data/inbox` 或 `data/archive`，一致性检查可能会报告缺文件。这是诊断结果，不代表脚本损坏。

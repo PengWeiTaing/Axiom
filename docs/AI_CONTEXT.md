@@ -75,6 +75,8 @@ scripts/
   backup_axiom.py
   check_consistency.py
   smoke_test_receiver.py
+  install_playwright_chromium.py
+  smoke_test_web_app.py
   smoke_test_inbox_processing.py
   export_items_markdown.py
   build_review_markdown.py
@@ -105,6 +107,7 @@ docs/
 deep-research-report.md
 README.md
 requirements.txt
+requirements-dev.txt
 .env.example
 ```
 
@@ -162,6 +165,7 @@ logs/
 - `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索和自动化产物浏览
 - 前端请求统一通过 `X-Axiom-Key` header 访问后端接口，不在页面里到处拼 query key
 - `/sw.js` 和 `manifest.webmanifest` 组成当前 PWA 壳，目标是把浏览器入口稳定成手机主屏入口
+- `scripts/smoke_test_web_app.py` 会启动本地临时 receiver，并用 Playwright 真跑 `/app` 的关键交互
 - `/artifacts` 支持按 group、window、mode、日期范围分页读取自动化产物
 - `/artifacts/summary` 返回最新 review、inbox report、action snapshot、action history 及其文本预览
 - `/artifacts/file/<path>` 只允许读取 `data/reviews` 下的 markdown 文件

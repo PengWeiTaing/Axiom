@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.venv/
 .env
 db/*.db
 data/inbox/*
@@ -8,3 +9,5 @@ data/reviews/*
 *.log
 logs/
 backup/
+playwright-report/
+test-results/
