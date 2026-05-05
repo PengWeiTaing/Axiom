@@ -213,3 +213,10 @@
 - 新增 `scripts/install_playwright_chromium.py`，统一本地 Chromium 安装入口
 - 新增 `scripts/smoke_test_web_app.py`，会真跑 `/app` 的 key 保存、总览同步、文本写入、图片上传、搜索和 service worker 注册
 - `.gitignore` 新增 `.venv/`、`playwright-report/`、`test-results/`
+- 已将 `/app`、PWA 静态资源和浏览器级验证相关代码部署到 VPS
+- 部署前已在 VPS 生成代码快照备份：`/opt/axiom/backup/code/axiom_code_backup_20260505_053950.tar.gz`
+- VPS 上 `axiom-receiver` 已重启并恢复运行
+- VPS 一致性检查通过：`DB files=2`，`Inbox files=2`，`Archive files=0`
+- 公网 `/app`、`/sw.js`、`/static/manifest.webmanifest` 已可访问
+- 公网鉴权 `/overview` 已验证通过，返回 `service=axiom-receiver`、`total=2`
+- 本地 Playwright 已验证公网 `/app` 的只读加载链路，确认能以线上 key 进入 `data-state=ready` 并读到 overview 统计
