@@ -135,7 +135,7 @@ def main() -> None:
                     page.get_by_role("button", name="关闭").click()
 
                     page.select_option("#recent-storage-input", "archive")
-                    page.get_by_role("button", name="应用筛选").click()
+                    page.locator("#recent-filter-form").get_by_role("button", name="应用筛选").click()
                     assert_text_present(page, note_text, "archive filtered recent")
 
                     page.locator("#recent-list").get_by_role("button", name="查看").first.click()
@@ -145,7 +145,7 @@ def main() -> None:
                     )
                     page.get_by_role("button", name="关闭").click()
 
-                    page.get_by_role("button", name="重置筛选").first.click()
+                    page.locator("#reset-recent-filters-button").click()
                     assert_text_present(page, note_text, "recent note after restore")
 
                     page.locator("#recent-list").get_by_role("button", name="查看").first.click()
@@ -208,6 +208,31 @@ def main() -> None:
                         timeout=15_000
                     )
                     page.get_by_role("button", name="关闭").click()
+
+                    page.select_option("#automation-runs-job-input", "review_day")
+                    page.select_option("#automation-runs-status-input", "success")
+                    page.locator("#automation-runs-filter-form").get_by_role(
+                        "button", name="应用筛选"
+                    ).click()
+                    page.locator("#automation-runs-feedback").get_by_text(
+                        "共 1 条运行记录", exact=False
+                    ).wait_for(timeout=15_000)
+
+                    page.locator("#automation-runs [data-action='rerun-automation-run']").first.click()
+                    page.locator("#viewer-title").get_by_text(f"{run_date}.md").wait_for(
+                        timeout=15_000
+                    )
+                    page.locator("#viewer-content").get_by_text("Summary", exact=False).wait_for(
+                        timeout=15_000
+                    )
+                    page.get_by_role("button", name="关闭").click()
+                    page.locator("#automation-runs-feedback").get_by_text(
+                        "共 2 条运行记录", exact=False
+                    ).wait_for(timeout=15_000)
+                    page.locator("#reset-automation-runs-filters-button").click()
+                    page.locator("#automation-runs").get_by_text("生成今日日回顾", exact=False).first.wait_for(
+                        timeout=15_000
+                    )
 
                     page.locator("#artifact-summary-cards").get_by_role("button", name="查看最新").first.click()
                     page.locator("#viewer-content").get_by_text("Summary", exact=False).wait_for(

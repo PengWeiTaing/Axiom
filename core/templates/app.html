@@ -290,6 +290,31 @@
                         <h3>最近运行</h3>
                         <button class="text-button" id="refresh-automation-runs-button" type="button">刷新运行记录</button>
                     </div>
+                    <form id="automation-runs-filter-form" class="stack-form filter-card">
+                        <div class="form-grid">
+                            <label class="field">
+                                <span>任务</span>
+                                <select id="automation-runs-job-input" name="job">
+                                    <option value="">全部任务</option>
+                                </select>
+                            </label>
+                            <label class="field">
+                                <span>状态</span>
+                                <select id="automation-runs-status-input" name="status">
+                                    <option value="">全部状态</option>
+                                    <option value="success">成功</option>
+                                    <option value="failed">失败</option>
+                                    <option value="timeout">超时</option>
+                                    <option value="running">运行中</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="inline-actions">
+                            <button class="primary-button" type="submit">应用筛选</button>
+                            <button class="text-button" id="reset-automation-runs-filters-button" type="button">重置筛选</button>
+                        </div>
+                        <p class="feedback-text" id="automation-runs-feedback"></p>
+                    </form>
                     <div id="automation-runs" class="stack-list"></div>
                     <div class="load-more-row">
                         <button class="secondary-button" id="load-more-automation-runs-button" type="button">加载更多</button>

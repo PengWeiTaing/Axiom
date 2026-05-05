@@ -4,6 +4,7 @@ const OVERVIEW_PREVIEW_CHARS = 140;
 const RECENT_PAGE_SIZE = 9;
 const SEARCH_PAGE_SIZE = 9;
 const ARTIFACT_PAGE_SIZE = 12;
+const AUTOMATION_RUN_PAGE_SIZE = 8;
 
 const state = {
     key: "",
@@ -31,6 +32,7 @@ const state = {
         runs: [],
         runsPage: 1,
         runsTotalPages: 1,
+        runsTotal: 0,
     },
     objectUrls: new Set(),
     viewerObjectUrl: null,
@@ -70,9 +72,14 @@ const elements = {
     automationDateInput: document.getElementById("automation-date-input"),
     automationFeedback: document.getElementById("automation-feedback"),
     automationJobs: document.getElementById("automation-jobs"),
+    automationRunsFilterForm: document.getElementById("automation-runs-filter-form"),
+    automationRunsJobInput: document.getElementById("automation-runs-job-input"),
+    automationRunsStatusInput: document.getElementById("automation-runs-status-input"),
+    automationRunsFeedback: document.getElementById("automation-runs-feedback"),
     automationRuns: document.getElementById("automation-runs"),
     refreshAutomationRunsButton: document.getElementById("refresh-automation-runs-button"),
     loadMoreAutomationRunsButton: document.getElementById("load-more-automation-runs-button"),
+    resetAutomationRunsFiltersButton: document.getElementById("reset-automation-runs-filters-button"),
     refreshArtifactsButton: document.getElementById("refresh-artifacts-button"),
     artifactFilterForm: document.getElementById("artifact-filter-form"),
     resetArtifactFiltersButton: document.getElementById("reset-artifact-filters-button"),
@@ -537,6 +544,7 @@ function renderArtifactSummaryCards(summaryPayload) {
 
 function renderAutomationJobs(jobs) {
     if (!jobs.length) {
+        renderAutomationRunJobOptions([]);
         renderEmptyState(elements.automationJobs, "保存 key 后即可读取可执行任务。");
         return;
     }
@@ -567,9 +575,24 @@ function renderAutomationJobs(jobs) {
         .join("");
 }
 
-function renderAutomationRuns(runs) {
+function renderAutomationRunJobOptions(jobs) {
+    const currentValue = elements.automationRunsJobInput.value;
+    elements.automationRunsJobInput.innerHTML = [
+        '<option value="">全部任务</option>',
+        ...jobs.map((job) => `<option value="${escapeHtml(job.id)}">${escapeHtml(job.label)}</option>`),
+    ].join("");
+
+    if (
+        currentValue &&
+        Array.from(elements.automationRunsJobInput.options).some((option) => option.value === currentValue)
+    ) {
+        elements.automationRunsJobInput.value = currentValue;
+    }
+}
+
+function renderAutomationRuns(runs, emptyText = "还没有自动化运行记录。") {
     if (!runs.length) {
-        renderEmptyState(elements.automationRuns, "还没有自动化运行记录。");
+        renderEmptyState(elements.automationRuns, emptyText);
         return;
     }
 
@@ -592,6 +615,7 @@ function renderAutomationRuns(runs) {
                     </div>
                     <div class="card-actions">
                         <button class="secondary-button" type="button" data-action="view-automation-run" data-run-id="${escapeHtml(run.id)}">查看记录</button>
+                        <button class="text-button" type="button" data-action="rerun-automation-run" data-run-id="${escapeHtml(run.id)}">再次运行</button>
                         ${
                             run.artifact?.relative_path
                                 ? `<button class="text-button" type="button" data-action="view-artifact" data-artifact-path="${escapeHtml(run.artifact.relative_path)}">查看产物</button>`
@@ -897,6 +921,14 @@ async function openAutomationRunViewer(runId) {
             { label: "产物路径", value: run.artifact?.relative_path || "无" },
         ],
         [
+            {
+                label: "再次运行",
+                className: "primary-button",
+                dataset: {
+                    action: "rerun-automation-run",
+                    runId: run.id,
+                },
+            },
             run.artifact?.relative_path
                 ? {
                     label: "查看产物",
@@ -1195,6 +1227,14 @@ function readArtifactFilters() {
     };
 }
 
+function readAutomationRunFilters() {
+    const form = new FormData(elements.automationRunsFilterForm);
+    return {
+        job: String(form.get("job") || "").trim(),
+        status: String(form.get("status") || "").trim(),
+    };
+}
+
 async function loadArtifactPanels({ reset = false } = {}) {
     const filters = readArtifactFilters();
     const nextPage = reset ? 1 : state.artifacts.page + 1;
@@ -1246,29 +1286,39 @@ async function loadAutomationJobs({ force = false } = {}) {
         elements.automationDateInput.value = state.automation.jobs[0].default_date;
     }
 
+    renderAutomationRunJobOptions(state.automation.jobs);
     renderAutomationJobs(state.automation.jobs);
 }
 
 async function loadAutomationRuns({ reset = false } = {}) {
+    const filters = readAutomationRunFilters();
     const nextPage = reset ? 1 : state.automation.runsPage + 1;
     const payload = await apiRequest("/automation/runs", {
         query: {
+            ...filters,
             page: nextPage,
-            page_size: 8,
+            page_size: AUTOMATION_RUN_PAGE_SIZE,
         },
     });
 
     state.automation.runsPage = payload.page;
     state.automation.runsTotalPages = payload.total_pages || 1;
+    state.automation.runsTotal = payload.total || 0;
     state.automation.runs = reset
         ? (payload.items || [])
         : [...state.automation.runs, ...(payload.items || [])];
 
-    renderAutomationRuns(state.automation.runs);
+    const emptyText = filters.job || filters.status ? "当前筛选下还没有运行记录。" : "还没有自动化运行记录。";
+    renderAutomationRuns(state.automation.runs, emptyText);
     updateLoadMoreButton(
         elements.loadMoreAutomationRunsButton,
         state.automation.runsPage,
         state.automation.runsTotalPages,
+    );
+    setFeedback(
+        elements.automationRunsFeedback,
+        `共 ${state.automation.runsTotal} 条运行记录，当前显示 ${state.automation.runs.length} 条。`,
+        "ok",
     );
 }
 
@@ -1458,8 +1508,8 @@ async function handleItemEditSubmit(form) {
     }
 }
 
-async function handleAutomationRun(jobId, button) {
-    const runDate = elements.automationDateInput.value.trim();
+async function handleAutomationRun(jobId, button, options = {}) {
+    const runDate = options.runDate || elements.automationDateInput.value.trim();
 
     try {
         setFeedback(elements.automationFeedback, "", "muted");
@@ -1497,6 +1547,17 @@ async function handleAutomationRun(jobId, button) {
     } finally {
         setButtonDisabled(button, false);
     }
+}
+
+async function handleAutomationRunRerun(runId, button) {
+    const run = findAutomationRunById(runId);
+    if (!run) {
+        showToast("当前运行记录未加载，请先刷新运行记录");
+        return;
+    }
+
+    elements.automationDateInput.value = run.run_date;
+    await handleAutomationRun(run.job_id, button, { runDate: run.run_date });
 }
 
 function bindDelegatedActions() {
@@ -1543,6 +1604,8 @@ function bindDelegatedActions() {
             await openArtifactViewer(target.getAttribute("data-artifact-path"));
         } else if (action === "view-automation-run") {
             await openAutomationRunViewer(target.getAttribute("data-run-id"));
+        } else if (action === "rerun-automation-run") {
+            await handleAutomationRunRerun(target.getAttribute("data-run-id"), target);
         } else if (action === "run-automation-job") {
             await handleAutomationRun(target.getAttribute("data-job-id"), target);
         }
@@ -1587,12 +1650,15 @@ function bindForms() {
         state.recent = { page: 1, totalPages: 1, items: [], total: 0 };
         state.search = { page: 1, totalPages: 1, items: [], active: false, total: 0 };
         state.artifacts = { page: 1, totalPages: 1, items: [] };
-        state.automation = { jobs: [], jobsLoaded: false, runs: [], runsPage: 1, runsTotalPages: 1 };
+        state.automation = { jobs: [], jobsLoaded: false, runs: [], runsPage: 1, runsTotalPages: 1, runsTotal: 0 };
         elements.automationDateInput.value = "";
+        elements.automationRunsFilterForm.reset();
+        renderAutomationRunJobOptions([]);
         setFeedback(elements.keyFeedback, "本地 key 已清除。", "ok");
         setFeedback(elements.recentFeedback, "", "muted");
         setFeedback(elements.searchFeedback, "", "muted");
         setFeedback(elements.automationFeedback, "", "muted");
+        setFeedback(elements.automationRunsFeedback, "", "muted");
         setConnectionState("idle", "尚未同步");
         elements.overviewGeneratedAt.textContent = "";
         closeViewer();
@@ -1638,6 +1704,32 @@ function bindForms() {
         try {
             await loadAutomationRuns();
         } catch (error) {
+            showToast(error.message);
+        }
+    });
+
+    elements.automationRunsFilterForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+            setConnectionState("busy", "正在筛选自动化运行记录");
+            await loadAutomationRuns({ reset: true });
+            setConnectionState("ready", elements.lastSyncIndicator.textContent);
+        } catch (error) {
+            setConnectionState("error", error.message);
+            setFeedback(elements.automationRunsFeedback, error.message, "error");
+            showToast(error.message);
+        }
+    });
+
+    elements.resetAutomationRunsFiltersButton.addEventListener("click", async () => {
+        elements.automationRunsFilterForm.reset();
+        try {
+            setConnectionState("busy", "正在重置自动化运行筛选");
+            await loadAutomationRuns({ reset: true });
+            setConnectionState("ready", elements.lastSyncIndicator.textContent);
+        } catch (error) {
+            setConnectionState("error", error.message);
+            setFeedback(elements.automationRunsFeedback, error.message, "error");
             showToast(error.message);
         }
     });
