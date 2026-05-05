@@ -11,12 +11,14 @@ const state = {
         page: 1,
         totalPages: 1,
         items: [],
+        total: 0,
     },
     search: {
         page: 1,
         totalPages: 1,
         items: [],
         active: false,
+        total: 0,
     },
     artifacts: {
         page: 1,
@@ -25,6 +27,7 @@ const state = {
     },
     objectUrls: new Set(),
     viewerObjectUrl: null,
+    viewerContext: null,
 };
 
 const elements = {
@@ -45,6 +48,9 @@ const elements = {
     overviewArtifactHighlights: document.getElementById("overview-artifact-highlights"),
     overviewGeneratedAt: document.getElementById("overview-generated-at"),
     refreshOverviewButton: document.getElementById("refresh-overview-button"),
+    recentFilterForm: document.getElementById("recent-filter-form"),
+    recentFeedback: document.getElementById("recent-feedback"),
+    resetRecentFiltersButton: document.getElementById("reset-recent-filters-button"),
     recentList: document.getElementById("recent-list"),
     refreshRecentButton: document.getElementById("refresh-recent-button"),
     loadMoreRecentButton: document.getElementById("load-more-recent-button"),
@@ -61,6 +67,8 @@ const elements = {
     loadMoreArtifactsButton: document.getElementById("load-more-artifacts-button"),
     viewerBackdrop: document.getElementById("viewer-backdrop"),
     viewerTitle: document.getElementById("viewer-title"),
+    viewerMeta: document.getElementById("viewer-meta"),
+    viewerActions: document.getElementById("viewer-actions"),
     viewerContent: document.getElementById("viewer-content"),
     closeViewerButton: document.getElementById("close-viewer-button"),
     toast: document.getElementById("toast"),
@@ -396,7 +404,7 @@ function renderItemCards(container, items, emptyText) {
 
     container.innerHTML = items
         .map((item) => {
-            const actionLabel = item.storage === "archive" ? "恢复到 Inbox" : "归档";
+            const actionLabel = buildStorageActionLabel(item);
             const preview = summarizeText(item.content, 150) || "没有可显示内容。";
             return `
                 <article class="item-card" data-item-id="${escapeHtml(item.id)}">
@@ -531,6 +539,99 @@ function createInlineError(message) {
     return element;
 }
 
+function buildItemTitle(item) {
+    return summarizeText(item?.content, 40) || `${formatType(item?.type)} #${item?.id}`;
+}
+
+function buildStorageActionLabel(item) {
+    return item?.storage === "archive" ? "恢复到 Inbox" : "归档";
+}
+
+function updateKnownItem(item) {
+    if (!item?.id) {
+        return;
+    }
+
+    const mergeItem = (items) => items.map((entry) => (entry.id === item.id ? { ...entry, ...item } : entry));
+    state.recent.items = mergeItem(state.recent.items);
+    state.search.items = mergeItem(state.search.items);
+}
+
+function clearViewerChrome() {
+    elements.viewerMeta.innerHTML = "";
+    elements.viewerActions.innerHTML = "";
+}
+
+function renderViewerMeta(rows) {
+    const filteredRows = rows.filter((row) => row && row.value);
+    if (!filteredRows.length) {
+        elements.viewerMeta.innerHTML = "";
+        return;
+    }
+
+    elements.viewerMeta.innerHTML = filteredRows
+        .map(
+            (row) => `
+                <div class="viewer-meta-card">
+                    <strong>${escapeHtml(row.label)}</strong>
+                    <span>${escapeHtml(row.value)}</span>
+                </div>
+            `
+        )
+        .join("");
+}
+
+function renderViewerActions(actions) {
+    const filteredActions = actions.filter(Boolean);
+    if (!filteredActions.length) {
+        elements.viewerActions.innerHTML = "";
+        return;
+    }
+
+    elements.viewerActions.innerHTML = filteredActions
+        .map((action) => {
+            const attributes = Object.entries(action.dataset || {})
+                .map(([name, value]) => {
+                    const dataName = name.replace(/[A-Z]/g, (character) => `-${character.toLowerCase()}`);
+                    return `data-${escapeHtml(dataName)}="${escapeHtml(value)}"`;
+                })
+                .join(" ");
+            return `
+                <button class="${escapeHtml(action.className || "secondary-button")}" type="button" ${attributes}>
+                    ${escapeHtml(action.label)}
+                </button>
+            `;
+        })
+        .join("");
+}
+
+async function fetchItemDetail(itemId) {
+    const payload = await apiRequest(`/item/${itemId}`);
+    updateKnownItem(payload.item);
+    return payload.item;
+}
+
+function buildArtifactFilePath(relativePath) {
+    return `/artifacts/file/${String(relativePath || "")
+        .split("/")
+        .map((part) => encodeURIComponent(part))
+        .join("/")}`;
+}
+
+async function downloadProtectedFile(fileUrl, downloadName) {
+    const blob = await apiRequest(fileUrl, { responseType: "blob" });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = downloadName || "axiom-file";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+    }, 0);
+}
+
 function findItemById(itemId) {
     const targetId = Number(itemId);
     return (
@@ -544,43 +645,113 @@ function findArtifactByPath(relativePath) {
     return state.artifacts.items.find((artifact) => artifact.relative_path === relativePath);
 }
 
-function openViewerWithText(title, content) {
+function openViewerShell(title, contentClass = "viewer-content") {
     releaseViewerObjectUrl();
     elements.viewerTitle.textContent = title;
-    elements.viewerContent.className = "viewer-content is-text";
-    elements.viewerContent.textContent = content;
+    elements.viewerContent.className = contentClass;
+    elements.viewerContent.innerHTML = "";
     elements.viewerBackdrop.classList.remove("hidden");
 }
 
-async function openViewerWithImage(title, fileUrl) {
-    releaseViewerObjectUrl();
+function openViewerWithText(title, content, metaRows = [], actions = []) {
+    openViewerShell(title, "viewer-content is-text");
+    renderViewerMeta(metaRows);
+    renderViewerActions(actions);
+    elements.viewerContent.textContent = content;
+}
+
+async function openViewerWithImage(title, fileUrl, metaRows = [], actions = []) {
+    openViewerShell(title);
+    renderViewerMeta(metaRows);
+    renderViewerActions(actions);
     const blob = await apiRequest(fileUrl, { responseType: "blob" });
     const objectUrl = URL.createObjectURL(blob);
     state.viewerObjectUrl = objectUrl;
     const image = document.createElement("img");
     image.src = objectUrl;
     image.alt = title;
-    elements.viewerTitle.textContent = title;
-    elements.viewerContent.className = "viewer-content";
-    elements.viewerContent.innerHTML = "";
     elements.viewerContent.append(image);
-    elements.viewerBackdrop.classList.remove("hidden");
 }
 
 async function openArtifactViewer(relativePath) {
     const artifact = findArtifactByPath(relativePath);
     const title = artifact ? artifact.name : relativePath;
-    const body = await apiRequest(`/artifacts/file/${relativePath}`, {
+    const filePath = artifact?.file_url || buildArtifactFilePath(relativePath);
+    const body = await apiRequest(filePath, {
         responseType: "text",
     });
-    openViewerWithText(title, body);
+    state.viewerContext = { kind: "artifact", relativePath };
+    openViewerWithText(
+        title,
+        body,
+        [
+            { label: "分组", value: artifact ? formatArtifactLabel(artifact) : "自动化产物" },
+            { label: "日期", value: artifact?.report_date || artifact?.generated_name || "未标记" },
+            { label: "修改时间", value: artifact?.modified_at ? formatDateTime(artifact.modified_at) : "未知时间" },
+            { label: "路径", value: artifact?.relative_path || relativePath },
+        ],
+        [
+            {
+                label: "下载 Markdown",
+                dataset: {
+                    action: "download-artifact-file",
+                    artifactPath: relativePath,
+                    artifactName: artifact?.name || "artifact.md",
+                },
+            },
+        ],
+    );
+}
+
+async function openItemViewer(itemId) {
+    const item = await fetchItemDetail(itemId);
+    const title = buildItemTitle(item);
+    const metaRows = [
+        { label: "ID", value: `#${item.id}` },
+        { label: "类型", value: formatType(item.type) },
+        { label: "存储区", value: formatStorage(item.storage) },
+        { label: "来源", value: item.source || "unknown" },
+        { label: "创建时间", value: formatDateTime(item.created_at) },
+        { label: "文件路径", value: item.file_path || "无文件" },
+    ];
+    const actions = [
+        item.file_url
+            ? {
+                label: item.type === "image" ? "下载图片" : "下载文件",
+                dataset: {
+                    action: "download-item-file",
+                    itemId: item.id,
+                    downloadName: item.file_path?.split(/[\\/]/).pop() || `item-${item.id}`,
+                },
+            }
+            : null,
+        {
+            label: buildStorageActionLabel(item),
+            className: "secondary-button",
+            dataset: {
+                action: "viewer-toggle-storage",
+                itemId: item.id,
+            },
+        },
+    ];
+
+    state.viewerContext = { kind: "item", itemId: item.id };
+
+    if (item.type === "image" && item.file_url) {
+        await openViewerWithImage(title, item.file_url, metaRows, actions);
+        return;
+    }
+
+    openViewerWithText(title, item.content || "没有内容。", metaRows, actions);
 }
 
 function closeViewer() {
     releaseViewerObjectUrl();
+    clearViewerChrome();
     elements.viewerBackdrop.classList.add("hidden");
     elements.viewerContent.innerHTML = "";
     elements.viewerContent.className = "viewer-content";
+    state.viewerContext = null;
 }
 
 function releaseViewerObjectUrl() {
@@ -611,24 +782,43 @@ async function loadOverview() {
     elements.lastSyncIndicator.textContent = `上次同步：${formatDateTime(payload.generated_at)}`;
 }
 
+function readRecentFilters() {
+    const form = new FormData(elements.recentFilterForm);
+    return {
+        type: String(form.get("type") || "").trim(),
+        storage: String(form.get("storage") || "").trim(),
+        source: String(form.get("source") || "").trim(),
+        sort: String(form.get("sort") || "newest").trim(),
+        created_from: toUtcIsoFromLocalInput(String(form.get("created_from") || "").trim()),
+        created_to: toUtcIsoFromLocalInput(String(form.get("created_to") || "").trim()),
+    };
+}
+
 async function loadRecentPage({ reset = false } = {}) {
+    const filters = readRecentFilters();
     const nextPage = reset ? 1 : state.recent.page + 1;
     const payload = await apiRequest("/recent", {
         query: {
+            ...filters,
             page: nextPage,
             page_size: RECENT_PAGE_SIZE,
-            sort: "newest",
         },
     });
 
     state.recent.page = payload.page;
     state.recent.totalPages = payload.total_pages || 1;
+    state.recent.total = payload.total || 0;
     state.recent.items = reset
         ? payload.items
         : [...state.recent.items, ...payload.items];
 
     renderItemCards(elements.recentList, state.recent.items, "还没有记录。");
     updateLoadMoreButton(elements.loadMoreRecentButton, state.recent.page, state.recent.totalPages);
+    setFeedback(
+        elements.recentFeedback,
+        `共 ${state.recent.total} 条记录，当前显示 ${state.recent.items.length} 条。`,
+        "ok",
+    );
 }
 
 function readSearchFilters() {
@@ -637,6 +827,7 @@ function readSearchFilters() {
         q: String(form.get("q") || "").trim(),
         type: String(form.get("type") || "").trim(),
         storage: String(form.get("storage") || "").trim(),
+        source: String(form.get("source") || "").trim(),
         sort: String(form.get("sort") || "relevance").trim(),
         created_from: toUtcIsoFromLocalInput(String(form.get("created_from") || "").trim()),
         created_to: toUtcIsoFromLocalInput(String(form.get("created_to") || "").trim()),
@@ -664,6 +855,7 @@ async function loadSearchPage({ reset = false } = {}) {
     state.search.active = true;
     state.search.page = payload.page;
     state.search.totalPages = payload.total_pages || 1;
+    state.search.total = payload.total || 0;
     state.search.items = reset
         ? payload.items
         : [...state.search.items, ...payload.items];
@@ -822,11 +1014,15 @@ async function handleImageCaptureSubmit(event) {
     }
 }
 
-async function handleStorageToggle(itemId) {
-    const item = findItemById(itemId);
+async function handleStorageToggle(itemId, { reopenViewer = false } = {}) {
+    let item = findItemById(itemId);
     if (!item) {
-        showToast("没有找到对应记录");
-        return;
+        try {
+            item = await fetchItemDetail(itemId);
+        } catch (error) {
+            showToast(error.message);
+            return;
+        }
     }
 
     const endpoint = item.storage === "archive" ? `/restore/${item.id}` : `/archive/${item.id}`;
@@ -834,9 +1030,13 @@ async function handleStorageToggle(itemId) {
 
     try {
         setConnectionState("busy", `正在${actionLabel}`);
-        await apiRequest(endpoint, { method: "POST" });
+        const payload = await apiRequest(endpoint, { method: "POST" });
+        updateKnownItem(payload.item);
         showToast(`${actionLabel}完成`);
         await syncDashboard();
+        if (reopenViewer) {
+            await openItemViewer(itemId);
+        }
     } catch (error) {
         setConnectionState("error", error.message);
         showToast(error.message);
@@ -844,25 +1044,8 @@ async function handleStorageToggle(itemId) {
 }
 
 async function handleItemView(itemId) {
-    const item = findItemById(itemId);
-    if (!item) {
-        showToast("没有找到对应记录");
-        return;
-    }
-
     try {
-        if (item.type === "image") {
-            await openViewerWithImage(
-                summarizeText(item.content, 40) || `图片 #${item.id}`,
-                item.file_url,
-            );
-            return;
-        }
-
-        openViewerWithText(
-            summarizeText(item.content, 40) || `文本 #${item.id}`,
-            item.content || "没有内容。",
-        );
+        await openItemViewer(itemId);
     } catch (error) {
         showToast(error.message);
     }
@@ -880,6 +1063,25 @@ function bindDelegatedActions() {
             await handleStorageToggle(target.getAttribute("data-item-id"));
         } else if (action === "view-item") {
             await handleItemView(target.getAttribute("data-item-id"));
+        } else if (action === "viewer-toggle-storage") {
+            await handleStorageToggle(target.getAttribute("data-item-id"), { reopenViewer: true });
+        } else if (action === "download-item-file") {
+            const item = await fetchItemDetail(target.getAttribute("data-item-id"));
+            if (!item.file_url) {
+                showToast("当前记录没有可下载文件");
+                return;
+            }
+            await downloadProtectedFile(
+                item.file_url,
+                target.getAttribute("data-download-name") || `item-${item.id}`,
+            );
+            showToast("文件下载已开始");
+        } else if (action === "download-artifact-file") {
+            await downloadProtectedFile(
+                buildArtifactFilePath(target.getAttribute("data-artifact-path")),
+                target.getAttribute("data-artifact-name") || "artifact.md",
+            );
+            showToast("Markdown 下载已开始");
         } else if (action === "view-artifact") {
             await openArtifactViewer(target.getAttribute("data-artifact-path"));
         }
@@ -912,9 +1114,15 @@ function bindForms() {
     elements.clearKeyButton.addEventListener("click", () => {
         saveKey("");
         elements.keyInput.value = "";
+        state.recent = { page: 1, totalPages: 1, items: [], total: 0 };
+        state.search = { page: 1, totalPages: 1, items: [], active: false, total: 0 };
+        state.artifacts = { page: 1, totalPages: 1, items: [] };
         setFeedback(elements.keyFeedback, "本地 key 已清除。", "ok");
+        setFeedback(elements.recentFeedback, "", "muted");
+        setFeedback(elements.searchFeedback, "", "muted");
         setConnectionState("idle", "尚未同步");
         elements.overviewGeneratedAt.textContent = "";
+        closeViewer();
         renderEmptyState(elements.overviewStats, "保存 key 后即可读取总览。");
         renderEmptyState(elements.overviewRecentHighlights, "保存 key 后即可查看最近记录。");
         renderEmptyState(elements.overviewArtifactHighlights, "保存 key 后即可查看自动化产物。");
@@ -959,6 +1167,33 @@ function bindForms() {
         }
     });
 
+    elements.recentFilterForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+            setConnectionState("busy", "正在刷新记录浏览");
+            await loadRecentPage({ reset: true });
+            setConnectionState("ready", elements.lastSyncIndicator.textContent);
+        } catch (error) {
+            setConnectionState("error", error.message);
+            setFeedback(elements.recentFeedback, error.message, "error");
+            showToast(error.message);
+        }
+    });
+
+    elements.resetRecentFiltersButton.addEventListener("click", async () => {
+        elements.recentFilterForm.reset();
+        document.getElementById("recent-sort-input").value = "newest";
+        try {
+            setConnectionState("busy", "正在重置记录筛选");
+            await loadRecentPage({ reset: true });
+            setConnectionState("ready", elements.lastSyncIndicator.textContent);
+        } catch (error) {
+            setConnectionState("error", error.message);
+            setFeedback(elements.recentFeedback, error.message, "error");
+            showToast(error.message);
+        }
+    });
+
     elements.loadMoreRecentButton.addEventListener("click", async () => {
         try {
             await loadRecentPage();
@@ -995,6 +1230,7 @@ function bindForms() {
             totalPages: 1,
             items: [],
             active: false,
+            total: 0,
         };
         setFeedback(elements.searchFeedback, "", "muted");
         renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");

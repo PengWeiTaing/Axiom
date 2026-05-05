@@ -6,7 +6,6 @@ import os
 import sys
 import tempfile
 import threading
-import time
 from pathlib import Path
 
 from werkzeug.serving import make_server
@@ -43,12 +42,22 @@ def assert_text_present(page, text: str, label: str) -> None:
         raise AssertionError(f"{label}: did not find text {text!r}") from exc
 
 
+def create_sample_artifact(root: Path) -> None:
+    artifact_path = root / "data" / "reviews" / "daily" / "2026" / "2026-05-05.md"
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text(
+        "# daily review\n\nSummary line for the browser smoke test.\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="axiom_web_app_") as temp_dir:
         root = Path(temp_dir)
         os.environ["AXIOM_ROOT"] = str(root)
         os.environ["AXIOM_SECRET_KEY"] = "test-key"
         os.environ["AXIOM_LOG_PATH"] = str(root / "logs" / "receiver.log")
+        create_sample_artifact(root)
 
         try:
             from core.receiver import app  # noqa: WPS433
@@ -59,6 +68,7 @@ def main() -> None:
 
             base_url = f"http://127.0.0.1:{server.port}"
             note_text = "Playwright smoke note"
+            note_source = "web_app_smoke"
             image_caption = "playwright smoke image"
 
             try:
@@ -93,14 +103,41 @@ def main() -> None:
                         raise AssertionError("service worker was not registered")
 
                     page.fill("#text-input", note_text)
+                    page.fill("#text-source-input", note_source)
                     page.get_by_role("button", name="写入 inbox").click()
                     assert_text_present(page, "文本已写入 inbox", "text capture feedback")
                     assert_text_present(page, note_text, "recent note")
 
                     page.fill("#search-query-input", note_text)
+                    page.fill("#search-source-input", note_source)
                     page.get_by_role("button", name="开始检索").click()
                     assert_text_present(page, "共 1 条结果", "search feedback")
                     assert_text_present(page, note_text, "search result")
+
+                    page.locator("#search-results").get_by_role("button", name="查看").first.click()
+                    page.locator("#viewer-meta").get_by_text(note_source).wait_for(timeout=15_000)
+                    page.locator("#viewer-content").get_by_text(note_text, exact=False).wait_for(
+                        timeout=15_000
+                    )
+                    page.locator("#viewer-actions").get_by_role("button", name="归档").click()
+                    page.locator("#viewer-actions").get_by_role("button", name="恢复到 Inbox").wait_for(
+                        timeout=15_000
+                    )
+                    page.get_by_role("button", name="关闭").click()
+
+                    page.select_option("#recent-storage-input", "archive")
+                    page.get_by_role("button", name="应用筛选").click()
+                    assert_text_present(page, note_text, "archive filtered recent")
+
+                    page.locator("#recent-list").get_by_role("button", name="查看").first.click()
+                    page.locator("#viewer-actions").get_by_role("button", name="恢复到 Inbox").click()
+                    page.locator("#viewer-actions").get_by_role("button", name="归档").wait_for(
+                        timeout=15_000
+                    )
+                    page.get_by_role("button", name="关闭").click()
+
+                    page.get_by_role("button", name="重置筛选").first.click()
+                    assert_text_present(page, note_text, "recent note after restore")
 
                     page.set_input_files(
                         "#image-input",
@@ -111,12 +148,22 @@ def main() -> None:
                         },
                     )
                     page.fill("#image-caption-input", image_caption)
+                    page.fill("#image-source-input", "web_app_image")
                     page.get_by_role("button", name="上传图片").click()
                     assert_text_present(page, "图片已写入 inbox", "image capture feedback")
 
                     page.fill("#search-query-input", image_caption)
+                    page.fill("#search-source-input", "web_app_image")
                     page.get_by_role("button", name="开始检索").click()
                     assert_text_present(page, image_caption, "image search result")
+
+                    page.locator("#artifact-summary-cards").get_by_role("button", name="查看最新").first.click()
+                    page.locator("#viewer-content").get_by_text("# daily review", exact=False).wait_for(
+                        timeout=15_000
+                    )
+                    page.locator("#viewer-meta").get_by_text("data/reviews/daily/2026/2026-05-05.md").wait_for(
+                        timeout=15_000
+                    )
 
                     browser.close()
             finally:
@@ -125,7 +172,7 @@ def main() -> None:
 
         except ImportError as exc:
             raise SystemExit(
-                "缺少 Playwright。请先执行: "
+                "缺少 Playwright。请先执行 "
                 "python -m pip install -r requirements-dev.txt，"
                 "然后执行 playwright install chromium"
             ) from exc

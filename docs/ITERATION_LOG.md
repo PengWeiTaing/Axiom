@@ -220,3 +220,8 @@
 - 公网 `/app`、`/sw.js`、`/static/manifest.webmanifest` 已可访问
 - 公网鉴权 `/overview` 已验证通过，返回 `service=axiom-receiver`、`total=2`
 - 本地 Playwright 已验证公网 `/app` 的只读加载链路，确认能以线上 key 进入 `data-state=ready` 并读到 overview 统计
+- `/app` 的“记录浏览”面板新增类型、存储区、来源、时间范围和排序筛选
+- `/app` 的搜索面板补上来源过滤，前端已完整接入后端现有 `source` 查询能力
+- `/app` 的记录详情查看器改为实时读取 `/item/<id>`，现在会显示元数据，并支持下载文件与归档 / 恢复
+- `/app` 的自动化产物查看器新增元数据区和 Markdown 下载入口
+- `scripts/smoke_test_web_app.py` 现在覆盖文本详情查看、归档、恢复、recent 筛选、source 检索和 artifact 查看链路

@@ -298,6 +298,13 @@ body::before {
     border: 1px solid rgba(255, 255, 255, 0.65);
 }
 
+.filter-card {
+    padding: 14px;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.56);
+    border: 1px solid rgba(255, 255, 255, 0.62);
+}
+
 .field {
     display: grid;
     gap: 8px;
@@ -432,6 +439,42 @@ body::before {
     padding: 18px;
 }
 
+.viewer-meta-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.viewer-meta-card {
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(20, 33, 30, 0.08);
+}
+
+.viewer-meta-card strong,
+.viewer-meta-card span {
+    display: block;
+}
+
+.viewer-meta-card strong {
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+}
+
+.viewer-meta-card span {
+    color: var(--ink);
+    word-break: break-word;
+}
+
+.viewer-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
 .viewer-content {
     margin: 12px 0 0;
     max-height: calc(88vh - 110px);
@@ -526,6 +569,10 @@ body::before {
 @media (max-width: 759px) {
     .quick-nav {
         display: none;
+    }
+
+    .viewer-meta-grid {
+        grid-template-columns: 1fr;
     }
 }
 

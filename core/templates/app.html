@@ -19,7 +19,7 @@
                 <p class="eyebrow">Axiom</p>
                 <h1>Axiom 外脑控制台</h1>
                 <p class="hero-text">
-                    用一个移动优先入口完成记录、回看、搜索、上传和自动化产物浏览。
+                    用一个移动优先入口完成记录、回看、搜索、归档、上传和自动化产物浏览。
                 </p>
             </div>
             <div class="hero-actions">
@@ -35,7 +35,7 @@
         <nav class="quick-nav panel" aria-label="页面导航">
             <button type="button" data-scroll-target="capture-panel">记录</button>
             <button type="button" data-scroll-target="overview-panel">总览</button>
-            <button type="button" data-scroll-target="recent-panel">最近</button>
+            <button type="button" data-scroll-target="recent-panel">浏览</button>
             <button type="button" data-scroll-target="search-panel">搜索</button>
             <button type="button" data-scroll-target="artifacts-panel">自动化</button>
         </nav>
@@ -138,10 +138,56 @@
                 <div class="section-head">
                     <div>
                         <p class="eyebrow">Recent</p>
-                        <h2>最近记录</h2>
+                        <h2>记录浏览</h2>
                     </div>
-                    <button class="secondary-button" id="refresh-recent-button" type="button">刷新最近</button>
+                    <button class="secondary-button" id="refresh-recent-button" type="button">刷新列表</button>
                 </div>
+                <form id="recent-filter-form" class="stack-form filter-card">
+                    <div class="form-grid">
+                        <label class="field">
+                            <span>类型</span>
+                            <select id="recent-type-input" name="type">
+                                <option value="">全部</option>
+                                <option value="text">文本</option>
+                                <option value="image">图片</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>存储区</span>
+                            <select id="recent-storage-input" name="storage">
+                                <option value="">全部</option>
+                                <option value="inbox">inbox</option>
+                                <option value="archive">archive</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>来源</span>
+                            <input id="recent-source-input" name="source" type="text" placeholder="如 web_app / ios_shortcut">
+                        </label>
+                        <label class="field">
+                            <span>排序</span>
+                            <select id="recent-sort-input" name="sort">
+                                <option value="newest">最新</option>
+                                <option value="oldest">最早</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="form-grid">
+                        <label class="field">
+                            <span>起始时间</span>
+                            <input id="recent-created-from-input" name="created_from" type="datetime-local">
+                        </label>
+                        <label class="field">
+                            <span>结束时间</span>
+                            <input id="recent-created-to-input" name="created_to" type="datetime-local">
+                        </label>
+                    </div>
+                    <div class="inline-actions">
+                        <button class="primary-button" type="submit">应用筛选</button>
+                        <button class="text-button" id="reset-recent-filters-button" type="button">重置筛选</button>
+                    </div>
+                    <p class="feedback-text" id="recent-feedback"></p>
+                </form>
                 <div id="recent-list" class="item-grid"></div>
                 <div class="load-more-row">
                     <button class="secondary-button" id="load-more-recent-button" type="button">加载更多</button>
@@ -152,10 +198,10 @@
                 <div class="section-head">
                     <div>
                         <p class="eyebrow">Search</p>
-                        <h2>检索</h2>
+                        <h2>搜索</h2>
                     </div>
                 </div>
-                <form id="search-form" class="stack-form">
+                <form id="search-form" class="stack-form filter-card">
                     <label class="field">
                         <span>关键词</span>
                         <input id="search-query-input" name="q" type="text" placeholder="输入关键词、文件名或说明">
@@ -176,6 +222,10 @@
                                 <option value="inbox">inbox</option>
                                 <option value="archive">archive</option>
                             </select>
+                        </label>
+                        <label class="field">
+                            <span>来源</span>
+                            <input id="search-source-input" name="source" type="text" placeholder="如 web_app / ios_shortcut">
                         </label>
                         <label class="field">
                             <span>排序</span>
@@ -216,7 +266,7 @@
                     </div>
                     <button class="secondary-button" id="refresh-artifacts-button" type="button">刷新产物</button>
                 </div>
-                <form id="artifact-filter-form" class="stack-form">
+                <form id="artifact-filter-form" class="stack-form filter-card">
                     <div class="form-grid">
                         <label class="field">
                             <span>分组</span>
@@ -271,7 +321,7 @@
         <div class="bottom-bar">
             <button type="button" data-scroll-target="capture-panel">记录</button>
             <button type="button" data-scroll-target="overview-panel">总览</button>
-            <button type="button" data-scroll-target="recent-panel">最近</button>
+            <button type="button" data-scroll-target="recent-panel">浏览</button>
             <button type="button" data-scroll-target="search-panel">搜索</button>
             <button type="button" data-scroll-target="artifacts-panel">自动化</button>
         </div>
@@ -286,6 +336,8 @@
                 </div>
                 <button class="text-button" id="close-viewer-button" type="button">关闭</button>
             </div>
+            <div id="viewer-meta" class="viewer-meta-grid"></div>
+            <div id="viewer-actions" class="viewer-actions"></div>
             <div id="viewer-content" class="viewer-content"></div>
         </div>
     </div>
