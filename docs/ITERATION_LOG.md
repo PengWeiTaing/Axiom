@@ -232,3 +232,11 @@
 - 脚本化部署后再次通过 `curl http://127.0.0.1:5000/health` 和 `python3 scripts/check_consistency.py --root /opt/axiom`
 - 公网 `/health` 与鉴权 `/overview` 已再次验证通过，当前线上 `total=2`
 - 本地 Playwright 已验证公网 `/app` 新版界面：`recent-filter-form`、`search-source-input`、详情查看器元数据区和“下载图片 / 归档”按钮均已在线生效
+- 新增 `/item/<id>/update` 接口，支持在保留现有 item id 和文件路径的前提下更新 `content` 与 `source`
+- 文本 item 更新时会先原子改写对应 txt 文件，再更新 SQLite；若数据库写入失败，会尝试把文本文件回滚到旧内容
+- 图片 item 更新保持二进制文件不变，仅更新 SQLite 中的图片说明与来源信息
+- `/app` 详情查看器新增“编辑”入口，文本和图片都可在 viewer 内直接修改内容与 source
+- 图片查看态元数据新增“图片说明”，编辑后可直接在 viewer 中回看结果
+- `/app` 编辑态的“保存修改”与“返回查看”被上移到 viewer 顶部操作栏，减少移动端滚动到底部才能提交的摩擦
+- `scripts/smoke_test_receiver.py` 新增 item 更新覆盖：校验文本更新会同步落盘、图片更新会保留原文件并更新说明 / source
+- `scripts/smoke_test_web_app.py` 新增浏览器级编辑覆盖：从 `/app` 打开记录详情、进入编辑态、保存、回看更新结果

@@ -132,11 +132,48 @@ def main() -> None:
             assert item_detail["item"]["storage"] == "inbox"
             assert item_detail["item"]["file_url"] == first["item"]["file_url"]
 
+            invalid_text_update = assert_status(
+                client.post(
+                    f"/item/{first['item']['id']}/update",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"content": "   "},
+                ),
+                400,
+                "invalid text update",
+            )
+            assert invalid_text_update["ok"] is False
+            assert invalid_text_update["error"]["code"] == "empty_text"
+
+            updated_first_text = "Axiom first smoke text updated\nsecond line"
+            updated_first = assert_status(
+                client.post(
+                    f"/item/{first['item']['id']}/update",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"content": updated_first_text},
+                ),
+                200,
+                "update text item",
+            )
+            assert updated_first["message"] == "updated"
+            assert updated_first["updated_fields"] == ["content"]
+            assert updated_first["item"]["content"] == updated_first_text
+            assert updated_first["item"]["source"] == "ios_shortcut"
+
+            updated_item_detail = assert_status(
+                client.get(
+                    f"/item/{first['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "updated item detail",
+            )
+            assert updated_item_detail["item"]["content"] == updated_first_text
+
             text_file = client.get(
                 f"/file/{first['item']['id']}",
                 query_string={"key": "test-key"},
             )
-            assert_file_body(text_file, first_text.encode("utf-8"), "text file")
+            assert_file_body(text_file, updated_first_text.encode("utf-8"), "text file")
 
             archived = assert_status(
                 client.post(
@@ -155,7 +192,7 @@ def main() -> None:
             )
             assert_file_body(
                 archived_text_file,
-                first_text.encode("utf-8"),
+                updated_first_text.encode("utf-8"),
                 "archived text file",
             )
 
@@ -207,7 +244,7 @@ def main() -> None:
                 200,
                 "restored item detail",
             )
-            assert restored_item_detail["item"]["content"] == first_text
+            assert restored_item_detail["item"]["content"] == updated_first_text
             assert restored_item_detail["item"]["storage"] == "inbox"
 
             restored_text_file = client.get(
@@ -216,7 +253,7 @@ def main() -> None:
             )
             assert_file_body(
                 restored_text_file,
-                first_text.encode("utf-8"),
+                updated_first_text.encode("utf-8"),
                 "restored text file",
             )
 
@@ -270,6 +307,35 @@ def main() -> None:
                 headers={"X-Axiom-Key": "test-key"},
             )
             assert_file_body(image_file, b"fake png bytes", "image file")
+
+            updated_image_caption = "edited smoke image"
+            updated_image = assert_status(
+                client.post(
+                    f"/item/{image['item']['id']}/update",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={
+                        "content": updated_image_caption,
+                        "source": "image_edit_test",
+                    },
+                ),
+                200,
+                "update image item",
+            )
+            assert updated_image["message"] == "updated"
+            assert updated_image["updated_fields"] == ["content", "source"]
+            assert updated_image["item"]["content"] == updated_image_caption
+            assert updated_image["item"]["source"] == "image_edit_test"
+
+            updated_image_detail = assert_status(
+                client.get(
+                    f"/item/{image['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "updated image detail",
+            )
+            assert updated_image_detail["item"]["content"] == updated_image_caption
+            assert updated_image_detail["item"]["source"] == "image_edit_test"
 
             recent = assert_status(
                 client.get("/recent", query_string={"key": "test-key", "limit": "100"}),
@@ -476,8 +542,9 @@ def main() -> None:
             assert stats["total"] == 3
             assert stats["by_type"]["text"] == 2
             assert stats["by_type"]["image"] == 1
-            assert stats["by_source"]["ios_shortcut"] == 2
+            assert stats["by_source"]["ios_shortcut"] == 1
             assert stats["by_source"]["smoke_test"] == 1
+            assert stats["by_source"]["image_edit_test"] == 1
             assert stats["by_storage"].get("archive", 0) == 0
             assert stats["by_storage"]["inbox"] == 3
 

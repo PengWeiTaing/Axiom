@@ -69,6 +69,8 @@ def main() -> None:
             base_url = f"http://127.0.0.1:{server.port}"
             note_text = "Playwright smoke note"
             note_source = "web_app_smoke"
+            updated_note_text = "Playwright smoke note updated"
+            updated_note_source = "web_app_smoke_edited"
             image_caption = "playwright smoke image"
 
             try:
@@ -138,6 +140,24 @@ def main() -> None:
 
                     page.get_by_role("button", name="重置筛选").first.click()
                     assert_text_present(page, note_text, "recent note after restore")
+
+                    page.locator("#recent-list").get_by_role("button", name="查看").first.click()
+                    page.locator("#viewer-actions").get_by_role("button", name="编辑").click()
+                    page.locator("[data-role='item-edit-form'] textarea[name='content']").fill(
+                        updated_note_text
+                    )
+                    page.locator("[data-role='item-edit-form'] input[name='source']").fill(
+                        updated_note_source
+                    )
+                    page.locator("#viewer-actions").get_by_role("button", name="保存修改").click()
+                    page.locator("#viewer-meta").get_by_text(updated_note_source).wait_for(
+                        timeout=15_000
+                    )
+                    page.locator("#viewer-content").get_by_text(
+                        updated_note_text, exact=False
+                    ).wait_for(timeout=15_000)
+                    page.get_by_role("button", name="关闭").click()
+                    assert_text_present(page, updated_note_text, "recent note after edit")
 
                     page.set_input_files(
                         "#image-input",

@@ -138,6 +138,27 @@ def get_request_field(name: str, default: str = "") -> str:
     return default
 
 
+def get_request_body_data() -> dict:
+    """读取本次请求的 body，供更新类 POST 接口使用。"""
+    if request.is_json:
+        data = request.get_json(silent=True)
+        if data is None:
+            raise ValueError("JSON body 无效")
+        if not isinstance(data, dict):
+            raise ValueError("JSON body 必须是对象")
+        return data
+    return request.form.to_dict(flat=True)
+
+
+def read_optional_body_field(body: dict, name: str) -> tuple[bool, str]:
+    if name not in body:
+        return False, ""
+    value = body.get(name)
+    if value is None:
+        return True, ""
+    return True, str(value)
+
+
 def get_request_key() -> str:
     return get_request_field("key") or request.headers.get("X-Axiom-Key", "")
 
@@ -585,6 +606,26 @@ def update_item_file_path(item_id: int, file_path: Path) -> None:
             WHERE id = ?
             """,
             (str(file_path), item_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_item_content_and_source(
+    item_id: int,
+    content: str | None,
+    source: str | None,
+) -> None:
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            """
+            UPDATE items
+            SET content = ?, source = ?
+            WHERE id = ?
+            """,
+            (content, source, item_id),
         )
         conn.commit()
     finally:
@@ -1214,6 +1255,101 @@ def get_item(item_id: int):
         return error_response(404, "item_not_found", "item 不存在")
 
     return ok_response({"item": row_to_item(row)})
+
+
+@app.route("/item/<int:item_id>/update", methods=["POST"])
+def update_item(item_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    row = get_item_by_id(item_id)
+    if row is None:
+        return error_response(404, "item_not_found", "item 不存在")
+
+    try:
+        body = get_request_body_data()
+    except ValueError as exc:
+        return error_response(400, "invalid_request_body", str(exc))
+
+    content_provided, raw_content = read_optional_body_field(body, "content")
+    source_provided, raw_source = read_optional_body_field(body, "source")
+
+    if not content_provided and not source_provided:
+        return error_response(400, "missing_update_fields", "至少要提供 content 或 source")
+
+    next_content = row["content"]
+    if content_provided:
+        if row["type"] == ITEM_TYPE_TEXT:
+            if not raw_content.strip():
+                return error_response(400, "empty_text", "text 不能为空")
+            next_content = raw_content
+        else:
+            next_content = raw_content.strip()
+
+    next_source = row["source"]
+    if source_provided:
+        cleaned_source = raw_source.strip()
+        if not cleaned_source:
+            return error_response(400, "empty_source", "source 不能为空")
+        next_source = cleaned_source
+
+    updated_fields: list[str] = []
+    if next_content != row["content"]:
+        updated_fields.append("content")
+    if next_source != row["source"]:
+        updated_fields.append("source")
+
+    if not updated_fields:
+        return ok_response(
+            {
+                "message": "unchanged",
+                "updated_fields": [],
+                "item": row_to_item(row),
+            }
+        )
+
+    file_path: Path | None = None
+    rollback_content = row["content"] or ""
+    content_written = False
+
+    if row["type"] == ITEM_TYPE_TEXT and "content" in updated_fields:
+        file_path = resolve_stored_file_path(row["file_path"])
+        if file_path is None:
+            return error_response(404, "file_not_found", "文本文件不存在")
+        if not is_path_under(file_path, AXIOM_ROOT):
+            logger.warning("blocked update outside root: item_id=%s path=%s", item_id, file_path)
+            return error_response(403, "forbidden_file_path", "文件路径不允许访问")
+        if not file_path.is_file():
+            return error_response(404, "file_not_found", "文本文件不存在")
+
+        try:
+            write_text_file_atomic(file_path, next_content or "")
+            content_written = True
+        except OSError:
+            logger.exception("failed to rewrite text file: item_id=%s", item_id)
+            return error_response(500, "file_write_failed", "文本文件更新失败")
+
+    try:
+        update_item_content_and_source(item_id, next_content, next_source)
+    except sqlite3.Error:
+        if content_written and file_path is not None:
+            try:
+                write_text_file_atomic(file_path, rollback_content)
+            except OSError:
+                logger.exception("failed to rollback text file after db error: item_id=%s", item_id)
+        logger.exception("failed to update item in database: item_id=%s", item_id)
+        return error_response(500, "database_write_failed", "数据库写入失败")
+
+    updated_row = get_item_by_id(item_id)
+    logger.info("updated item id=%s fields=%s", item_id, ",".join(updated_fields))
+    return ok_response(
+        {
+            "message": "updated",
+            "updated_fields": updated_fields,
+            "item": row_to_item(updated_row),
+        }
+    )
 
 
 @app.route("/file/<int:item_id>", methods=["GET"])

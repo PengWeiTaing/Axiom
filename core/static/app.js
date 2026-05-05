@@ -547,6 +547,52 @@ function buildStorageActionLabel(item) {
     return item?.storage === "archive" ? "恢复到 Inbox" : "归档";
 }
 
+function buildItemMetaRows(item) {
+    const rows = [
+        { label: "ID", value: `#${item.id}` },
+        { label: "类型", value: formatType(item.type) },
+        { label: "存储区", value: formatStorage(item.storage) },
+        { label: "来源", value: item.source || "unknown" },
+        { label: "创建时间", value: formatDateTime(item.created_at) },
+        { label: "文件路径", value: item.file_path || "无文件" },
+    ];
+    if (item.type === "image" && item.content) {
+        rows.splice(4, 0, { label: "图片说明", value: item.content });
+    }
+    return rows;
+}
+
+function buildItemViewerActions(item) {
+    return [
+        {
+            label: "编辑",
+            className: "primary-button",
+            dataset: {
+                action: "edit-item",
+                itemId: item.id,
+            },
+        },
+        item.file_url
+            ? {
+                label: item.type === "image" ? "下载图片" : "下载文件",
+                dataset: {
+                    action: "download-item-file",
+                    itemId: item.id,
+                    downloadName: item.file_path?.split(/[\\/]/).pop() || `item-${item.id}`,
+                },
+            }
+            : null,
+        {
+            label: buildStorageActionLabel(item),
+            className: "secondary-button",
+            dataset: {
+                action: "viewer-toggle-storage",
+                itemId: item.id,
+            },
+        },
+    ];
+}
+
 function updateKnownItem(item) {
     if (!item?.id) {
         return;
@@ -703,18 +749,118 @@ async function openArtifactViewer(relativePath) {
     );
 }
 
-async function openItemViewer(itemId) {
+function createViewerField(labelText, control, helperText = "") {
+    const label = document.createElement("label");
+    label.className = "field";
+
+    const title = document.createElement("span");
+    title.textContent = labelText;
+    label.append(title, control);
+
+    if (helperText) {
+        const helper = document.createElement("p");
+        helper.className = "helper-text";
+        helper.textContent = helperText;
+        label.append(helper);
+    }
+
+    return label;
+}
+
+function buildItemEditorForm(item) {
+    const form = document.createElement("form");
+    form.className = "stack-form viewer-edit-form";
+    form.dataset.role = "item-edit-form";
+    form.dataset.itemId = String(item.id);
+    form.dataset.itemType = item.type;
+
+    const intro = document.createElement("p");
+    intro.className = "helper-text";
+    intro.textContent = item.type === "image"
+        ? "可以补图片说明，也可以修正 source。留空可清空图片说明。"
+        : "文本内容会同时更新数据库和落盘 txt 文件。";
+    form.append(intro);
+
+    let previewSlot = null;
+    if (item.type === "image" && item.file_url) {
+        previewSlot = document.createElement("div");
+        previewSlot.className = "viewer-edit-preview";
+        previewSlot.append(createInlineError("正在加载图片预览..."));
+        form.append(previewSlot);
+    }
+
+    const contentInput = document.createElement("textarea");
+    contentInput.name = "content";
+    contentInput.rows = item.type === "image" ? 4 : 10;
+    contentInput.placeholder = item.type === "image" ? "给图片补一段说明" : "修正文本文字";
+    contentInput.value = item.content || "";
+    form.append(
+        createViewerField(
+            item.type === "image" ? "图片说明" : "文本内容",
+            contentInput,
+            item.type === "image" ? "" : "文本内容不能为空。",
+        ),
+    );
+
+    const sourceInput = document.createElement("input");
+    sourceInput.name = "source";
+    sourceInput.type = "text";
+    sourceInput.placeholder = "如 web_app / ios_shortcut";
+    sourceInput.value = item.source || "";
+    form.append(createViewerField("来源", sourceInput));
+
+    const feedback = document.createElement("p");
+    feedback.className = "feedback-text";
+    feedback.dataset.editFeedback = "true";
+    form.append(feedback);
+
+    return { form, previewSlot };
+}
+
+async function loadViewerEditPreview(previewSlot, fileUrl, title) {
+    if (!previewSlot || !fileUrl) {
+        return;
+    }
+
+    try {
+        const blob = await apiRequest(fileUrl, { responseType: "blob" });
+        const objectUrl = URL.createObjectURL(blob);
+        state.viewerObjectUrl = objectUrl;
+
+        previewSlot.innerHTML = "";
+        const image = document.createElement("img");
+        image.src = objectUrl;
+        image.alt = title;
+        previewSlot.append(image);
+    } catch (error) {
+        previewSlot.innerHTML = "";
+        previewSlot.append(createInlineError("图片预览读取失败"));
+    }
+}
+
+async function openItemEditor(itemId) {
     const item = await fetchItemDetail(itemId);
-    const title = buildItemTitle(item);
-    const metaRows = [
-        { label: "ID", value: `#${item.id}` },
-        { label: "类型", value: formatType(item.type) },
-        { label: "存储区", value: formatStorage(item.storage) },
-        { label: "来源", value: item.source || "unknown" },
-        { label: "创建时间", value: formatDateTime(item.created_at) },
-        { label: "文件路径", value: item.file_path || "无文件" },
-    ];
-    const actions = [
+    const title = `编辑 ${formatType(item.type)} #${item.id}`;
+    state.viewerContext = { kind: "item-edit", itemId: item.id };
+    openViewerShell(title);
+    renderViewerMeta(buildItemMetaRows(item));
+    renderViewerActions([
+        {
+            label: "保存修改",
+            className: "primary-button",
+            dataset: {
+                action: "save-item-edit",
+                itemId: item.id,
+            },
+        },
+        {
+            label: "返回查看",
+            className: "secondary-button",
+            dataset: {
+                action: "view-item",
+                itemId: item.id,
+            },
+        },
         item.file_url
             ? {
                 label: item.type === "image" ? "下载图片" : "下载文件",
@@ -725,24 +871,32 @@ async function openItemViewer(itemId) {
                 },
             }
             : null,
-        {
-            label: buildStorageActionLabel(item),
-            className: "secondary-button",
-            dataset: {
-                action: "viewer-toggle-storage",
-                itemId: item.id,
-            },
-        },
-    ];
+    ]);
 
+    const { form, previewSlot } = buildItemEditorForm(item);
+    elements.viewerContent.append(form);
+
+    if (previewSlot && item.file_url) {
+        await loadViewerEditPreview(previewSlot, item.file_url, buildItemTitle(item));
+    }
+}
+
+async function openItemViewer(itemId) {
+    const item = await fetchItemDetail(itemId);
+    const title = buildItemTitle(item);
     state.viewerContext = { kind: "item", itemId: item.id };
 
     if (item.type === "image" && item.file_url) {
-        await openViewerWithImage(title, item.file_url, metaRows, actions);
+        await openViewerWithImage(title, item.file_url, buildItemMetaRows(item), buildItemViewerActions(item));
         return;
     }
 
-    openViewerWithText(title, item.content || "没有内容。", metaRows, actions);
+    openViewerWithText(
+        title,
+        item.content || "没有内容。",
+        buildItemMetaRows(item),
+        buildItemViewerActions(item),
+    );
 }
 
 function closeViewer() {
@@ -1051,6 +1205,56 @@ async function handleItemView(itemId) {
     }
 }
 
+async function handleItemEdit(itemId) {
+    try {
+        await openItemEditor(itemId);
+    } catch (error) {
+        showToast(error.message);
+    }
+}
+
+async function handleItemEditSubmit(form) {
+    const itemId = form.dataset.itemId;
+    const itemType = form.dataset.itemType;
+    const formData = new FormData(form);
+    const content = String(formData.get("content") || "");
+    const source = String(formData.get("source") || "");
+    const feedback = form.querySelector("[data-edit-feedback]");
+    const submitButton = elements.viewerActions.querySelector("[data-action='save-item-edit']");
+
+    if (itemType === "text" && !content.trim()) {
+        setFeedback(feedback, "文本内容不能为空。", "error");
+        return;
+    }
+    if (!source.trim()) {
+        setFeedback(feedback, "来源不能为空。", "error");
+        return;
+    }
+
+    try {
+        setFeedback(feedback, "", "muted");
+        setButtonDisabled(submitButton, true, "保存中...");
+        setConnectionState("busy", "正在保存修改");
+        const payload = await apiRequest(`/item/${itemId}/update`, {
+            method: "POST",
+            json: {
+                content,
+                source,
+            },
+        });
+        updateKnownItem(payload.item);
+        await syncDashboard();
+        await openItemViewer(itemId);
+        showToast(payload.message === "unchanged" ? "没有检测到变化" : "修改已保存");
+    } catch (error) {
+        setConnectionState("error", error.message);
+        setFeedback(feedback, error.message, "error");
+        showToast(error.message);
+    } finally {
+        setButtonDisabled(submitButton, false);
+    }
+}
+
 function bindDelegatedActions() {
     document.body.addEventListener("click", async (event) => {
         const target = event.target.closest("[data-action]");
@@ -1063,6 +1267,15 @@ function bindDelegatedActions() {
             await handleStorageToggle(target.getAttribute("data-item-id"));
         } else if (action === "view-item") {
             await handleItemView(target.getAttribute("data-item-id"));
+        } else if (action === "edit-item") {
+            await handleItemEdit(target.getAttribute("data-item-id"));
+        } else if (action === "save-item-edit") {
+            const form = elements.viewerContent.querySelector("[data-role='item-edit-form']");
+            if (!form) {
+                showToast("当前没有可保存的编辑表单");
+                return;
+            }
+            await handleItemEditSubmit(form);
         } else if (action === "viewer-toggle-storage") {
             await handleStorageToggle(target.getAttribute("data-item-id"), { reopenViewer: true });
         } else if (action === "download-item-file") {
@@ -1085,6 +1298,15 @@ function bindDelegatedActions() {
         } else if (action === "view-artifact") {
             await openArtifactViewer(target.getAttribute("data-artifact-path"));
         }
+    });
+
+    document.body.addEventListener("submit", async (event) => {
+        const form = event.target.closest("[data-role='item-edit-form']");
+        if (!form) {
+            return;
+        }
+        event.preventDefault();
+        await handleItemEditSubmit(form);
     });
 }
 
