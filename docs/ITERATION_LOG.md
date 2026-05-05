@@ -225,3 +225,10 @@
 - `/app` 的记录详情查看器改为实时读取 `/item/<id>`，现在会显示元数据，并支持下载文件与归档 / 恢复
 - `/app` 的自动化产物查看器新增元数据区和 Markdown 下载入口
 - `scripts/smoke_test_web_app.py` 现在覆盖文本详情查看、归档、恢复、recent 筛选、source 检索和 artifact 查看链路
+- 新增 `scripts/deploy_to_vps.py`，把本地当前 commit 打包、备份 VPS 代码、上传、`rsync --delete` 同步、重启服务和基础验证串成统一部署入口
+- README 和 DeepWiki 生成脚本已去掉过时的 `VPS 上 git pull` 部署说明，改为从本地执行 `python scripts\deploy_to_vps.py`
+- 已用 `scripts/deploy_to_vps.py` 完成一次真实部署，当前线上代码已更新到 `fe8e233`
+- 这次脚本化部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260505_101329_fe8e233.tar.gz`
+- 脚本化部署后再次通过 `curl http://127.0.0.1:5000/health` 和 `python3 scripts/check_consistency.py --root /opt/axiom`
+- 公网 `/health` 与鉴权 `/overview` 已再次验证通过，当前线上 `total=2`
+- 本地 Playwright 已验证公网 `/app` 新版界面：`recent-filter-form`、`search-source-input`、详情查看器元数据区和“下载图片 / 归档”按钮均已在线生效
