@@ -243,3 +243,14 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮 item 编辑能力部署到 VPS，当前线上代码更新到 `65580b5`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260505_102946_65580b5.tar.gz`
 - 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常，公网 `/app` 打开记录详情后已可看到“编辑”入口
+- 新增 `/automation/jobs` 接口，返回当前允许手动触发的安全自动化任务清单
+- 新增 `/automation/run` 接口，在 receiver 进程内串行触发白名单脚本，并用 `runtime/automation_run.lock` 避免并发运行
+- 当前手动自动化只开放 `review_day`、`review_week`、`inbox_report`、`inbox_action_dry_run`
+- `/automation/run` 返回任务元数据、stdout/stderr 尾部输出和本次生成的最新 artifact 摘要，前端可直接跳转查看结果
+- `/app` 的“自动化中心”新增“手动触发”区块，支持选择运行日期并直接生成 review / inbox report / dry-run artifact
+- `scripts/smoke_test_receiver.py` 新增手动自动化覆盖：验证 `/automation/jobs`、`/automation/run`、artifact summary 和 `/overview/text` 会反映最新生成结果
+- `scripts/smoke_test_web_app.py` 新增浏览器级自动化覆盖：在 `/app` 填入日期、触发 `review_day`，并直接打开新生成的 artifact
+- README、AI Context 和 DeepWiki 生成脚本已同步到手动自动化中心的当前状态，并修正了 receiver 代码片段定位
+- 已用 `scripts/deploy_to_vps.py` 将这轮手动自动化中心部署到 VPS，当前线上代码更新到 `c3fff11`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260505_104941_c3fff11.tar.gz`
+- 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常、鉴权 `/automation/jobs` 正常，公网 `/app` 已可读到 4 个手动自动化任务卡片
