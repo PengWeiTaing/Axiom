@@ -138,6 +138,7 @@ logs/
 - `/add`
 - `/upload`
 - `/item/<id>`
+- `/item/<id>/update`
 - `/file/<id>`
 - `/archive/<id>`
 - `/restore/<id>`
@@ -146,6 +147,8 @@ logs/
 - `/overview`
 - `/overview/text`
 - `/app`
+- `/automation/jobs`
+- `/automation/run`
 - `/artifacts`
 - `/artifacts/summary`
 - `/artifacts/file/<path>`
@@ -160,10 +163,13 @@ logs/
 - 文本和图片写入都先落临时文件，再替换为正式文件
 - 数据库写入失败时会清理本次已写入文件
 - `/file/<id>` 会限制路径只能在 `AXIOM_ROOT` 下
+- `/item/<id>/update` 支持更新 `content` 和 `source`；文本 item 会同步改写 txt 文件，数据库失败时会尝试回滚文本文件
 - `/recent` 和 `/search` 支持分页、类型、存储区、来源、时间范围过滤
 - `/overview` 聚合返回 stats、最近 item 和最新 artifact 摘要，适合作为手机端或轻前端总览入口
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
-- `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索和自动化产物浏览
+- `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化和自动化产物浏览
+- `/automation/jobs` 返回当前允许手动触发的任务清单，当前只开放 review、inbox report 和 dry-run
+- `/automation/run` 会在 receiver 进程里串行触发白名单脚本，默认不开放 destructive apply
 - 前端请求统一通过 `X-Axiom-Key` header 访问后端接口，不在页面里到处拼 query key
 - `/sw.js` 和 `manifest.webmanifest` 组成当前 PWA 壳，目标是把浏览器入口稳定成手机主屏入口
 - `scripts/smoke_test_web_app.py` 会启动本地临时 receiver，并用 Playwright 真跑 `/app` 的关键交互

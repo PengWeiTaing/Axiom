@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from werkzeug.serving import make_server
@@ -43,12 +44,17 @@ def assert_text_present(page, text: str, label: str) -> None:
 
 
 def create_sample_artifact(root: Path) -> None:
-    artifact_path = root / "data" / "reviews" / "daily" / "2026" / "2026-05-05.md"
+    run_date = current_local_date_iso()
+    artifact_path = root / "data" / "reviews" / "daily" / run_date[:4] / f"{run_date}.md"
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     artifact_path.write_text(
         "# daily review\n\nSummary line for the browser smoke test.\n",
         encoding="utf-8",
     )
+
+
+def current_local_date_iso() -> str:
+    return datetime.now(timezone(timedelta(hours=8))).date().isoformat()
 
 
 def main() -> None:
@@ -72,6 +78,7 @@ def main() -> None:
             updated_note_text = "Playwright smoke note updated"
             updated_note_source = "web_app_smoke_edited"
             image_caption = "playwright smoke image"
+            run_date = current_local_date_iso()
 
             try:
                 with sync_playwright() as playwright:
@@ -177,13 +184,21 @@ def main() -> None:
                     page.get_by_role("button", name="开始检索").click()
                     assert_text_present(page, image_caption, "image search result")
 
+                    page.fill("#automation-date-input", run_date)
+                    page.locator("[data-job-id='review_day']").click()
+                    page.locator("#viewer-title").get_by_text(f"{run_date}.md").wait_for(
+                        timeout=15_000
+                    )
+                    page.locator("#viewer-content").get_by_text("Summary", exact=False).wait_for(
+                        timeout=15_000
+                    )
+                    page.get_by_role("button", name="关闭").click()
+
                     page.locator("#artifact-summary-cards").get_by_role("button", name="查看最新").first.click()
-                    page.locator("#viewer-content").get_by_text("# daily review", exact=False).wait_for(
+                    page.locator("#viewer-content").get_by_text("Summary", exact=False).wait_for(
                         timeout=15_000
                     )
-                    page.locator("#viewer-meta").get_by_text("data/reviews/daily/2026/2026-05-05.md").wait_for(
-                        timeout=15_000
-                    )
+                    page.locator("#viewer-meta").get_by_text(f"data/reviews/daily/{run_date[:4]}/{run_date}.md").wait_for(timeout=15_000)
 
                     browser.close()
             finally:

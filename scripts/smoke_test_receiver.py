@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -31,6 +32,10 @@ def assert_file_body(response, expected_bytes: bytes, label: str) -> None:
     if expected_bytes not in response.data:
         raise AssertionError(f"{label}: file content did not match expected bytes")
     response.close()
+
+
+def current_local_date_iso() -> str:
+    return datetime.now(timezone(timedelta(hours=8))).date().isoformat()
 
 
 def main() -> None:
@@ -587,6 +592,48 @@ def main() -> None:
             if "Axiom 总览" not in overview_text_body or "总条目: 3" not in overview_text_body:
                 raise AssertionError(f"overview text body unexpected: {overview_text_body}")
 
+            automation_jobs = assert_status(
+                client.get("/automation/jobs", query_string={"key": "test-key"}),
+                200,
+                "automation jobs",
+            )
+            job_ids = [job["id"] for job in automation_jobs["jobs"]]
+            assert "review_day" in job_ids
+            assert "inbox_action_dry_run" in job_ids
+
+            run_date = current_local_date_iso()
+
+            review_run = assert_status(
+                client.post(
+                    "/automation/run",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"job": "review_day", "date": run_date},
+                ),
+                200,
+                "run review day",
+            )
+            assert review_run["message"] == "completed"
+            assert review_run["job"]["id"] == "review_day"
+            assert review_run["artifact"]["group"] == "review"
+            assert review_run["artifact"]["window"] == "daily"
+            assert review_run["artifact"]["report_date"] == run_date
+            assert review_run["artifact"]["file_url"].startswith("/artifacts/file/")
+
+            action_run = assert_status(
+                client.post(
+                    "/automation/run",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"job": "inbox_action_dry_run", "date": run_date},
+                ),
+                200,
+                "run inbox action dry-run",
+            )
+            assert action_run["message"] == "completed"
+            assert action_run["job"]["id"] == "inbox_action_dry_run"
+            assert action_run["artifact"]["group"] == "inbox-actions"
+            assert action_run["artifact"]["mode"] == "dry-run"
+            assert action_run["artifact"]["report_date"] == run_date
+
             review_daily_path = root / "data" / "reviews" / "daily" / "2026" / "2026-04-29.md"
             review_daily_path.parent.mkdir(parents=True, exist_ok=True)
             review_daily_path.write_text(
@@ -657,8 +704,8 @@ def main() -> None:
                 200,
                 "artifacts",
             )
-            assert artifacts["total"] == 4
-            assert len(artifacts["items"]) == 4
+            assert artifacts["total"] == 6
+            assert len(artifacts["items"]) == 6
             assert all(item["file_url"].startswith("/artifacts/file/") for item in artifacts["items"])
 
             review_artifacts = assert_status(
@@ -668,6 +715,8 @@ def main() -> None:
                         "key": "test-key",
                         "group": "review",
                         "window": "daily",
+                        "date_from": "2026-04-29",
+                        "date_to": "2026-04-29",
                     },
                 ),
                 200,
@@ -705,42 +754,31 @@ def main() -> None:
                 200,
                 "artifact summary",
             )
-            assert artifact_summary["total"] == 4
-            assert artifact_summary["counts"]["review"]["daily"] == 1
+            assert artifact_summary["total"] == 6
+            assert artifact_summary["counts"]["review"]["daily"] == 2
             assert artifact_summary["counts"]["inbox"] == 1
-            assert artifact_summary["counts"]["inbox-actions"]["dry-run"] == 1
+            assert artifact_summary["counts"]["inbox-actions"]["dry-run"] == 2
             assert artifact_summary["counts"]["inbox-action-history"]["daily"] == 1
-            assert (
-                artifact_summary["latest"]["review"]["daily"]["preview"]
-                == "Summary Daily review summary line."
-            )
-            assert (
-                artifact_summary["latest"]["inbox-actions"]["dry-run"]["preview"]
-                == "Entries Action snapshot preview line."
-            )
+            assert artifact_summary["latest"]["review"]["daily"]["report_date"] == run_date
+            assert artifact_summary["latest"]["inbox-actions"]["dry-run"]["report_date"] == run_date
 
             overview_with_artifacts = assert_status(
                 client.get(
                     "/overview",
                     query_string={
-                        "key": "test-key",
-                        "recent_limit": "2",
-                        "preview_chars": "120",
-                    },
+                    "key": "test-key",
+                    "recent_limit": "2",
+                    "preview_chars": "120",
+                },
                 ),
                 200,
                 "overview with artifacts",
             )
-            assert overview_with_artifacts["artifacts"]["total"] == 4
-            assert overview_with_artifacts["artifacts"]["counts"]["review"]["daily"] == 1
-            assert (
-                overview_with_artifacts["artifacts"]["latest"]["review"]["daily"]["preview"]
-                == "Summary Daily review summary line."
-            )
-            assert (
-                overview_with_artifacts["artifacts"]["latest_overall"]["relative_path"]
-                == "data/reviews/inbox-actions/dry-run/2026/2026-04-30/20260430_120000_000001.md"
-            )
+            assert overview_with_artifacts["artifacts"]["total"] == 6
+            assert overview_with_artifacts["artifacts"]["counts"]["review"]["daily"] == 2
+            assert overview_with_artifacts["artifacts"]["latest"]["review"]["daily"]["report_date"] == run_date
+            assert overview_with_artifacts["artifacts"]["latest_overall"]["group"] == "inbox-actions"
+            assert overview_with_artifacts["artifacts"]["latest_overall"]["report_date"] == run_date
 
             overview_text_with_artifacts = client.get(
                 "/overview/text",
@@ -764,9 +802,9 @@ def main() -> None:
                     "overview text with artifacts missing dry-run line: "
                     f"{overview_text_with_artifacts_body}"
                 )
-            if "Summary Daily review summary line." not in overview_text_with_artifacts_body:
+            if run_date not in overview_text_with_artifacts_body:
                 raise AssertionError(
-                    "overview text with artifacts missing review preview: "
+                    "overview text with artifacts missing latest run date: "
                     f"{overview_text_with_artifacts_body}"
                 )
 
@@ -777,6 +815,8 @@ def main() -> None:
                         "key": "test-key",
                         "group": "review",
                         "window": "daily",
+                        "date_from": "2026-04-29",
+                        "date_to": "2026-04-29",
                     },
                 ),
                 200,

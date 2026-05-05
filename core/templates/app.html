@@ -262,9 +262,28 @@
                 <div class="section-head">
                     <div>
                         <p class="eyebrow">Automation</p>
-                        <h2>自动化产物</h2>
+                        <h2>自动化中心</h2>
                     </div>
                     <button class="secondary-button" id="refresh-artifacts-button" type="button">刷新产物</button>
+                </div>
+                <div class="subpanel">
+                    <div class="subpanel-head">
+                        <h3>手动触发</h3>
+                        <span class="subtle-text">只开放报告和 dry-run</span>
+                    </div>
+                    <form id="automation-run-form" class="stack-form filter-card">
+                        <div class="form-grid">
+                            <label class="field">
+                                <span>运行日期</span>
+                                <input id="automation-date-input" name="date" type="date">
+                            </label>
+                        </div>
+                        <p class="helper-text">
+                            手动触发只会生成 review / inbox report / dry-run artifact，不会默认执行真实归档。
+                        </p>
+                        <p class="feedback-text" id="automation-feedback"></p>
+                        <div id="automation-jobs" class="automation-job-grid"></div>
+                    </form>
                 </div>
                 <form id="artifact-filter-form" class="stack-form filter-card">
                     <div class="form-grid">

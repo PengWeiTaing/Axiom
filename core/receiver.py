@@ -4,7 +4,9 @@ import hmac
 import logging
 import os
 import sqlite3
-from datetime import date, datetime, timezone
+import subprocess
+import sys
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 from uuid import uuid4
@@ -21,12 +23,16 @@ app.config["JSON_AS_ASCII"] = False
 # ===== 基础配置 =====
 # 默认保持 VPS 目录结构；环境变量用于本地测试或后续部署覆盖。
 AXIOM_ROOT = Path(os.environ.get("AXIOM_ROOT", "/opt/axiom")).resolve()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INBOX_PATH = Path(os.environ.get("AXIOM_INBOX_PATH", AXIOM_ROOT / "data" / "inbox")).resolve()
 ARCHIVE_PATH = Path(os.environ.get("AXIOM_ARCHIVE_PATH", AXIOM_ROOT / "data" / "archive")).resolve()
 DB_PATH = Path(os.environ.get("AXIOM_DB_PATH", AXIOM_ROOT / "db" / "axiom.db")).resolve()
 SECRET_KEY = os.environ.get("AXIOM_SECRET_KEY", os.environ.get("AXIOM_KEY", "axiom123"))
 LOG_PATH = os.environ.get("AXIOM_LOG_PATH", "")
 MAX_UPLOAD_BYTES = int(os.environ.get("AXIOM_MAX_UPLOAD_BYTES", str(20 * 1024 * 1024)))
+LOCAL_UTC_OFFSET = os.environ.get("AXIOM_LOCAL_UTC_OFFSET", "+08:00")
+AUTOMATION_TIMEOUT_SECONDS = int(os.environ.get("AXIOM_AUTOMATION_TIMEOUT_SECONDS", "90"))
+AUTOMATION_LOCK_PATH = AXIOM_ROOT / "runtime" / "automation_run.lock"
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 
 DEFAULT_PAGE = 1
@@ -43,6 +49,44 @@ REVIEWS_PATH = Path(os.environ.get("AXIOM_REVIEWS_PATH", AXIOM_ROOT / "data" / "
 ARTIFACT_GROUPS = {"review", "inbox", "inbox-actions", "inbox-action-history"}
 ARTIFACT_WINDOWS = {"daily", "weekly"}
 ARTIFACT_MODES = {"dry-run", "apply"}
+AUTOMATION_JOBS = {
+    "review_day": {
+        "label": "生成今日日回顾",
+        "description": "按本地日期生成 1 天窗口的 review 快照。",
+        "script_name": "save_review_snapshot.py",
+        "artifact_group": "review",
+        "artifact_window": "daily",
+        "artifact_mode": None,
+        "build_args": lambda run_date: ["--window", "day", "--date", run_date, "--force"],
+    },
+    "review_week": {
+        "label": "生成本周回顾",
+        "description": "按锚点日期回看最近 7 天，生成 weekly review。",
+        "script_name": "save_review_snapshot.py",
+        "artifact_group": "review",
+        "artifact_window": "weekly",
+        "artifact_mode": None,
+        "build_args": lambda run_date: ["--window", "week", "--date", run_date, "--force"],
+    },
+    "inbox_report": {
+        "label": "生成 Inbox 报告",
+        "description": "基于当前 inbox 规则生成处理建议，不改动真实数据。",
+        "script_name": "save_inbox_processing_snapshot.py",
+        "artifact_group": "inbox",
+        "artifact_window": None,
+        "artifact_mode": None,
+        "build_args": lambda run_date: ["--date", run_date, "--force"],
+    },
+    "inbox_action_dry_run": {
+        "label": "生成 Inbox 动作预演",
+        "description": "运行安全 dry-run，只生成 action snapshot，不执行真实归档。",
+        "script_name": "save_inbox_action_snapshot.py",
+        "artifact_group": "inbox-actions",
+        "artifact_window": None,
+        "artifact_mode": "dry-run",
+        "build_args": lambda run_date: ["--date", run_date],
+    },
+}
 
 
 def configure_logging() -> None:
@@ -257,6 +301,31 @@ def parse_date_filter(value: str, field_name: str) -> date:
         raise ValueError(f"{field_name} 必须是 YYYY-MM-DD") from exc
 
 
+def parse_utc_offset_value(offset_text: str) -> timezone:
+    text = offset_text.strip()
+    if len(text) != 6 or text[0] not in {"+", "-"} or text[3] != ":":
+        raise ValueError("utc offset 必须是 ±HH:MM")
+
+    try:
+        hours = int(text[1:3])
+        minutes = int(text[4:6])
+    except ValueError as exc:
+        raise ValueError("utc offset 必须是 ±HH:MM") from exc
+
+    if hours > 23 or minutes > 59:
+        raise ValueError("utc offset 超出范围")
+
+    delta = timedelta(hours=hours, minutes=minutes)
+    if text[0] == "-":
+        delta = -delta
+    return timezone(delta)
+
+
+def current_local_date_iso() -> str:
+    local_tz = parse_utc_offset_value(LOCAL_UTC_OFFSET)
+    return datetime.now(local_tz).date().isoformat()
+
+
 def parse_datetime_filter(
     value: str,
     field_name: str,
@@ -366,6 +435,13 @@ def read_recent_limit(default: int = 10) -> int:
         default,
         MAX_PAGE_SIZE,
     )
+
+
+def read_optional_run_date(body: dict) -> str:
+    run_date = str(body.get("date") or "").strip()
+    if not run_date:
+        return current_local_date_iso()
+    return parse_date_filter(run_date, "date").isoformat()
 
 
 def build_item_filter_conditions(
@@ -1064,6 +1140,105 @@ def build_artifact_latest_summary(artifacts: list[dict], preview_chars: int) -> 
     }
 
 
+def build_automation_job_payload(job_id: str, job: dict) -> dict:
+    return {
+        "id": job_id,
+        "label": job["label"],
+        "description": job["description"],
+        "artifact_group": job["artifact_group"],
+        "artifact_window": job["artifact_window"],
+        "artifact_mode": job["artifact_mode"],
+        "destructive": False,
+        "default_date": current_local_date_iso(),
+    }
+
+
+def build_automation_command(job_id: str, run_date: str) -> list[str]:
+    job = AUTOMATION_JOBS[job_id]
+    command = [
+        sys.executable,
+        str(PROJECT_ROOT / "scripts" / job["script_name"]),
+        "--root",
+        str(AXIOM_ROOT),
+        "--utc-offset",
+        LOCAL_UTC_OFFSET,
+    ]
+    command.extend(job["build_args"](run_date))
+    return command
+
+
+def tail_output_lines(value: str, max_lines: int = 12) -> list[str]:
+    return [line for line in value.splitlines() if line.strip()][-max_lines:]
+
+
+def select_latest_artifact_for_job(job_id: str, run_date: str, preview_chars: int) -> dict | None:
+    job = AUTOMATION_JOBS[job_id]
+    matches = [
+        artifact
+        for artifact in list_review_artifacts()
+        if artifact["group"] == job["artifact_group"]
+        and artifact.get("window") == job["artifact_window"]
+        and artifact.get("mode") == job["artifact_mode"]
+        and artifact.get("report_date") == run_date
+    ]
+    if not matches:
+        return None
+    latest = max(matches, key=artifact_sort_key)
+    return build_artifact_summary_payload(latest, preview_chars)
+
+
+def acquire_automation_lock(job_id: str, run_date: str) -> bool:
+    AUTOMATION_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    try:
+        fd = os.open(str(AUTOMATION_LOCK_PATH), flags)
+    except FileExistsError:
+        return False
+
+    with os.fdopen(fd, "w", encoding="utf-8") as file:
+        file.write(
+            "\n".join(
+                [
+                    f"job={job_id}",
+                    f"date={run_date}",
+                    f"pid={os.getpid()}",
+                    f"started_at={utc_now().isoformat(timespec='seconds')}",
+                ]
+            )
+            + "\n"
+        )
+    return True
+
+
+def release_automation_lock() -> None:
+    AUTOMATION_LOCK_PATH.unlink(missing_ok=True)
+
+
+def run_automation_job(job_id: str, run_date: str) -> tuple[subprocess.CompletedProcess[str], dict | None]:
+    if not acquire_automation_lock(job_id, run_date):
+        raise RuntimeError("当前已有自动化任务在运行，请稍后重试")
+
+    try:
+        command = build_automation_command(job_id, run_date)
+        result = subprocess.run(
+            command,
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=AUTOMATION_TIMEOUT_SECONDS,
+            check=False,
+        )
+    finally:
+        release_automation_lock()
+
+    artifact = None
+    if result.returncode == 0:
+        artifact = select_latest_artifact_for_job(job_id, run_date, preview_chars=240)
+    return result, artifact
+
+
 def cleanup_file(file_path: Path) -> None:
     try:
         file_path.unlink(missing_ok=True)
@@ -1255,6 +1430,89 @@ def get_item(item_id: int):
         return error_response(404, "item_not_found", "item 不存在")
 
     return ok_response({"item": row_to_item(row)})
+
+
+@app.route("/automation/jobs", methods=["GET"])
+def list_automation_jobs():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    jobs = [build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id]) for job_id in AUTOMATION_JOBS]
+    return ok_response({"jobs": jobs})
+
+
+@app.route("/automation/run", methods=["POST"])
+def run_automation():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        body = get_request_body_data()
+    except ValueError as exc:
+        return error_response(400, "invalid_request_body", str(exc))
+
+    job_id = str(body.get("job") or "").strip()
+    if not job_id:
+        return error_response(400, "missing_job", "job 不能为空")
+    if job_id not in AUTOMATION_JOBS:
+        return error_response(400, "invalid_job", "job 不存在")
+
+    try:
+        run_date = read_optional_run_date(body)
+    except ValueError as exc:
+        return error_response(400, "invalid_run_date", str(exc))
+
+    try:
+        result, artifact = run_automation_job(job_id, run_date)
+    except RuntimeError as exc:
+        return error_response(409, "automation_busy", str(exc))
+    except subprocess.TimeoutExpired:
+        logger.exception("automation job timed out: job=%s date=%s", job_id, run_date)
+        return error_response(504, "automation_timeout", "自动化任务执行超时")
+
+    stdout_tail = tail_output_lines(result.stdout)
+    stderr_tail = tail_output_lines(result.stderr)
+    if result.returncode != 0:
+        logger.warning(
+            "automation job failed: job=%s date=%s code=%s stderr=%s",
+            job_id,
+            run_date,
+            result.returncode,
+            " | ".join(stderr_tail),
+        )
+        message = stderr_tail[-1] if stderr_tail else "自动化任务执行失败"
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "automation_failed",
+                        "message": message,
+                    },
+                    "job": build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id]),
+                    "date": run_date,
+                    "return_code": result.returncode,
+                    "stdout_tail": stdout_tail,
+                    "stderr_tail": stderr_tail,
+                }
+            ),
+            500,
+        )
+
+    logger.info("automation job completed: job=%s date=%s", job_id, run_date)
+    return ok_response(
+        {
+            "message": "completed",
+            "job": build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id]),
+            "date": run_date,
+            "return_code": result.returncode,
+            "stdout_tail": stdout_tail,
+            "stderr_tail": stderr_tail,
+            "artifact": artifact,
+        }
+    )
 
 
 @app.route("/item/<int:item_id>/update", methods=["POST"])

@@ -279,6 +279,7 @@ body::before {
 .capture-grid,
 .form-grid,
 .split-grid,
+.automation-job-grid,
 .item-grid,
 .artifact-summary-grid,
 .stat-grid {
@@ -342,12 +343,22 @@ body::before {
 
 .stat-card,
 .summary-card,
+.automation-job-card,
 .artifact-card,
 .item-card {
     border-radius: var(--radius-lg);
     border: 1px solid rgba(20, 33, 30, 0.08);
     background: rgba(255, 255, 255, 0.72);
     padding: 14px;
+}
+
+.automation-job-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.automation-job-card h3 {
+    margin: 10px 0 6px;
+    font-size: 1rem;
 }
 
 .stat-card strong {

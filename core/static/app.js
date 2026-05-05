@@ -25,6 +25,10 @@ const state = {
         totalPages: 1,
         items: [],
     },
+    automation: {
+        jobs: [],
+        loaded: false,
+    },
     objectUrls: new Set(),
     viewerObjectUrl: null,
     viewerContext: null,
@@ -59,6 +63,10 @@ const elements = {
     searchResults: document.getElementById("search-results"),
     loadMoreSearchButton: document.getElementById("load-more-search-button"),
     resetSearchButton: document.getElementById("reset-search-button"),
+    automationRunForm: document.getElementById("automation-run-form"),
+    automationDateInput: document.getElementById("automation-date-input"),
+    automationFeedback: document.getElementById("automation-feedback"),
+    automationJobs: document.getElementById("automation-jobs"),
     refreshArtifactsButton: document.getElementById("refresh-artifacts-button"),
     artifactFilterForm: document.getElementById("artifact-filter-form"),
     resetArtifactFiltersButton: document.getElementById("reset-artifact-filters-button"),
@@ -492,6 +500,38 @@ function renderArtifactSummaryCards(summaryPayload) {
                 </article>
             `;
         })
+        .join("");
+}
+
+function renderAutomationJobs(jobs) {
+    if (!jobs.length) {
+        renderEmptyState(elements.automationJobs, "保存 key 后即可读取可执行任务。");
+        return;
+    }
+
+    elements.automationJobs.innerHTML = jobs
+        .map(
+            (job) => `
+                <article class="automation-job-card">
+                    <div class="item-meta">
+                        <span class="tag">safe</span>
+                        <span>${escapeHtml(job.artifact_group)}</span>
+                    </div>
+                    <h3>${escapeHtml(job.label)}</h3>
+                    <p class="item-preview">${escapeHtml(job.description)}</p>
+                    <div class="card-actions">
+                        <button
+                            class="primary-button"
+                            type="button"
+                            data-action="run-automation-job"
+                            data-job-id="${escapeHtml(job.id)}"
+                        >
+                            立即生成
+                        </button>
+                    </div>
+                </article>
+            `,
+        )
         .join("");
 }
 
@@ -1071,12 +1111,30 @@ async function loadArtifactPanels({ reset = false } = {}) {
     );
 }
 
+async function loadAutomationJobs({ force = false } = {}) {
+    if (state.automation.loaded && !force) {
+        renderAutomationJobs(state.automation.jobs);
+        return;
+    }
+
+    const payload = await apiRequest("/automation/jobs");
+    state.automation.jobs = payload.jobs || [];
+    state.automation.loaded = true;
+
+    if (!elements.automationDateInput.value && state.automation.jobs[0]?.default_date) {
+        elements.automationDateInput.value = state.automation.jobs[0].default_date;
+    }
+
+    renderAutomationJobs(state.automation.jobs);
+}
+
 async function syncDashboard({ showMessage = false } = {}) {
     try {
         requireKey();
         setConnectionState("busy", "正在同步总览、最近记录和自动化产物");
         await loadOverview();
         await loadRecentPage({ reset: true });
+        await loadAutomationJobs();
         await loadArtifactPanels({ reset: true });
         if (state.search.active) {
             await loadSearchPage({ reset: true });
@@ -1255,6 +1313,41 @@ async function handleItemEditSubmit(form) {
     }
 }
 
+async function handleAutomationRun(jobId, button) {
+    const runDate = elements.automationDateInput.value.trim();
+
+    try {
+        setFeedback(elements.automationFeedback, "", "muted");
+        setButtonDisabled(button, true, "生成中...");
+        setConnectionState("busy", "正在执行自动化任务");
+        const payload = await apiRequest("/automation/run", {
+            method: "POST",
+            json: {
+                job: jobId,
+                date: runDate || undefined,
+            },
+        });
+        await loadOverview();
+        await loadArtifactPanels({ reset: true });
+        setConnectionState("ready", elements.lastSyncIndicator.textContent);
+        setFeedback(
+            elements.automationFeedback,
+            `${payload.job.label} 已完成，日期：${payload.date}`,
+            "ok",
+        );
+        showToast(`${payload.job.label} 已生成`);
+        if (payload.artifact?.relative_path) {
+            await openArtifactViewer(payload.artifact.relative_path);
+        }
+    } catch (error) {
+        setConnectionState("error", error.message);
+        setFeedback(elements.automationFeedback, error.message, "error");
+        showToast(error.message);
+    } finally {
+        setButtonDisabled(button, false);
+    }
+}
+
 function bindDelegatedActions() {
     document.body.addEventListener("click", async (event) => {
         const target = event.target.closest("[data-action]");
@@ -1297,6 +1390,8 @@ function bindDelegatedActions() {
             showToast("Markdown 下载已开始");
         } else if (action === "view-artifact") {
             await openArtifactViewer(target.getAttribute("data-artifact-path"));
+        } else if (action === "run-automation-job") {
+            await handleAutomationRun(target.getAttribute("data-job-id"), target);
         }
     });
 
@@ -1339,9 +1434,12 @@ function bindForms() {
         state.recent = { page: 1, totalPages: 1, items: [], total: 0 };
         state.search = { page: 1, totalPages: 1, items: [], active: false, total: 0 };
         state.artifacts = { page: 1, totalPages: 1, items: [] };
+        state.automation = { jobs: [], loaded: false };
+        elements.automationDateInput.value = "";
         setFeedback(elements.keyFeedback, "本地 key 已清除。", "ok");
         setFeedback(elements.recentFeedback, "", "muted");
         setFeedback(elements.searchFeedback, "", "muted");
+        setFeedback(elements.automationFeedback, "", "muted");
         setConnectionState("idle", "尚未同步");
         elements.overviewGeneratedAt.textContent = "";
         closeViewer();
@@ -1350,6 +1448,7 @@ function bindForms() {
         renderEmptyState(elements.overviewArtifactHighlights, "保存 key 后即可查看自动化产物。");
         renderEmptyState(elements.recentList, "保存 key 后即可读取最近记录。");
         renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
+        renderEmptyState(elements.automationJobs, "保存 key 后即可读取可执行任务。");
         renderEmptyState(elements.artifactSummaryCards, "保存 key 后即可读取自动化摘要。");
         renderEmptyState(elements.artifactList, "保存 key 后即可读取自动化产物。");
         updateLoadMoreButton(elements.loadMoreRecentButton, 1, 1);
@@ -1364,6 +1463,9 @@ function bindForms() {
 
     elements.textCaptureForm.addEventListener("submit", handleTextCaptureSubmit);
     elements.imageCaptureForm.addEventListener("submit", handleImageCaptureSubmit);
+    elements.automationRunForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+    });
 
     elements.refreshOverviewButton.addEventListener("click", async () => {
         try {
@@ -1536,6 +1638,7 @@ function renderInitialEmptyStates() {
     renderEmptyState(elements.overviewArtifactHighlights, "保存 key 后即可查看自动化产物。");
     renderEmptyState(elements.recentList, "保存 key 后即可读取最近记录。");
     renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
+    renderEmptyState(elements.automationJobs, "保存 key 后即可读取可执行任务。");
     renderEmptyState(elements.artifactSummaryCards, "保存 key 后即可读取自动化摘要。");
     renderEmptyState(elements.artifactList, "保存 key 后即可读取自动化产物。");
     updateLoadMoreButton(elements.loadMoreRecentButton, 1, 1);
