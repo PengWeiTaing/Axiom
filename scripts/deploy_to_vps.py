@@ -7,7 +7,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from shlex import quote
 
 
@@ -37,14 +37,18 @@ def run_command(
     *,
     cwd: Path | None = None,
     capture_output: bool = False,
+    input_text: str | None = None,
+    echo_command: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    print(f"$ {' '.join(command)}")
+    if echo_command:
+        print(f"$ {' '.join(command)}")
     return subprocess.run(
         command,
         cwd=str(cwd) if cwd else None,
         check=True,
         text=True,
         capture_output=capture_output,
+        input=input_text,
     )
 
 
@@ -92,9 +96,14 @@ def create_release_archive(commit_ref: str, archive_path: Path) -> None:
 
 
 def run_remote_script(host: str, script: str, *, capture_output: bool = False) -> subprocess.CompletedProcess[str]:
+    print("$ ssh", host, "bash -s <<'EOF'")
+    print(script.rstrip())
+    print("EOF")
     return run_command(
-        ["ssh", host, "bash", "-lc", script],
+        ["ssh", host, "bash", "-s"],
         capture_output=capture_output,
+        input_text=script,
+        echo_command=False,
     )
 
 
@@ -107,9 +116,10 @@ def build_exclude_flags() -> str:
 
 
 def backup_remote_code(host: str, root: str, backup_path: str) -> None:
+    backup_dir = str(PurePosixPath(backup_path).parent)
     script = f"""
 set -euo pipefail
-mkdir -p {quote(str(Path(backup_path).parent))}
+mkdir -p {quote(backup_dir)}
 tar -czf {quote(backup_path)} {build_exclude_flags()} -C {quote(root)} .
 """
     run_remote_script(host, script)
