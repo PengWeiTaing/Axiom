@@ -127,6 +127,7 @@ logs/
 - `/recent`
 - `/search`
 - `/overview`
+- `/overview/text`
 - `/artifacts`
 - `/artifacts/summary`
 - `/artifacts/file/<path>`
@@ -142,6 +143,7 @@ logs/
 - `/file/<id>` 会限制路径只能在 `AXIOM_ROOT` 下
 - `/recent` 和 `/search` 支持分页、类型、存储区、来源、时间范围过滤
 - `/overview` 聚合返回 stats、最近 item 和最新 artifact 摘要，适合作为手机端或轻前端总览入口
+- `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
 - `/artifacts` 支持按 group、window、mode、日期范围分页读取自动化产物
 - `/artifacts/summary` 返回最新 review、inbox report、action snapshot、action history 及其文本预览
 - `/artifacts/file/<path>` 只允许读取 `data/reviews` 下的 markdown 文件

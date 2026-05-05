@@ -667,6 +667,95 @@ def fetch_recent_item_rows(limit: int) -> list[sqlite3.Row]:
         conn.close()
 
 
+def summarize_text(value: str | None, max_chars: int) -> str:
+    if not value:
+        return ""
+
+    text = " ".join(part.strip() for part in str(value).splitlines() if part.strip())
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip() + "..."
+
+
+def build_overview_payload(recent_limit: int, preview_chars: int) -> dict:
+    recent_rows = fetch_recent_item_rows(recent_limit)
+    artifacts = list_review_artifacts()
+    latest_overall = max(artifacts, key=artifact_sort_key) if artifacts else None
+
+    return {
+        "service": "axiom-receiver",
+        "generated_at": utc_now().isoformat(timespec="seconds"),
+        "recent": {
+            "limit": recent_limit,
+            "items": [row_to_item(row) for row in recent_rows],
+        },
+        "stats": build_stats_payload(),
+        "artifacts": {
+            "preview_chars": preview_chars,
+            "total": len(artifacts),
+            "counts": build_artifact_counts(artifacts),
+            "latest_overall": build_artifact_summary_payload(latest_overall, preview_chars),
+            "latest": build_artifact_latest_summary(artifacts, preview_chars),
+        },
+    }
+
+
+def build_overview_text(payload: dict, preview_chars: int) -> str:
+    stats = payload["stats"]
+    recent = payload["recent"]
+    artifacts = payload["artifacts"]
+    latest = artifacts["latest"]
+    lines = [
+        "Axiom 总览",
+        f"生成时间: {payload['generated_at']}",
+        "",
+        "数据统计",
+        f"- 总条目: {stats['total']}",
+        f"- 文本: {stats['by_type'].get('text', 0)}",
+        f"- 图片: {stats['by_type'].get('image', 0)}",
+        f"- inbox: {stats['by_storage'].get('inbox', 0)}",
+        f"- archive: {stats['by_storage'].get('archive', 0)}",
+        "",
+        "最近记录",
+    ]
+
+    if recent["items"]:
+        for index, item in enumerate(recent["items"], start=1):
+            content = summarize_text(item.get("content"), preview_chars) or "(无内容)"
+            lines.append(
+                f"{index}. [{item['type']}] {content} | {item['created_at']} | {item.get('source') or 'unknown'}"
+            )
+    else:
+        lines.append("- 暂无记录")
+
+    lines.extend(["", "自动化产物", f"- 总数: {artifacts['total']}"])
+
+    latest_overall = artifacts.get("latest_overall")
+    if latest_overall:
+        overall_preview = summarize_text(latest_overall.get("preview"), preview_chars) or "(无预览)"
+        lines.append(
+            f"- 最新产物: {latest_overall['group']} {latest_overall.get('window') or latest_overall.get('mode') or ''} {latest_overall.get('report_date') or ''} {overall_preview}".strip()
+        )
+
+    artifact_sections = [
+        ("Review 日报", latest["review"]["daily"]),
+        ("Review 周报", latest["review"]["weekly"]),
+        ("Inbox 报告", latest["inbox"]),
+        ("Inbox 动作预演", latest["inbox-actions"]["dry-run"]),
+        ("Inbox 动作执行", latest["inbox-actions"]["apply"]),
+        ("动作历史日报", latest["inbox-action-history"]["daily"]),
+        ("动作历史周报", latest["inbox-action-history"]["weekly"]),
+    ]
+    for label, artifact in artifact_sections:
+        if artifact is None:
+            continue
+        preview = summarize_text(artifact.get("preview"), preview_chars) or "(无预览)"
+        report_date = artifact.get("report_date") or artifact.get("generated_name") or ""
+        lines.append(f"- {label}: {report_date} {preview}".rstrip())
+
+    return "\n".join(lines) + "\n"
+
+
 def resolve_stored_file_path(file_path_value: str | None) -> Path | None:
     if not file_path_value:
         return None
@@ -985,28 +1074,24 @@ def overview():
     except ValueError as exc:
         return error_response(400, "invalid_overview_param", str(exc))
 
-    recent_rows = fetch_recent_item_rows(recent_limit)
-    artifacts = list_review_artifacts()
-    latest_overall = max(artifacts, key=artifact_sort_key) if artifacts else None
+    return ok_response(build_overview_payload(recent_limit, preview_chars))
 
-    return ok_response(
-        {
-            "service": "axiom-receiver",
-            "generated_at": utc_now().isoformat(timespec="seconds"),
-            "recent": {
-                "limit": recent_limit,
-                "items": [row_to_item(row) for row in recent_rows],
-            },
-            "stats": build_stats_payload(),
-            "artifacts": {
-                "preview_chars": preview_chars,
-                "total": len(artifacts),
-                "counts": build_artifact_counts(artifacts),
-                "latest_overall": build_artifact_summary_payload(latest_overall, preview_chars),
-                "latest": build_artifact_latest_summary(artifacts, preview_chars),
-            },
-        }
-    )
+
+@app.route("/overview/text", methods=["GET"])
+def overview_text():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        recent_limit = read_recent_limit()
+        preview_chars = read_preview_chars()
+    except ValueError as exc:
+        return error_response(400, "invalid_overview_param", str(exc))
+
+    payload = build_overview_payload(recent_limit, preview_chars)
+    body = build_overview_text(payload, preview_chars)
+    return app.response_class(body, mimetype="text/plain")
 
 
 @app.route("/add", methods=["GET", "POST"])

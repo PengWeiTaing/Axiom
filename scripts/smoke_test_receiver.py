@@ -449,6 +449,26 @@ def main() -> None:
             assert overview["recent"]["items"][0]["id"] == 3
             assert overview["recent"]["items"][1]["id"] == 2
 
+            overview_text = client.get(
+                "/overview/text",
+                query_string={
+                    "key": "test-key",
+                    "recent_limit": "2",
+                    "preview_chars": "40",
+                },
+            )
+            if overview_text.status_code != 200:
+                raise AssertionError(
+                    f"overview text: expected HTTP 200, got {overview_text.status_code}, body={overview_text.data!r}"
+                )
+            if overview_text.mimetype != "text/plain":
+                raise AssertionError(
+                    f"overview text: expected text/plain, got {overview_text.mimetype}"
+                )
+            overview_text_body = overview_text.get_data(as_text=True)
+            if "Axiom 总览" not in overview_text_body or "总条目: 3" not in overview_text_body:
+                raise AssertionError(f"overview text body unexpected: {overview_text_body}")
+
             review_daily_path = root / "data" / "reviews" / "daily" / "2026" / "2026-04-29.md"
             review_daily_path.parent.mkdir(parents=True, exist_ok=True)
             review_daily_path.write_text(
@@ -603,6 +623,34 @@ def main() -> None:
                 overview_with_artifacts["artifacts"]["latest_overall"]["relative_path"]
                 == "data/reviews/inbox-actions/dry-run/2026/2026-04-30/20260430_120000_000001.md"
             )
+
+            overview_text_with_artifacts = client.get(
+                "/overview/text",
+                query_string={
+                    "key": "test-key",
+                    "recent_limit": "2",
+                    "preview_chars": "40",
+                },
+            )
+            if overview_text_with_artifacts.status_code != 200:
+                raise AssertionError(
+                    "overview text with artifacts: "
+                    f"expected HTTP 200, got {overview_text_with_artifacts.status_code}, "
+                    f"body={overview_text_with_artifacts.data!r}"
+                )
+            overview_text_with_artifacts_body = overview_text_with_artifacts.get_data(
+                as_text=True
+            )
+            if "Inbox 动作预演" not in overview_text_with_artifacts_body:
+                raise AssertionError(
+                    "overview text with artifacts missing dry-run line: "
+                    f"{overview_text_with_artifacts_body}"
+                )
+            if "Summary Daily review summary line." not in overview_text_with_artifacts_body:
+                raise AssertionError(
+                    "overview text with artifacts missing review preview: "
+                    f"{overview_text_with_artifacts_body}"
+                )
 
             review_artifact_summary = assert_status(
                 client.get(

@@ -189,3 +189,5 @@
 - 本地冒烟测试新增自动化产物读取覆盖，验证 artifact 列表、summary、过滤、错误参数和文件取回
 - 新增 `/overview` 接口，聚合返回 stats、最近记录和最新自动化产物摘要
 - `/overview` 支持 `recent_limit` 和 `preview_chars`，适合作为手机端和轻前端总览接口
+- 新增 `/overview/text` 接口，返回适合快捷指令直接显示的中文纯文本总览
+- `/overview/text` 与 `/overview` 复用同一套 payload 构建逻辑，避免总览能力分叉
