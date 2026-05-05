@@ -51,6 +51,12 @@ flowchart LR
 - `/restore/<id>`
 - `/recent`
 - `/search`
+- `/overview`
+- `/overview/text`
+- `/artifacts`
+- `/artifacts/summary`
+- `/artifacts/file/<path>`
+- `/app`
 - SQLite `items` 表
 - `data/inbox` 和 `data/archive`
 - 每日自动备份
@@ -63,11 +69,13 @@ flowchart LR
 - inbox action snapshot
 - inbox action history
 - 对应的 VPS systemd timers
+- 移动优先 Web App / PWA 壳
 
 ## 当前已稳住的点
 
 - 文本和图片都能进入 inbox 并写入 SQLite。
 - 文件取回、元数据读取、统计、类型过滤、来源过滤、存储区过滤、时间范围过滤已经验证。
+- `/app` 已经能直接覆盖文本写入、图片上传、总览、最近记录、搜索和自动化产物浏览。
 - 归档和恢复不会破坏 `/file/<id>` 的取回路径。
 - 备份包含 SQLite、inbox、archive 和 manifest。
 - 一致性检查覆盖 inbox 与 archive。

@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import quote
 from uuid import uuid4
 
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
 from werkzeug.utils import secure_filename
 
@@ -1031,6 +1031,17 @@ def cleanup_file(file_path: Path) -> None:
 
 
 # ===== 路由 =====
+@app.route("/app", methods=["GET"], strict_slashes=False)
+def app_shell():
+    return render_template("app.html")
+
+
+@app.route("/sw.js", methods=["GET"])
+def service_worker():
+    static_root = Path(app.static_folder or "").resolve()
+    return send_file(static_root / "sw.js", mimetype="application/javascript")
+
+
 @app.route("/health", methods=["GET"])
 def health_check():
     conn = None

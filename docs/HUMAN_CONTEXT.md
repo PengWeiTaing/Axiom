@@ -12,7 +12,7 @@ Axiom 当前已经有可运行的 VPS 后端基线，重点正在从“能收、
 
 - VPS 是当前线上运行节点，路径是 `/opt/axiom`。
 - 文件系统保存内容本体，SQLite 保存索引。
-- receiver 已支持文本、图片、检索、文件取回、归档、恢复、统计，以及自动化产物读取。
+- receiver 已支持文本、图片、检索、文件取回、归档、恢复、统计、自动化产物读取，以及 `/app` 移动优先 Web App。
 - 早期技术边界已经松绑，以后可以改架构，但大改必须先做决策说明、备份、迁移和回滚设计。
 
 ## 当前状态图
@@ -42,17 +42,21 @@ flowchart TD
    需要掌握：备份范围、SQLite backup API、zip 输出、manifest、`--keep`、`--dry-run`。
 4. `scripts/smoke_test_receiver.py`
    需要掌握：receiver 主链路如何在临时目录里被验证。
-5. `scripts/build_review_markdown.py` 和 `scripts/save_review_snapshot.py`
+5. `core/templates/app.html`、`core/static/app.css`、`core/static/app.js`
+   需要掌握：Web App 的页面结构、移动端布局、状态管理和 API 调用方式。
+6. `core/static/manifest.webmanifest`、`core/static/sw.js`、`core/static/icons/axiom-mark.svg`
+   需要掌握：PWA 壳、主屏幕安装入口和前端静态资源边界。
+7. `scripts/build_review_markdown.py` 和 `scripts/save_review_snapshot.py`
    需要掌握：日回顾、周回顾如何生成和落盘。
-6. `scripts/build_inbox_processing_report.py`
+8. `scripts/build_inbox_processing_report.py`
    需要掌握：inbox 条目如何被规则判断为“补描述”“归档候选”等动作。
-7. `scripts/apply_inbox_actions.py` 和 `scripts/save_inbox_action_snapshot.py`
+9. `scripts/apply_inbox_actions.py` 和 `scripts/save_inbox_action_snapshot.py`
    需要掌握：dry-run、`--apply`、`--only-id`、`--exclude-id`、`--max-items` 这些安全开关。
-8. `scripts/list_inbox_action_snapshots.py`、`scripts/build_inbox_action_history_markdown.py`、`scripts/save_inbox_action_history_snapshot.py`
+10. `scripts/list_inbox_action_snapshots.py`、`scripts/build_inbox_action_history_markdown.py`、`scripts/save_inbox_action_history_snapshot.py`
    需要掌握：action snapshots 如何被回看和汇总。
-9. `deploy/*.service` 和 `deploy/*.timer`
+11. `deploy/*.service` 和 `deploy/*.timer`
    需要掌握：receiver、备份、回顾、inbox 处理和 action history 在 VPS 上如何自动运行。
-10. `docs/SHORT_TERM.md`
+12. `docs/SHORT_TERM.md`
    需要掌握：当前短期推进顺序和架构决策方式。
 
 ## 可以先略读的位置

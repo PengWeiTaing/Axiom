@@ -193,3 +193,18 @@
 - `/overview/text` 与 `/overview` 复用同一套 payload 构建逻辑，避免总览能力分叉
 - 补充新的协作原则：没有时间约束的功能，优先一次做得更完整
 - 明确应减少“先暂时能用”的临时妥协，优先减少返工和额外迭代次数
+
+## 2026-05-05
+
+- 新增 `/app` 页面，作为 Axiom 的移动优先 Web App 入口
+- Web App 第一版已覆盖文本写入、图片上传、总览、最近记录、搜索和自动化产物浏览
+- 浏览器端统一使用本地保存的 key，并通过 `X-Axiom-Key` header 访问后端接口
+- 新增 `core/templates/app.html`
+- 新增 `core/static/app.css`
+- 新增 `core/static/app.js`
+- 新增 `core/static/manifest.webmanifest`
+- 新增 `core/static/sw.js`
+- 新增 `core/static/icons/axiom-mark.svg`
+- receiver 新增 `/sw.js` 路由，使 service worker 以根路径作用于 `/app`
+- `scripts/smoke_test_receiver.py` 新增 `/app`、静态资源和 `/sw.js` 的冒烟覆盖
+- README、AI Context、Human Context、Short Term、DeepWiki 说明已同步到 Web App / PWA 当前状态

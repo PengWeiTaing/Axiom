@@ -1,0 +1,20 @@
+{
+  "name": "Axiom 外脑控制台",
+  "short_name": "Axiom",
+  "description": "Axiom 的移动优先 Web App，支持记录、检索、回看和自动化产物浏览。",
+  "lang": "zh-CN",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#19352f",
+  "background_color": "#f3ede2",
+  "icons": [
+    {
+      "src": "/static/icons/axiom-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

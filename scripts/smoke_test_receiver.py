@@ -50,6 +50,57 @@ def main() -> None:
             health = assert_status(client.get("/health"), 200, "health")
             assert health["ok"] is True
 
+            app_shell = client.get("/app")
+            if app_shell.status_code != 200:
+                raise AssertionError(
+                    f"app shell: expected HTTP 200, got {app_shell.status_code}"
+                )
+            app_shell_body = app_shell.get_data(as_text=True)
+            if "Axiom 外脑控制台" not in app_shell_body:
+                raise AssertionError(f"app shell body unexpected: {app_shell_body[:200]}")
+
+            app_css = client.get("/static/app.css")
+            if app_css.status_code != 200:
+                raise AssertionError(
+                    f"app css: expected HTTP 200, got {app_css.status_code}"
+                )
+            if ":root" not in app_css.get_data(as_text=True):
+                raise AssertionError("app css body unexpected")
+
+            app_js = client.get("/static/app.js")
+            if app_js.status_code != 200:
+                raise AssertionError(
+                    f"app js: expected HTTP 200, got {app_js.status_code}"
+                )
+            if "syncDashboard" not in app_js.get_data(as_text=True):
+                raise AssertionError("app js body unexpected")
+
+            app_manifest = client.get("/static/manifest.webmanifest")
+            if app_manifest.status_code != 200:
+                raise AssertionError(
+                    "manifest: "
+                    f"expected HTTP 200, got {app_manifest.status_code}"
+                )
+            if "Axiom 外脑控制台" not in app_manifest.get_data(as_text=True):
+                raise AssertionError("manifest body unexpected")
+
+            service_worker = client.get("/sw.js")
+            if service_worker.status_code != 200:
+                raise AssertionError(
+                    "service worker: "
+                    f"expected HTTP 200, got {service_worker.status_code}"
+                )
+            if "axiom-app-shell-v1" not in service_worker.get_data(as_text=True):
+                raise AssertionError("service worker body unexpected")
+
+            app_icon = client.get("/static/icons/axiom-mark.svg")
+            if app_icon.status_code != 200:
+                raise AssertionError(
+                    f"app icon: expected HTTP 200, got {app_icon.status_code}"
+                )
+            if "<svg" not in app_icon.get_data(as_text=True):
+                raise AssertionError("app icon body unexpected")
+
             unauthorized = assert_status(
                 client.get("/add", query_string={"text": "hello"}),
                 403,

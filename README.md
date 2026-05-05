@@ -43,9 +43,11 @@ receiver 已提供：
 - `/search`：关键词检索，支持相关性、时间和过滤条件
 - `/overview`：聚合返回统计、最近记录和最新自动化产物摘要
 - `/overview/text`：返回适合快捷指令直接显示的纯文本总览
+- `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口
 - `/artifacts`：列出 `data/reviews` 下的自动化产物
 - `/artifacts/summary`：直接读取各类自动化产物的最新摘要
 - `/artifacts/file/<path>`：取回 markdown artifact 文件
+- `/sw.js` + `manifest.webmanifest`：PWA 壳，可添加到手机主屏幕
 
 脚本侧已提供：
 
@@ -57,6 +59,24 @@ receiver 已提供：
 - inbox action dry-run / apply 留痕
 - action history 日 / 周汇总
 - VPS systemd 定时任务模板
+
+## Web App
+
+现在仓库里已经有一个移动优先前端壳：
+
+- 页面入口：`https://pengweitai.me/app`
+- 页面职责：文本写入、图片上传、总览、最近记录、搜索、自动化产物浏览
+- 鉴权方式：浏览器本地保存 key，前端请求统一走 `X-Axiom-Key`
+- PWA 资源：`manifest.webmanifest`、`/sw.js`、应用图标
+
+对应代码位置：
+
+- `core/templates/app.html`
+- `core/static/app.css`
+- `core/static/app.js`
+- `core/static/manifest.webmanifest`
+- `core/static/sw.js`
+- `core/static/icons/axiom-mark.svg`
 
 ## 当前状态图
 

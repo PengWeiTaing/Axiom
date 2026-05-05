@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Axiom</title>
+  <desc id="desc">Axiom mobile web app icon</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#214c44"/>
+      <stop offset="100%" stop-color="#14312b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#d98b5f"/>
+      <stop offset="100%" stop-color="#9d4f2a"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="64" fill="url(#bg)"/>
+  <path d="M56 64h144v128H56z" fill="none" stroke="#f7efe4" stroke-linejoin="round" stroke-width="12"/>
+  <path d="M56 112h144" fill="none" stroke="#f7efe4" stroke-linecap="round" stroke-width="12"/>
+  <circle cx="92" cy="90" r="12" fill="url(#accent)"/>
+  <circle cx="128" cy="90" r="12" fill="url(#accent)"/>
+  <circle cx="164" cy="90" r="12" fill="url(#accent)"/>
+  <path d="M86 146h85" fill="none" stroke="#f7efe4" stroke-linecap="round" stroke-width="12"/>
+  <path d="M86 176h56" fill="none" stroke="#f7efe4" stroke-linecap="round" stroke-width="12"/>
+  <path d="M168 153l18 18-18 18" fill="none" stroke="url(#accent)" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+</svg>
