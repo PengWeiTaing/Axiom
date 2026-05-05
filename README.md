@@ -128,6 +128,7 @@ flowchart TD
 - `scripts/check_consistency.py`：检查文件系统和 SQLite 索引是否一致
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
 - `scripts/smoke_test_web_app.py`：Web App 浏览器级冒烟测试
+- `scripts/deploy_to_vps.py`：从本地当前 commit 生成发布包、备份 VPS 代码、上传、同步、重启并验证
 - `scripts/build_review_markdown.py`：生成日 / 周回顾 Markdown
 - `scripts/save_review_snapshot.py`：保存日 / 周回顾快照
 - `scripts/build_inbox_processing_report.py`：生成 inbox 处理建议
@@ -171,17 +172,24 @@ python3 scripts/check_consistency.py --root /opt/axiom
 python3 scripts/backup_axiom.py --root /opt/axiom --keep 14
 ```
 
-部署更新的常规顺序：
+从本地发起部署的常规顺序：
 
-```bash
-cd /opt/axiom
-git pull
-. .venv/bin/activate
-pip install -r requirements.txt
-python3 scripts/check_consistency.py --root /opt/axiom
-sudo systemctl restart axiom-receiver
-curl http://127.0.0.1:5000/health
+```powershell
+python scripts\deploy_to_vps.py
 ```
+
+这条命令会做这些事：
+
+- 从本地当前 `HEAD` 生成代码快照
+- 先在 VPS 上生成代码备份
+- 把快照上传到 `/tmp`
+- 用 `rsync --delete` 同步到 `/opt/axiom`，同时保留 `.env`、`.venv`、`db/`、`data/`、`backup/`、`logs/`
+- 在 VPS 上执行 `pip install -r requirements.txt`
+- 重启 `axiom-receiver`
+- 跑 `curl http://127.0.0.1:5000/health`
+- 跑 `python3 scripts/check_consistency.py --root /opt/axiom`
+
+如果本地工作区不是干净状态，脚本默认会拒绝部署；只有明确传 `--allow-dirty` 才会继续，但依然只会部署当前 `HEAD`，不会带上未提交改动。
 
 ## 文档结构
 

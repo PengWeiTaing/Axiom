@@ -415,17 +415,21 @@ curl http://127.0.0.1:5000/health
 
 {snippet("deploy/axiom-weekly-inbox-action-history.timer", 1, 11, "ini")}
 
-## 部署更新顺序
+## 从本地发起部署
 
-```bash
-cd /opt/axiom
-git pull
-. .venv/bin/activate
-pip install -r requirements.txt
-python3 scripts/check_consistency.py --root /opt/axiom
-sudo systemctl restart axiom-receiver
-curl http://127.0.0.1:5000/health
+```powershell
+python scripts\\deploy_to_vps.py
 ```
+
+这条命令会按顺序完成：
+
+1. 从本地当前 `HEAD` 生成代码快照。
+2. 在 VPS 上生成代码备份。
+3. 上传快照到 `/tmp`。
+4. 用 `rsync --delete` 同步到 `/opt/axiom`，同时保留 `.env`、`.venv`、`db/`、`data/`、`backup/`、`logs/`。
+5. 在 VPS 上执行 `pip install -r requirements.txt`。
+6. 重启 `axiom-receiver`。
+7. 运行 health check 和一致性检查。
 """,
     )
 
@@ -528,6 +532,7 @@ history 汇总基于已保存的 action snapshots 聚合，不重新执行任何
             "scripts/check_consistency.py",
             "scripts/smoke_test_receiver.py",
             "scripts/smoke_test_web_app.py",
+            "scripts/deploy_to_vps.py",
             "scripts/smoke_test_inbox_processing.py",
             "scripts/generate_deepwiki_cache.py",
         ],
@@ -551,6 +556,7 @@ history 汇总基于已保存的 action snapshots 聚合，不重新执行任何
 | 改 Web App 页面 | `core/templates/app.html`、`core/static/app.css`、`core/static/app.js` |
 | 改 PWA 壳 | `core/static/manifest.webmanifest`、`core/static/sw.js`、`core/static/icons/axiom-mark.svg` |
 | 改浏览器级前端验证 | `requirements-dev.txt`、`scripts/install_playwright_chromium.py`、`scripts/smoke_test_web_app.py` |
+| 改 VPS 部署 | `scripts/deploy_to_vps.py` |
 | 改备份 | `scripts/backup_axiom.py` |
 | 改一致性检查 | `scripts/check_consistency.py` |
 | 改 receiver 测试 | `scripts/smoke_test_receiver.py` |
@@ -590,6 +596,8 @@ history 汇总基于已保存的 action snapshots 聚合，不重新执行任何
 {snippet("scripts/smoke_test_receiver.py", 36, 100)}
 
 {snippet("scripts/smoke_test_web_app.py", 1, 140)}
+
+{snippet("scripts/deploy_to_vps.py", 1, 220)}
 
 {snippet("scripts/smoke_test_inbox_processing.py", 1, 80)}
 """,
