@@ -240,3 +240,6 @@
 - `/app` 编辑态的“保存修改”与“返回查看”被上移到 viewer 顶部操作栏，减少移动端滚动到底部才能提交的摩擦
 - `scripts/smoke_test_receiver.py` 新增 item 更新覆盖：校验文本更新会同步落盘、图片更新会保留原文件并更新说明 / source
 - `scripts/smoke_test_web_app.py` 新增浏览器级编辑覆盖：从 `/app` 打开记录详情、进入编辑态、保存、回看更新结果
+- 已用 `scripts/deploy_to_vps.py` 将这轮 item 编辑能力部署到 VPS，当前线上代码更新到 `65580b5`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260505_102946_65580b5.tar.gz`
+- 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常，公网 `/app` 打开记录详情后已可看到“编辑”入口
