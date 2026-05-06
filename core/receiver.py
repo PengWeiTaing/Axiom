@@ -103,11 +103,16 @@ ITEM_LIST_SELECT_FIELDS = f"""
     CASE
         WHEN COALESCE(TRIM(derived_text), '') != '' THEN SUBSTR(derived_text, 1, 600)
         ELSE NULL
-    END AS derived_text_preview
+    END AS derived_text_preview,
+    CASE
+        WHEN COALESCE(TRIM(transcript_text), '') != '' THEN SUBSTR(transcript_text, 1, 600)
+        ELSE NULL
+    END AS transcript_text_preview
 """
 ITEM_DETAIL_SELECT_FIELDS = f"""
     {ITEM_LIST_SELECT_FIELDS},
-    derived_text
+    derived_text,
+    transcript_text
 """
 REVIEWS_PATH = Path(os.environ.get("AXIOM_REVIEWS_PATH", AXIOM_ROOT / "data" / "reviews")).resolve()
 ARTIFACT_GROUPS = {"review", "inbox", "inbox-actions", "inbox-action-history"}
@@ -227,6 +232,7 @@ def ensure_items_table_columns(conn: sqlite3.Connection) -> None:
         "mime_type": "TEXT",
         "size_bytes": "INTEGER",
         "derived_text": "TEXT",
+        "transcript_text": "TEXT",
     }
     for column_name, column_type in required_columns.items():
         if column_name in existing_columns:
@@ -252,7 +258,8 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 original_name TEXT,
                 mime_type TEXT,
                 size_bytes INTEGER,
-                derived_text TEXT
+                derived_text TEXT,
+                transcript_text TEXT
             )
             """
         )
@@ -765,10 +772,14 @@ def build_item_payload(
     size_bytes: int | None = None,
     derived_text_preview: str | None = None,
     derived_text: str | None = None,
+    transcript_text_preview: str | None = None,
+    transcript_text: str | None = None,
 ) -> dict:
     extension = get_file_extension(original_name or file_path)
     normalized_preview = normalize_extracted_text(derived_text_preview)
     normalized_derived_text = normalize_extracted_text(derived_text)
+    normalized_transcript_preview = normalize_extracted_text(transcript_text_preview)
+    normalized_transcript_text = normalize_extracted_text(transcript_text)
     item = {
         "id": item_id,
         "type": item_type,
@@ -786,9 +797,13 @@ def build_item_payload(
         "extension": extension.lstrip(".") if extension else None,
         "derived_text_available": bool(normalized_preview or normalized_derived_text),
         "derived_text_preview": normalized_preview or normalized_derived_text,
+        "transcript_text_available": bool(normalized_transcript_preview or normalized_transcript_text),
+        "transcript_text_preview": normalized_transcript_preview or normalized_transcript_text,
     }
     if derived_text is not None:
         item["derived_text"] = normalized_derived_text
+    if transcript_text is not None:
+        item["transcript_text"] = normalized_transcript_text
     return item
 
 
@@ -806,6 +821,8 @@ def row_to_item(row: sqlite3.Row, include_score: bool = False) -> dict:
         row["size_bytes"] if "size_bytes" in row.keys() else None,
         row["derived_text_preview"] if "derived_text_preview" in row_keys else None,
         row["derived_text"] if "derived_text" in row_keys else None,
+        row["transcript_text_preview"] if "transcript_text_preview" in row_keys else None,
+        row["transcript_text"] if "transcript_text" in row_keys else None,
     )
     if include_score and "score" in row.keys():
         item["score"] = row["score"]
@@ -1007,6 +1024,7 @@ def insert_item(
     mime_type: str | None = None,
     size_bytes: int | None = None,
     derived_text: str | None = None,
+    transcript_text: str | None = None,
 ) -> int:
     conn = get_db_connection()
     try:
@@ -1021,9 +1039,10 @@ def insert_item(
                 original_name,
                 mime_type,
                 size_bytes,
-                derived_text
+                derived_text,
+                transcript_text
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 item_type,
@@ -1035,6 +1054,7 @@ def insert_item(
                 mime_type,
                 size_bytes,
                 derived_text,
+                transcript_text,
             ),
         )
         conn.commit()
@@ -1078,20 +1098,21 @@ def update_item_file_path(item_id: int, file_path: Path) -> None:
         conn.close()
 
 
-def update_item_content_and_source(
+def update_item_content_source_and_transcript(
     item_id: int,
     content: str | None,
     source: str | None,
+    transcript_text: str | None,
 ) -> None:
     conn = get_db_connection()
     try:
         conn.execute(
             """
             UPDATE items
-            SET content = ?, source = ?
+            SET content = ?, source = ?, transcript_text = ?
             WHERE id = ?
             """,
-            (content, source, item_id),
+            (content, source, transcript_text, item_id),
         )
         conn.commit()
     finally:
@@ -2195,8 +2216,16 @@ def upload_file():
 
     size_bytes = file_path.stat().st_size
     derived_text = None
+    transcript_text = None
     if item_type == ITEM_TYPE_DOCUMENT:
         derived_text = extract_document_text(file_path, original_name)
+    elif item_type == ITEM_TYPE_AUDIO:
+        transcript_text = normalize_extracted_text(
+            get_request_field(
+                "transcript_text",
+                get_request_field("transcript", ""),
+            ).strip()
+        )
 
     try:
         item_id = insert_item(
@@ -2209,6 +2238,7 @@ def upload_file():
             mime_type=mime_type,
             size_bytes=size_bytes,
             derived_text=derived_text,
+            transcript_text=transcript_text,
         )
     except sqlite3.Error:
         cleanup_file(file_path)
@@ -2231,6 +2261,7 @@ def upload_file():
                 mime_type,
                 size_bytes,
                 derived_text=derived_text,
+                transcript_text=transcript_text,
             ),
             "type_label": type_label,
         }
@@ -2338,9 +2369,13 @@ def update_item(item_id: int):
 
     content_provided, raw_content = read_optional_body_field(body, "content")
     source_provided, raw_source = read_optional_body_field(body, "source")
+    transcript_provided, raw_transcript_text = read_optional_body_field(body, "transcript_text")
 
-    if not content_provided and not source_provided:
-        return error_response(400, "missing_update_fields", "至少要提供 content 或 source")
+    if transcript_provided and row["type"] != ITEM_TYPE_AUDIO:
+        return error_response(400, "invalid_transcript_target", "transcript_text 目前只支持 audio item")
+
+    if not content_provided and not source_provided and not transcript_provided:
+        return error_response(400, "missing_update_fields", "至少要提供 content、source 或 transcript_text")
 
     next_content = row["content"]
     if content_provided:
@@ -2358,11 +2393,17 @@ def update_item(item_id: int):
             return error_response(400, "empty_source", "source 不能为空")
         next_source = cleaned_source
 
+    next_transcript_text = row["transcript_text"] if "transcript_text" in row.keys() else None
+    if transcript_provided:
+        next_transcript_text = normalize_extracted_text(raw_transcript_text)
+
     updated_fields: list[str] = []
     if next_content != row["content"]:
         updated_fields.append("content")
     if next_source != row["source"]:
         updated_fields.append("source")
+    if next_transcript_text != row["transcript_text"]:
+        updated_fields.append("transcript_text")
 
     if not updated_fields:
         return ok_response(
@@ -2395,7 +2436,12 @@ def update_item(item_id: int):
             return error_response(500, "file_write_failed", "文本文件更新失败")
 
     try:
-        update_item_content_and_source(item_id, next_content, next_source)
+        update_item_content_source_and_transcript(
+            item_id,
+            next_content,
+            next_source,
+            next_transcript_text,
+        )
     except sqlite3.Error:
         if content_written and file_path is not None:
             try:
@@ -2795,10 +2841,11 @@ def search_items():
                 COALESCE(content, '') LIKE ? ESCAPE '\\'
                 OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
                 OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
+                OR COALESCE(transcript_text, '') LIKE ? ESCAPE '\\'
             )
             {filter_clause}
             """,
-            (fuzzy_match, fuzzy_match, fuzzy_match, *filter_params),
+            (fuzzy_match, fuzzy_match, fuzzy_match, fuzzy_match, *filter_params),
         ).fetchone()["total"]
 
         if sort == "relevance":
@@ -2829,8 +2876,15 @@ def search_items():
                         END
                         +
                         CASE
-                            WHEN LENGTH(COALESCE(content, original_name, derived_text, '')) <= 20 THEN 8
-                            WHEN LENGTH(COALESCE(content, original_name, derived_text, '')) <= 50 THEN 4
+                            WHEN COALESCE(transcript_text, '') = ? THEN 75
+                            WHEN COALESCE(transcript_text, '') LIKE ? ESCAPE '\\' THEN 38
+                            WHEN COALESCE(transcript_text, '') LIKE ? ESCAPE '\\' THEN 18
+                            ELSE 0
+                        END
+                        +
+                        CASE
+                            WHEN LENGTH(COALESCE(content, original_name, transcript_text, derived_text, '')) <= 20 THEN 8
+                            WHEN LENGTH(COALESCE(content, original_name, transcript_text, derived_text, '')) <= 50 THEN 4
                             ELSE 0
                         END
                     ) AS score
@@ -2839,6 +2893,7 @@ def search_items():
                     COALESCE(content, '') LIKE ? ESCAPE '\\'
                     OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
                     OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
+                    OR COALESCE(transcript_text, '') LIKE ? ESCAPE '\\'
                 )
                 {filter_clause}
                 ORDER BY {order_clause}
@@ -2853,6 +2908,10 @@ def search_items():
                     fuzzy_match,
                     exact_match,
                     prefix_match,
+                    fuzzy_match,
+                    exact_match,
+                    prefix_match,
+                    fuzzy_match,
                     fuzzy_match,
                     fuzzy_match,
                     fuzzy_match,
@@ -2871,12 +2930,13 @@ def search_items():
                     COALESCE(content, '') LIKE ? ESCAPE '\\'
                     OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
                     OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
+                    OR COALESCE(transcript_text, '') LIKE ? ESCAPE '\\'
                 )
                 {filter_clause}
                 ORDER BY {order_clause}
                 LIMIT ? OFFSET ?
                 """,
-                (fuzzy_match, fuzzy_match, fuzzy_match, *filter_params, page_size, offset),
+                (fuzzy_match, fuzzy_match, fuzzy_match, fuzzy_match, *filter_params, page_size, offset),
             ).fetchall()
     finally:
         conn.close()

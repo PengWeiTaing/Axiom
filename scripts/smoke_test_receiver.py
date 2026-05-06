@@ -558,6 +558,7 @@ def main() -> None:
                     data={
                         "key": "test-key",
                         "content": "team sync voice note",
+                        "transcript_text": "Axiom audio transcript line",
                         "source": "audio_test",
                         "file": (io.BytesIO(b"fake m4a bytes"), "meeting-note.m4a"),
                     },
@@ -573,6 +574,10 @@ def main() -> None:
             assert audio["item"]["extension"] == "m4a"
             assert audio["item"]["download_name"] == "meeting-note.m4a"
             assert audio["item"]["size_bytes"] == len(b"fake m4a bytes")
+            assert audio["item"]["transcript_text_available"] is True
+            assert "Axiom audio transcript line" in (
+                audio["item"]["transcript_text_preview"] or ""
+            )
 
             audio_file = client.get(
                 f"/file/{audio['item']['id']}",
@@ -583,6 +588,34 @@ def main() -> None:
                     f"audio file headers unexpected: {audio_file.headers!r}"
                 )
             assert_file_body(audio_file, b"fake m4a bytes", "audio file")
+
+            audio_detail = assert_status(
+                client.get(
+                    f"/item/{audio['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "audio detail",
+            )
+            assert audio_detail["item"]["transcript_text_available"] is True
+            assert "Axiom audio transcript line" in (
+                audio_detail["item"].get("transcript_text") or ""
+            )
+
+            updated_audio = assert_status(
+                client.post(
+                    f"/item/{audio['item']['id']}/update",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"transcript_text": "updated audio transcript"},
+                ),
+                200,
+                "update audio transcript",
+            )
+            assert updated_audio["updated_fields"] == ["transcript_text"]
+            assert updated_audio["item"]["transcript_text_available"] is True
+            assert "updated audio transcript" in (
+                updated_audio["item"].get("transcript_text") or ""
+            )
 
             recent = assert_status(
                 client.get("/recent", query_string={"key": "test-key", "limit": "100"}),
@@ -630,6 +663,7 @@ def main() -> None:
             assert recent_audio["type"] == "audio"
             assert recent_audio["total"] == 1
             assert recent_audio["items"][0]["type"] == "audio"
+            assert recent_audio["items"][0]["transcript_text_available"] is True
 
             recent_archive = assert_status(
                 client.get(
@@ -785,6 +819,22 @@ def main() -> None:
             assert audio_name_search["type"] == "audio"
             assert audio_name_search["total"] == 1
             assert audio_name_search["items"][0]["id"] == audio["item"]["id"]
+
+            audio_transcript_search = assert_status(
+                client.get(
+                    "/search",
+                    query_string={
+                        "key": "test-key",
+                        "q": "updated audio transcript",
+                        "type": "audio",
+                    },
+                ),
+                200,
+                "search audio transcript",
+            )
+            assert audio_transcript_search["type"] == "audio"
+            assert audio_transcript_search["total"] == 1
+            assert audio_transcript_search["items"][0]["id"] == audio["item"]["id"]
 
             archive_search = assert_status(
                 client.get(

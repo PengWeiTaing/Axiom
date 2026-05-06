@@ -334,3 +334,11 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“旧文档正文回填脚本”部署到 VPS，当前线上代码更新到 `ae4129c`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_102423_ae4129c.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常且当前 `total=2`，公网 `/app` 可完成 key 连接并进入 `ready` 状态；`python3 scripts/backfill_document_text.py --root /opt/axiom --dry-run` 已在线跑通
+- `items` 表新增 `transcript_text` 字段，并在启动时自动补齐旧库缺失列
+- `/upload` 现在支持在 audio item 上直接携带 `transcript_text`；音频上传后会把转写文本一起写入 SQLite
+- `/item/<id>` 现在会返回 `transcript_text_available`、`transcript_text_preview`，详情接口会附带完整 `transcript_text`
+- `/item/<id>/update` 现在支持更新 audio item 的 `transcript_text`，并拒绝把这个字段错误写到非音频条目
+- `/search` 现在会同时匹配 `content`、`original_name`、文档 `derived_text` 和音频 `transcript_text`
+- `/app` 的文件上传面板新增音频转写输入框；音频查看器可直接显示转写文本，编辑态可补写或修订转写文本
+- `scripts/smoke_test_receiver.py` 新增音频转写上传、详情读取、更新和转写检索覆盖
+- `scripts/smoke_test_web_app.py` 新增浏览器级音频转写填写、查看、编辑和再次检索覆盖

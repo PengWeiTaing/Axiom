@@ -179,11 +179,15 @@ function formatBytes(sizeBytes) {
 function getDocumentAwarePreviewText(item, maxChars = 150) {
     const primary = summarizeText(item?.content, maxChars);
     const derived = summarizeText(item?.derived_text_preview, maxChars);
+    const transcript = summarizeText(item?.transcript_text_preview, maxChars);
     const originalName = String(item?.original_name || "").trim();
     if (item?.type === "document" && (!primary || primary === originalName)) {
         return derived || originalName || "no preview";
     }
-    return primary || derived || originalName || "no preview";
+    if (item?.type === "audio" && (!primary || primary === originalName)) {
+        return transcript || originalName || "no preview";
+    }
+    return primary || transcript || derived || originalName || "no preview";
 }
 
 function getItemDisplayName(item) {
@@ -775,6 +779,12 @@ function buildItemMetaRows(item) {
             value: item.derived_text_available ? "宸叉彁鍙?" : "鏆傛湭鎻愬彇",
         });
     }
+    if (item.type === "audio") {
+        rows.splice(8, 0, {
+            label: "音频转写",
+            value: item.transcript_text_available ? "已填写" : "暂未填写",
+        });
+    }
     if (item.type === "image" && item.content) {
         rows.splice(4, 0, { label: "图片说明", value: item.content });
     } else if (item.type !== "text" && item.content) {
@@ -994,6 +1004,9 @@ async function openViewerWithAudio(title, fileUrl, item, metaRows = [], actions 
         description.textContent = item.content;
         elements.viewerContent.append(description);
     }
+    if (item?.transcript_text) {
+        appendViewerTextSection("音频转写文本", item.transcript_text);
+    }
 }
 
 async function openViewerWithPdf(title, fileUrl, item, metaRows = [], actions = []) {
@@ -1160,6 +1173,21 @@ function buildItemEditorForm(item) {
             item.type === "text" ? "文本内容不能为空。" : "",
         ),
     );
+
+    if (item.type === "audio") {
+        const transcriptInput = document.createElement("textarea");
+        transcriptInput.name = "transcript_text";
+        transcriptInput.rows = 8;
+        transcriptInput.placeholder = "可选：补充音频转写文本，后续搜索会直接命中这里";
+        transcriptInput.value = item.transcript_text || "";
+        form.append(
+            createViewerField(
+                "音频转写文本",
+                transcriptInput,
+                "可留空，也可以后续回来继续补写。",
+            ),
+        );
+    }
 
     const sourceInput = document.createElement("input");
     sourceInput.name = "source";
@@ -1592,6 +1620,7 @@ async function handleFileCaptureSubmit(event) {
     const file = elements.fileInput.files?.[0];
     const sourceInput = document.getElementById("file-source-input");
     const noteInput = document.getElementById("file-note-input");
+    const transcriptInput = document.getElementById("file-transcript-input");
 
     if (!file) {
         setFeedback(elements.captureFeedback, "请先选择文件。", "error");
@@ -1603,6 +1632,7 @@ async function handleFileCaptureSubmit(event) {
         formData.set("file", file);
         formData.set("source", sourceInput.value.trim() || "web_app");
         formData.set("content", noteInput.value.trim());
+        formData.set("transcript_text", transcriptInput.value.trim());
 
         setConnectionState("busy", "正在上传文件");
         const payload = await apiRequest("/upload", {
@@ -1678,6 +1708,7 @@ async function handleItemEditSubmit(form) {
     const formData = new FormData(form);
     const content = String(formData.get("content") || "");
     const source = String(formData.get("source") || "");
+    const transcriptText = String(formData.get("transcript_text") || "");
     const feedback = form.querySelector("[data-edit-feedback]");
     const submitButton = elements.viewerActions.querySelector("[data-action='save-item-edit']");
 
@@ -1699,6 +1730,7 @@ async function handleItemEditSubmit(form) {
             json: {
                 content,
                 source,
+                transcript_text: itemType === "audio" ? transcriptText : undefined,
             },
         });
         updateKnownItem(payload.item);

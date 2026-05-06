@@ -103,10 +103,19 @@
                             <input id="file-note-input" name="content" type="text" placeholder="给文件补一句说明，留空则使用原文件名">
                         </label>
                         <label class="field">
+                            <span>音频转写文本</span>
+                            <textarea
+                                id="file-transcript-input"
+                                name="transcript_text"
+                                rows="5"
+                                placeholder="可选：如果上传的是音频，可以直接补转写文本"
+                            ></textarea>
+                        </label>
+                        <label class="field">
                             <span>来源</span>
                             <input id="file-source-input" name="source" type="text" value="web_app">
                         </label>
-                        <p class="helper-text">支持图片、PDF、Word 和常见音频格式。</p>
+                        <p class="helper-text">支持图片、PDF、Word 和常见音频格式；音频可额外填写转写文本。</p>
                         <button class="primary-button" type="submit">上传文件</button>
                     </form>
                 </div>

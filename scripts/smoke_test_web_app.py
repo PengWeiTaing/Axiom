@@ -143,6 +143,14 @@ def click_first_action(page, selector: str, label: str) -> None:
         raise AssertionError(f"{label}: could not click {selector}") from exc
 
 
+def close_viewer(page) -> None:
+    try:
+        page.locator("#close-viewer-button").click()
+        page.locator("#viewer-backdrop").wait_for(state="hidden", timeout=15_000)
+    except Exception as exc:  # noqa: BLE001
+        raise AssertionError("close viewer: viewer backdrop did not disappear") from exc
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="axiom_web_app_") as temp_dir:
         root = Path(temp_dir)
@@ -167,6 +175,8 @@ def main() -> None:
             pdf_note = "playwright project spec"
             docx_note = "weekly planning doc"
             audio_note = "playwright voice note"
+            audio_transcript = "browser audio transcript line"
+            updated_audio_transcript = "updated browser audio transcript"
             run_date = current_local_date_iso()
             pdf_bytes = build_pdf_bytes("Axiom pdf browser line")
             docx_bytes = build_docx_bytes(
@@ -218,7 +228,7 @@ def main() -> None:
                     wait_for_text(page, "#viewer-meta", note_source, "text source in viewer")
                     wait_for_text(page, "#viewer-content", note_text, "text content in viewer")
                     click_first_action(page, "#viewer-actions [data-action='viewer-toggle-storage']", "archive text item")
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
 
                     page.select_option("#recent-storage-input", "archive")
                     page.locator("#recent-filter-form button[type='submit']").click()
@@ -226,7 +236,7 @@ def main() -> None:
 
                     click_first_action(page, "#recent-list [data-action='view-item']", "open archived text item")
                     click_first_action(page, "#viewer-actions [data-action='viewer-toggle-storage']", "restore text item")
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
                     page.locator("#reset-recent-filters-button").click()
                     wait_for_text(page, "#recent-list", note_text, "recent note after restore")
 
@@ -237,7 +247,7 @@ def main() -> None:
                     click_first_action(page, "#viewer-actions [data-action='save-item-edit']", "save text edit")
                     wait_for_text(page, "#viewer-meta", updated_note_source, "updated source")
                     wait_for_text(page, "#viewer-content", updated_note_text, "updated text content")
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
                     wait_for_text(page, "#recent-list", updated_note_text, "updated recent note")
 
                     page.set_input_files(
@@ -259,7 +269,7 @@ def main() -> None:
                     wait_for_text(page, "#search-results", image_caption, "image search result")
                     click_first_action(page, "#search-results [data-action='view-item']", "open image item")
                     page.locator("#viewer-content img").wait_for(timeout=15_000)
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
 
                     page.set_input_files(
                         "#file-input",
@@ -282,7 +292,7 @@ def main() -> None:
                     wait_for_text(page, "#viewer-meta", "Project Spec.pdf", "pdf meta")
                     page.locator("#viewer-content iframe").wait_for(timeout=15_000)
                     wait_for_text(page, "#viewer-content", "Axiom pdf browser line", "pdf extracted text")
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
 
                     page.set_input_files(
                         "#file-input",
@@ -304,7 +314,7 @@ def main() -> None:
                     click_first_action(page, "#search-results [data-action='view-item']", "open docx item")
                     wait_for_text(page, "#viewer-meta", "Weekly Plan.docx", "docx meta")
                     wait_for_text(page, "#viewer-content", "Docx body line for browser search", "docx extracted text")
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
 
                     page.set_input_files(
                         "#file-input",
@@ -315,24 +325,35 @@ def main() -> None:
                         },
                     )
                     page.fill("#file-note-input", audio_note)
+                    page.fill("#file-transcript-input", audio_transcript)
                     page.fill("#file-source-input", "web_app_audio")
                     page.locator("#file-capture-form button[type='submit']").click()
                     page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
 
-                    page.fill("#search-query-input", "meeting-note")
+                    page.fill("#search-query-input", audio_transcript)
                     page.fill("#search-source-input", "web_app_audio")
                     page.locator("#search-form button[type='submit']").click()
                     wait_for_text(page, "#search-results", audio_note, "audio search result")
                     click_first_action(page, "#search-results [data-action='view-item']", "open audio item")
                     wait_for_text(page, "#viewer-meta", "meeting-note.m4a", "audio meta")
                     page.locator("#viewer-content audio").wait_for(timeout=15_000)
-                    page.locator("#close-viewer-button").click()
+                    wait_for_text(page, "#viewer-content", audio_transcript, "audio transcript")
+                    click_first_action(page, "#viewer-actions [data-action='edit-item']", "edit audio item")
+                    page.locator("[data-role='item-edit-form'] textarea[name='transcript_text']").fill(updated_audio_transcript)
+                    click_first_action(page, "#viewer-actions [data-action='save-item-edit']", "save audio transcript")
+                    wait_for_text(page, "#viewer-content", updated_audio_transcript, "updated audio transcript")
+                    close_viewer(page)
+
+                    page.fill("#search-query-input", updated_audio_transcript)
+                    page.fill("#search-source-input", "web_app_audio")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", audio_note, "updated audio transcript search result")
 
                     page.fill("#automation-date-input", run_date)
                     click_first_action(page, "[data-job-id='review_day']", "run daily review")
                     wait_for_text(page, "#viewer-title", f"{run_date}.md", "artifact viewer title")
                     wait_for_text(page, "#viewer-content", "Summary", "artifact viewer body")
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
 
                     page.locator("#automation-runs .automation-run-card").first.wait_for(timeout=15_000)
                     click_first_action(
@@ -341,7 +362,7 @@ def main() -> None:
                         "open automation run",
                     )
                     wait_for_text(page, "#viewer-content", "completed", "automation run output")
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
 
                     click_first_action(
                         page,
@@ -350,7 +371,7 @@ def main() -> None:
                     )
                     wait_for_text(page, "#viewer-title", f"{run_date}.md", "rerun artifact title")
                     wait_for_text(page, "#viewer-content", "Summary", "rerun artifact body")
-                    page.locator("#close-viewer-button").click()
+                    close_viewer(page)
 
                     browser.close()
             finally:
