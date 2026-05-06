@@ -306,3 +306,6 @@
 - `/app` 的“图片上传”区块升级为“文件上传”，并补了 PDF 内嵌预览、音频播放器预览，以及文档 / 音频类型筛选
 - `scripts/smoke_test_receiver.py` 新增 PDF 与音频上传、取回、原文件名检索和统计覆盖
 - `scripts/smoke_test_web_app.py` 新增 PDF 与音频的浏览器级上传、检索和查看覆盖
+- 已用 `scripts/deploy_to_vps.py` 将这轮“文档 / 音频数据入口”能力部署到 VPS，当前线上代码更新到 `4c0a564`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_044010_4c0a564.tar.gz`
+- 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常，公网 `/app` 已出现“文件上传”和 `document / audio` 类型筛选
