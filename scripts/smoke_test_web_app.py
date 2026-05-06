@@ -90,6 +90,43 @@ def build_docx_bytes(*paragraphs: str) -> bytes:
     return buffer.getvalue()
 
 
+def build_pdf_bytes(text: str) -> bytes:
+    safe_text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    stream = f"BT\n/F1 18 Tf\n40 100 Td\n({safe_text}) Tj\nET\n".encode("latin-1")
+
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] "
+            b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"
+        ),
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"endstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+
+    chunks = [b"%PDF-1.4\n"]
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(sum(len(chunk) for chunk in chunks))
+        chunks.append(f"{index} 0 obj\n".encode("ascii"))
+        chunks.append(obj)
+        chunks.append(b"\nendobj\n")
+
+    xref_offset = sum(len(chunk) for chunk in chunks)
+    chunks.append(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    chunks.append(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        chunks.append(f"{offset:010d} 00000 n \n".encode("ascii"))
+    chunks.append(
+        (
+            f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+            f"startxref\n{xref_offset}\n%%EOF\n"
+        ).encode("ascii")
+    )
+    return b"".join(chunks)
+
+
 def wait_for_text(page, selector: str, text: str, label: str) -> None:
     try:
         page.locator(selector).get_by_text(text, exact=False).first.wait_for(timeout=15_000)
@@ -131,6 +168,7 @@ def main() -> None:
             docx_note = "weekly planning doc"
             audio_note = "playwright voice note"
             run_date = current_local_date_iso()
+            pdf_bytes = build_pdf_bytes("Axiom pdf browser line")
             docx_bytes = build_docx_bytes(
                 "Axiom document insight",
                 "Docx body line for browser search",
@@ -228,7 +266,7 @@ def main() -> None:
                         {
                             "name": "Project Spec.pdf",
                             "mimeType": "application/pdf",
-                            "buffer": b"%PDF-1.4 playwright pdf",
+                            "buffer": pdf_bytes,
                         },
                     )
                     page.fill("#file-note-input", pdf_note)
@@ -243,6 +281,7 @@ def main() -> None:
                     click_first_action(page, "#search-results [data-action='view-item']", "open pdf item")
                     wait_for_text(page, "#viewer-meta", "Project Spec.pdf", "pdf meta")
                     page.locator("#viewer-content iframe").wait_for(timeout=15_000)
+                    wait_for_text(page, "#viewer-content", "Axiom pdf browser line", "pdf extracted text")
                     page.locator("#close-viewer-button").click()
 
                     page.set_input_files(

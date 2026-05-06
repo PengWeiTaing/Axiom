@@ -34,7 +34,7 @@ receiver 已提供：
 - `/health`：服务和数据库健康检查
 - `/stats`：总量、类型、来源、存储区统计
 - `/add`：文本写入
-- `/upload`：通用文件上传，支持图片、PDF、Word 和常见音频；`.docx` 会自动抽取正文
+- `/upload`：通用文件上传，支持图片、PDF、Word 和常见音频；`.pdf` 与 `.docx` 会自动抽取正文
 - `/item/<id>`：读取单条元数据
 - `/item/<id>/update`：更新单条内容与来源；文本会同步改写落盘文件
 - `/file/<id>`：按 item id 取回文件
@@ -44,7 +44,7 @@ receiver 已提供：
 - `/search`：关键词检索，支持相关性、时间、过滤条件，以及按原文件名和文档抽取正文搜索
 - `/overview`：聚合返回统计、最近记录和最新自动化产物摘要
 - `/overview/text`：返回适合快捷指令直接显示的纯文本总览
-- `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口；已补 PDF 预览、音频播放器和 Word 正文预览
+- `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口；已补 PDF 预览与正文预览、音频播放器和 Word 正文预览
 - `/automation/jobs`：返回当前允许手动触发的安全自动化任务
 - `/automation/runs`：读取自动化运行历史，覆盖手动触发和定时任务，并返回状态、产物和输出尾部
 - `/automation/run`：手动生成 review / inbox report / dry-run artifact

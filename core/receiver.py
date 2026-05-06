@@ -17,6 +17,12 @@ from xml.etree import ElementTree as ET
 
 from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
+
+try:
+    from pypdf import PdfReader
+except ImportError:  # pragma: no cover - deployment should install requirements.txt
+    PdfReader = None
+
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 
@@ -923,16 +929,33 @@ def extract_docx_text(file_path: Path) -> str | None:
     return normalize_extracted_text("\n".join(parts))
 
 
-def extract_document_text(file_path: Path, original_name: str | None) -> str | None:
-    extension = get_file_extension(original_name or file_path)
-    if extension != ".docx":
+def extract_pdf_text(file_path: Path) -> str | None:
+    if PdfReader is None:
+        logger.warning("pypdf is not installed, skip pdf text extraction: file=%s", file_path.name)
         return None
 
+    reader = PdfReader(str(file_path))
+    page_texts = [page.extract_text() or "" for page in reader.pages]
+    return normalize_extracted_text("\n\n".join(page_texts))
+
+
+def extract_document_text(file_path: Path, original_name: str | None) -> str | None:
+    extension = get_file_extension(original_name or file_path)
+    if extension == ".docx":
+        try:
+            return extract_docx_text(file_path)
+        except (KeyError, OSError, ET.ParseError, zipfile.BadZipFile):
+            logger.warning("failed to extract docx text: file=%s", file_path.name, exc_info=True)
+            return None
+
     try:
-        return extract_docx_text(file_path)
-    except (KeyError, OSError, ET.ParseError, zipfile.BadZipFile):
-        logger.warning("failed to extract docx text: file=%s", file_path.name, exc_info=True)
+        if extension == ".pdf":
+            return extract_pdf_text(file_path)
+    except Exception:
+        logger.warning("failed to extract pdf text: file=%s", file_path.name, exc_info=True)
         return None
+
+    return None
 
 
 def build_archive_file_path(now: datetime, file_path: Path) -> Path:

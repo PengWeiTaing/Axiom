@@ -319,3 +319,9 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“Word 正文抽取与文档读取层增强”部署到 VPS，当前线上代码更新到 `97ed304`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_054250_97ed304.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常，公网 `/app` 可完成 key 连接并进入 ready 状态
+- `requirements.txt` 新增 `pypdf` 依赖，用于 PDF 正文抽取
+- `.pdf` 上传现在也会自动抽取正文写入 `derived_text`，与 `.docx` 共用统一的文档抽取入口
+- `/search` 继续复用 `derived_text` 检索能力，PDF 与 Word 都可以直接按抽取正文搜索
+- `/item/<id>` 与 `/app` 文档查看器现在会展示 PDF 的抽取正文；PDF 保留内嵌预览，同时补上可搜索、可阅读的正文层
+- `scripts/smoke_test_receiver.py` 改为上传真实可抽取 PDF，补齐 PDF 正文抽取、详情返回和正文检索覆盖
+- `scripts/smoke_test_web_app.py` 新增 PDF 抽取正文浏览器级断言，确认 `/app` 中可直接看到 PDF 正文预览

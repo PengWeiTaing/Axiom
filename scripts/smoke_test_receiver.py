@@ -78,6 +78,43 @@ def build_docx_bytes(*paragraphs: str) -> bytes:
     return buffer.getvalue()
 
 
+def build_pdf_bytes(text: str) -> bytes:
+    safe_text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    stream = f"BT\n/F1 18 Tf\n40 100 Td\n({safe_text}) Tj\nET\n".encode("latin-1")
+
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] "
+            b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"
+        ),
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"endstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+
+    chunks = [b"%PDF-1.4\n"]
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(sum(len(chunk) for chunk in chunks))
+        chunks.append(f"{index} 0 obj\n".encode("ascii"))
+        chunks.append(obj)
+        chunks.append(b"\nendobj\n")
+
+    xref_offset = sum(len(chunk) for chunk in chunks)
+    chunks.append(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    chunks.append(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        chunks.append(f"{offset:010d} 00000 n \n".encode("ascii"))
+    chunks.append(
+        (
+            f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+            f"startxref\n{xref_offset}\n%%EOF\n"
+        ).encode("ascii")
+    )
+    return b"".join(chunks)
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="axiom_receiver_") as temp_dir:
         root = Path(temp_dir)
@@ -388,13 +425,15 @@ def main() -> None:
                 "Axiom project plan",
                 "Document body line for extracted search",
             )
+            pdf_bytes = build_pdf_bytes("Axiom pdf summary line")
             document = assert_status(
                 client.post(
                     "/upload",
                     data={
                         "key": "test-key",
+                        "content": "important project spec",
                         "source": "document_test",
-                        "file": (io.BytesIO(docx_bytes), "Weekly Plan.docx"),
+                        "file": (io.BytesIO(pdf_bytes), "Project Spec.pdf"),
                     },
                     content_type="multipart/form-data",
                 ),
@@ -402,16 +441,14 @@ def main() -> None:
                 "upload document",
             )
             assert document["item"]["type"] == "document"
-            assert document["item"]["content"] == "Weekly Plan.docx"
-            assert document["item"]["original_name"] == "Weekly Plan.docx"
-            assert document["item"]["mime_type"] == (
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-            assert document["item"]["extension"] == "docx"
-            assert document["item"]["download_name"] == "Weekly Plan.docx"
-            assert document["item"]["size_bytes"] == len(docx_bytes)
+            assert document["item"]["content"] == "important project spec"
+            assert document["item"]["original_name"] == "Project Spec.pdf"
+            assert document["item"]["mime_type"] == "application/pdf"
+            assert document["item"]["extension"] == "pdf"
+            assert document["item"]["download_name"] == "Project Spec.pdf"
+            assert document["item"]["size_bytes"] == len(pdf_bytes)
             assert document["item"]["derived_text_available"] is True
-            assert "Document body line for extracted search" in (
+            assert "Axiom pdf summary line" in (
                 document["item"]["derived_text_preview"] or ""
             )
 
@@ -419,11 +456,11 @@ def main() -> None:
                 f"/file/{document['item']['id']}",
                 headers={"X-Axiom-Key": "test-key"},
             )
-            if "Weekly Plan.docx" not in (document_file.headers.get("Content-Disposition") or ""):
+            if "Project Spec.pdf" not in (document_file.headers.get("Content-Disposition") or ""):
                 raise AssertionError(
                     f"document file headers unexpected: {document_file.headers!r}"
                 )
-            assert_file_body(document_file, docx_bytes, "document file")
+            assert_file_body(document_file, pdf_bytes, "document file")
 
             document_detail = assert_status(
                 client.get(
@@ -435,8 +472,32 @@ def main() -> None:
             )
             assert document_detail["item"]["derived_text_available"] is True
             assert (
-                "Document body line for extracted search"
+                "Axiom pdf summary line"
                 in (document_detail["item"].get("derived_text") or "")
+            )
+
+            docx_bytes = build_docx_bytes(
+                "Axiom project plan",
+                "Document body line for extracted search",
+            )
+            docx_document = assert_status(
+                client.post(
+                    "/upload",
+                    data={
+                        "key": "test-key",
+                        "source": "docx_test",
+                        "file": (io.BytesIO(docx_bytes), "Weekly Plan.docx"),
+                    },
+                    content_type="multipart/form-data",
+                ),
+                200,
+                "upload docx document",
+            )
+            assert docx_document["item"]["type"] == "document"
+            assert docx_document["item"]["extension"] == "docx"
+            assert docx_document["item"]["derived_text_available"] is True
+            assert "Document body line for extracted search" in (
+                docx_document["item"]["derived_text_preview"] or ""
             )
 
             time.sleep(1.1)
@@ -479,8 +540,8 @@ def main() -> None:
                 "recent",
             )
             assert recent["page_size"] == 50
-            assert recent["total"] == 5
-            assert len(recent["items"]) == 5
+            assert recent["total"] == 6
+            assert len(recent["items"]) == 6
             assert all(item["file_url"].startswith("/file/") for item in recent["items"])
 
             recent_images = assert_status(
@@ -504,7 +565,7 @@ def main() -> None:
                 "recent document filter",
             )
             assert recent_documents["type"] == "document"
-            assert recent_documents["total"] == 1
+            assert recent_documents["total"] == 2
             assert recent_documents["items"][0]["type"] == "document"
             assert recent_documents["items"][0]["derived_text_available"] is True
 
@@ -541,7 +602,7 @@ def main() -> None:
                 "recent inbox filter",
             )
             assert recent_inbox["storage"] == "inbox"
-            assert recent_inbox["total"] == 5
+            assert recent_inbox["total"] == 6
 
             recent_created_from = assert_status(
                 client.get(
@@ -593,7 +654,7 @@ def main() -> None:
                 200,
                 "search",
             )
-            assert search["total"] == 2
+            assert search["total"] == 3
             assert search["items"][0]["score"] > 0
             assert search["items"][0]["file_url"].startswith("/file/")
             assert search["items"][0]["id"] == first["item"]["id"]
@@ -627,7 +688,7 @@ def main() -> None:
             )
             assert document_name_search["type"] == "document"
             assert document_name_search["total"] == 1
-            assert document_name_search["items"][0]["id"] == document["item"]["id"]
+            assert document_name_search["items"][0]["id"] == docx_document["item"]["id"]
             assert document_name_search["items"][0]["derived_text_available"] is True
 
             document_text_search = assert_status(
@@ -644,7 +705,24 @@ def main() -> None:
             )
             assert document_text_search["type"] == "document"
             assert document_text_search["total"] == 1
-            assert document_text_search["items"][0]["id"] == document["item"]["id"]
+            assert document_text_search["items"][0]["id"] == docx_document["item"]["id"]
+
+            pdf_text_search = assert_status(
+                client.get(
+                    "/search",
+                    query_string={
+                        "key": "test-key",
+                        "q": "pdf summary",
+                        "type": "document",
+                        "source": "document_test",
+                    },
+                ),
+                200,
+                "search pdf extracted text",
+            )
+            assert pdf_text_search["type"] == "document"
+            assert pdf_text_search["total"] == 1
+            assert pdf_text_search["items"][0]["id"] == document["item"]["id"]
 
             audio_name_search = assert_status(
                 client.get(
@@ -742,18 +820,19 @@ def main() -> None:
                 200,
                 "stats",
             )
-            assert stats["total"] == 5
+            assert stats["total"] == 6
             assert stats["by_type"]["text"] == 2
             assert stats["by_type"]["image"] == 1
-            assert stats["by_type"]["document"] == 1
+            assert stats["by_type"]["document"] == 2
             assert stats["by_type"]["audio"] == 1
             assert stats["by_source"]["ios_shortcut"] == 1
             assert stats["by_source"]["smoke_test"] == 1
             assert stats["by_source"]["image_edit_test"] == 1
             assert stats["by_source"]["document_test"] == 1
+            assert stats["by_source"]["docx_test"] == 1
             assert stats["by_source"]["audio_test"] == 1
             assert stats["by_storage"].get("archive", 0) == 0
-            assert stats["by_storage"]["inbox"] == 5
+            assert stats["by_storage"]["inbox"] == 6
 
             overview = assert_status(
                 client.get(
@@ -768,11 +847,11 @@ def main() -> None:
                 "overview",
             )
             assert overview["service"] == "axiom-receiver"
-            assert overview["stats"]["total"] == 5
+            assert overview["stats"]["total"] == 6
             assert overview["recent"]["limit"] == 2
             assert len(overview["recent"]["items"]) == 2
             assert overview["recent"]["items"][0]["id"] == audio["item"]["id"]
-            assert overview["recent"]["items"][1]["id"] == document["item"]["id"]
+            assert overview["recent"]["items"][1]["id"] == docx_document["item"]["id"]
 
             overview_text = client.get(
                 "/overview/text",
@@ -793,8 +872,8 @@ def main() -> None:
             overview_text_body = overview_text.get_data(as_text=True)
             if (
                 "Axiom 总览" not in overview_text_body
-                or "总条目: 5" not in overview_text_body
-                or "文档: 1" not in overview_text_body
+                or "总条目: 6" not in overview_text_body
+                or "文档: 2" not in overview_text_body
                 or "音频: 1" not in overview_text_body
             ):
                 raise AssertionError(f"overview text body unexpected: {overview_text_body}")
@@ -1154,8 +1233,8 @@ def main() -> None:
             all_inbox_files = [
                 path for path in (root / "data" / "inbox").rglob("*") if path.is_file()
             ]
-            if len(all_inbox_files) != 5:
-                raise AssertionError(f"expected 5 inbox files, got {len(all_inbox_files)}")
+            if len(all_inbox_files) != 6:
+                raise AssertionError(f"expected 6 inbox files, got {len(all_inbox_files)}")
 
             archive_files = [
                 path for path in (root / "data" / "archive").rglob("*") if path.is_file()
