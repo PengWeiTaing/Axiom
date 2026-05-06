@@ -349,3 +349,6 @@
 - `scripts/build_review_markdown.py` 现在会把文档正文与音频转写摘要写进日 / 周回顾底稿，不再只看原始 `content`
 - `scripts/build_inbox_processing_report.py` 现在会复用统一文本选择逻辑；对 document / audio 条目，正文或转写存在时不会再被简单当成“空内容”
 - `scripts/smoke_test_receiver.py` 新增导出脚本与 review 底稿覆盖，验证 PDF 正文和音频转写都能进入 Markdown 输出
+- 已用 `scripts/deploy_to_vps.py` 将这轮“导出与回顾脚本感知正文 / 转写”部署到 VPS，当前线上代码更新到 `5e9f059`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_110400_5e9f059.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常；并已在 VPS 上成功跑通 `export_items_markdown.py` 与 `build_review_markdown.py` 的生产环境输出检查
