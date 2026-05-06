@@ -3,6 +3,7 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import mimetypes
 import os
 import sqlite3
 import subprocess
@@ -14,9 +15,6 @@ from uuid import uuid4
 
 from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
-from werkzeug.utils import secure_filename
-
-
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 
@@ -43,9 +41,55 @@ MAX_PAGE_SIZE = 50
 DEFAULT_SOURCE = "ios_shortcut"
 ITEM_TYPE_TEXT = "text"
 ITEM_TYPE_IMAGE = "image"
-ITEM_TYPES = {ITEM_TYPE_TEXT, ITEM_TYPE_IMAGE}
+ITEM_TYPE_DOCUMENT = "document"
+ITEM_TYPE_AUDIO = "audio"
+ITEM_TYPES = {ITEM_TYPE_TEXT, ITEM_TYPE_IMAGE, ITEM_TYPE_DOCUMENT, ITEM_TYPE_AUDIO}
 STORAGE_AREAS = {"inbox": INBOX_PATH, "archive": ARCHIVE_PATH}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
+DOCUMENT_EXTENSIONS = {".pdf", ".doc", ".docx"}
+AUDIO_EXTENSIONS = {".aac", ".caf", ".flac", ".m4a", ".mp3", ".ogg", ".wav", ".webm"}
+DOCUMENT_MIME_TYPES = {
+    "application/msword",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+UPLOAD_TYPE_LABELS = {
+    ITEM_TYPE_TEXT: "文本",
+    ITEM_TYPE_IMAGE: "图片",
+    ITEM_TYPE_DOCUMENT: "文档",
+    ITEM_TYPE_AUDIO: "音频",
+}
+MIME_TYPE_EXTENSION_MAP = {
+    "application/msword": ".doc",
+    "application/pdf": ".pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "audio/aac": ".aac",
+    "audio/flac": ".flac",
+    "audio/mp4": ".m4a",
+    "audio/mpeg": ".mp3",
+    "audio/ogg": ".ogg",
+    "audio/webm": ".webm",
+    "audio/wav": ".wav",
+    "audio/x-m4a": ".m4a",
+    "audio/x-wav": ".wav",
+    "image/gif": ".gif",
+    "image/heic": ".heic",
+    "image/heif": ".heif",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+ITEM_SELECT_FIELDS = """
+    id,
+    type,
+    content,
+    file_path,
+    source,
+    created_at,
+    original_name,
+    mime_type,
+    size_bytes
+"""
 REVIEWS_PATH = Path(os.environ.get("AXIOM_REVIEWS_PATH", AXIOM_ROOT / "data" / "reviews")).resolve()
 ARTIFACT_GROUPS = {"review", "inbox", "inbox-actions", "inbox-action-history"}
 ARTIFACT_WINDOWS = {"daily", "weekly"}
@@ -153,6 +197,22 @@ def ensure_storage_dirs() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
+def ensure_items_table_columns(conn: sqlite3.Connection) -> None:
+    existing_columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(items)").fetchall()
+    }
+    required_columns = {
+        "original_name": "TEXT",
+        "mime_type": "TEXT",
+        "size_bytes": "INTEGER",
+    }
+    for column_name, column_type in required_columns.items():
+        if column_name in existing_columns:
+            continue
+        conn.execute(f"ALTER TABLE items ADD COLUMN {column_name} {column_type}")
+
+
 def init_db(db_path: Path = DB_PATH) -> None:
     """创建 v0.1 阶段最小表结构。"""
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -167,10 +227,14 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 content TEXT,
                 file_path TEXT,
                 source TEXT,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                original_name TEXT,
+                mime_type TEXT,
+                size_bytes INTEGER
             )
             """
         )
+        ensure_items_table_columns(conn)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at)"
         )
@@ -572,6 +636,74 @@ def join_conditions(conditions: list[str], prefix: str) -> str:
     return f"{prefix} " + " AND ".join(conditions)
 
 
+def normalize_mime_type(value: str | None) -> str:
+    return str(value or "").split(";", 1)[0].strip().lower()
+
+
+def get_file_extension(filename: str | Path | None) -> str:
+    if filename is None:
+        return ""
+    return Path(str(filename)).suffix.lower()
+
+
+def format_allowed_extensions(extensions: set[str]) -> str:
+    return ", ".join(sorted(extensions))
+
+
+def build_upload_error_message() -> str:
+    groups = [
+        f"图片: {format_allowed_extensions(IMAGE_EXTENSIONS)}",
+        f"文档: {format_allowed_extensions(DOCUMENT_EXTENSIONS)}",
+        f"音频: {format_allowed_extensions(AUDIO_EXTENSIONS)}",
+    ]
+    return "只支持以下文件类型: " + "；".join(groups)
+
+
+def detect_upload_item_type(extension: str, mime_type: str) -> str | None:
+    if extension in IMAGE_EXTENSIONS or mime_type.startswith("image/"):
+        return ITEM_TYPE_IMAGE
+    if extension in DOCUMENT_EXTENSIONS or mime_type in DOCUMENT_MIME_TYPES:
+        return ITEM_TYPE_DOCUMENT
+    if extension in AUDIO_EXTENSIONS or mime_type.startswith("audio/"):
+        return ITEM_TYPE_AUDIO
+    return None
+
+
+def normalize_original_name(filename: str, item_type: str, mime_type: str) -> str:
+    raw_name = str(filename or "").strip().replace("\\", "/")
+    normalized_name = Path(raw_name).name.strip()
+    fallback_extension = MIME_TYPE_EXTENSION_MAP.get(mime_type, "")
+
+    if not normalized_name:
+        normalized_name = item_type
+
+    if not get_file_extension(normalized_name) and fallback_extension:
+        normalized_name = f"{normalized_name}{fallback_extension}"
+
+    return normalized_name
+
+
+def build_binary_file_path(now: datetime, original_name: str) -> Path:
+    extension = get_file_extension(original_name) or ".bin"
+    return build_inbox_file_path(now, extension)
+
+
+def build_download_name(
+    original_name: str | None,
+    file_path: str | Path | None,
+    item_id: int,
+) -> str:
+    if original_name:
+        return original_name
+    if file_path:
+        return Path(str(file_path)).name
+    return f"item-{item_id}"
+
+
+def get_type_label(item_type: str) -> str:
+    return UPLOAD_TYPE_LABELS.get(item_type, item_type)
+
+
 def build_file_url(item_id: int) -> str:
     return f"/file/{item_id}"
 
@@ -606,16 +738,26 @@ def build_item_payload(
     file_path: str | Path | None,
     source: str | None,
     created_at: str,
+    original_name: str | None = None,
+    mime_type: str | None = None,
+    size_bytes: int | None = None,
 ) -> dict:
+    extension = get_file_extension(original_name or file_path)
     item = {
         "id": item_id,
         "type": item_type,
+        "type_label": get_type_label(item_type),
         "content": content,
         "file_path": str(file_path) if file_path else None,
         "file_url": build_file_url(item_id) if file_path else None,
+        "download_name": build_download_name(original_name, file_path, item_id) if file_path else None,
         "storage": get_storage_area(file_path),
         "source": source,
         "created_at": created_at,
+        "original_name": original_name,
+        "mime_type": mime_type,
+        "size_bytes": size_bytes,
+        "extension": extension.lstrip(".") if extension else None,
     }
     return item
 
@@ -628,6 +770,9 @@ def row_to_item(row: sqlite3.Row, include_score: bool = False) -> dict:
         row["file_path"],
         row["source"],
         row["created_at"],
+        row["original_name"] if "original_name" in row.keys() else None,
+        row["mime_type"] if "mime_type" in row.keys() else None,
+        row["size_bytes"] if "size_bytes" in row.keys() else None,
     )
     if include_score and "score" in row.keys():
         item["score"] = row["score"]
@@ -676,8 +821,42 @@ def build_text_file_path(now: datetime) -> Path:
     return build_inbox_file_path(now, ".txt")
 
 
-def build_image_file_path(now: datetime, filename: str) -> Path:
-    return build_inbox_file_path(now, Path(filename).suffix.lower())
+def read_upload_content(original_name: str, item_type: str) -> str:
+    for field_name in ("content", "caption", "title", "description"):
+        value = get_request_field(field_name).strip()
+        if value:
+            return value
+    return original_name or item_type
+
+
+def parse_uploaded_file(uploaded_file) -> dict:
+    raw_name = uploaded_file.filename.strip()
+    mime_type = normalize_mime_type(
+        getattr(uploaded_file, "mimetype", None)
+        or getattr(uploaded_file, "content_type", None)
+    )
+    extension = get_file_extension(raw_name)
+    item_type = detect_upload_item_type(extension, mime_type)
+    if item_type is None:
+        raise ValueError(build_upload_error_message())
+
+    original_name = normalize_original_name(raw_name, item_type, mime_type)
+    normalized_extension = get_file_extension(original_name)
+    if item_type == ITEM_TYPE_IMAGE and normalized_extension not in IMAGE_EXTENSIONS:
+        raise ValueError(build_upload_error_message())
+    if item_type == ITEM_TYPE_DOCUMENT and normalized_extension not in DOCUMENT_EXTENSIONS:
+        raise ValueError(build_upload_error_message())
+    if item_type == ITEM_TYPE_AUDIO and normalized_extension not in AUDIO_EXTENSIONS:
+        raise ValueError(build_upload_error_message())
+
+    if not mime_type:
+        mime_type = mimetypes.guess_type(original_name)[0] or ""
+
+    return {
+        "item_type": item_type,
+        "original_name": original_name,
+        "mime_type": mime_type or None,
+    }
 
 
 def build_archive_file_path(now: datetime, file_path: Path) -> Path:
@@ -725,15 +904,36 @@ def insert_item(
     file_path: Path,
     source: str,
     created_at: str,
+    original_name: str | None = None,
+    mime_type: str | None = None,
+    size_bytes: int | None = None,
 ) -> int:
     conn = get_db_connection()
     try:
         cursor = conn.execute(
             """
-            INSERT INTO items (type, content, file_path, source, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO items (
+                type,
+                content,
+                file_path,
+                source,
+                created_at,
+                original_name,
+                mime_type,
+                size_bytes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (item_type, content, str(file_path), source, created_at),
+            (
+                item_type,
+                content,
+                str(file_path),
+                source,
+                created_at,
+                original_name,
+                mime_type,
+                size_bytes,
+            ),
         )
         conn.commit()
         return int(cursor.lastrowid)
@@ -749,8 +949,8 @@ def get_item_by_id(item_id: int) -> sqlite3.Row | None:
     conn = get_db_connection()
     try:
         return conn.execute(
-            """
-            SELECT id, type, content, file_path, source, created_at
+            f"""
+            SELECT {ITEM_SELECT_FIELDS}
             FROM items
             WHERE id = ?
             """,
@@ -1072,8 +1272,8 @@ def fetch_recent_item_rows(limit: int) -> list[sqlite3.Row]:
     conn = get_db_connection()
     try:
         return conn.execute(
-            """
-            SELECT id, type, content, file_path, source, created_at
+            f"""
+            SELECT {ITEM_SELECT_FIELDS}
             FROM items
             ORDER BY id DESC
             LIMIT ?
@@ -1130,6 +1330,8 @@ def build_overview_text(payload: dict, preview_chars: int) -> str:
         f"- 总条目: {stats['total']}",
         f"- 文本: {stats['by_type'].get('text', 0)}",
         f"- 图片: {stats['by_type'].get('image', 0)}",
+        f"- 文档: {stats['by_type'].get('document', 0)}",
+        f"- 音频: {stats['by_type'].get('audio', 0)}",
         f"- inbox: {stats['by_storage'].get('inbox', 0)}",
         f"- archive: {stats['by_storage'].get('archive', 0)}",
         "",
@@ -1853,55 +2055,77 @@ def add_note():
 
 
 @app.route("/upload", methods=["POST"])
-def upload_image():
+def upload_file():
     auth_error = require_key()
     if auth_error:
         return auth_error
 
-    uploaded_file = request.files.get("file") or request.files.get("image")
+    uploaded_file = (
+        request.files.get("file")
+        or request.files.get("image")
+        or request.files.get("document")
+        or request.files.get("audio")
+    )
     if uploaded_file is None or not uploaded_file.filename:
         return error_response(400, "empty_file", "file 不能为空")
 
-    original_filename = uploaded_file.filename.strip()
-    extension = Path(original_filename).suffix.lower()
-    if extension not in IMAGE_EXTENSIONS:
-        allowed = ", ".join(sorted(IMAGE_EXTENSIONS))
-        return error_response(400, "invalid_file_type", f"只支持图片格式: {allowed}")
+    try:
+        upload_info = parse_uploaded_file(uploaded_file)
+    except ValueError as exc:
+        return error_response(400, "invalid_file_type", str(exc))
 
     source = get_request_field("source", DEFAULT_SOURCE).strip() or DEFAULT_SOURCE
-    caption = get_request_field("caption").strip()
-    content = caption or original_filename or secure_filename(original_filename) or "image"
+    item_type = upload_info["item_type"]
+    original_name = upload_info["original_name"]
+    mime_type = upload_info["mime_type"]
+    content = read_upload_content(original_name, item_type)
     now = utc_now()
     created_at = now.isoformat(timespec="seconds")
-    file_path = build_image_file_path(now, original_filename)
+    file_path = build_binary_file_path(now, original_name)
 
     try:
         write_binary_file_atomic(file_path, uploaded_file)
     except ValueError:
         return error_response(400, "empty_file", "file 不能为空")
     except OSError:
-        logger.exception("failed to write uploaded image")
+        logger.exception("failed to write uploaded file")
         return error_response(500, "file_write_failed", "文件写入失败")
 
+    size_bytes = file_path.stat().st_size
+
     try:
-        item_id = insert_item(ITEM_TYPE_IMAGE, content, file_path, source, created_at)
+        item_id = insert_item(
+            item_type,
+            content,
+            file_path,
+            source,
+            created_at,
+            original_name=original_name,
+            mime_type=mime_type,
+            size_bytes=size_bytes,
+        )
     except sqlite3.Error:
         cleanup_file(file_path)
-        logger.exception("failed to insert image item into database")
+        logger.exception("failed to insert uploaded item into database")
         return error_response(500, "database_write_failed", "数据库写入失败")
 
-    logger.info("saved image item id=%s file=%s", item_id, file_path.name)
+    type_label = get_type_label(item_type)
+    logger.info("saved %s item id=%s file=%s", item_type, item_id, file_path.name)
     return ok_response(
         {
             "message": f"saved: {file_path.name}",
             "item": build_item_payload(
                 item_id,
-                ITEM_TYPE_IMAGE,
+                item_type,
                 content,
                 file_path,
                 source,
                 created_at,
+                original_name,
+                mime_type,
+                size_bytes,
             ),
+            "type_label": type_label,
         }
     )
 
@@ -2106,7 +2330,12 @@ def get_item_file(item_id: int):
     if not file_path.is_file():
         return error_response(404, "file_not_found", "文件不存在")
 
-    return send_file(file_path, download_name=file_path.name)
+    download_name = build_download_name(
+        row["original_name"] if "original_name" in row.keys() else None,
+        file_path,
+        row["id"],
+    )
+    return send_file(file_path, download_name=download_name)
 
 
 @app.route("/artifacts", methods=["GET"])
@@ -2363,7 +2592,7 @@ def recent_items():
         ).fetchone()["total"]
         rows = conn.execute(
             f"""
-            SELECT id, type, content, file_path, source, created_at
+            SELECT {ITEM_SELECT_FIELDS}
             FROM items
             {where_clause}
             ORDER BY {order_clause}
@@ -2455,38 +2684,46 @@ def search_items():
             f"""
             SELECT COUNT(*) AS total
             FROM items
-            WHERE content LIKE ? ESCAPE '\\'
+            WHERE (
+                COALESCE(content, '') LIKE ? ESCAPE '\\'
+                OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
+            )
             {filter_clause}
             """,
-            (fuzzy_match, *filter_params),
+            (fuzzy_match, fuzzy_match, *filter_params),
         ).fetchone()["total"]
 
         if sort == "relevance":
             rows = conn.execute(
                 f"""
                 SELECT
-                    id,
-                    type,
-                    content,
-                    file_path,
-                    source,
-                    created_at,
+                    {ITEM_SELECT_FIELDS},
                     (
                         CASE
-                            WHEN content = ? THEN 100
-                            WHEN content LIKE ? ESCAPE '\\' THEN 60
-                            WHEN content LIKE ? ESCAPE '\\' THEN 30
+                            WHEN COALESCE(content, '') = ? THEN 100
+                            WHEN COALESCE(content, '') LIKE ? ESCAPE '\\' THEN 60
+                            WHEN COALESCE(content, '') LIKE ? ESCAPE '\\' THEN 30
                             ELSE 0
                         END
                         +
                         CASE
-                            WHEN LENGTH(content) <= 20 THEN 8
-                            WHEN LENGTH(content) <= 50 THEN 4
+                            WHEN COALESCE(original_name, '') = ? THEN 90
+                            WHEN COALESCE(original_name, '') LIKE ? ESCAPE '\\' THEN 50
+                            WHEN COALESCE(original_name, '') LIKE ? ESCAPE '\\' THEN 25
+                            ELSE 0
+                        END
+                        +
+                        CASE
+                            WHEN LENGTH(COALESCE(content, original_name, '')) <= 20 THEN 8
+                            WHEN LENGTH(COALESCE(content, original_name, '')) <= 50 THEN 4
                             ELSE 0
                         END
                     ) AS score
                 FROM items
-                WHERE content LIKE ? ESCAPE '\\'
+                WHERE (
+                    COALESCE(content, '') LIKE ? ESCAPE '\\'
+                    OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
+                )
                 {filter_clause}
                 ORDER BY {order_clause}
                 LIMIT ? OFFSET ?
@@ -2494,6 +2731,10 @@ def search_items():
                 (
                     exact_match,
                     prefix_match,
+                    fuzzy_match,
+                    exact_match,
+                    prefix_match,
+                    fuzzy_match,
                     fuzzy_match,
                     fuzzy_match,
                     *filter_params,
@@ -2504,14 +2745,17 @@ def search_items():
         else:
             rows = conn.execute(
                 f"""
-                SELECT id, type, content, file_path, source, created_at
+                SELECT {ITEM_SELECT_FIELDS}
                 FROM items
-                WHERE content LIKE ? ESCAPE '\\'
+                WHERE (
+                    COALESCE(content, '') LIKE ? ESCAPE '\\'
+                    OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
+                )
                 {filter_clause}
                 ORDER BY {order_clause}
                 LIMIT ? OFFSET ?
                 """,
-                (fuzzy_match, *filter_params, page_size, offset),
+                (fuzzy_match, fuzzy_match, *filter_params, page_size, offset),
             ).fetchall()
     finally:
         conn.close()

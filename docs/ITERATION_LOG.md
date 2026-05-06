@@ -298,3 +298,11 @@
   `axiom-daily-inbox-action-history.service` -> `Result=success`，`ExecMainStatus=0`
 - 演练后公网 `/automation/runs` 已可读到 2 条真实运行记录：`review_day` 与 `inbox_action_history_day`
 - 演练后公网 `/app` 的运行历史筛选已可读到 `生成 Inbox 动作历史日报` 与 `生成 Inbox 动作历史周报` 两个定时专用选项
+- `/upload` 从“图片上传”升级为“通用文件上传”，当前支持图片、PDF、Word 和常见音频格式
+- `items` 表新增 `original_name`、`mime_type`、`size_bytes` 三个元数据字段，并在启动时自动补齐旧库缺失列
+- 新增 `document` 与 `audio` 两种 item type；recent / search / stats / overview 都已经接入
+- `/file/<id>` 现在会优先使用原文件名作为下载名，而不是内部时间戳文件名
+- `/search` 现在会同时检索 `content` 和 `original_name`，上传文件后可以直接按原文件名搜索
+- `/app` 的“图片上传”区块升级为“文件上传”，并补了 PDF 内嵌预览、音频播放器预览，以及文档 / 音频类型筛选
+- `scripts/smoke_test_receiver.py` 新增 PDF 与音频上传、取回、原文件名检索和统计覆盖
+- `scripts/smoke_test_web_app.py` 新增 PDF 与音频的浏览器级上传、检索和查看覆盖

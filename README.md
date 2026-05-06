@@ -34,14 +34,14 @@ receiver 已提供：
 - `/health`：服务和数据库健康检查
 - `/stats`：总量、类型、来源、存储区统计
 - `/add`：文本写入
-- `/upload`：图片上传
+- `/upload`：通用文件上传，支持图片、PDF、Word 和常见音频
 - `/item/<id>`：读取单条元数据
 - `/item/<id>/update`：更新单条内容与来源；文本会同步改写落盘文件
 - `/file/<id>`：按 item id 取回文件
 - `/archive/<id>`：归档 item 文件
 - `/restore/<id>`：从 archive 恢复到 inbox
 - `/recent`：分页读取最近记录，支持类型、存储区、来源、时间过滤
-- `/search`：关键词检索，支持相关性、时间和过滤条件
+- `/search`：关键词检索，支持相关性、时间、过滤条件，以及按原文件名搜索
 - `/overview`：聚合返回统计、最近记录和最新自动化产物摘要
 - `/overview/text`：返回适合快捷指令直接显示的纯文本总览
 - `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口
@@ -69,7 +69,7 @@ receiver 已提供：
 现在仓库里已经有一个移动优先前端壳：
 
 - 页面入口：`https://pengweitai.me/app`
-- 页面职责：文本写入、图片上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看、自动化产物浏览
+- 页面职责：文本写入、文件上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看、自动化产物浏览
 - 鉴权方式：浏览器本地保存 key，前端请求统一走 `X-Axiom-Key`
 - PWA 资源：`manifest.webmanifest`、`/sw.js`、应用图标
 
@@ -90,7 +90,7 @@ flowchart TD
     B --> C["gunicorn + Flask receiver"]
 
     C --> D["/add 文本"]
-    C --> E["/upload 图片"]
+    C --> E["/upload 文件"]
     D --> F["data/inbox"]
     E --> F
     D --> G["SQLite items"]

@@ -169,7 +169,7 @@ def print_text_report(report: dict) -> None:
             print(f"  - {path}")
 
     if report["orphan_files"]:
-        print("Inbox txt files without DB records:")
+        print("Storage files without DB records:")
         for path in report["orphan_files"]:
             print(f"  - {path}")
 

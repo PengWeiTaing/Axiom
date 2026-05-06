@@ -343,14 +343,82 @@ def main() -> None:
             assert updated_image_detail["item"]["content"] == updated_image_caption
             assert updated_image_detail["item"]["source"] == "image_edit_test"
 
+            time.sleep(1.1)
+
+            document = assert_status(
+                client.post(
+                    "/upload",
+                    data={
+                        "key": "test-key",
+                        "content": "important project spec",
+                        "source": "document_test",
+                        "file": (io.BytesIO(b"%PDF-1.4 fake pdf bytes"), "Project Spec.pdf"),
+                    },
+                    content_type="multipart/form-data",
+                ),
+                200,
+                "upload document",
+            )
+            assert document["item"]["type"] == "document"
+            assert document["item"]["content"] == "important project spec"
+            assert document["item"]["original_name"] == "Project Spec.pdf"
+            assert document["item"]["mime_type"] == "application/pdf"
+            assert document["item"]["extension"] == "pdf"
+            assert document["item"]["download_name"] == "Project Spec.pdf"
+            assert document["item"]["size_bytes"] == len(b"%PDF-1.4 fake pdf bytes")
+
+            document_file = client.get(
+                f"/file/{document['item']['id']}",
+                headers={"X-Axiom-Key": "test-key"},
+            )
+            if "Project Spec.pdf" not in (document_file.headers.get("Content-Disposition") or ""):
+                raise AssertionError(
+                    f"document file headers unexpected: {document_file.headers!r}"
+                )
+            assert_file_body(document_file, b"%PDF-1.4 fake pdf bytes", "document file")
+
+            time.sleep(1.1)
+
+            audio = assert_status(
+                client.post(
+                    "/upload",
+                    data={
+                        "key": "test-key",
+                        "content": "team sync voice note",
+                        "source": "audio_test",
+                        "file": (io.BytesIO(b"fake m4a bytes"), "meeting-note.m4a"),
+                    },
+                    content_type="multipart/form-data",
+                ),
+                200,
+                "upload audio",
+            )
+            assert audio["item"]["type"] == "audio"
+            assert audio["item"]["content"] == "team sync voice note"
+            assert audio["item"]["original_name"] == "meeting-note.m4a"
+            assert audio["item"]["mime_type"] in {"audio/mp4", "audio/x-m4a"}
+            assert audio["item"]["extension"] == "m4a"
+            assert audio["item"]["download_name"] == "meeting-note.m4a"
+            assert audio["item"]["size_bytes"] == len(b"fake m4a bytes")
+
+            audio_file = client.get(
+                f"/file/{audio['item']['id']}",
+                headers={"X-Axiom-Key": "test-key"},
+            )
+            if "meeting-note.m4a" not in (audio_file.headers.get("Content-Disposition") or ""):
+                raise AssertionError(
+                    f"audio file headers unexpected: {audio_file.headers!r}"
+                )
+            assert_file_body(audio_file, b"fake m4a bytes", "audio file")
+
             recent = assert_status(
                 client.get("/recent", query_string={"key": "test-key", "limit": "100"}),
                 200,
                 "recent",
             )
             assert recent["page_size"] == 50
-            assert recent["total"] == 3
-            assert len(recent["items"]) == 3
+            assert recent["total"] == 5
+            assert len(recent["items"]) == 5
             assert all(item["file_url"].startswith("/file/") for item in recent["items"])
 
             recent_images = assert_status(
@@ -364,6 +432,30 @@ def main() -> None:
             assert recent_images["type"] == "image"
             assert recent_images["total"] == 1
             assert recent_images["items"][0]["type"] == "image"
+
+            recent_documents = assert_status(
+                client.get(
+                    "/recent",
+                    query_string={"key": "test-key", "type": "document"},
+                ),
+                200,
+                "recent document filter",
+            )
+            assert recent_documents["type"] == "document"
+            assert recent_documents["total"] == 1
+            assert recent_documents["items"][0]["type"] == "document"
+
+            recent_audio = assert_status(
+                client.get(
+                    "/recent",
+                    query_string={"key": "test-key", "type": "audio"},
+                ),
+                200,
+                "recent audio filter",
+            )
+            assert recent_audio["type"] == "audio"
+            assert recent_audio["total"] == 1
+            assert recent_audio["items"][0]["type"] == "audio"
 
             recent_archive = assert_status(
                 client.get(
@@ -386,22 +478,22 @@ def main() -> None:
                 "recent inbox filter",
             )
             assert recent_inbox["storage"] == "inbox"
-            assert recent_inbox["total"] == 3
+            assert recent_inbox["total"] == 5
 
             recent_created_from = assert_status(
                 client.get(
                     "/recent",
                     query_string={
                         "key": "test-key",
-                        "created_from": image["item"]["created_at"],
+                        "created_from": audio["item"]["created_at"],
                     },
                 ),
                 200,
                 "recent created_from filter",
             )
-            assert recent_created_from["created_from"] == image["item"]["created_at"]
+            assert recent_created_from["created_from"] == audio["item"]["created_at"]
             assert recent_created_from["total"] == 1
-            assert recent_created_from["items"][0]["id"] == image["item"]["id"]
+            assert recent_created_from["items"][0]["id"] == audio["item"]["id"]
 
             recent_created_to = assert_status(
                 client.get(
@@ -460,6 +552,30 @@ def main() -> None:
             assert image_search["type"] == "image"
             assert image_search["total"] == 1
             assert image_search["items"][0]["type"] == "image"
+
+            document_name_search = assert_status(
+                client.get(
+                    "/search",
+                    query_string={"key": "test-key", "q": "Project Spec", "type": "document"},
+                ),
+                200,
+                "search document original name",
+            )
+            assert document_name_search["type"] == "document"
+            assert document_name_search["total"] == 1
+            assert document_name_search["items"][0]["id"] == document["item"]["id"]
+
+            audio_name_search = assert_status(
+                client.get(
+                    "/search",
+                    query_string={"key": "test-key", "q": "meeting-note", "type": "audio"},
+                ),
+                200,
+                "search audio original name",
+            )
+            assert audio_name_search["type"] == "audio"
+            assert audio_name_search["total"] == 1
+            assert audio_name_search["items"][0]["id"] == audio["item"]["id"]
 
             archive_search = assert_status(
                 client.get(
@@ -545,14 +661,18 @@ def main() -> None:
                 200,
                 "stats",
             )
-            assert stats["total"] == 3
+            assert stats["total"] == 5
             assert stats["by_type"]["text"] == 2
             assert stats["by_type"]["image"] == 1
+            assert stats["by_type"]["document"] == 1
+            assert stats["by_type"]["audio"] == 1
             assert stats["by_source"]["ios_shortcut"] == 1
             assert stats["by_source"]["smoke_test"] == 1
             assert stats["by_source"]["image_edit_test"] == 1
+            assert stats["by_source"]["document_test"] == 1
+            assert stats["by_source"]["audio_test"] == 1
             assert stats["by_storage"].get("archive", 0) == 0
-            assert stats["by_storage"]["inbox"] == 3
+            assert stats["by_storage"]["inbox"] == 5
 
             overview = assert_status(
                 client.get(
@@ -567,11 +687,11 @@ def main() -> None:
                 "overview",
             )
             assert overview["service"] == "axiom-receiver"
-            assert overview["stats"]["total"] == 3
+            assert overview["stats"]["total"] == 5
             assert overview["recent"]["limit"] == 2
             assert len(overview["recent"]["items"]) == 2
-            assert overview["recent"]["items"][0]["id"] == 3
-            assert overview["recent"]["items"][1]["id"] == 2
+            assert overview["recent"]["items"][0]["id"] == audio["item"]["id"]
+            assert overview["recent"]["items"][1]["id"] == document["item"]["id"]
 
             overview_text = client.get(
                 "/overview/text",
@@ -588,9 +708,14 @@ def main() -> None:
             if overview_text.mimetype != "text/plain":
                 raise AssertionError(
                     f"overview text: expected text/plain, got {overview_text.mimetype}"
-                )
+            )
             overview_text_body = overview_text.get_data(as_text=True)
-            if "Axiom 总览" not in overview_text_body or "总条目: 3" not in overview_text_body:
+            if (
+                "Axiom 总览" not in overview_text_body
+                or "总条目: 5" not in overview_text_body
+                or "文档: 1" not in overview_text_body
+                or "音频: 1" not in overview_text_body
+            ):
                 raise AssertionError(f"overview text body unexpected: {overview_text_body}")
 
             automation_jobs = assert_status(
@@ -948,8 +1073,8 @@ def main() -> None:
             all_inbox_files = [
                 path for path in (root / "data" / "inbox").rglob("*") if path.is_file()
             ]
-            if len(all_inbox_files) != 3:
-                raise AssertionError(f"expected 3 inbox files, got {len(all_inbox_files)}")
+            if len(all_inbox_files) != 5:
+                raise AssertionError(f"expected 5 inbox files, got {len(all_inbox_files)}")
 
             archive_files = [
                 path for path in (root / "data" / "archive").rglob("*") if path.is_file()

@@ -78,6 +78,8 @@ def main() -> None:
             updated_note_text = "Playwright smoke note updated"
             updated_note_source = "web_app_smoke_edited"
             image_caption = "playwright smoke image"
+            document_note = "playwright project spec"
+            audio_note = "playwright voice note"
             run_date = current_local_date_iso()
 
             try:
@@ -177,22 +179,66 @@ def main() -> None:
                     assert_text_present(page, updated_note_text, "recent note after edit")
 
                     page.set_input_files(
-                        "#image-input",
+                        "#file-input",
                         {
                             "name": "smoke.png",
                             "mimeType": "image/png",
                             "buffer": PNG_1X1_BYTES,
                         },
                     )
-                    page.fill("#image-caption-input", image_caption)
-                    page.fill("#image-source-input", "web_app_image")
-                    page.get_by_role("button", name="上传图片").click()
+                    page.fill("#file-note-input", image_caption)
+                    page.fill("#file-source-input", "web_app_image")
+                    page.get_by_role("button", name="上传文件").click()
                     assert_text_present(page, "图片已写入 inbox", "image capture feedback")
 
                     page.fill("#search-query-input", image_caption)
                     page.fill("#search-source-input", "web_app_image")
                     page.get_by_role("button", name="开始检索").click()
                     assert_text_present(page, image_caption, "image search result")
+
+                    page.set_input_files(
+                        "#file-input",
+                        {
+                            "name": "Project Spec.pdf",
+                            "mimeType": "application/pdf",
+                            "buffer": b"%PDF-1.4 playwright pdf",
+                        },
+                    )
+                    page.fill("#file-note-input", document_note)
+                    page.fill("#file-source-input", "web_app_document")
+                    page.get_by_role("button", name="上传文件").click()
+                    assert_text_present(page, "文档已写入 inbox", "document capture feedback")
+
+                    page.fill("#search-query-input", "Project Spec")
+                    page.fill("#search-source-input", "web_app_document")
+                    page.get_by_role("button", name="开始检索").click()
+                    assert_text_present(page, document_note, "document search result")
+                    page.locator("#search-results").get_by_role("button", name="查看").first.click()
+                    page.locator("#viewer-meta").get_by_text("Project Spec.pdf").wait_for(timeout=15_000)
+                    page.locator("#viewer-content iframe").wait_for(timeout=15_000)
+                    page.get_by_role("button", name="关闭").click()
+
+                    page.set_input_files(
+                        "#file-input",
+                        {
+                            "name": "meeting-note.m4a",
+                            "mimeType": "audio/mp4",
+                            "buffer": b"fake playwright m4a bytes",
+                        },
+                    )
+                    page.fill("#file-note-input", audio_note)
+                    page.fill("#file-source-input", "web_app_audio")
+                    page.get_by_role("button", name="上传文件").click()
+                    assert_text_present(page, "音频已写入 inbox", "audio capture feedback")
+
+                    page.fill("#search-query-input", "meeting-note")
+                    page.fill("#search-source-input", "web_app_audio")
+                    page.get_by_role("button", name="开始检索").click()
+                    assert_text_present(page, audio_note, "audio search result")
+                    page.locator("#search-results").get_by_role("button", name="查看").first.click()
+                    page.locator("#viewer-meta").get_by_text("meeting-note.m4a").wait_for(timeout=15_000)
+                    page.locator("#viewer-content audio").wait_for(timeout=15_000)
+                    page.get_by_role("button", name="关闭").click()
 
                     page.fill("#automation-date-input", run_date)
                     page.locator("[data-job-id='review_day']").click()

@@ -4,7 +4,7 @@
 
 ## 核心目标
 
-Axiom 是个人“外脑系统”的后端工程。当前已经从最小接收链路推进到 VPS 线上基线：能接收文本和图片，能落盘，能入库，能检索，能归档恢复，能备份，也能生成回顾和 inbox action 留痕。
+Axiom 是个人“外脑系统”的后端工程。当前已经从最小接收链路推进到 VPS 线上基线：能接收文本、图片、文档和音频，能落盘，能入库，能检索，能归档恢复，能备份，也能生成回顾和 inbox action 留痕。
 
 长期方向来自 `deep-research-report.md`，短期执行看 `docs/SHORT_TERM.md`。
 
@@ -161,15 +161,16 @@ logs/
 - 默认根路径是 `/opt/axiom`
 - 可用 `AXIOM_ROOT`、`AXIOM_INBOX_PATH`、`AXIOM_ARCHIVE_PATH`、`AXIOM_DB_PATH`、`AXIOM_SECRET_KEY`、`AXIOM_LOG_PATH` 覆盖配置
 - `/add` 支持 query、form、JSON 读取 `text`
-- `/upload` 支持 `file` 或 `image` 表单字段
-- 文本和图片写入都先落临时文件，再替换为正式文件
+- `/upload` 支持 `file`、`image`、`document` 或 `audio` 表单字段
+- `/upload` 当前支持图片、PDF、Word 和常见音频格式；入库时会补 `original_name`、`mime_type`、`size_bytes`
+- 文本和二进制文件写入都先落临时文件，再替换为正式文件
 - 数据库写入失败时会清理本次已写入文件
 - `/file/<id>` 会限制路径只能在 `AXIOM_ROOT` 下
 - `/item/<id>/update` 支持更新 `content` 和 `source`；文本 item 会同步改写 txt 文件，数据库失败时会尝试回滚文本文件
-- `/recent` 和 `/search` 支持分页、类型、存储区、来源、时间范围过滤
+- `/recent` 和 `/search` 支持分页、类型、存储区、来源、时间范围过滤；`/search` 还会匹配 `original_name`
 - `/overview` 聚合返回 stats、最近 item 和最新 artifact 摘要，适合作为手机端或轻前端总览入口
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
-- `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览
+- `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；当前已补 PDF 预览和音频播放器预览
 - `/automation/jobs` 返回当前允许手动触发的任务清单，当前只开放 review、inbox report 和 dry-run
 - `/automation/runs` 返回自动化运行历史，覆盖手动任务与 systemd 定时任务，包含状态、产物、stdout/stderr 尾部和耗时
 - `/automation/run` 会在 receiver 进程里串行触发白名单脚本，默认不开放 destructive apply
@@ -188,7 +189,7 @@ logs/
 ```mermaid
 flowchart TD
     A["输入端"] --> B["receiver 鉴权"]
-    B --> C["文本 / 图片落盘"]
+    B --> C["文本 / 文件落盘"]
     C --> D["data/inbox"]
     C --> E["SQLite items"]
     E --> F["查询接口"]
@@ -216,7 +217,7 @@ flowchart TD
 
 - 改善读取层和人类阅读体验
 - 让回顾、inbox 处理、action history 更容易浏览
-- 为后续 AI 摘要、分类、图片描述补全准备稳定数据入口
+- 为后续 AI 摘要、分类、图片描述 / 语音处理补全准备稳定数据入口
 
 第三优先级：
 

@@ -50,8 +50,8 @@ const elements = {
     lastSyncIndicator: document.getElementById("last-sync-indicator"),
     textCaptureForm: document.getElementById("text-capture-form"),
     textInput: document.getElementById("text-input"),
-    imageCaptureForm: document.getElementById("image-capture-form"),
-    imageInput: document.getElementById("image-input"),
+    fileCaptureForm: document.getElementById("file-capture-form"),
+    fileInput: document.getElementById("file-input"),
     captureFeedback: document.getElementById("capture-feedback"),
     overviewStats: document.getElementById("overview-stats"),
     overviewRecentHighlights: document.getElementById("overview-recent-highlights"),
@@ -150,7 +150,60 @@ function toUtcIsoFromLocalInput(value) {
 }
 
 function formatType(type) {
-    return type === "image" ? "图片" : "文本";
+    if (type === "image") {
+        return "图片";
+    }
+    if (type === "document") {
+        return "文档";
+    }
+    if (type === "audio") {
+        return "音频";
+    }
+    return "文本";
+}
+
+function formatBytes(sizeBytes) {
+    if (sizeBytes === null || sizeBytes === undefined || Number.isNaN(Number(sizeBytes))) {
+        return "未知";
+    }
+    const size = Number(sizeBytes);
+    if (size < 1024) {
+        return `${size} B`;
+    }
+    if (size < 1024 * 1024) {
+        return `${(size / 1024).toFixed(size >= 10 * 1024 ? 0 : 1)} KB`;
+    }
+    return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function getItemDisplayName(item) {
+    return summarizeText(item?.content, 40) || item?.original_name || `${formatType(item?.type)} #${item?.id}`;
+}
+
+function getItemPreviewText(item, maxChars = 150) {
+    return summarizeText(item?.content, maxChars) || item?.original_name || "没有可显示内容。";
+}
+
+function getItemFileDetail(item) {
+    const originalName = item?.original_name || "";
+    const extension = String(item?.extension || "").toLowerCase();
+    if (item?.type === "document") {
+        if (extension === "pdf") {
+            return "PDF";
+        }
+        if (extension === "doc" || extension === "docx") {
+            return "Word";
+        }
+        return originalName || "文档文件";
+    }
+    if (item?.type === "audio") {
+        return originalName || "音频文件";
+    }
+    return originalName || "";
+}
+
+function isPdfItem(item) {
+    return item?.type === "document" && String(item?.extension || "").toLowerCase() === "pdf";
 }
 
 function formatStorage(storage) {
@@ -374,6 +427,8 @@ function renderOverviewStats(stats) {
         ["总条目", stats.total],
         ["文本", stats.by_type?.text || 0],
         ["图片", stats.by_type?.image || 0],
+        ["文档", stats.by_type?.document || 0],
+        ["音频", stats.by_type?.audio || 0],
         ["Inbox", stats.by_storage?.inbox || 0],
         ["Archive", stats.by_storage?.archive || 0],
     ];
@@ -404,8 +459,8 @@ function renderOverviewRecent(items) {
                         <span class="tag">${escapeHtml(formatType(item.type))}</span>
                         <span>${escapeHtml(formatDateTime(item.created_at))}</span>
                     </div>
-                    <h3>${escapeHtml(summarizeText(item.content, 40) || "未命名记录")}</h3>
-                    <p class="item-preview">${escapeHtml(summarizeText(item.content, 120) || "没有可显示内容。")}</p>
+                    <h3>${escapeHtml(getItemDisplayName(item))}</h3>
+                    <p class="item-preview">${escapeHtml(getItemPreviewText(item, 120))}</p>
                 </article>
             `
         )
@@ -453,7 +508,8 @@ function renderItemCards(container, items, emptyText) {
     container.innerHTML = items
         .map((item) => {
             const actionLabel = buildStorageActionLabel(item);
-            const preview = summarizeText(item.content, 150) || "没有可显示内容。";
+            const preview = getItemPreviewText(item, 150);
+            const fileDetail = getItemFileDetail(item);
             return `
                 <article class="item-card" data-item-id="${escapeHtml(item.id)}">
                     <div class="item-meta">
@@ -461,11 +517,16 @@ function renderItemCards(container, items, emptyText) {
                         <span class="tag">${escapeHtml(formatStorage(item.storage))}</span>
                         <span>${escapeHtml(formatDateTime(item.created_at))}</span>
                     </div>
-                    <h3>${escapeHtml(summarizeText(item.content, 40) || `${formatType(item.type)} #${item.id}`)}</h3>
+                    <h3>${escapeHtml(getItemDisplayName(item))}</h3>
                     ${
                         item.type === "image"
                             ? `<img class="item-image" alt="${escapeHtml(preview)}" data-protected-image="${escapeHtml(item.file_url || "")}">`
                             : `<p class="item-preview">${escapeHtml(preview)}</p>`
+                    }
+                    ${
+                        fileDetail
+                            ? `<p class="helper-text">文件：${escapeHtml(fileDetail)}</p>`
+                            : ""
                     }
                     <p class="helper-text">来源：${escapeHtml(item.source || "unknown")}</p>
                     <div class="card-actions">
@@ -678,7 +739,7 @@ function createInlineError(message) {
 }
 
 function buildItemTitle(item) {
-    return summarizeText(item?.content, 40) || `${formatType(item?.type)} #${item?.id}`;
+    return getItemDisplayName(item);
 }
 
 function buildStorageActionLabel(item) {
@@ -691,16 +752,30 @@ function buildItemMetaRows(item) {
         { label: "类型", value: formatType(item.type) },
         { label: "存储区", value: formatStorage(item.storage) },
         { label: "来源", value: item.source || "unknown" },
+        { label: "原文件名", value: item.original_name || "无" },
+        { label: "格式", value: item.extension ? item.extension.toUpperCase() : null },
+        { label: "MIME", value: item.mime_type || "未知" },
+        { label: "大小", value: item.size_bytes ? formatBytes(item.size_bytes) : null },
         { label: "创建时间", value: formatDateTime(item.created_at) },
         { label: "文件路径", value: item.file_path || "无文件" },
     ];
     if (item.type === "image" && item.content) {
         rows.splice(4, 0, { label: "图片说明", value: item.content });
+    } else if (item.type !== "text" && item.content) {
+        rows.splice(4, 0, { label: "文件说明", value: item.content });
     }
     return rows;
 }
 
 function buildItemViewerActions(item) {
+    let downloadLabel = "下载文件";
+    if (item.type === "image") {
+        downloadLabel = "下载图片";
+    } else if (item.type === "document") {
+        downloadLabel = "下载文档";
+    } else if (item.type === "audio") {
+        downloadLabel = "下载音频";
+    }
     return [
         {
             label: "编辑",
@@ -712,11 +787,11 @@ function buildItemViewerActions(item) {
         },
         item.file_url
             ? {
-                label: item.type === "image" ? "下载图片" : "下载文件",
+                label: downloadLabel,
                 dataset: {
                     action: "download-item-file",
                     itemId: item.id,
-                    downloadName: item.file_path?.split(/[\\/]/).pop() || `item-${item.id}`,
+                    downloadName: item.download_name || `item-${item.id}`,
                 },
             }
             : null,
@@ -862,6 +937,50 @@ async function openViewerWithImage(title, fileUrl, metaRows = [], actions = []) 
     elements.viewerContent.append(image);
 }
 
+async function openViewerWithAudio(title, fileUrl, item, metaRows = [], actions = []) {
+    openViewerShell(title);
+    renderViewerMeta(metaRows);
+    renderViewerActions(actions);
+    const blob = await apiRequest(fileUrl, { responseType: "blob" });
+    const objectUrl = URL.createObjectURL(blob);
+    state.viewerObjectUrl = objectUrl;
+
+    const audio = document.createElement("audio");
+    audio.src = objectUrl;
+    audio.controls = true;
+    audio.preload = "metadata";
+    elements.viewerContent.append(audio);
+
+    if (item?.content) {
+        const description = document.createElement("p");
+        description.className = "item-preview";
+        description.textContent = item.content;
+        elements.viewerContent.append(description);
+    }
+}
+
+async function openViewerWithPdf(title, fileUrl, item, metaRows = [], actions = []) {
+    openViewerShell(title);
+    renderViewerMeta(metaRows);
+    renderViewerActions(actions);
+    const blob = await apiRequest(fileUrl, { responseType: "blob" });
+    const objectUrl = URL.createObjectURL(blob);
+    state.viewerObjectUrl = objectUrl;
+
+    const frame = document.createElement("iframe");
+    frame.src = objectUrl;
+    frame.title = title;
+    frame.className = "viewer-embed";
+    elements.viewerContent.append(frame);
+
+    if (item?.content) {
+        const description = document.createElement("p");
+        description.className = "item-preview";
+        description.textContent = item.content;
+        elements.viewerContent.append(description);
+    }
+}
+
 async function openArtifactViewer(relativePath) {
     const artifact = findArtifactByPath(relativePath);
     const title = artifact ? artifact.name : relativePath;
@@ -976,9 +1095,9 @@ function buildItemEditorForm(item) {
 
     const intro = document.createElement("p");
     intro.className = "helper-text";
-    intro.textContent = item.type === "image"
-        ? "可以补图片说明，也可以修正 source。留空可清空图片说明。"
-        : "文本内容会同时更新数据库和落盘 txt 文件。";
+    intro.textContent = item.type === "text"
+        ? "文本内容会同时更新数据库和落盘 txt 文件。"
+        : "可以补文件说明，也可以修正 source。留空可清空文件说明。";
     form.append(intro);
 
     let previewSlot = null;
@@ -991,14 +1110,14 @@ function buildItemEditorForm(item) {
 
     const contentInput = document.createElement("textarea");
     contentInput.name = "content";
-    contentInput.rows = item.type === "image" ? 4 : 10;
-    contentInput.placeholder = item.type === "image" ? "给图片补一段说明" : "修正文本文字";
+    contentInput.rows = item.type === "text" ? 10 : 4;
+    contentInput.placeholder = item.type === "text" ? "修正文本文字" : "给文件补一段说明";
     contentInput.value = item.content || "";
     form.append(
         createViewerField(
-            item.type === "image" ? "图片说明" : "文本内容",
+            item.type === "text" ? "文本内容" : "文件说明",
             contentInput,
-            item.type === "image" ? "" : "文本内容不能为空。",
+            item.type === "text" ? "文本内容不能为空。" : "",
         ),
     );
 
@@ -1063,11 +1182,17 @@ async function openItemEditor(itemId) {
         },
         item.file_url
             ? {
-                label: item.type === "image" ? "下载图片" : "下载文件",
+                label: item.type === "image"
+                    ? "下载图片"
+                    : item.type === "document"
+                        ? "下载文档"
+                        : item.type === "audio"
+                            ? "下载音频"
+                            : "下载文件",
                 dataset: {
                     action: "download-item-file",
                     itemId: item.id,
-                    downloadName: item.file_path?.split(/[\\/]/).pop() || `item-${item.id}`,
+                    downloadName: item.download_name || `item-${item.id}`,
                 },
             }
             : null,
@@ -1091,9 +1216,19 @@ async function openItemViewer(itemId) {
         return;
     }
 
+    if (item.type === "audio" && item.file_url) {
+        await openViewerWithAudio(title, item.file_url, item, buildItemMetaRows(item), buildItemViewerActions(item));
+        return;
+    }
+
+    if (isPdfItem(item) && item.file_url) {
+        await openViewerWithPdf(title, item.file_url, item, buildItemMetaRows(item), buildItemViewerActions(item));
+        return;
+    }
+
     openViewerWithText(
         title,
-        item.content || "没有内容。",
+        item.content || item.original_name || "该文件暂不支持内嵌预览，请使用下载文件。",
         buildItemMetaRows(item),
         buildItemViewerActions(item),
     );
@@ -1390,14 +1525,14 @@ async function handleTextCaptureSubmit(event) {
     }
 }
 
-async function handleImageCaptureSubmit(event) {
+async function handleFileCaptureSubmit(event) {
     event.preventDefault();
-    const file = elements.imageInput.files?.[0];
-    const sourceInput = document.getElementById("image-source-input");
-    const captionInput = document.getElementById("image-caption-input");
+    const file = elements.fileInput.files?.[0];
+    const sourceInput = document.getElementById("file-source-input");
+    const noteInput = document.getElementById("file-note-input");
 
     if (!file) {
-        setFeedback(elements.captureFeedback, "请先选择图片。", "error");
+        setFeedback(elements.captureFeedback, "请先选择文件。", "error");
         return;
     }
 
@@ -1405,22 +1540,23 @@ async function handleImageCaptureSubmit(event) {
         const formData = new FormData();
         formData.set("file", file);
         formData.set("source", sourceInput.value.trim() || "web_app");
-        formData.set("caption", captionInput.value.trim());
+        formData.set("content", noteInput.value.trim());
 
-        setConnectionState("busy", "正在上传图片");
+        setConnectionState("busy", "正在上传文件");
         const payload = await apiRequest("/upload", {
             method: "POST",
             formData,
         });
 
-        elements.imageCaptureForm.reset();
+        elements.fileCaptureForm.reset();
         sourceInput.value = "web_app";
+        const typeLabel = payload.item?.type_label || formatType(payload.item?.type);
         setFeedback(
             elements.captureFeedback,
-            `图片已写入 inbox，item #${payload.item.id}`,
+            `${typeLabel}已写入 inbox，item #${payload.item.id}`,
             "ok",
         );
-        showToast("图片已上传");
+        showToast(`${typeLabel}已上传`);
         await syncDashboard();
     } catch (error) {
         setConnectionState("error", error.message);
@@ -1695,7 +1831,7 @@ function bindForms() {
     });
 
     elements.textCaptureForm.addEventListener("submit", handleTextCaptureSubmit);
-    elements.imageCaptureForm.addEventListener("submit", handleImageCaptureSubmit);
+    elements.fileCaptureForm.addEventListener("submit", handleFileCaptureSubmit);
     elements.automationRunForm.addEventListener("submit", (event) => {
         event.preventDefault();
     });
