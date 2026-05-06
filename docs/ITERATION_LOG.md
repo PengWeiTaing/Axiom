@@ -325,3 +325,6 @@
 - `/item/<id>` 与 `/app` 文档查看器现在会展示 PDF 的抽取正文；PDF 保留内嵌预览，同时补上可搜索、可阅读的正文层
 - `scripts/smoke_test_receiver.py` 改为上传真实可抽取 PDF，补齐 PDF 正文抽取、详情返回和正文检索覆盖
 - `scripts/smoke_test_web_app.py` 新增 PDF 抽取正文浏览器级断言，确认 `/app` 中可直接看到 PDF 正文预览
+- 已用 `scripts/deploy_to_vps.py` 将这轮“PDF 正文抽取与文档读取层增强”部署到 VPS，当前线上代码更新到 `2e17830`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_101331_2e17830.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常且当前 `total=2`，公网 `/app` 可完成 key 连接并进入 `ready` 状态
