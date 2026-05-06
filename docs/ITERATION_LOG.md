@@ -342,3 +342,6 @@
 - `/app` 的文件上传面板新增音频转写输入框；音频查看器可直接显示转写文本，编辑态可补写或修订转写文本
 - `scripts/smoke_test_receiver.py` 新增音频转写上传、详情读取、更新和转写检索覆盖
 - `scripts/smoke_test_web_app.py` 新增浏览器级音频转写填写、查看、编辑和再次检索覆盖
+- 已用 `scripts/deploy_to_vps.py` 将这轮“音频转写文本链路”部署到 VPS，当前线上代码更新到 `9da488d`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_105540_9da488d.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常且当前 `total=2`；公网 `/app` 可完成 key 连接并进入 `ready` 状态，同时已出现音频转写输入框
