@@ -269,3 +269,32 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮自动化历史筛选与重跑能力部署到 VPS，当前线上代码更新到 `d9d2a38`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260505_111438_d9d2a38.tar.gz`
 - 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常、鉴权 `/automation/jobs` 正常、鉴权 `/automation/runs` 正常，公网 `/app` 已可读到运行历史筛选字段“任务 / 状态”
+
+## 2026-05-06
+
+- `AUTOMATION_JOBS` 扩展出 `manual_enabled`，把“可手动触发的 job”和“仅供定时任务记录的 job”合并到同一套定义
+- 新增 `inbox_action_history_day` 与 `inbox_action_history_week`，用于把动作历史日报 / 周报纳入统一运行历史
+- 新增 `scripts/run_logged_automation.py`，复用 receiver 里的锁、运行记录和 artifact 关联逻辑，供 systemd timer 直接调用
+- `/automation/jobs` 现在返回 `jobs` 与 `history_jobs` 两组任务；前者给手动触发区块，后者给运行历史筛选使用
+- `/automation/runs` 现在不再只记录手动触发；systemd timer 通过 `run_logged_automation.py` 也会把执行结果写入同一张 `automation_runs` 表
+- `/app` 的运行历史任务筛选现在能看到“生成 Inbox 动作历史日报 / 周报”这类定时专用 job
+- `/app` 的“再次运行”入口只对允许手动触发的 job 显示，避免历史里对定时专用 job 误点重跑
+- `deploy/axiom-daily-review.service`
+- `deploy/axiom-weekly-review.service`
+- `deploy/axiom-inbox-processing.service`
+- `deploy/axiom-daily-inbox-action.service`
+- `deploy/axiom-daily-inbox-action-history.service`
+- `deploy/axiom-weekly-inbox-action-history.service`
+  已统一改为调用 `scripts/run_logged_automation.py`
+- `scripts/deploy_to_vps.py` 新增 systemd unit 安装步骤：会把 `deploy/*.service` / `deploy/*.timer` 同步到 `/etc/systemd/system/` 并执行 `systemctl daemon-reload`
+- `scripts/smoke_test_receiver.py` 新增 wrapper 覆盖，验证定时专用 job 可通过 `run_logged_automation.py` 写入 `automation_runs`
+- `scripts/smoke_test_web_app.py` 新增运行历史 job 下拉验证，确认浏览器端能读到“生成 Inbox 动作历史日报”选项
+- 已用 `scripts/deploy_to_vps.py` 将这轮“定时自动化统一写入运行历史”能力部署到 VPS，当前线上代码更新到 `076aa5b`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_034825_076aa5b.tar.gz`
+- 线上基础验证通过：`/health` 正常，鉴权 `/automation/jobs` 正常，鉴权 `/overview` 正常
+- 线上手动触发定时服务演练通过：
+  `axiom-daily-review.service` -> `Result=success`，`ExecMainStatus=0`
+- 线上手动触发定时服务演练通过：
+  `axiom-daily-inbox-action-history.service` -> `Result=success`，`ExecMainStatus=0`
+- 演练后公网 `/automation/runs` 已可读到 2 条真实运行记录：`review_day` 与 `inbox_action_history_day`
+- 演练后公网 `/app` 的运行历史筛选已可读到 `生成 Inbox 动作历史日报` 与 `生成 Inbox 动作历史周报` 两个定时专用选项
