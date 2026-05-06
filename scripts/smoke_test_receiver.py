@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -598,8 +599,11 @@ def main() -> None:
                 "automation jobs",
             )
             job_ids = [job["id"] for job in automation_jobs["jobs"]]
+            history_job_ids = [job["id"] for job in automation_jobs["history_jobs"]]
             assert "review_day" in job_ids
             assert "inbox_action_dry_run" in job_ids
+            assert "inbox_action_history_day" not in job_ids
+            assert "inbox_action_history_day" in history_job_ids
 
             run_date = current_local_date_iso()
 
@@ -892,6 +896,48 @@ def main() -> None:
                 query_string={"key": "test-key"},
             )
             assert_file_body(artifact_file, b"# daily review", "artifact file")
+
+            logged_history_result = subprocess.run(
+                [
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    str(REPO_ROOT / "scripts" / "run_logged_automation.py"),
+                    "--job-id",
+                    "inbox_action_history_day",
+                    "--root",
+                    str(root),
+                    "--date",
+                    run_date,
+                    "--utc-offset",
+                    "+08:00",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            if logged_history_result.returncode != 0:
+                raise AssertionError(
+                    "run_logged_automation failed: "
+                    f"code={logged_history_result.returncode}, "
+                    f"stdout={logged_history_result.stdout!r}, stderr={logged_history_result.stderr!r}"
+                )
+
+            history_run = assert_status(
+                client.get(
+                    "/automation/runs",
+                    query_string={"key": "test-key", "job": "inbox_action_history_day"},
+                ),
+                200,
+                "automation runs scheduled history job",
+            )
+            assert history_run["total"] == 1
+            assert history_run["items"][0]["job_id"] == "inbox_action_history_day"
+            assert history_run["items"][0]["artifact"]["group"] == "inbox-action-history"
+            assert history_run["items"][0]["artifact"]["window"] == "daily"
+            assert history_run["items"][0]["artifact"]["report_date"] == run_date
 
             inbox_text_files = list((root / "data" / "inbox").glob("*.txt"))
             if len(inbox_text_files) != 2:

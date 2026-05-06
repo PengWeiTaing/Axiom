@@ -5,4 +5,4 @@ Description=Axiom weekly inbox action history snapshot
 Type=oneshot
 WorkingDirectory=/opt/axiom
 EnvironmentFile=/opt/axiom/.env
-ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/save_inbox_action_history_snapshot.py --root /opt/axiom --window week --days-offset -1 --utc-offset +08:00 --details --force
+ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/run_logged_automation.py --job-id inbox_action_history_week --root /opt/axiom --days-offset -1 --utc-offset +08:00

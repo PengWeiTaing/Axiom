@@ -60,6 +60,7 @@ AUTOMATION_JOBS = {
         "artifact_window": "daily",
         "artifact_mode": None,
         "build_args": lambda run_date: ["--window", "day", "--date", run_date, "--force"],
+        "manual_enabled": True,
     },
     "review_week": {
         "label": "生成本周回顾",
@@ -69,6 +70,7 @@ AUTOMATION_JOBS = {
         "artifact_window": "weekly",
         "artifact_mode": None,
         "build_args": lambda run_date: ["--window", "week", "--date", run_date, "--force"],
+        "manual_enabled": True,
     },
     "inbox_report": {
         "label": "生成 Inbox 报告",
@@ -78,6 +80,7 @@ AUTOMATION_JOBS = {
         "artifact_window": None,
         "artifact_mode": None,
         "build_args": lambda run_date: ["--date", run_date, "--force"],
+        "manual_enabled": True,
     },
     "inbox_action_dry_run": {
         "label": "生成 Inbox 动作预演",
@@ -87,6 +90,27 @@ AUTOMATION_JOBS = {
         "artifact_window": None,
         "artifact_mode": "dry-run",
         "build_args": lambda run_date: ["--date", run_date],
+        "manual_enabled": True,
+    },
+    "inbox_action_history_day": {
+        "label": "生成 Inbox 动作历史日报",
+        "description": "基于已有 action snapshot 生成当日动作历史汇总。",
+        "script_name": "save_inbox_action_history_snapshot.py",
+        "artifact_group": "inbox-action-history",
+        "artifact_window": "daily",
+        "artifact_mode": None,
+        "build_args": lambda run_date: ["--window", "day", "--date", run_date, "--details", "--force"],
+        "manual_enabled": False,
+    },
+    "inbox_action_history_week": {
+        "label": "生成 Inbox 动作历史周报",
+        "description": "基于已有 action snapshot 生成最近 7 天动作历史汇总。",
+        "script_name": "save_inbox_action_history_snapshot.py",
+        "artifact_group": "inbox-action-history",
+        "artifact_window": "weekly",
+        "artifact_mode": None,
+        "build_args": lambda run_date: ["--window", "week", "--date", run_date, "--details", "--force"],
+        "manual_enabled": False,
     },
 }
 
@@ -359,9 +383,22 @@ def parse_utc_offset_value(offset_text: str) -> timezone:
     return timezone(delta)
 
 
+def resolve_run_date_value(
+    run_date: str | None,
+    *,
+    days_offset: int = 0,
+    utc_offset_text: str = LOCAL_UTC_OFFSET,
+) -> str:
+    if run_date:
+        anchor_date = parse_date_filter(run_date, "date")
+    else:
+        local_tz = parse_utc_offset_value(utc_offset_text)
+        anchor_date = datetime.now(local_tz).date()
+    return (anchor_date + timedelta(days=days_offset)).isoformat()
+
+
 def current_local_date_iso() -> str:
-    local_tz = parse_utc_offset_value(LOCAL_UTC_OFFSET)
-    return datetime.now(local_tz).date().isoformat()
+    return resolve_run_date_value(None)
 
 
 def parse_datetime_filter(
@@ -477,9 +514,7 @@ def read_recent_limit(default: int = 10) -> int:
 
 def read_optional_run_date(body: dict) -> str:
     run_date = str(body.get("date") or "").strip()
-    if not run_date:
-        return current_local_date_iso()
-    return parse_date_filter(run_date, "date").isoformat()
+    return resolve_run_date_value(run_date or None)
 
 
 def read_automation_job_filter() -> str | None:
@@ -879,6 +914,7 @@ def row_to_automation_run(row: sqlite3.Row, preview_chars: int = 240) -> dict:
         "id": row["id"],
         "job_id": row["job_id"],
         "job_label": job["label"] if job else row["job_id"],
+        "manual_enabled": job.get("manual_enabled", False) if job else False,
         "run_date": row["run_date"],
         "status": row["status"],
         "return_code": row["return_code"],
@@ -1404,6 +1440,13 @@ def build_artifact_latest_summary(artifacts: list[dict], preview_chars: int) -> 
     }
 
 
+def iter_automation_job_items(*, manual_only: bool = False):
+    for job_id, job in AUTOMATION_JOBS.items():
+        if manual_only and not job.get("manual_enabled", True):
+            continue
+        yield job_id, job
+
+
 def build_automation_job_payload(job_id: str, job: dict) -> dict:
     return {
         "id": job_id,
@@ -1412,6 +1455,7 @@ def build_automation_job_payload(job_id: str, job: dict) -> dict:
         "artifact_group": job["artifact_group"],
         "artifact_window": job["artifact_window"],
         "artifact_mode": job["artifact_mode"],
+        "manual_enabled": job.get("manual_enabled", True),
         "destructive": False,
         "default_date": current_local_date_iso(),
     }
@@ -1505,6 +1549,180 @@ def run_automation_job(job_id: str, run_date: str) -> subprocess.CompletedProces
         errors="replace",
         timeout=AUTOMATION_TIMEOUT_SECONDS,
         check=False,
+    )
+
+
+def execute_logged_automation_job(job_id: str, run_date: str) -> tuple[dict, int]:
+    job_payload = build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id])
+
+    if not acquire_automation_lock(job_id, run_date):
+        return (
+            {
+                "ok": False,
+                "error": {
+                    "code": "automation_busy",
+                    "message": "当前已有自动化任务在运行，请稍后重试",
+                },
+                "job": job_payload,
+                "date": run_date,
+            },
+            409,
+        )
+
+    started_at_dt = utc_now()
+    started_at = started_at_dt.isoformat(timespec="seconds")
+    try:
+        run_id = create_automation_run(job_id, run_date, started_at)
+    except sqlite3.Error:
+        release_automation_lock()
+        logger.exception("failed to create automation run record: job=%s date=%s", job_id, run_date)
+        return (
+            {
+                "ok": False,
+                "error": {
+                    "code": "database_write_failed",
+                    "message": "数据库写入失败",
+                },
+                "job": job_payload,
+                "date": run_date,
+            },
+            500,
+        )
+
+    try:
+        result = run_automation_job(job_id, run_date)
+    except subprocess.TimeoutExpired as exc:
+        finished_at_dt = utc_now()
+        finished_at = finished_at_dt.isoformat(timespec="seconds")
+        duration_ms = max(0, int((finished_at_dt - started_at_dt).total_seconds() * 1000))
+        stdout_tail = tail_output_lines(exc.stdout or "")
+        stderr_tail = tail_output_lines(exc.stderr or "")
+        message = derive_automation_message("timeout", stdout_tail, stderr_tail)
+        finalize_automation_run(
+            run_id,
+            status="timeout",
+            return_code=None,
+            message=message,
+            artifact_path=None,
+            stdout_tail=stdout_tail,
+            stderr_tail=stderr_tail,
+            finished_at=finished_at,
+            duration_ms=duration_ms,
+        )
+        logger.exception("automation job timed out: job=%s date=%s", job_id, run_date)
+        run_row = get_automation_run_by_id(run_id)
+        return (
+            {
+                "ok": False,
+                "error": {
+                    "code": "automation_timeout",
+                    "message": "自动化任务执行超时",
+                },
+                "job": job_payload,
+                "date": run_date,
+                "stdout_tail": stdout_tail,
+                "stderr_tail": stderr_tail,
+                "run": row_to_automation_run(run_row) if run_row else None,
+            },
+            504,
+        )
+    except Exception as exc:
+        finished_at_dt = utc_now()
+        finished_at = finished_at_dt.isoformat(timespec="seconds")
+        duration_ms = max(0, int((finished_at_dt - started_at_dt).total_seconds() * 1000))
+        message = str(exc).strip() or "自动化任务执行失败"
+        finalize_automation_run(
+            run_id,
+            status="failed",
+            return_code=None,
+            message=message,
+            artifact_path=None,
+            stdout_tail=[],
+            stderr_tail=[message],
+            finished_at=finished_at,
+            duration_ms=duration_ms,
+        )
+        logger.exception("automation job crashed: job=%s date=%s", job_id, run_date)
+        run_row = get_automation_run_by_id(run_id)
+        return (
+            {
+                "ok": False,
+                "error": {
+                    "code": "automation_failed",
+                    "message": message,
+                },
+                "job": job_payload,
+                "date": run_date,
+                "stdout_tail": [],
+                "stderr_tail": [message],
+                "run": row_to_automation_run(run_row) if run_row else None,
+            },
+            500,
+        )
+    finally:
+        release_automation_lock()
+
+    stdout_tail = tail_output_lines(result.stdout)
+    stderr_tail = tail_output_lines(result.stderr)
+    artifact = select_latest_artifact_for_job(job_id, run_date, preview_chars=240)
+    artifact_path = artifact["relative_path"] if artifact else None
+    status = "success" if result.returncode == 0 else "failed"
+    message = derive_automation_message(status, stdout_tail, stderr_tail)
+    finished_at_dt = utc_now()
+    finished_at = finished_at_dt.isoformat(timespec="seconds")
+    duration_ms = max(0, int((finished_at_dt - started_at_dt).total_seconds() * 1000))
+    finalize_automation_run(
+        run_id,
+        status=status,
+        return_code=result.returncode,
+        message=message,
+        artifact_path=artifact_path,
+        stdout_tail=stdout_tail,
+        stderr_tail=stderr_tail,
+        finished_at=finished_at,
+        duration_ms=duration_ms,
+    )
+    run_row = get_automation_run_by_id(run_id)
+
+    if result.returncode != 0:
+        logger.warning(
+            "automation job failed: job=%s date=%s code=%s stderr=%s",
+            job_id,
+            run_date,
+            result.returncode,
+            "\n".join(stderr_tail),
+        )
+        return (
+            {
+                "ok": False,
+                "error": {
+                    "code": "automation_failed",
+                    "message": message,
+                },
+                "job": job_payload,
+                "date": run_date,
+                "return_code": result.returncode,
+                "stdout_tail": stdout_tail,
+                "stderr_tail": stderr_tail,
+                "run": row_to_automation_run(run_row) if run_row else None,
+            },
+            500,
+        )
+
+    logger.info("automation job completed: job=%s date=%s", job_id, run_date)
+    return (
+        {
+            "ok": True,
+            "message": "completed",
+            "job": job_payload,
+            "date": run_date,
+            "return_code": result.returncode,
+            "stdout_tail": stdout_tail,
+            "stderr_tail": stderr_tail,
+            "artifact": artifact,
+            "run": row_to_automation_run(run_row) if run_row else None,
+        },
+        200,
     )
 
 
@@ -1707,8 +1925,9 @@ def list_automation_jobs():
     if auth_error:
         return auth_error
 
-    jobs = [build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id]) for job_id in AUTOMATION_JOBS]
-    return ok_response({"jobs": jobs})
+    jobs = [build_automation_job_payload(job_id, job) for job_id, job in iter_automation_job_items(manual_only=True)]
+    history_jobs = [build_automation_job_payload(job_id, job) for job_id, job in iter_automation_job_items()]
+    return ok_response({"jobs": jobs, "history_jobs": history_jobs})
 
 
 @app.route("/automation/runs", methods=["GET"])
@@ -1760,167 +1979,15 @@ def run_automation():
         return error_response(400, "missing_job", "job 不能为空")
     if job_id not in AUTOMATION_JOBS:
         return error_response(400, "invalid_job", "job 不存在")
+    if not AUTOMATION_JOBS[job_id].get("manual_enabled", True):
+        return error_response(400, "manual_job_disabled", "job 不支持手动触发")
 
     try:
         run_date = read_optional_run_date(body)
     except ValueError as exc:
         return error_response(400, "invalid_run_date", str(exc))
-
-    if not acquire_automation_lock(job_id, run_date):
-        return error_response(409, "automation_busy", "当前已有自动化任务在运行，请稍后重试")
-
-    started_at_dt = utc_now()
-    started_at = started_at_dt.isoformat(timespec="seconds")
-    try:
-        run_id = create_automation_run(job_id, run_date, started_at)
-    except sqlite3.Error:
-        release_automation_lock()
-        logger.exception("failed to create automation run record: job=%s date=%s", job_id, run_date)
-        return error_response(500, "database_write_failed", "数据库写入失败")
-
-    try:
-        result = run_automation_job(job_id, run_date)
-    except subprocess.TimeoutExpired as exc:
-        finished_at_dt = utc_now()
-        finished_at = finished_at_dt.isoformat(timespec="seconds")
-        duration_ms = max(0, int((finished_at_dt - started_at_dt).total_seconds() * 1000))
-        stdout_tail = tail_output_lines(exc.stdout or "")
-        stderr_tail = tail_output_lines(exc.stderr or "")
-        message = derive_automation_message("timeout", stdout_tail, stderr_tail)
-        finalize_automation_run(
-            run_id,
-            status="timeout",
-            return_code=None,
-            message=message,
-            artifact_path=None,
-            stdout_tail=stdout_tail,
-            stderr_tail=stderr_tail,
-            finished_at=finished_at,
-            duration_ms=duration_ms,
-        )
-        logger.exception("automation job timed out: job=%s date=%s", job_id, run_date)
-        run_row = get_automation_run_by_id(run_id)
-        return (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": {
-                        "code": "automation_timeout",
-                        "message": "自动化任务执行超时",
-                    },
-                    "job": build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id]),
-                    "date": run_date,
-                    "stdout_tail": stdout_tail,
-                    "stderr_tail": stderr_tail,
-                    "run": row_to_automation_run(run_row) if run_row else None,
-                }
-            ),
-            504,
-        )
-    except Exception as exc:
-        finished_at_dt = utc_now()
-        finished_at = finished_at_dt.isoformat(timespec="seconds")
-        duration_ms = max(0, int((finished_at_dt - started_at_dt).total_seconds() * 1000))
-        message = str(exc).strip() or "自动化任务执行失败"
-        finalize_automation_run(
-            run_id,
-            status="failed",
-            return_code=None,
-            message=message,
-            artifact_path=None,
-            stdout_tail=[],
-            stderr_tail=[message],
-            finished_at=finished_at,
-            duration_ms=duration_ms,
-        )
-        logger.exception("automation job crashed: job=%s date=%s", job_id, run_date)
-        run_row = get_automation_run_by_id(run_id)
-        return (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": {
-                        "code": "automation_failed",
-                        "message": message,
-                    },
-                    "job": build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id]),
-                    "date": run_date,
-                    "stdout_tail": [],
-                    "stderr_tail": [message],
-                    "run": row_to_automation_run(run_row) if run_row else None,
-                }
-            ),
-            500,
-        )
-    finally:
-        release_automation_lock()
-
-    stdout_tail = tail_output_lines(result.stdout)
-    stderr_tail = tail_output_lines(result.stderr)
-    status = "success" if result.returncode == 0 else "failed"
-    message = derive_automation_message(status, stdout_tail, stderr_tail)
-    artifact = (
-        select_latest_artifact_for_job(job_id, run_date, preview_chars=240)
-        if status == "success"
-        else None
-    )
-    artifact_path = artifact["relative_path"] if artifact else None
-    finished_at_dt = utc_now()
-    finished_at = finished_at_dt.isoformat(timespec="seconds")
-    duration_ms = max(0, int((finished_at_dt - started_at_dt).total_seconds() * 1000))
-    finalize_automation_run(
-        run_id,
-        status=status,
-        return_code=result.returncode,
-        message=message,
-        artifact_path=artifact_path,
-        stdout_tail=stdout_tail,
-        stderr_tail=stderr_tail,
-        finished_at=finished_at,
-        duration_ms=duration_ms,
-    )
-    run_row = get_automation_run_by_id(run_id)
-
-    if result.returncode != 0:
-        logger.warning(
-            "automation job failed: job=%s date=%s code=%s stderr=%s",
-            job_id,
-            run_date,
-            result.returncode,
-            " | ".join(stderr_tail),
-        )
-        return (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": {
-                        "code": "automation_failed",
-                        "message": message,
-                    },
-                    "job": build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id]),
-                    "date": run_date,
-                    "return_code": result.returncode,
-                    "stdout_tail": stdout_tail,
-                    "stderr_tail": stderr_tail,
-                    "run": row_to_automation_run(run_row) if run_row else None,
-                }
-            ),
-            500,
-        )
-
-    logger.info("automation job completed: job=%s date=%s", job_id, run_date)
-    return ok_response(
-        {
-            "message": "completed",
-            "job": build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id]),
-            "date": run_date,
-            "return_code": result.returncode,
-            "stdout_tail": stdout_tail,
-            "stderr_tail": stderr_tail,
-            "artifact": artifact,
-            "run": row_to_automation_run(run_row) if run_row else None,
-        }
-    )
+    payload, status = execute_logged_automation_job(job_id, run_date)
+    return jsonify(payload), status
 
 
 @app.route("/item/<int:item_id>/update", methods=["POST"])

@@ -28,6 +28,7 @@ const state = {
     },
     automation: {
         jobs: [],
+        historyJobs: [],
         jobsLoaded: false,
         runs: [],
         runsPage: 1,
@@ -615,7 +616,11 @@ function renderAutomationRuns(runs, emptyText = "还没有自动化运行记录�
                     </div>
                     <div class="card-actions">
                         <button class="secondary-button" type="button" data-action="view-automation-run" data-run-id="${escapeHtml(run.id)}">查看记录</button>
-                        <button class="text-button" type="button" data-action="rerun-automation-run" data-run-id="${escapeHtml(run.id)}">再次运行</button>
+                        ${
+                            run.manual_enabled
+                                ? `<button class="text-button" type="button" data-action="rerun-automation-run" data-run-id="${escapeHtml(run.id)}">再次运行</button>`
+                                : ""
+                        }
                         ${
                             run.artifact?.relative_path
                                 ? `<button class="text-button" type="button" data-action="view-artifact" data-artifact-path="${escapeHtml(run.artifact.relative_path)}">查看产物</button>`
@@ -921,14 +926,16 @@ async function openAutomationRunViewer(runId) {
             { label: "产物路径", value: run.artifact?.relative_path || "无" },
         ],
         [
-            {
-                label: "再次运行",
-                className: "primary-button",
-                dataset: {
-                    action: "rerun-automation-run",
-                    runId: run.id,
-                },
-            },
+            run.manual_enabled
+                ? {
+                    label: "再次运行",
+                    className: "primary-button",
+                    dataset: {
+                        action: "rerun-automation-run",
+                        runId: run.id,
+                    },
+                }
+                : null,
             run.artifact?.relative_path
                 ? {
                     label: "查看产物",
@@ -1280,13 +1287,14 @@ async function loadAutomationJobs({ force = false } = {}) {
 
     const payload = await apiRequest("/automation/jobs");
     state.automation.jobs = payload.jobs || [];
+    state.automation.historyJobs = payload.history_jobs || payload.jobs || [];
     state.automation.jobsLoaded = true;
 
     if (!elements.automationDateInput.value && state.automation.jobs[0]?.default_date) {
         elements.automationDateInput.value = state.automation.jobs[0].default_date;
     }
 
-    renderAutomationRunJobOptions(state.automation.jobs);
+    renderAutomationRunJobOptions(state.automation.historyJobs);
     renderAutomationJobs(state.automation.jobs);
 }
 
@@ -1555,6 +1563,10 @@ async function handleAutomationRunRerun(runId, button) {
         showToast("当前运行记录未加载，请先刷新运行记录");
         return;
     }
+    if (!run.manual_enabled) {
+        showToast("这个任务只支持定时执行，不能在 Web 里手动重跑");
+        return;
+    }
 
     elements.automationDateInput.value = run.run_date;
     await handleAutomationRun(run.job_id, button, { runDate: run.run_date });
@@ -1650,7 +1662,7 @@ function bindForms() {
         state.recent = { page: 1, totalPages: 1, items: [], total: 0 };
         state.search = { page: 1, totalPages: 1, items: [], active: false, total: 0 };
         state.artifacts = { page: 1, totalPages: 1, items: [] };
-        state.automation = { jobs: [], jobsLoaded: false, runs: [], runsPage: 1, runsTotalPages: 1, runsTotal: 0 };
+        state.automation = { jobs: [], historyJobs: [], jobsLoaded: false, runs: [], runsPage: 1, runsTotalPages: 1, runsTotal: 0 };
         elements.automationDateInput.value = "";
         elements.automationRunsFilterForm.reset();
         renderAutomationRunJobOptions([]);

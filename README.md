@@ -46,7 +46,7 @@ receiver 已提供：
 - `/overview/text`：返回适合快捷指令直接显示的纯文本总览
 - `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口
 - `/automation/jobs`：返回当前允许手动触发的安全自动化任务
-- `/automation/runs`：读取手动自动化的最近运行记录、状态、产物和输出尾部
+- `/automation/runs`：读取自动化运行历史，覆盖手动触发和定时任务，并返回状态、产物和输出尾部
 - `/automation/run`：手动生成 review / inbox report / dry-run artifact
 - `/artifacts`：列出 `data/reviews` 下的自动化产物
 - `/artifacts/summary`：直接读取各类自动化产物的最新摘要
@@ -132,7 +132,8 @@ flowchart TD
 - `scripts/check_consistency.py`：检查文件系统和 SQLite 索引是否一致
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
 - `scripts/smoke_test_web_app.py`：Web App 浏览器级冒烟测试
-- `scripts/deploy_to_vps.py`：从本地当前 commit 生成发布包、备份 VPS 代码、上传、同步、重启并验证
+- `scripts/deploy_to_vps.py`：从本地当前 commit 生成发布包、备份 VPS 代码、同步代码和 systemd unit、重启并验证
+- `scripts/run_logged_automation.py`：统一执行并记录自动化任务，供 systemd timer 复用
 - `scripts/build_review_markdown.py`：生成日 / 周回顾 Markdown
 - `scripts/save_review_snapshot.py`：保存日 / 周回顾快照
 - `scripts/build_inbox_processing_report.py`：生成 inbox 处理建议
@@ -188,6 +189,7 @@ python scripts\deploy_to_vps.py
 - 先在 VPS 上生成代码备份
 - 把快照上传到 `/tmp`
 - 用 `rsync --delete` 同步到 `/opt/axiom`，同时保留 `.env`、`.venv`、`db/`、`data/`、`backup/`、`logs/`
+- 把 `deploy/*.service` 和 `deploy/*.timer` 安装到 `/etc/systemd/system/` 并执行 `systemctl daemon-reload`
 - 在 VPS 上执行 `pip install -r requirements.txt`
 - 重启 `axiom-receiver`
 - 跑 `curl http://127.0.0.1:5000/health`

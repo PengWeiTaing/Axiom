@@ -5,4 +5,4 @@ Description=Axiom daily review snapshot
 Type=oneshot
 WorkingDirectory=/opt/axiom
 EnvironmentFile=/opt/axiom/.env
-ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/save_review_snapshot.py --root /opt/axiom --window day --days-offset -1 --utc-offset +08:00 --force
+ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/run_logged_automation.py --job-id review_day --root /opt/axiom --days-offset -1 --utc-offset +08:00

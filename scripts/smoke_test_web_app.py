@@ -100,6 +100,16 @@ def main() -> None:
                     )
                     assert_text_present(page, "总条目", "overview stats")
 
+                    automation_filter_options = [
+                        option.inner_text().strip()
+                        for option in page.locator("#automation-runs-job-input option").all()
+                    ]
+                    if "生成 Inbox 动作历史日报" not in automation_filter_options:
+                        raise AssertionError(
+                            "automation run filter missing scheduled history option: "
+                            f"{automation_filter_options!r}"
+                        )
+
                     has_service_worker = page.evaluate(
                         """
                         async () => {

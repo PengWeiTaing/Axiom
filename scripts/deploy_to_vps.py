@@ -142,6 +142,16 @@ def sync_remote_release(host: str, remote_release_dir: str, root: str) -> None:
 set -euo pipefail
 command -v rsync >/dev/null 2>&1
 rsync -a --delete --exclude='.env' {exclude_flags} {quote(remote_release_dir)}/ {quote(root)}/
+    """
+    run_remote_script(host, script)
+
+
+def sync_remote_systemd_units(host: str, root: str) -> None:
+    script = f"""
+set -euo pipefail
+install -m 0644 {quote(root)}/deploy/axiom-*.service /etc/systemd/system/
+install -m 0644 {quote(root)}/deploy/axiom-*.timer /etc/systemd/system/
+systemctl daemon-reload
 """
     run_remote_script(host, script)
 
@@ -218,6 +228,7 @@ def main() -> None:
         try:
             extract_remote_archive(plan.host, remote_archive_path, remote_release_dir)
             sync_remote_release(plan.host, remote_release_dir, plan.root)
+            sync_remote_systemd_units(plan.host, plan.root)
             install_requirements_and_restart(plan.host, plan.root, plan.service)
             validate_remote_runtime(plan.host, plan.root)
         finally:
