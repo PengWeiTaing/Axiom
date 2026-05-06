@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 
 
 DEFAULT_DEPLOY_ROOT = "/opt/axiom"
-ITEM_TYPES = {"text", "image"}
+ITEM_TYPES = {"text", "image", "document", "audio"}
 STORAGE_TYPES = {"inbox", "archive"}
 
 
@@ -155,7 +155,18 @@ def read_rows(args: argparse.Namespace, root: Path) -> list[sqlite3.Row]:
     try:
         rows = conn.execute(
             f"""
-            SELECT id, type, content, file_path, source, created_at
+            SELECT
+                id,
+                type,
+                content,
+                file_path,
+                source,
+                created_at,
+                original_name,
+                mime_type,
+                size_bytes,
+                derived_text,
+                transcript_text
             FROM items
             {where_clause}
             ORDER BY {order_clause}
@@ -174,6 +185,59 @@ def format_multiline_block(text: str) -> list[str]:
         return ["", "_空_"]
 
     return [""] + [line for line in text.splitlines()]
+
+
+def read_row_text(row: sqlite3.Row, key: str) -> str:
+    if key not in row.keys():
+        return ""
+    value = row[key]
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def describe_primary_text_source(row: sqlite3.Row) -> str:
+    item_type = read_row_text(row, "type")
+    content = read_row_text(row, "content")
+    original_name = read_row_text(row, "original_name")
+    derived_text = read_row_text(row, "derived_text")
+    transcript_text = read_row_text(row, "transcript_text")
+
+    if item_type == "document" and derived_text and (not content or content == original_name):
+        return "derived_text"
+    if item_type == "audio" and transcript_text and (not content or content == original_name):
+        return "transcript_text"
+    if content:
+        return "content"
+    if derived_text:
+        return "derived_text"
+    if transcript_text:
+        return "transcript_text"
+    if original_name:
+        return "original_name"
+    return "empty"
+
+
+def pick_primary_text(row: sqlite3.Row) -> str:
+    source = describe_primary_text_source(row)
+    if source == "content":
+        return read_row_text(row, "content")
+    if source == "derived_text":
+        return read_row_text(row, "derived_text")
+    if source == "transcript_text":
+        return read_row_text(row, "transcript_text")
+    if source == "original_name":
+        return read_row_text(row, "original_name")
+    return ""
+
+
+def summarize_inline_text(text: str, limit: int = 120) -> str:
+    cleaned = " ".join(text.strip().split())
+    if not cleaned:
+        return ""
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[: limit - 3] + "..."
 
 
 def build_markdown(args: argparse.Namespace, root: Path, rows: list[sqlite3.Row]) -> str:
@@ -215,8 +279,14 @@ def build_markdown(args: argparse.Namespace, root: Path, rows: list[sqlite3.Row]
     for index, row in enumerate(rows, start=1):
         resolved_path = resolve_file_path(root, row["file_path"], args.deploy_root)
         storage = detect_storage(root, resolved_path) or "unknown"
-        file_size = resolved_path.stat().st_size if resolved_path and resolved_path.exists() else None
-        content = row["content"] or ""
+        file_size = row["size_bytes"] if "size_bytes" in row.keys() else None
+        if file_size is None and resolved_path and resolved_path.exists():
+            file_size = resolved_path.stat().st_size
+        content = read_row_text(row, "content")
+        derived_text = read_row_text(row, "derived_text")
+        transcript_text = read_row_text(row, "transcript_text")
+        original_name = read_row_text(row, "original_name")
+        mime_type = read_row_text(row, "mime_type")
 
         lines.extend(
             [
@@ -226,12 +296,21 @@ def build_markdown(args: argparse.Namespace, root: Path, rows: list[sqlite3.Row]
                 f"- type: {row['type']}",
                 f"- source: {row['source'] or 'None'}",
                 f"- storage: {storage}",
+                f"- text_source: {describe_primary_text_source(row)}",
+                f"- original_name: {original_name or 'None'}",
+                f"- mime_type: {mime_type or 'None'}",
                 f"- file_path: {row['file_path'] or 'None'}",
                 f"- file_size_bytes: {file_size if file_size is not None else 'None'}",
                 "- content:",
             ]
         )
         lines.extend(format_multiline_block(content))
+        if derived_text:
+            lines.append("- derived_text:")
+            lines.extend(format_multiline_block(derived_text))
+        if transcript_text:
+            lines.append("- transcript_text:")
+            lines.extend(format_multiline_block(transcript_text))
         lines.append("")
 
     return "\n".join(lines) + "\n"

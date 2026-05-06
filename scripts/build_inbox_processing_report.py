@@ -123,9 +123,10 @@ def build_processing_items(args: argparse.Namespace, rows: list) -> list[Process
     for row in rows:
         local_created = review_tools.to_local_datetime(row["created_at"], local_tz)
         age_days = (report_date - local_created.date()).days
+        effective_text = export_tools.pick_primary_text(row)
         action, reasons = decide_action(
             row["type"] or "unknown",
-            row["content"] or "",
+            effective_text,
             age_days,
             args.stale_days,
         )
@@ -145,7 +146,7 @@ def build_processing_items(args: argparse.Namespace, rows: list) -> list[Process
                 created_at=row["created_at"],
                 local_created_at=local_created.isoformat(),
                 age_days=age_days,
-                content_preview=preview_content(row["content"] or ""),
+                content_preview=preview_content(effective_text),
                 file_path=row["file_path"] or "None",
                 file_size_bytes=file_size,
                 action=action,

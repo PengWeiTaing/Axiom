@@ -345,3 +345,7 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“音频转写文本链路”部署到 VPS，当前线上代码更新到 `9da488d`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_105540_9da488d.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常且当前 `total=2`；公网 `/app` 可完成 key 连接并进入 `ready` 状态，同时已出现音频转写输入框
+- `scripts/export_items_markdown.py` 现在支持 `document` 与 `audio`，导出时会同时带上 `original_name`、`mime_type`、`text_source`、`derived_text` 和 `transcript_text`
+- `scripts/build_review_markdown.py` 现在会把文档正文与音频转写摘要写进日 / 周回顾底稿，不再只看原始 `content`
+- `scripts/build_inbox_processing_report.py` 现在会复用统一文本选择逻辑；对 document / audio 条目，正文或转写存在时不会再被简单当成“空内容”
+- `scripts/smoke_test_receiver.py` 新增导出脚本与 review 底稿覆盖，验证 PDF 正文和音频转写都能进入 Markdown 输出

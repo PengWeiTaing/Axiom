@@ -166,17 +166,24 @@ def build_markdown(
             )
             storage = export_tools.detect_storage(args.root, resolved_path) or "unknown"
             file_size = resolved_path.stat().st_size if resolved_path and resolved_path.exists() else None
-            content = (row["content"] or "").strip() or "_空_"
+            content = export_tools.pick_primary_text(row) or "_空_"
+            derived_preview = export_tools.summarize_inline_text(export_tools.read_row_text(row, "derived_text"))
+            transcript_preview = export_tools.summarize_inline_text(export_tools.read_row_text(row, "transcript_text"))
 
             lines.extend(
                 [
                     f"{index}. `[item {row['id']}]` `{local_created_at.strftime('%H:%M:%S')}` `{row['type']}` `{storage}` `{row['source'] or 'None'}`",
+                    f"   text_source: {export_tools.describe_primary_text_source(row)}",
                     f"   content: {content}",
                     f"   file_path: {row['file_path'] or 'None'}",
                     f"   file_size_bytes: {file_size if file_size is not None else 'None'}",
-                    "",
                 ]
             )
+            if derived_preview:
+                lines.append(f"   derived_text: {derived_preview}")
+            if transcript_preview:
+                lines.append(f"   transcript_text: {transcript_preview}")
+            lines.append("")
 
     lines.extend(
         [

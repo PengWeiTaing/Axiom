@@ -836,6 +836,80 @@ def main() -> None:
             assert audio_transcript_search["total"] == 1
             assert audio_transcript_search["items"][0]["id"] == audio["item"]["id"]
 
+            export_document_result = subprocess.run(
+                [
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    str(REPO_ROOT / "scripts" / "export_items_markdown.py"),
+                    "--root",
+                    str(root),
+                    "--type",
+                    "document",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            if export_document_result.returncode != 0:
+                raise AssertionError(
+                    "export document markdown failed: "
+                    + (export_document_result.stderr or export_document_result.stdout)
+                )
+            assert "derived_text:" in export_document_result.stdout
+            assert "Axiom pdf summary line" in export_document_result.stdout
+
+            export_audio_result = subprocess.run(
+                [
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    str(REPO_ROOT / "scripts" / "export_items_markdown.py"),
+                    "--root",
+                    str(root),
+                    "--type",
+                    "audio",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            if export_audio_result.returncode != 0:
+                raise AssertionError(
+                    "export audio markdown failed: "
+                    + (export_audio_result.stderr or export_audio_result.stdout)
+                )
+            assert "transcript_text:" in export_audio_result.stdout
+            assert "updated audio transcript" in export_audio_result.stdout
+
+            review_result = subprocess.run(
+                [
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    str(REPO_ROOT / "scripts" / "build_review_markdown.py"),
+                    "--root",
+                    str(root),
+                    "--date",
+                    current_local_date_iso(),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            if review_result.returncode != 0:
+                raise AssertionError(
+                    "build review markdown failed: " + (review_result.stderr or review_result.stdout)
+                )
+            assert "derived_text: Axiom pdf summary line" in review_result.stdout
+            assert "transcript_text: updated audio transcript" in review_result.stdout
+
             archive_search = assert_status(
                 client.get(
                     "/search",
