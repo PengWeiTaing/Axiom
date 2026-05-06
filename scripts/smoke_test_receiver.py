@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -37,6 +38,44 @@ def assert_file_body(response, expected_bytes: bytes, label: str) -> None:
 
 def current_local_date_iso() -> str:
     return datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+
+
+def build_docx_bytes(*paragraphs: str) -> bytes:
+    buffer = io.BytesIO()
+    document_body = "".join(
+        f"<w:p><w:r><w:t>{paragraph}</w:t></w:r></w:p>"
+        for paragraph in paragraphs
+    )
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{document_body}</w:body>"
+        "</w:document>"
+    )
+    content_types_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        "</Types>"
+    )
+    rels_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="word/document.xml"/>'
+        "</Relationships>"
+    )
+
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types_xml)
+        archive.writestr("_rels/.rels", rels_xml)
+        archive.writestr("word/document.xml", document_xml)
+
+    return buffer.getvalue()
 
 
 def main() -> None:
@@ -345,14 +384,17 @@ def main() -> None:
 
             time.sleep(1.1)
 
+            docx_bytes = build_docx_bytes(
+                "Axiom project plan",
+                "Document body line for extracted search",
+            )
             document = assert_status(
                 client.post(
                     "/upload",
                     data={
                         "key": "test-key",
-                        "content": "important project spec",
                         "source": "document_test",
-                        "file": (io.BytesIO(b"%PDF-1.4 fake pdf bytes"), "Project Spec.pdf"),
+                        "file": (io.BytesIO(docx_bytes), "Weekly Plan.docx"),
                     },
                     content_type="multipart/form-data",
                 ),
@@ -360,22 +402,42 @@ def main() -> None:
                 "upload document",
             )
             assert document["item"]["type"] == "document"
-            assert document["item"]["content"] == "important project spec"
-            assert document["item"]["original_name"] == "Project Spec.pdf"
-            assert document["item"]["mime_type"] == "application/pdf"
-            assert document["item"]["extension"] == "pdf"
-            assert document["item"]["download_name"] == "Project Spec.pdf"
-            assert document["item"]["size_bytes"] == len(b"%PDF-1.4 fake pdf bytes")
+            assert document["item"]["content"] == "Weekly Plan.docx"
+            assert document["item"]["original_name"] == "Weekly Plan.docx"
+            assert document["item"]["mime_type"] == (
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+            assert document["item"]["extension"] == "docx"
+            assert document["item"]["download_name"] == "Weekly Plan.docx"
+            assert document["item"]["size_bytes"] == len(docx_bytes)
+            assert document["item"]["derived_text_available"] is True
+            assert "Document body line for extracted search" in (
+                document["item"]["derived_text_preview"] or ""
+            )
 
             document_file = client.get(
                 f"/file/{document['item']['id']}",
                 headers={"X-Axiom-Key": "test-key"},
             )
-            if "Project Spec.pdf" not in (document_file.headers.get("Content-Disposition") or ""):
+            if "Weekly Plan.docx" not in (document_file.headers.get("Content-Disposition") or ""):
                 raise AssertionError(
                     f"document file headers unexpected: {document_file.headers!r}"
                 )
-            assert_file_body(document_file, b"%PDF-1.4 fake pdf bytes", "document file")
+            assert_file_body(document_file, docx_bytes, "document file")
+
+            document_detail = assert_status(
+                client.get(
+                    f"/item/{document['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "document detail",
+            )
+            assert document_detail["item"]["derived_text_available"] is True
+            assert (
+                "Document body line for extracted search"
+                in (document_detail["item"].get("derived_text") or "")
+            )
 
             time.sleep(1.1)
 
@@ -444,6 +506,7 @@ def main() -> None:
             assert recent_documents["type"] == "document"
             assert recent_documents["total"] == 1
             assert recent_documents["items"][0]["type"] == "document"
+            assert recent_documents["items"][0]["derived_text_available"] is True
 
             recent_audio = assert_status(
                 client.get(
@@ -530,9 +593,10 @@ def main() -> None:
                 200,
                 "search",
             )
-            assert search["total"] == 1
+            assert search["total"] == 2
             assert search["items"][0]["score"] > 0
             assert search["items"][0]["file_url"].startswith("/file/")
+            assert search["items"][0]["id"] == first["item"]["id"]
 
             literal_search = assert_status(
                 client.get("/search", query_string={"key": "test-key", "q": "100%"}),
@@ -556,7 +620,7 @@ def main() -> None:
             document_name_search = assert_status(
                 client.get(
                     "/search",
-                    query_string={"key": "test-key", "q": "Project Spec", "type": "document"},
+                    query_string={"key": "test-key", "q": "Weekly Plan", "type": "document"},
                 ),
                 200,
                 "search document original name",
@@ -564,6 +628,23 @@ def main() -> None:
             assert document_name_search["type"] == "document"
             assert document_name_search["total"] == 1
             assert document_name_search["items"][0]["id"] == document["item"]["id"]
+            assert document_name_search["items"][0]["derived_text_available"] is True
+
+            document_text_search = assert_status(
+                client.get(
+                    "/search",
+                    query_string={
+                        "key": "test-key",
+                        "q": "extracted search",
+                        "type": "document",
+                    },
+                ),
+                200,
+                "search document extracted text",
+            )
+            assert document_text_search["type"] == "document"
+            assert document_text_search["total"] == 1
+            assert document_text_search["items"][0]["id"] == document["item"]["id"]
 
             audio_name_search = assert_status(
                 client.get(

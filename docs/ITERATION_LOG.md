@@ -309,3 +309,10 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“文档 / 音频数据入口”能力部署到 VPS，当前线上代码更新到 `4c0a564`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_044010_4c0a564.tar.gz`
 - 线上只读验证通过：`/health` 正常、鉴权 `/overview` 正常，公网 `/app` 已出现“文件上传”和 `document / audio` 类型筛选
+- `items` 表新增 `derived_text` 字段，并在启动时自动补齐旧库缺失列
+- `.docx` 上传现在会自动抽取正文写入 `derived_text`，文档即使没有手写说明也能保留可检索文本
+- `/search` 现在会同时匹配 `content`、`original_name` 和文档 `derived_text`
+- `/item/<id>` 会返回 `derived_text_available`、`derived_text_preview`，详情接口会附带完整 `derived_text`
+- `/app` 的文档读取层补上了 Word 正文预览；列表卡片在说明为空或等于原文件名时，会优先显示抽取正文预览
+- `scripts/smoke_test_receiver.py` 新增真实 `.docx` 构造、正文抽取、抽取文本检索和详情返回覆盖
+- `scripts/smoke_test_web_app.py` 重写为基于 `id` / `data-action` 的浏览器级冒烟，并新增 `.docx` 上传、抽取文本检索和正文查看覆盖

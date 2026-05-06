@@ -8,10 +8,12 @@ import os
 import sqlite3
 import subprocess
 import sys
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 from uuid import uuid4
+from xml.etree import ElementTree as ET
 
 from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
@@ -79,7 +81,7 @@ MIME_TYPE_EXTENSION_MAP = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
-ITEM_SELECT_FIELDS = """
+ITEM_BASE_SELECT_FIELDS = """
     id,
     type,
     content,
@@ -90,11 +92,23 @@ ITEM_SELECT_FIELDS = """
     mime_type,
     size_bytes
 """
+ITEM_LIST_SELECT_FIELDS = f"""
+    {ITEM_BASE_SELECT_FIELDS},
+    CASE
+        WHEN COALESCE(TRIM(derived_text), '') != '' THEN SUBSTR(derived_text, 1, 600)
+        ELSE NULL
+    END AS derived_text_preview
+"""
+ITEM_DETAIL_SELECT_FIELDS = f"""
+    {ITEM_LIST_SELECT_FIELDS},
+    derived_text
+"""
 REVIEWS_PATH = Path(os.environ.get("AXIOM_REVIEWS_PATH", AXIOM_ROOT / "data" / "reviews")).resolve()
 ARTIFACT_GROUPS = {"review", "inbox", "inbox-actions", "inbox-action-history"}
 ARTIFACT_WINDOWS = {"daily", "weekly"}
 ARTIFACT_MODES = {"dry-run", "apply"}
 AUTOMATION_RUN_STATUSES = {"running", "success", "failed", "timeout"}
+DOCX_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 AUTOMATION_JOBS = {
     "review_day": {
         "label": "生成今日日回顾",
@@ -206,6 +220,7 @@ def ensure_items_table_columns(conn: sqlite3.Connection) -> None:
         "original_name": "TEXT",
         "mime_type": "TEXT",
         "size_bytes": "INTEGER",
+        "derived_text": "TEXT",
     }
     for column_name, column_type in required_columns.items():
         if column_name in existing_columns:
@@ -230,7 +245,8 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 created_at TEXT NOT NULL,
                 original_name TEXT,
                 mime_type TEXT,
-                size_bytes INTEGER
+                size_bytes INTEGER,
+                derived_text TEXT
             )
             """
         )
@@ -741,8 +757,12 @@ def build_item_payload(
     original_name: str | None = None,
     mime_type: str | None = None,
     size_bytes: int | None = None,
+    derived_text_preview: str | None = None,
+    derived_text: str | None = None,
 ) -> dict:
     extension = get_file_extension(original_name or file_path)
+    normalized_preview = normalize_extracted_text(derived_text_preview)
+    normalized_derived_text = normalize_extracted_text(derived_text)
     item = {
         "id": item_id,
         "type": item_type,
@@ -758,11 +778,16 @@ def build_item_payload(
         "mime_type": mime_type,
         "size_bytes": size_bytes,
         "extension": extension.lstrip(".") if extension else None,
+        "derived_text_available": bool(normalized_preview or normalized_derived_text),
+        "derived_text_preview": normalized_preview or normalized_derived_text,
     }
+    if derived_text is not None:
+        item["derived_text"] = normalized_derived_text
     return item
 
 
 def row_to_item(row: sqlite3.Row, include_score: bool = False) -> dict:
+    row_keys = set(row.keys())
     item = build_item_payload(
         row["id"],
         row["type"],
@@ -773,6 +798,8 @@ def row_to_item(row: sqlite3.Row, include_score: bool = False) -> dict:
         row["original_name"] if "original_name" in row.keys() else None,
         row["mime_type"] if "mime_type" in row.keys() else None,
         row["size_bytes"] if "size_bytes" in row.keys() else None,
+        row["derived_text_preview"] if "derived_text_preview" in row_keys else None,
+        row["derived_text"] if "derived_text" in row_keys else None,
     )
     if include_score and "score" in row.keys():
         item["score"] = row["score"]
@@ -859,6 +886,55 @@ def parse_uploaded_file(uploaded_file) -> dict:
     }
 
 
+def normalize_extracted_text(text: str | None) -> str | None:
+    if not text:
+        return None
+
+    paragraphs = [part.strip() for part in str(text).replace("\r", "\n").split("\n") if part.strip()]
+    if not paragraphs:
+        return None
+    return "\n\n".join(paragraphs)
+
+
+def extract_docx_text(file_path: Path) -> str | None:
+    with zipfile.ZipFile(file_path) as archive:
+        with archive.open("word/document.xml") as document_xml:
+            root = ET.parse(document_xml).getroot()
+
+    paragraphs: list[str] = []
+    for paragraph in root.findall(".//w:p", DOCX_NAMESPACE):
+        parts = [
+            node.text
+            for node in paragraph.findall(".//w:t", DOCX_NAMESPACE)
+            if node.text
+        ]
+        text = "".join(parts).strip()
+        if text:
+            paragraphs.append(text)
+
+    if paragraphs:
+        return normalize_extracted_text("\n\n".join(paragraphs))
+
+    parts = [
+        node.text
+        for node in root.findall(".//w:t", DOCX_NAMESPACE)
+        if node.text
+    ]
+    return normalize_extracted_text("\n".join(parts))
+
+
+def extract_document_text(file_path: Path, original_name: str | None) -> str | None:
+    extension = get_file_extension(original_name or file_path)
+    if extension != ".docx":
+        return None
+
+    try:
+        return extract_docx_text(file_path)
+    except (KeyError, OSError, ET.ParseError, zipfile.BadZipFile):
+        logger.warning("failed to extract docx text: file=%s", file_path.name, exc_info=True)
+        return None
+
+
 def build_archive_file_path(now: datetime, file_path: Path) -> Path:
     archive_dir = ARCHIVE_PATH / now.strftime("%Y%m")
     return build_unique_file_path(archive_dir, file_path.name)
@@ -907,6 +983,7 @@ def insert_item(
     original_name: str | None = None,
     mime_type: str | None = None,
     size_bytes: int | None = None,
+    derived_text: str | None = None,
 ) -> int:
     conn = get_db_connection()
     try:
@@ -920,9 +997,10 @@ def insert_item(
                 created_at,
                 original_name,
                 mime_type,
-                size_bytes
+                size_bytes,
+                derived_text
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 item_type,
@@ -933,6 +1011,7 @@ def insert_item(
                 original_name,
                 mime_type,
                 size_bytes,
+                derived_text,
             ),
         )
         conn.commit()
@@ -950,7 +1029,7 @@ def get_item_by_id(item_id: int) -> sqlite3.Row | None:
     try:
         return conn.execute(
             f"""
-            SELECT {ITEM_SELECT_FIELDS}
+            SELECT {ITEM_DETAIL_SELECT_FIELDS}
             FROM items
             WHERE id = ?
             """,
@@ -1273,7 +1352,7 @@ def fetch_recent_item_rows(limit: int) -> list[sqlite3.Row]:
     try:
         return conn.execute(
             f"""
-            SELECT {ITEM_SELECT_FIELDS}
+            SELECT {ITEM_LIST_SELECT_FIELDS}
             FROM items
             ORDER BY id DESC
             LIMIT ?
@@ -2092,6 +2171,9 @@ def upload_file():
         return error_response(500, "file_write_failed", "文件写入失败")
 
     size_bytes = file_path.stat().st_size
+    derived_text = None
+    if item_type == ITEM_TYPE_DOCUMENT:
+        derived_text = extract_document_text(file_path, original_name)
 
     try:
         item_id = insert_item(
@@ -2103,6 +2185,7 @@ def upload_file():
             original_name=original_name,
             mime_type=mime_type,
             size_bytes=size_bytes,
+            derived_text=derived_text,
         )
     except sqlite3.Error:
         cleanup_file(file_path)
@@ -2124,6 +2207,7 @@ def upload_file():
                 original_name,
                 mime_type,
                 size_bytes,
+                derived_text=derived_text,
             ),
             "type_label": type_label,
         }
@@ -2592,7 +2676,7 @@ def recent_items():
         ).fetchone()["total"]
         rows = conn.execute(
             f"""
-            SELECT {ITEM_SELECT_FIELDS}
+            SELECT {ITEM_LIST_SELECT_FIELDS}
             FROM items
             {where_clause}
             ORDER BY {order_clause}
@@ -2687,17 +2771,18 @@ def search_items():
             WHERE (
                 COALESCE(content, '') LIKE ? ESCAPE '\\'
                 OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
+                OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
             )
             {filter_clause}
             """,
-            (fuzzy_match, fuzzy_match, *filter_params),
+            (fuzzy_match, fuzzy_match, fuzzy_match, *filter_params),
         ).fetchone()["total"]
 
         if sort == "relevance":
             rows = conn.execute(
                 f"""
                 SELECT
-                    {ITEM_SELECT_FIELDS},
+                    {ITEM_LIST_SELECT_FIELDS},
                     (
                         CASE
                             WHEN COALESCE(content, '') = ? THEN 100
@@ -2714,8 +2799,15 @@ def search_items():
                         END
                         +
                         CASE
-                            WHEN LENGTH(COALESCE(content, original_name, '')) <= 20 THEN 8
-                            WHEN LENGTH(COALESCE(content, original_name, '')) <= 50 THEN 4
+                            WHEN COALESCE(derived_text, '') = ? THEN 70
+                            WHEN COALESCE(derived_text, '') LIKE ? ESCAPE '\\' THEN 35
+                            WHEN COALESCE(derived_text, '') LIKE ? ESCAPE '\\' THEN 15
+                            ELSE 0
+                        END
+                        +
+                        CASE
+                            WHEN LENGTH(COALESCE(content, original_name, derived_text, '')) <= 20 THEN 8
+                            WHEN LENGTH(COALESCE(content, original_name, derived_text, '')) <= 50 THEN 4
                             ELSE 0
                         END
                     ) AS score
@@ -2723,6 +2815,7 @@ def search_items():
                 WHERE (
                     COALESCE(content, '') LIKE ? ESCAPE '\\'
                     OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
+                    OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
                 )
                 {filter_clause}
                 ORDER BY {order_clause}
@@ -2735,6 +2828,10 @@ def search_items():
                     exact_match,
                     prefix_match,
                     fuzzy_match,
+                    exact_match,
+                    prefix_match,
+                    fuzzy_match,
+                    fuzzy_match,
                     fuzzy_match,
                     fuzzy_match,
                     *filter_params,
@@ -2745,17 +2842,18 @@ def search_items():
         else:
             rows = conn.execute(
                 f"""
-                SELECT {ITEM_SELECT_FIELDS}
+                SELECT {ITEM_LIST_SELECT_FIELDS}
                 FROM items
                 WHERE (
                     COALESCE(content, '') LIKE ? ESCAPE '\\'
                     OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
+                    OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
                 )
                 {filter_clause}
                 ORDER BY {order_clause}
                 LIMIT ? OFFSET ?
                 """,
-                (fuzzy_match, fuzzy_match, *filter_params, page_size, offset),
+                (fuzzy_match, fuzzy_match, fuzzy_match, *filter_params, page_size, offset),
             ).fetchall()
     finally:
         conn.close()

@@ -581,6 +581,28 @@ body::before {
     background: #ffffff;
 }
 
+.viewer-text-section {
+    margin-top: 16px;
+    display: grid;
+    gap: 10px;
+}
+
+.viewer-text-section h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+}
+
+.viewer-text-block {
+    margin: 0;
+    padding: 12px 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(20, 33, 30, 0.08);
+}
+
 .toast {
     position: fixed;
     left: 50%;

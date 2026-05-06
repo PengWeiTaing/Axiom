@@ -176,6 +176,16 @@ function formatBytes(sizeBytes) {
     return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 }
 
+function getDocumentAwarePreviewText(item, maxChars = 150) {
+    const primary = summarizeText(item?.content, maxChars);
+    const derived = summarizeText(item?.derived_text_preview, maxChars);
+    const originalName = String(item?.original_name || "").trim();
+    if (item?.type === "document" && (!primary || primary === originalName)) {
+        return derived || originalName || "no preview";
+    }
+    return primary || derived || originalName || "no preview";
+}
+
 function getItemDisplayName(item) {
     return summarizeText(item?.content, 40) || item?.original_name || `${formatType(item?.type)} #${item?.id}`;
 }
@@ -460,7 +470,7 @@ function renderOverviewRecent(items) {
                         <span>${escapeHtml(formatDateTime(item.created_at))}</span>
                     </div>
                     <h3>${escapeHtml(getItemDisplayName(item))}</h3>
-                    <p class="item-preview">${escapeHtml(getItemPreviewText(item, 120))}</p>
+                    <p class="item-preview">${escapeHtml(getDocumentAwarePreviewText(item, 120))}</p>
                 </article>
             `
         )
@@ -508,7 +518,7 @@ function renderItemCards(container, items, emptyText) {
     container.innerHTML = items
         .map((item) => {
             const actionLabel = buildStorageActionLabel(item);
-            const preview = getItemPreviewText(item, 150);
+            const preview = getDocumentAwarePreviewText(item, 150);
             const fileDetail = getItemFileDetail(item);
             return `
                 <article class="item-card" data-item-id="${escapeHtml(item.id)}">
@@ -759,6 +769,12 @@ function buildItemMetaRows(item) {
         { label: "创建时间", value: formatDateTime(item.created_at) },
         { label: "文件路径", value: item.file_path || "无文件" },
     ];
+    if (item.type === "document") {
+        rows.splice(8, 0, {
+            label: "姝ｆ枃鎶藉彇",
+            value: item.derived_text_available ? "宸叉彁鍙?" : "鏆傛湭鎻愬彇",
+        });
+    }
     if (item.type === "image" && item.content) {
         rows.splice(4, 0, { label: "图片说明", value: item.content });
     } else if (item.type !== "text" && item.content) {
@@ -924,6 +940,27 @@ function openViewerWithText(title, content, metaRows = [], actions = []) {
     elements.viewerContent.textContent = content;
 }
 
+function appendViewerTextSection(heading, text) {
+    const normalizedText = String(text || "").trim();
+    if (!normalizedText) {
+        return;
+    }
+
+    const section = document.createElement("section");
+    section.className = "viewer-text-section";
+
+    const title = document.createElement("h3");
+    title.textContent = heading;
+    section.append(title);
+
+    const body = document.createElement("pre");
+    body.className = "viewer-text-block";
+    body.textContent = normalizedText;
+    section.append(body);
+
+    elements.viewerContent.append(section);
+}
+
 async function openViewerWithImage(title, fileUrl, metaRows = [], actions = []) {
     openViewerShell(title);
     renderViewerMeta(metaRows);
@@ -978,6 +1015,9 @@ async function openViewerWithPdf(title, fileUrl, item, metaRows = [], actions = 
         description.className = "item-preview";
         description.textContent = item.content;
         elements.viewerContent.append(description);
+    }
+    if (item?.derived_text) {
+        appendViewerTextSection("PDF 鎻愬彇鏂囨湰", item.derived_text);
     }
 }
 
@@ -1223,6 +1263,28 @@ async function openItemViewer(itemId) {
 
     if (isPdfItem(item) && item.file_url) {
         await openViewerWithPdf(title, item.file_url, item, buildItemMetaRows(item), buildItemViewerActions(item));
+        return;
+    }
+
+    if (item.type === "document") {
+        const sections = [];
+        const contentText = String(item.content || "").trim();
+        const originalName = String(item.original_name || "").trim();
+        const derivedText = String(item.derived_text || "").trim();
+
+        if (contentText && contentText !== originalName) {
+            sections.push("????", contentText);
+        }
+        if (derivedText) {
+            sections.push("????", derivedText);
+        }
+
+        openViewerWithText(
+            title,
+            sections.length ? sections.join("\n\n") : (contentText || originalName || "document preview unavailable, use download"),
+            buildItemMetaRows(item),
+            buildItemViewerActions(item),
+        );
         return;
     }
 

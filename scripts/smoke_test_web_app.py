@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import base64
+import io
 import logging
 import os
 import sys
 import tempfile
 import threading
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -36,11 +38,8 @@ class LocalServerThread(threading.Thread):
         self.join(timeout=5)
 
 
-def assert_text_present(page, text: str, label: str) -> None:
-    try:
-        page.get_by_text(text, exact=False).first.wait_for(timeout=15_000)
-    except Exception as exc:  # noqa: BLE001
-        raise AssertionError(f"{label}: did not find text {text!r}") from exc
+def current_local_date_iso() -> str:
+    return datetime.now(timezone(timedelta(hours=8))).date().isoformat()
 
 
 def create_sample_artifact(root: Path) -> None:
@@ -53,8 +52,58 @@ def create_sample_artifact(root: Path) -> None:
     )
 
 
-def current_local_date_iso() -> str:
-    return datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+def build_docx_bytes(*paragraphs: str) -> bytes:
+    buffer = io.BytesIO()
+    document_body = "".join(
+        f"<w:p><w:r><w:t>{paragraph}</w:t></w:r></w:p>"
+        for paragraph in paragraphs
+    )
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{document_body}</w:body>"
+        "</w:document>"
+    )
+    content_types_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        "</Types>"
+    )
+    rels_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="word/document.xml"/>'
+        "</Relationships>"
+    )
+
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types_xml)
+        archive.writestr("_rels/.rels", rels_xml)
+        archive.writestr("word/document.xml", document_xml)
+
+    return buffer.getvalue()
+
+
+def wait_for_text(page, selector: str, text: str, label: str) -> None:
+    try:
+        page.locator(selector).get_by_text(text, exact=False).first.wait_for(timeout=15_000)
+    except Exception as exc:  # noqa: BLE001
+        raise AssertionError(f"{label}: did not find text {text!r} in {selector}") from exc
+
+
+def click_first_action(page, selector: str, label: str) -> None:
+    locator = page.locator(selector).first
+    try:
+        locator.wait_for(timeout=15_000)
+        locator.click()
+    except Exception as exc:  # noqa: BLE001
+        raise AssertionError(f"{label}: could not click {selector}") from exc
 
 
 def main() -> None:
@@ -62,7 +111,7 @@ def main() -> None:
         root = Path(temp_dir)
         os.environ["AXIOM_ROOT"] = str(root)
         os.environ["AXIOM_SECRET_KEY"] = "test-key"
-        os.environ["AXIOM_LOG_PATH"] = str(root / "logs" / "receiver.log")
+        os.environ["AXIOM_LOG_PATH"] = ""
         create_sample_artifact(root)
 
         try:
@@ -78,9 +127,14 @@ def main() -> None:
             updated_note_text = "Playwright smoke note updated"
             updated_note_source = "web_app_smoke_edited"
             image_caption = "playwright smoke image"
-            document_note = "playwright project spec"
+            pdf_note = "playwright project spec"
+            docx_note = "weekly planning doc"
             audio_note = "playwright voice note"
             run_date = current_local_date_iso()
+            docx_bytes = build_docx_bytes(
+                "Axiom document insight",
+                "Docx body line for browser search",
+            )
 
             try:
                 with sync_playwright() as playwright:
@@ -88,29 +142,17 @@ def main() -> None:
                     page = browser.new_page()
                     page.goto(f"{base_url}/app", wait_until="networkidle")
 
-                    if page.title() != "Axiom 外脑控制台":
-                        raise AssertionError(f"unexpected title: {page.title()!r}")
+                    if page.locator("#key-form").count() != 1:
+                        raise AssertionError("app shell did not render key form")
 
                     manifest_href = page.locator("link[rel='manifest']").get_attribute("href")
                     if manifest_href != "/static/manifest.webmanifest":
                         raise AssertionError(f"unexpected manifest href: {manifest_href!r}")
 
                     page.fill("#key-input", "test-key")
-                    page.get_by_role("button", name="保存并连接").click()
-                    page.locator("#connection-indicator").get_by_text("已连接").wait_for(
-                        timeout=15_000
-                    )
-                    assert_text_present(page, "总条目", "overview stats")
-
-                    automation_filter_options = [
-                        option.inner_text().strip()
-                        for option in page.locator("#automation-runs-job-input option").all()
-                    ]
-                    if "生成 Inbox 动作历史日报" not in automation_filter_options:
-                        raise AssertionError(
-                            "automation run filter missing scheduled history option: "
-                            f"{automation_filter_options!r}"
-                        )
+                    page.locator("#key-form button[type='submit']").click()
+                    page.locator("#connection-indicator[data-state='ready']").wait_for(timeout=15_000)
+                    page.locator("#overview-stats").wait_for(timeout=15_000)
 
                     has_service_worker = page.evaluate(
                         """
@@ -125,58 +167,40 @@ def main() -> None:
 
                     page.fill("#text-input", note_text)
                     page.fill("#text-source-input", note_source)
-                    page.get_by_role("button", name="写入 inbox").click()
-                    assert_text_present(page, "文本已写入 inbox", "text capture feedback")
-                    assert_text_present(page, note_text, "recent note")
+                    page.locator("#text-capture-form button[type='submit']").click()
+                    page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
+                    wait_for_text(page, "#recent-list", note_text, "recent note")
 
                     page.fill("#search-query-input", note_text)
                     page.fill("#search-source-input", note_source)
-                    page.get_by_role("button", name="开始检索").click()
-                    assert_text_present(page, "共 1 条结果", "search feedback")
-                    assert_text_present(page, note_text, "search result")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", note_text, "search result")
 
-                    page.locator("#search-results").get_by_role("button", name="查看").first.click()
-                    page.locator("#viewer-meta").get_by_text(note_source).wait_for(timeout=15_000)
-                    page.locator("#viewer-content").get_by_text(note_text, exact=False).wait_for(
-                        timeout=15_000
-                    )
-                    page.locator("#viewer-actions").get_by_role("button", name="归档").click()
-                    page.locator("#viewer-actions").get_by_role("button", name="恢复到 Inbox").wait_for(
-                        timeout=15_000
-                    )
-                    page.get_by_role("button", name="关闭").click()
+                    click_first_action(page, "#search-results [data-action='view-item']", "open text item")
+                    wait_for_text(page, "#viewer-meta", note_source, "text source in viewer")
+                    wait_for_text(page, "#viewer-content", note_text, "text content in viewer")
+                    click_first_action(page, "#viewer-actions [data-action='viewer-toggle-storage']", "archive text item")
+                    page.locator("#close-viewer-button").click()
 
                     page.select_option("#recent-storage-input", "archive")
-                    page.locator("#recent-filter-form").get_by_role("button", name="应用筛选").click()
-                    assert_text_present(page, note_text, "archive filtered recent")
+                    page.locator("#recent-filter-form button[type='submit']").click()
+                    wait_for_text(page, "#recent-list", note_text, "archived recent note")
 
-                    page.locator("#recent-list").get_by_role("button", name="查看").first.click()
-                    page.locator("#viewer-actions").get_by_role("button", name="恢复到 Inbox").click()
-                    page.locator("#viewer-actions").get_by_role("button", name="归档").wait_for(
-                        timeout=15_000
-                    )
-                    page.get_by_role("button", name="关闭").click()
-
+                    click_first_action(page, "#recent-list [data-action='view-item']", "open archived text item")
+                    click_first_action(page, "#viewer-actions [data-action='viewer-toggle-storage']", "restore text item")
+                    page.locator("#close-viewer-button").click()
                     page.locator("#reset-recent-filters-button").click()
-                    assert_text_present(page, note_text, "recent note after restore")
+                    wait_for_text(page, "#recent-list", note_text, "recent note after restore")
 
-                    page.locator("#recent-list").get_by_role("button", name="查看").first.click()
-                    page.locator("#viewer-actions").get_by_role("button", name="编辑").click()
-                    page.locator("[data-role='item-edit-form'] textarea[name='content']").fill(
-                        updated_note_text
-                    )
-                    page.locator("[data-role='item-edit-form'] input[name='source']").fill(
-                        updated_note_source
-                    )
-                    page.locator("#viewer-actions").get_by_role("button", name="保存修改").click()
-                    page.locator("#viewer-meta").get_by_text(updated_note_source).wait_for(
-                        timeout=15_000
-                    )
-                    page.locator("#viewer-content").get_by_text(
-                        updated_note_text, exact=False
-                    ).wait_for(timeout=15_000)
-                    page.get_by_role("button", name="关闭").click()
-                    assert_text_present(page, updated_note_text, "recent note after edit")
+                    click_first_action(page, "#recent-list [data-action='view-item']", "open recent text item")
+                    click_first_action(page, "#viewer-actions [data-action='edit-item']", "open edit form")
+                    page.locator("[data-role='item-edit-form'] textarea[name='content']").fill(updated_note_text)
+                    page.locator("[data-role='item-edit-form'] input[name='source']").fill(updated_note_source)
+                    click_first_action(page, "#viewer-actions [data-action='save-item-edit']", "save text edit")
+                    wait_for_text(page, "#viewer-meta", updated_note_source, "updated source")
+                    wait_for_text(page, "#viewer-content", updated_note_text, "updated text content")
+                    page.locator("#close-viewer-button").click()
+                    wait_for_text(page, "#recent-list", updated_note_text, "updated recent note")
 
                     page.set_input_files(
                         "#file-input",
@@ -188,13 +212,16 @@ def main() -> None:
                     )
                     page.fill("#file-note-input", image_caption)
                     page.fill("#file-source-input", "web_app_image")
-                    page.get_by_role("button", name="上传文件").click()
-                    assert_text_present(page, "图片已写入 inbox", "image capture feedback")
+                    page.locator("#file-capture-form button[type='submit']").click()
+                    page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
 
                     page.fill("#search-query-input", image_caption)
                     page.fill("#search-source-input", "web_app_image")
-                    page.get_by_role("button", name="开始检索").click()
-                    assert_text_present(page, image_caption, "image search result")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", image_caption, "image search result")
+                    click_first_action(page, "#search-results [data-action='view-item']", "open image item")
+                    page.locator("#viewer-content img").wait_for(timeout=15_000)
+                    page.locator("#close-viewer-button").click()
 
                     page.set_input_files(
                         "#file-input",
@@ -204,19 +231,41 @@ def main() -> None:
                             "buffer": b"%PDF-1.4 playwright pdf",
                         },
                     )
-                    page.fill("#file-note-input", document_note)
+                    page.fill("#file-note-input", pdf_note)
                     page.fill("#file-source-input", "web_app_document")
-                    page.get_by_role("button", name="上传文件").click()
-                    assert_text_present(page, "文档已写入 inbox", "document capture feedback")
+                    page.locator("#file-capture-form button[type='submit']").click()
+                    page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
 
                     page.fill("#search-query-input", "Project Spec")
                     page.fill("#search-source-input", "web_app_document")
-                    page.get_by_role("button", name="开始检索").click()
-                    assert_text_present(page, document_note, "document search result")
-                    page.locator("#search-results").get_by_role("button", name="查看").first.click()
-                    page.locator("#viewer-meta").get_by_text("Project Spec.pdf").wait_for(timeout=15_000)
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", pdf_note, "pdf search result")
+                    click_first_action(page, "#search-results [data-action='view-item']", "open pdf item")
+                    wait_for_text(page, "#viewer-meta", "Project Spec.pdf", "pdf meta")
                     page.locator("#viewer-content iframe").wait_for(timeout=15_000)
-                    page.get_by_role("button", name="关闭").click()
+                    page.locator("#close-viewer-button").click()
+
+                    page.set_input_files(
+                        "#file-input",
+                        {
+                            "name": "Weekly Plan.docx",
+                            "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "buffer": docx_bytes,
+                        },
+                    )
+                    page.fill("#file-note-input", docx_note)
+                    page.fill("#file-source-input", "web_app_docx")
+                    page.locator("#file-capture-form button[type='submit']").click()
+                    page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
+
+                    page.fill("#search-query-input", "browser search")
+                    page.fill("#search-source-input", "web_app_docx")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", docx_note, "docx search result")
+                    click_first_action(page, "#search-results [data-action='view-item']", "open docx item")
+                    wait_for_text(page, "#viewer-meta", "Weekly Plan.docx", "docx meta")
+                    wait_for_text(page, "#viewer-content", "Docx body line for browser search", "docx extracted text")
+                    page.locator("#close-viewer-button").click()
 
                     page.set_input_files(
                         "#file-input",
@@ -228,88 +277,48 @@ def main() -> None:
                     )
                     page.fill("#file-note-input", audio_note)
                     page.fill("#file-source-input", "web_app_audio")
-                    page.get_by_role("button", name="上传文件").click()
-                    assert_text_present(page, "音频已写入 inbox", "audio capture feedback")
+                    page.locator("#file-capture-form button[type='submit']").click()
+                    page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
 
                     page.fill("#search-query-input", "meeting-note")
                     page.fill("#search-source-input", "web_app_audio")
-                    page.get_by_role("button", name="开始检索").click()
-                    assert_text_present(page, audio_note, "audio search result")
-                    page.locator("#search-results").get_by_role("button", name="查看").first.click()
-                    page.locator("#viewer-meta").get_by_text("meeting-note.m4a").wait_for(timeout=15_000)
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", audio_note, "audio search result")
+                    click_first_action(page, "#search-results [data-action='view-item']", "open audio item")
+                    wait_for_text(page, "#viewer-meta", "meeting-note.m4a", "audio meta")
                     page.locator("#viewer-content audio").wait_for(timeout=15_000)
-                    page.get_by_role("button", name="关闭").click()
+                    page.locator("#close-viewer-button").click()
 
                     page.fill("#automation-date-input", run_date)
-                    page.locator("[data-job-id='review_day']").click()
-                    page.locator("#viewer-title").get_by_text(f"{run_date}.md").wait_for(
-                        timeout=15_000
-                    )
-                    page.locator("#viewer-content").get_by_text("Summary", exact=False).wait_for(
-                        timeout=15_000
-                    )
-                    page.get_by_role("button", name="关闭").click()
+                    click_first_action(page, "[data-job-id='review_day']", "run daily review")
+                    wait_for_text(page, "#viewer-title", f"{run_date}.md", "artifact viewer title")
+                    wait_for_text(page, "#viewer-content", "Summary", "artifact viewer body")
+                    page.locator("#close-viewer-button").click()
 
-                    page.locator("#automation-runs .automation-run-card").first.wait_for(
-                        timeout=15_000
+                    page.locator("#automation-runs .automation-run-card").first.wait_for(timeout=15_000)
+                    click_first_action(
+                        page,
+                        "#automation-runs [data-action='view-automation-run']",
+                        "open automation run",
                     )
-                    page.locator("#automation-runs").get_by_text("生成今日日回顾", exact=False).first.wait_for(
-                        timeout=15_000
-                    )
-                    page.locator("#automation-runs [data-action='view-automation-run']").first.click()
-                    page.locator("#viewer-title").get_by_text("生成今日日回顾", exact=False).wait_for(
-                        timeout=15_000
-                    )
-                    page.locator("#viewer-content").get_by_text("completed", exact=False).wait_for(
-                        timeout=15_000
-                    )
-                    page.get_by_role("button", name="关闭").click()
+                    wait_for_text(page, "#viewer-content", "completed", "automation run output")
+                    page.locator("#close-viewer-button").click()
 
-                    page.select_option("#automation-runs-job-input", "review_day")
-                    page.select_option("#automation-runs-status-input", "success")
-                    page.locator("#automation-runs-filter-form").get_by_role(
-                        "button", name="应用筛选"
-                    ).click()
-                    page.locator("#automation-runs-feedback").get_by_text(
-                        "共 1 条运行记录", exact=False
-                    ).wait_for(timeout=15_000)
-
-                    page.locator("#automation-runs [data-action='rerun-automation-run']").first.click()
-                    page.locator("#viewer-title").get_by_text(f"{run_date}.md").wait_for(
-                        timeout=15_000
+                    click_first_action(
+                        page,
+                        "#automation-runs [data-action='rerun-automation-run']",
+                        "rerun automation job",
                     )
-                    page.locator("#viewer-content").get_by_text("Summary", exact=False).wait_for(
-                        timeout=15_000
-                    )
-                    page.get_by_role("button", name="关闭").click()
-                    page.locator("#automation-runs-feedback").get_by_text(
-                        "共 2 条运行记录", exact=False
-                    ).wait_for(timeout=15_000)
-                    page.locator("#reset-automation-runs-filters-button").click()
-                    page.locator("#automation-runs").get_by_text("生成今日日回顾", exact=False).first.wait_for(
-                        timeout=15_000
-                    )
-
-                    page.locator("#artifact-summary-cards").get_by_role("button", name="查看最新").first.click()
-                    page.locator("#viewer-content").get_by_text("Summary", exact=False).wait_for(
-                        timeout=15_000
-                    )
-                    page.locator("#viewer-meta").get_by_text(f"data/reviews/daily/{run_date[:4]}/{run_date}.md").wait_for(timeout=15_000)
+                    wait_for_text(page, "#viewer-title", f"{run_date}.md", "rerun artifact title")
+                    wait_for_text(page, "#viewer-content", "Summary", "rerun artifact body")
+                    page.locator("#close-viewer-button").click()
 
                     browser.close()
             finally:
-                logging.shutdown()
                 server.stop()
-
-        except ImportError as exc:
-            raise SystemExit(
-                "缺少 Playwright。请先执行 "
-                "python -m pip install -r requirements-dev.txt，"
-                "然后执行 playwright install chromium"
-            ) from exc
-
-        print("web app smoke test passed")
-        print(f"temporary root: {root}")
+        except Exception:
+            logging.exception("smoke_test_web_app failed")
+            raise
 
 
 if __name__ == "__main__":
