@@ -74,6 +74,7 @@ core/
 scripts/
   backup_axiom.py
   check_consistency.py
+  backfill_document_text.py
   smoke_test_receiver.py
   install_playwright_chromium.py
   smoke_test_web_app.py
@@ -163,6 +164,7 @@ logs/
 - `/add` 支持 query、form、JSON 读取 `text`
 - `/upload` 支持 `file`、`image`、`document` 或 `audio` 表单字段
 - `/upload` 当前支持图片、PDF、Word 和常见音频格式；入库时会补 `original_name`、`mime_type`、`size_bytes`，其中 `.pdf` 与 `.docx` 会自动抽取正文写入 `derived_text`
+- `scripts/backfill_document_text.py` 可为旧 PDF / DOCX 记录补跑正文抽取，把历史文档也补齐到 `derived_text` 检索层
 - 文本和二进制文件写入都先落临时文件，再替换为正式文件
 - 数据库写入失败时会清理本次已写入文件
 - `/file/<id>` 会限制路径只能在 `AXIOM_ROOT` 下

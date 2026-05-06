@@ -328,3 +328,6 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“PDF 正文抽取与文档读取层增强”部署到 VPS，当前线上代码更新到 `2e17830`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_101331_2e17830.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常且当前 `total=2`，公网 `/app` 可完成 key 连接并进入 `ready` 状态
+- 新增 `scripts/backfill_document_text.py`，可扫描现有 document item 并为旧 `.pdf` / `.docx` 记录回填 `derived_text`
+- `backfill_document_text.py` 复用 receiver 里的文档抽取逻辑，支持 `--item-id`、`--limit`、`--force` 和 `--dry-run`
+- `scripts/smoke_test_receiver.py` 新增旧文档回填覆盖：先清空测试 PDF / DOCX 的 `derived_text`，再通过脚本回填并验证查询结果恢复

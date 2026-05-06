@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -124,6 +125,7 @@ def main() -> None:
 
         try:
             from core.receiver import app  # noqa: WPS433
+            from scripts.backfill_document_text import backfill_document_text  # noqa: WPS433
             from scripts.check_consistency import build_report  # noqa: WPS433
 
             client = app.test_client()
@@ -498,6 +500,54 @@ def main() -> None:
             assert docx_document["item"]["derived_text_available"] is True
             assert "Document body line for extracted search" in (
                 docx_document["item"]["derived_text_preview"] or ""
+            )
+
+            db_path = root / "db" / "axiom.db"
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute(
+                    "UPDATE items SET derived_text = NULL WHERE id IN (?, ?)",
+                    (document["item"]["id"], docx_document["item"]["id"]),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            backfill_summary = backfill_document_text(
+                root=root,
+                item_ids=[document["item"]["id"], docx_document["item"]["id"]],
+            )
+            assert backfill_summary["updated"] == 2
+            assert sorted(backfill_summary["updated_ids"]) == sorted(
+                [document["item"]["id"], docx_document["item"]["id"]]
+            )
+
+            backfilled_document_detail = assert_status(
+                client.get(
+                    f"/item/{document['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "backfilled pdf detail",
+            )
+            assert backfilled_document_detail["item"]["derived_text_available"] is True
+            assert (
+                "Axiom pdf summary line"
+                in (backfilled_document_detail["item"].get("derived_text") or "")
+            )
+
+            backfilled_docx_detail = assert_status(
+                client.get(
+                    f"/item/{docx_document['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "backfilled docx detail",
+            )
+            assert backfilled_docx_detail["item"]["derived_text_available"] is True
+            assert (
+                "Document body line for extracted search"
+                in (backfilled_docx_detail["item"].get("derived_text") or "")
             )
 
             time.sleep(1.1)

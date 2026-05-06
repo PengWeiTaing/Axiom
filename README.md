@@ -57,6 +57,7 @@ receiver 已提供：
 
 - 备份与恢复演练基础
 - 文件和数据库一致性检查
+- 旧 PDF / Word 文档正文回填
 - Markdown 导出
 - 日回顾 / 周回顾底稿
 - inbox 处理报告
@@ -130,6 +131,7 @@ flowchart TD
 - `core/init_db.py`：独立数据库初始化脚本，复用 receiver 的建表逻辑
 - `scripts/backup_axiom.py`：备份 SQLite、inbox、archive 并生成 manifest
 - `scripts/check_consistency.py`：检查文件系统和 SQLite 索引是否一致
+- `scripts/backfill_document_text.py`：为旧 PDF / DOCX 记录回填 `derived_text`
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
 - `scripts/smoke_test_web_app.py`：Web App 浏览器级冒烟测试
 - `scripts/deploy_to_vps.py`：从本地当前 commit 生成发布包、备份 VPS 代码、同步代码和 systemd unit、重启并验证

@@ -546,6 +546,7 @@ history 汇总基于已保存的 action snapshots 聚合，不重新执行任何
             "scripts/install_playwright_chromium.py",
             "scripts/backup_axiom.py",
             "scripts/check_consistency.py",
+            "scripts/backfill_document_text.py",
             "scripts/smoke_test_receiver.py",
             "scripts/smoke_test_web_app.py",
             "scripts/deploy_to_vps.py",
@@ -575,6 +576,7 @@ history 汇总基于已保存的 action snapshots 聚合，不重新执行任何
 | 改 VPS 部署 | `scripts/deploy_to_vps.py` |
 | 改备份 | `scripts/backup_axiom.py` |
 | 改一致性检查 | `scripts/check_consistency.py` |
+| 改旧文档正文回填 | `scripts/backfill_document_text.py` |
 | 改 receiver 测试 | `scripts/smoke_test_receiver.py` |
 | 改 inbox 自动化 | `build_inbox_processing_report.py`、`apply_inbox_actions.py` |
 | 改 action history | `list_inbox_action_snapshots.py`、`build_inbox_action_history_markdown.py` |
