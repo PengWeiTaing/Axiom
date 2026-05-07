@@ -371,3 +371,19 @@
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_023441_af61873.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常、公网 `/app` 已出现 `file-transcript-file-input`
 - VPS 上 `python3 scripts/backfill_audio_transcript.py --root /opt/axiom --dry-run` 已跑通；当前生产库扫描到 `0` 条 audio item
+- `requirements.txt` 新增 `openai>=2.35,<3.0`，为音频自动转写任务提供官方 SDK 依赖
+- `.env.example` 新增 `AXIOM_AUDIO_TRANSCRIBE_MODEL`、`AXIOM_AUDIO_TRANSCRIBE_LANGUAGE`、`AXIOM_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS` 和 `AXIOM_OPENAI_API_KEY` 示例
+- `AUTOMATION_JOBS` 新增 `audio_transcribe_day`，当前 label 为“生成音频自动转写”，手动触发后会为当日 audio item 补全 `transcript_text`
+- `/automation/jobs` 现在会把 `audio_transcribe_day` 返回给 `/app` 自动化中心；真实运行依赖 `AXIOM_OPENAI_API_KEY` 或 `OPENAI_API_KEY`
+- `data/reviews/audio-transcripts/<year>/<date>.md` 成为新的自动化产物组，`/artifacts`、`/artifacts/summary`、`/overview` 和 `/overview/text` 已接入这类报告
+- 新增 `scripts/transcribe_audio_items.py`，支持 `--item-id`、`--source`、`--limit`、`--force`、`--dry-run`、`--model`、`--language` 和 `--prompt`
+- `transcribe_audio_items.py` 会优先跳过已有 `transcript_text` 的 audio item；本地冒烟通过 `AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE` 走 mock，不依赖真实网络调用
+- `scripts/smoke_test_receiver.py` 新增 `audio_transcribe_day` 覆盖：验证任务注册、自动转写写回、`audio-transcripts` artifact 生成，以及 `/overview` / `/artifacts/summary` 已反映新报告
+- `scripts/smoke_test_web_app.py` 新增“音频自动转写”任务卡片可见性覆盖，并修正 viewer 遮罩导致 recent filter 点击被拦截的浏览器级竞态
+- 已本地运行：`node --check core/static/app.js`
+- 已本地运行：`git diff --check`
+- 已用 `scripts/deploy_to_vps.py` 将这轮“可选的音频自动转写自动化”部署到 VPS，当前线上代码更新到 `ba7ff52`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_025945_ba7ff52.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常、鉴权 `/automation/jobs` 已出现 `audio_transcribe_day`、公网 `/app` 仍可读到 `file-transcript-file-input`
+- VPS 上已安全运行：`python3 scripts/transcribe_audio_items.py --root /opt/axiom --dry-run`
+- 上述 dry-run 已在生产 `data/reviews/audio-transcripts/2026/2026-05-07.md` 留下一份空扫描报告；当前 `/artifacts/summary` 中 `audio-transcripts=1`，并成为最新 artifact
