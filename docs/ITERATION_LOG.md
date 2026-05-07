@@ -387,3 +387,28 @@
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常、鉴权 `/automation/jobs` 已出现 `audio_transcribe_day`、公网 `/app` 仍可读到 `file-transcript-file-input`
 - VPS 上已安全运行：`python3 scripts/transcribe_audio_items.py --root /opt/axiom --dry-run`
 - 上述 dry-run 已在生产 `data/reviews/audio-transcripts/2026/2026-05-07.md` 留下一份空扫描报告；当前 `/artifacts/summary` 中 `audio-transcripts=1`，并成为最新 artifact
+- `/automation/jobs` 现在会额外返回 `ready`、`runtime_mode` 和 `availability_note`，让前端能直接知道任务是否可运行
+- `audio_transcribe_day` 当前在无 key 环境下会返回 `ready=false`、`runtime_mode=missing_key`，并明确提示缺少 `AXIOM_OPENAI_API_KEY` / `OPENAI_API_KEY`
+- `/automation/run` 现在会在执行前做可用性预检；音频自动转写任务在未配置 key 且未配置 mock 模板时，会直接返回 `automation_job_unavailable`
+- `/app` 自动化中心现在会显示 `local / mock / OpenAI / 未就绪` 运行态标签；未就绪任务会禁用按钮，不再让用户点进去才报错
+- `scripts/smoke_test_receiver.py` 新增音频自动转写“缺 key 不可用”覆盖：验证 `/automation/jobs` 状态与 `/automation/run` 的预检错误
+- `scripts/smoke_test_web_app.py` 新增 mock 模式下的运行态展示覆盖，并修正归档 / 恢复后 viewer 异步重开导致 recent filter 被遮罩拦截的浏览器级竞态
+- 已本地运行：`python -m compileall -q core scripts`
+- 已本地运行：`python scripts/smoke_test_receiver.py`
+- 已本地运行：`python scripts/smoke_test_web_app.py`
+- 已本地运行：`node --check core/static/app.js`
+- 已用 `scripts/deploy_to_vps.py` 将这轮“自动化任务可用性治理”部署到 VPS，当前线上代码更新到 `dc59d07`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_030816_dc59d07.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/automation/jobs?key=axiomnb` 中 `audio_transcribe_day` 已返回 `ready=false` 与 `runtime_mode=missing_key`
+- item payload 现在会额外返回 `text_source`、`text_source_label`、`processing_state`、`processing_label` 和 `processing_note`
+- `/stats` 现在会返回 `by_text_source` 与 `by_processing_state`，用于区分“可直接消费的正文 / 转写”和“仍待补处理”的条目
+- `/recent` 和 `/search` 现在支持 `processing_state=ready|pending` 过滤，可直接筛出待补正文 / 待补转写条目
+- `/item/<id>/update` 现在支持 document item 的 `derived_text` 手动补录；`.docx` / `.pdf` 抽取失败时可以直接在 Web App viewer 中补正文
+- `/app` 的记录卡片和详情元数据现在会显示“主要文本来源”和“处理状态”；最近记录与搜索都补了处理状态筛选
+- `scripts/smoke_test_receiver.py` 新增 document `derived_text` 手动清空 / 补录、`processing_state` 过滤和统计字段覆盖
+- `scripts/smoke_test_web_app.py` 新增浏览器级“待补正文筛出 -> 在 viewer 中补正文 -> 再次检索命中”闭环覆盖
+- 已本地运行：`python scripts/smoke_test_inbox_processing.py`
+- 已本地运行：`python scripts/generate_deepwiki_cache.py`
+- 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮“document 正文补录与 processing_state 治理闭环”部署到 VPS，当前线上代码更新到 `953ae86`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_032941_953ae86.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 已返回 `by_text_source` / `by_processing_state`、鉴权 `/recent?processing_state=ready` 已可返回过滤结果、公网 `/app` 已出现 `recent-processing-state-input` 和 `search-processing-state-input`
