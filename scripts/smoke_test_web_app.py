@@ -324,8 +324,22 @@ def main() -> None:
                             "buffer": b"fake playwright m4a bytes",
                         },
                     )
+                    page.set_input_files(
+                        "#file-transcript-file-input",
+                        {
+                            "name": "meeting-note.srt",
+                            "mimeType": "application/x-subrip",
+                            "buffer": (
+                                "1\n"
+                                "00:00:00,000 --> 00:00:01,500\n"
+                                f"{audio_transcript}\n\n"
+                                "2\n"
+                                "00:00:01,700 --> 00:00:03,000\n"
+                                "Second browser transcript line\n"
+                            ).encode("utf-8"),
+                        },
+                    )
                     page.fill("#file-note-input", audio_note)
-                    page.fill("#file-transcript-input", audio_transcript)
                     page.fill("#file-source-input", "web_app_audio")
                     page.locator("#file-capture-form button[type='submit']").click()
                     page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
@@ -338,6 +352,7 @@ def main() -> None:
                     wait_for_text(page, "#viewer-meta", "meeting-note.m4a", "audio meta")
                     page.locator("#viewer-content audio").wait_for(timeout=15_000)
                     wait_for_text(page, "#viewer-content", audio_transcript, "audio transcript")
+                    wait_for_text(page, "#viewer-content", "Second browser transcript line", "audio transcript second line")
                     click_first_action(page, "#viewer-actions [data-action='edit-item']", "edit audio item")
                     page.locator("[data-role='item-edit-form'] textarea[name='transcript_text']").fill(updated_audio_transcript)
                     click_first_action(page, "#viewer-actions [data-action='save-item-edit']", "save audio transcript")

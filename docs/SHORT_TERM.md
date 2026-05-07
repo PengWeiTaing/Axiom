@@ -75,7 +75,7 @@ flowchart LR
 
 - 文本、图片、PDF / Word 文档和常见音频都能进入 inbox 并写入 SQLite。
 - PDF `.pdf` 与 Word `.docx` 上传后都会自动抽取正文，可直接进入 `/search` 和 `/app` 的文档查看器。
-- 音频 item 现在可以携带 `transcript_text`，并进入 `/search`、`/item/<id>` 和 `/app` 的统一读取 / 编辑链路。
+- 音频 item 现在既可以直接携带 `transcript_text`，也可以通过 `transcript_file` 导入 `txt / md / srt / vtt` 转写内容，并进入 `/search`、`/item/<id>` 和 `/app` 的统一读取 / 编辑链路。
 - 文件取回、元数据读取、统计、类型过滤、来源过滤、存储区过滤、时间范围过滤已经验证。
 - `/app` 已经能直接覆盖文本写入、文件上传、总览、最近记录、搜索和自动化产物浏览，并补了 PDF 预览与正文预览、音频播放与转写查看 / 编辑，以及 Word 正文预览。
 - 归档和恢复不会破坏 `/file/<id>` 的取回路径。

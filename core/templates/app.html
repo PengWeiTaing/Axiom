@@ -112,10 +112,19 @@
                             ></textarea>
                         </label>
                         <label class="field">
+                            <span>转写文件</span>
+                            <input
+                                id="file-transcript-file-input"
+                                name="transcript_file"
+                                type="file"
+                                accept=".txt,.md,.srt,.vtt,text/plain,text/markdown,text/vtt,application/x-subrip"
+                            >
+                        </label>
+                        <label class="field">
                             <span>来源</span>
                             <input id="file-source-input" name="source" type="text" value="web_app">
                         </label>
-                        <p class="helper-text">支持图片、PDF、Word 和常见音频格式；音频可额外填写转写文本。</p>
+                        <p class="helper-text">支持图片、PDF、Word 和常见音频格式；音频可额外填写转写文本，或上传 txt / md / srt / vtt 转写文件。</p>
                         <button class="primary-button" type="submit">上传文件</button>
                     </form>
                 </div>

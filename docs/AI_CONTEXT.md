@@ -75,6 +75,7 @@ scripts/
   backup_axiom.py
   check_consistency.py
   backfill_document_text.py
+  backfill_audio_transcript.py
   smoke_test_receiver.py
   install_playwright_chromium.py
   smoke_test_web_app.py
@@ -163,8 +164,10 @@ logs/
 - 可用 `AXIOM_ROOT`、`AXIOM_INBOX_PATH`、`AXIOM_ARCHIVE_PATH`、`AXIOM_DB_PATH`、`AXIOM_SECRET_KEY`、`AXIOM_LOG_PATH` 覆盖配置
 - `/add` 支持 query、form、JSON 读取 `text`
 - `/upload` 支持 `file`、`image`、`document` 或 `audio` 表单字段
-- `/upload` 当前支持图片、PDF、Word 和常见音频格式；入库时会补 `original_name`、`mime_type`、`size_bytes`，其中 `.pdf` 与 `.docx` 会自动抽取正文写入 `derived_text`，音频可额外接收 `transcript_text`
+- `/upload` 当前支持图片、PDF、Word 和常见音频格式；入库时会补 `original_name`、`mime_type`、`size_bytes`，其中 `.pdf` 与 `.docx` 会自动抽取正文写入 `derived_text`，音频既可直接接收 `transcript_text`，也可同时上传 `transcript_file`
+- `transcript_file` 当前支持 `txt / md / srt / vtt`；`.srt` 与 `.vtt` 会自动清洗时间轴、cue 序号和基础标签后写入 `transcript_text`
 - `scripts/backfill_document_text.py` 可为旧 PDF / DOCX 记录补跑正文抽取，把历史文档也补齐到 `derived_text` 检索层
+- `scripts/backfill_audio_transcript.py` 可为旧 audio 记录从同名 sidecar 转写文件回填 `transcript_text`，支持 `--transcript-dir`、`--item-id`、`--limit`、`--force` 和 `--dry-run`
 - 文本和二进制文件写入都先落临时文件，再替换为正式文件
 - 数据库写入失败时会清理本次已写入文件
 - `/file/<id>` 会限制路径只能在 `AXIOM_ROOT` 下

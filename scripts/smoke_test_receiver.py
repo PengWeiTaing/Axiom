@@ -125,6 +125,7 @@ def main() -> None:
 
         try:
             from core.receiver import app  # noqa: WPS433
+            from scripts.backfill_audio_transcript import backfill_audio_transcript  # noqa: WPS433
             from scripts.backfill_document_text import backfill_document_text  # noqa: WPS433
             from scripts.check_consistency import build_report  # noqa: WPS433
 
@@ -552,15 +553,23 @@ def main() -> None:
 
             time.sleep(1.1)
 
+            audio_transcript_srt = (
+                "1\n"
+                "00:00:00,000 --> 00:00:01,500\n"
+                "Axiom audio transcript line\n\n"
+                "2\n"
+                "00:00:01,700 --> 00:00:03,000\n"
+                "<v Speaker>Second transcript line</v>\n"
+            ).encode("utf-8")
             audio = assert_status(
                 client.post(
                     "/upload",
                     data={
                         "key": "test-key",
                         "content": "team sync voice note",
-                        "transcript_text": "Axiom audio transcript line",
                         "source": "audio_test",
                         "file": (io.BytesIO(b"fake m4a bytes"), "meeting-note.m4a"),
+                        "transcript_file": (io.BytesIO(audio_transcript_srt), "meeting-note.srt"),
                     },
                     content_type="multipart/form-data",
                 ),
@@ -578,6 +587,7 @@ def main() -> None:
             assert "Axiom audio transcript line" in (
                 audio["item"]["transcript_text_preview"] or ""
             )
+            assert "00:00" not in (audio["item"]["transcript_text_preview"] or "")
 
             audio_file = client.get(
                 f"/file/{audio['item']['id']}",
@@ -600,6 +610,50 @@ def main() -> None:
             assert audio_detail["item"]["transcript_text_available"] is True
             assert "Axiom audio transcript line" in (
                 audio_detail["item"].get("transcript_text") or ""
+            )
+            assert "Second transcript line" in (
+                audio_detail["item"].get("transcript_text") or ""
+            )
+
+            transcript_sidecar_dir = root / "data" / "transcripts"
+            transcript_sidecar_dir.mkdir(parents=True, exist_ok=True)
+            audio_sidecar_path = transcript_sidecar_dir / "meeting-note.srt"
+            audio_sidecar_path.write_text(
+                "1\n"
+                "00:00:00,000 --> 00:00:01,500\n"
+                "Recovered transcript from sidecar\n",
+                encoding="utf-8",
+            )
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute(
+                    "UPDATE items SET transcript_text = NULL WHERE id = ?",
+                    (audio["item"]["id"],),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            audio_backfill_summary = backfill_audio_transcript(
+                root=root,
+                item_ids=[audio["item"]["id"]],
+                transcript_dir=transcript_sidecar_dir,
+            )
+            assert audio_backfill_summary["updated"] == 1
+            assert audio_backfill_summary["updated_ids"] == [audio["item"]["id"]]
+
+            backfilled_audio_detail = assert_status(
+                client.get(
+                    f"/item/{audio['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "backfilled audio detail",
+            )
+            assert backfilled_audio_detail["item"]["transcript_text_available"] is True
+            assert "Recovered transcript from sidecar" in (
+                backfilled_audio_detail["item"].get("transcript_text") or ""
             )
 
             updated_audio = assert_status(

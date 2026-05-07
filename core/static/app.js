@@ -1621,6 +1621,8 @@ async function handleFileCaptureSubmit(event) {
     const sourceInput = document.getElementById("file-source-input");
     const noteInput = document.getElementById("file-note-input");
     const transcriptInput = document.getElementById("file-transcript-input");
+    const transcriptFileInput = document.getElementById("file-transcript-file-input");
+    const transcriptFile = transcriptFileInput?.files?.[0];
 
     if (!file) {
         setFeedback(elements.captureFeedback, "请先选择文件。", "error");
@@ -1633,6 +1635,9 @@ async function handleFileCaptureSubmit(event) {
         formData.set("source", sourceInput.value.trim() || "web_app");
         formData.set("content", noteInput.value.trim());
         formData.set("transcript_text", transcriptInput.value.trim());
+        if (transcriptFile) {
+            formData.set("transcript_file", transcriptFile);
+        }
 
         setConnectionState("busy", "正在上传文件");
         const payload = await apiRequest("/upload", {

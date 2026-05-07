@@ -34,7 +34,7 @@ receiver 已提供：
 - `/health`：服务和数据库健康检查
 - `/stats`：总量、类型、来源、存储区统计
 - `/add`：文本写入
-- `/upload`：通用文件上传，支持图片、PDF、Word 和常见音频；`.pdf` 与 `.docx` 会自动抽取正文，音频可额外写入 `transcript_text`
+- `/upload`：通用文件上传，支持图片、PDF、Word 和常见音频；`.pdf` 与 `.docx` 会自动抽取正文，音频可额外写入 `transcript_text`，也可同时上传 `txt / md / srt / vtt` 转写文件
 - `/item/<id>`：读取单条元数据
 - `/item/<id>/update`：更新单条内容与来源；文本会同步改写落盘文件，音频可补写或修订转写文本
 - `/file/<id>`：按 item id 取回文件
@@ -132,6 +132,7 @@ flowchart TD
 - `scripts/backup_axiom.py`：备份 SQLite、inbox、archive 并生成 manifest
 - `scripts/check_consistency.py`：检查文件系统和 SQLite 索引是否一致
 - `scripts/backfill_document_text.py`：为旧 PDF / DOCX 记录回填 `derived_text`
+- `scripts/backfill_audio_transcript.py`：为旧 audio 记录从同名 sidecar 转写文件回填 `transcript_text`
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
 - `scripts/smoke_test_web_app.py`：Web App 浏览器级冒烟测试
 - `scripts/deploy_to_vps.py`：从本地当前 commit 生成发布包、备份 VPS 代码、同步代码和 systemd unit、重启并验证
