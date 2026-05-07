@@ -172,13 +172,23 @@ ITEM_DETAIL_SELECT_FIELDS = f"""
     transcript_text
 """
 REVIEWS_PATH = Path(os.environ.get("AXIOM_REVIEWS_PATH", AXIOM_ROOT / "data" / "reviews")).resolve()
-ARTIFACT_GROUPS = {"review", "inbox", "inbox-actions", "inbox-action-history", "audio-transcripts"}
+ARTIFACT_GROUPS = {
+    "review",
+    "inbox",
+    "inbox-actions",
+    "inbox-action-history",
+    "audio-transcripts",
+    "image-descriptions",
+}
 ARTIFACT_WINDOWS = {"daily", "weekly"}
 ARTIFACT_MODES = {"dry-run", "apply"}
 AUTOMATION_RUN_STATUSES = {"running", "success", "failed", "timeout"}
 DOCX_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 AUTOMATION_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS = int(
     os.environ.get("AXIOM_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS", "300")
+)
+AUTOMATION_IMAGE_DESCRIBE_TIMEOUT_SECONDS = int(
+    os.environ.get("AXIOM_IMAGE_DESCRIBE_TIMEOUT_SECONDS", "300")
 )
 AUTOMATION_JOBS = {
     "review_day": {
@@ -251,7 +261,25 @@ AUTOMATION_JOBS = {
         "build_args": lambda run_date: ["--date", run_date],
         "manual_enabled": True,
         "requires_openai": True,
+        "mock_template_env": "AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE",
+        "openai_ready_note": "当前环境已配置 OpenAI key，可以执行真实音频自动转写。",
+        "missing_key_note": "当前环境未配置 AXIOM_OPENAI_API_KEY 或 OPENAI_API_KEY，暂时不能执行真实音频自动转写。",
         "timeout_seconds": AUTOMATION_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS,
+    },
+    "image_describe_day": {
+        "label": "生成图片自动描述",
+        "description": "为当日新入库的 image item 补全 OpenAI 图片描述，并生成一份可回看的描述报告。",
+        "script_name": "describe_image_items.py",
+        "artifact_group": "image-descriptions",
+        "artifact_window": None,
+        "artifact_mode": None,
+        "build_args": lambda run_date: ["--date", run_date],
+        "manual_enabled": True,
+        "requires_openai": True,
+        "mock_template_env": "AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE",
+        "openai_ready_note": "当前环境已配置 OpenAI key，可以执行真实图片自动描述。",
+        "missing_key_note": "当前环境未配置 AXIOM_OPENAI_API_KEY 或 OPENAI_API_KEY，暂时不能执行真实图片自动描述。",
+        "timeout_seconds": AUTOMATION_IMAGE_DESCRIBE_TIMEOUT_SECONDS,
     },
 }
 
@@ -1804,6 +1832,7 @@ def build_overview_text(payload: dict, preview_chars: int) -> str:
         ("动作历史日报", latest["inbox-action-history"]["daily"]),
         ("动作历史周报", latest["inbox-action-history"]["weekly"]),
         ("音频转写报告", latest["audio-transcripts"]),
+        ("图片描述报告", latest["image-descriptions"]),
     ]
     for label, artifact in artifact_sections:
         if artifact is None:
@@ -1907,6 +1936,17 @@ def build_artifact_payload(file_path: Path) -> dict | None:
         payload.update(
             {
                 "group": "audio-transcripts",
+                "window": None,
+                "mode": None,
+                "report_date": Path(parts[4]).stem,
+            }
+        )
+        return payload
+
+    if group_dir == "image-descriptions" and len(parts) == 5:
+        payload.update(
+            {
+                "group": "image-descriptions",
                 "window": None,
                 "mode": None,
                 "report_date": Path(parts[4]).stem,
@@ -2039,6 +2079,7 @@ def build_artifact_counts(artifacts: list[dict]) -> dict:
         "inbox-actions": {"dry-run": 0, "apply": 0},
         "inbox-action-history": {"daily": 0, "weekly": 0},
         "audio-transcripts": 0,
+        "image-descriptions": 0,
     }
 
     for artifact in artifacts:
@@ -2053,6 +2094,8 @@ def build_artifact_counts(artifacts: list[dict]) -> dict:
             counts["inbox-action-history"][artifact["window"]] += 1
         elif group == "audio-transcripts":
             counts["audio-transcripts"] += 1
+        elif group == "image-descriptions":
+            counts["image-descriptions"] += 1
 
     return counts
 
@@ -2097,6 +2140,10 @@ def build_artifact_latest_summary(artifacts: list[dict], preview_chars: int) -> 
             select_latest_artifact(artifacts, group="audio-transcripts"),
             preview_chars,
         ),
+        "image-descriptions": build_artifact_summary_payload(
+            select_latest_artifact(artifacts, group="image-descriptions"),
+            preview_chars,
+        ),
     }
 
 
@@ -2115,7 +2162,8 @@ def build_automation_job_runtime_payload(job: dict) -> dict:
             "availability_note": "当前环境已就绪。",
         }
 
-    if os.environ.get("AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE", "").strip():
+    mock_template_env = str(job.get("mock_template_env", "")).strip()
+    if mock_template_env and os.environ.get(mock_template_env, "").strip():
         return {
             "ready": True,
             "runtime_mode": "mock",
@@ -2126,13 +2174,19 @@ def build_automation_job_runtime_payload(job: dict) -> dict:
         return {
             "ready": True,
             "runtime_mode": "openai",
-            "availability_note": "当前环境已配置 OpenAI key，可以执行真实音频自动转写。",
+            "availability_note": job.get(
+                "openai_ready_note",
+                "当前环境已配置 OpenAI key，可以执行真实 AI 自动化。",
+            ),
         }
 
     return {
         "ready": False,
         "runtime_mode": "missing_key",
-        "availability_note": "当前环境未配置 AXIOM_OPENAI_API_KEY 或 OPENAI_API_KEY，暂时不能执行真实音频自动转写。",
+        "availability_note": job.get(
+            "missing_key_note",
+            "当前环境未配置 AXIOM_OPENAI_API_KEY 或 OPENAI_API_KEY，暂时不能执行真实 AI 自动化。",
+        ),
     }
 
 

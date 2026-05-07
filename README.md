@@ -45,11 +45,11 @@ receiver 已提供：
 - `/overview`：聚合返回统计、最近记录和最新自动化产物摘要
 - `/overview/text`：返回适合快捷指令直接显示的纯文本总览
 - `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口；已补 PDF 预览与正文预览、音频播放器与转写预览，以及 Word 正文预览
-- `/automation/jobs`：返回当前允许手动触发的安全自动化任务；当前包含 review、inbox report、dry-run，以及可选的音频自动转写
+- `/automation/jobs`：返回当前允许手动触发的安全自动化任务；当前包含 review、inbox report、dry-run，以及可选的音频自动转写和图片自动描述
 - `/automation/runs`：读取自动化运行历史，覆盖手动触发和定时任务，并返回状态、产物和输出尾部
-- `/automation/run`：手动生成 review / inbox report / dry-run artifact / audio transcript report
+- `/automation/run`：手动生成 review / inbox report / dry-run artifact / audio transcript report / image description report
 - `/artifacts`：列出 `data/reviews` 下的自动化产物
-- `/artifacts/summary`：直接读取各类自动化产物的最新摘要，当前包含 `audio-transcripts`
+- `/artifacts/summary`：直接读取各类自动化产物的最新摘要，当前包含 `audio-transcripts` 和 `image-descriptions`
 - `/artifacts/file/<path>`：取回 markdown artifact 文件
 - `/sw.js` + `manifest.webmanifest`：PWA 壳，可添加到手机主屏幕
 
@@ -136,6 +136,7 @@ flowchart TD
 - `scripts/backfill_document_text.py`：为旧 PDF / DOCX 记录回填 `derived_text`
 - `scripts/backfill_audio_transcript.py`：为旧 audio 记录从同名 sidecar 转写文件回填 `transcript_text`
 - `scripts/transcribe_audio_items.py`：为当日 audio item 批量补全转写文本，并生成 `audio-transcripts` 报告
+- `scripts/describe_image_items.py`：为当日 image item 批量补全中文描述，并生成 `image-descriptions` 报告
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
 - `scripts/smoke_test_web_app.py`：Web App 浏览器级冒烟测试
 - `scripts/deploy_to_vps.py`：从本地当前 commit 生成发布包、备份 VPS 代码、同步代码和 systemd unit、重启并验证
@@ -168,7 +169,14 @@ $env:AXIOM_OPENAI_API_KEY="..."
 $env:AXIOM_AUDIO_TRANSCRIBE_MODEL="gpt-4o-mini-transcribe"
 ```
 
-没有配置 key 时，`audio_transcribe_day` 任务仍会出现在自动化中心，但真实转写不会成功；本地冒烟通过 mock 模板覆盖这条链路。
+如果要启用真实图片自动描述，再额外配置：
+
+```powershell
+$env:AXIOM_OPENAI_API_KEY="..."
+$env:AXIOM_IMAGE_DESCRIBE_MODEL="gpt-4.1-mini"
+```
+
+没有配置 key 时，`audio_transcribe_day` 和 `image_describe_day` 任务仍会出现在自动化中心，但真实转写 / 描述不会成功；本地冒烟通过 mock 模板覆盖这两条链路。
 
 如果要补浏览器级验证，再执行：
 

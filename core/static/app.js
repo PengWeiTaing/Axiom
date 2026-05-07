@@ -266,6 +266,9 @@ function formatArtifactLabel(artifact) {
     if (artifact.group === "audio-transcripts") {
         return "音频转写报告";
     }
+    if (artifact.group === "image-descriptions") {
+        return "图片描述报告";
+    }
     return artifact.group;
 }
 
@@ -532,6 +535,7 @@ function renderOverviewArtifacts(artifactSummary) {
             artifactSummary["inbox-action-history"]?.weekly,
         ),
         artifactSummary["audio-transcripts"],
+        artifactSummary["image-descriptions"],
     ].filter(Boolean);
 
     if (!summaryEntries.length) {
@@ -638,6 +642,11 @@ function flattenArtifactCards(summaryPayload) {
             title: "Audio Transcripts",
             countText: `${summaryPayload.counts["audio-transcripts"]} 份`,
             artifact: latest["audio-transcripts"],
+        },
+        {
+            title: "Image Descriptions",
+            countText: `${summaryPayload.counts["image-descriptions"]} 份`,
+            artifact: latest["image-descriptions"],
         },
     ];
 }

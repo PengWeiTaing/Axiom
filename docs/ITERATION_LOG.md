@@ -412,3 +412,15 @@
 - 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮“document 正文补录与 processing_state 治理闭环”部署到 VPS，当前线上代码更新到 `953ae86`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_032941_953ae86.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 已返回 `by_text_source` / `by_processing_state`、鉴权 `/recent?processing_state=ready` 已可返回过滤结果、公网 `/app` 已出现 `recent-processing-state-input` 和 `search-processing-state-input`
+- `AUTOMATION_JOBS` 新增 `image_describe_day`，用于为当日 image item 批量补全中文描述
+- `data/reviews/image-descriptions/<year>/<date>.md` 成为新的自动化产物组；`/artifacts`、`/artifacts/summary`、`/overview`、`/overview/text` 和 `/app` 都已接入图片描述报告
+- 新增 `scripts/describe_image_items.py`，支持 `--item-id`、`--source`、`--limit`、`--force`、`--dry-run`、`--model` 和 `--prompt`
+- `describe_image_items.py` 会优先跳过已有人工说明的 image item；真实运行可调用 OpenAI Vision，本地冒烟通过 `AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE` 走 mock
+- `.env.example` 新增 `AXIOM_IMAGE_DESCRIBE_MODEL`、`AXIOM_IMAGE_DESCRIBE_TIMEOUT_SECONDS` 和 `AXIOM_IMAGE_DESCRIBE_PROMPT` 示例
+- `/automation/jobs` 现在会把 `image_describe_day` 返回给 `/app` 自动化中心，并附带 `ready`、`runtime_mode` 和 `availability_note`
+- `/app` 现在可以直接触发“生成图片自动描述”，artifact 摘要卡片和报告列表也已新增 `image-descriptions` 分组
+- `scripts/smoke_test_receiver.py` 新增图片自动描述覆盖：验证任务注册、无 key 不可用预检、描述写回、artifact 生成，以及 `/overview` / `/artifacts/summary` 反映新报告
+- `scripts/smoke_test_web_app.py` 新增浏览器级图片自动描述覆盖：上传待描述图片、运行 `image_describe_day`、查看报告、再从图片编辑态确认描述已写回
+- 已本地运行：`python -m compileall -q core scripts`
+- 已本地运行：`python scripts/smoke_test_receiver.py`
+- 已本地运行：`python scripts/smoke_test_web_app.py`

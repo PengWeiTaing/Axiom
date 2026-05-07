@@ -172,6 +172,7 @@ def main() -> None:
         os.environ["AXIOM_SECRET_KEY"] = "test-key"
         os.environ["AXIOM_LOG_PATH"] = ""
         os.environ["AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE"] = "browser mock transcript for {original_name}"
+        os.environ["AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE"] = "browser mock image description for {original_name}"
         create_sample_artifact(root)
 
         try:
@@ -218,8 +219,11 @@ def main() -> None:
                     page.locator("#overview-stats").wait_for(timeout=15_000)
                     wait_for_text(page, "#automation-jobs", "音频自动转写", "audio transcribe job card")
                     wait_for_text(page, "#automation-jobs", "mock", "audio transcribe runtime badge")
+                    wait_for_text(page, "#automation-jobs", "生成图片自动描述", "image describe job card")
                     if page.locator("[data-job-id='audio_transcribe_day']").is_disabled():
                         raise AssertionError("audio transcribe job button should be enabled in mock mode")
+                    if page.locator("[data-job-id='image_describe_day']").is_disabled():
+                        raise AssertionError("image describe job button should be enabled in mock mode")
 
                     has_service_worker = page.evaluate(
                         """
@@ -419,6 +423,46 @@ def main() -> None:
                     page.fill("#search-source-input", "web_app_audio")
                     page.locator("#search-form button[type='submit']").click()
                     wait_for_text(page, "#search-results", audio_note, "updated audio transcript search result")
+
+                    page.set_input_files(
+                        "#file-input",
+                        {
+                            "name": "pending-shot.png",
+                            "mimeType": "image/png",
+                            "buffer": PNG_1X1_BYTES,
+                        },
+                    )
+                    page.fill("#file-note-input", "")
+                    page.fill("#file-source-input", "web_app_image_pending")
+                    page.locator("#file-capture-form button[type='submit']").click()
+                    page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
+
+                    page.fill("#search-query-input", "pending-shot.png")
+                    page.fill("#search-source-input", "web_app_image_pending")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", "pending-shot.png", "pending image search result")
+
+                    page.fill("#automation-date-input", run_date)
+                    click_first_action(page, "[data-job-id='image_describe_day']", "run image describe day")
+                    wait_for_text(page, "#viewer-title", f"{run_date}.md", "image describe artifact viewer title")
+                    wait_for_text(page, "#viewer-content", "pending-shot.png", "image describe artifact body")
+                    close_viewer(page)
+
+                    page.fill("#search-query-input", "pending-shot.png")
+                    page.fill("#search-source-input", "web_app_image_pending")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", "pending-shot.png", "described image search result")
+                    click_first_action(page, "#search-results [data-action='view-item']", "open described image item")
+                    click_first_action(page, "#viewer-actions [data-action='edit-item']", "edit described image item")
+                    image_description_value = page.locator(
+                        "[data-role='item-edit-form'] textarea[name='content']"
+                    ).input_value()
+                    if "browser mock image description for pending-shot.png" not in image_description_value:
+                        raise AssertionError(
+                            "described image edit form missing mock description: "
+                            f"{image_description_value}"
+                        )
+                    close_viewer(page)
 
                     page.fill("#automation-date-input", run_date)
                     click_first_action(page, "[data-job-id='review_day']", "run daily review")

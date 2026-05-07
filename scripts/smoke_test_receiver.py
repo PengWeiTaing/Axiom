@@ -123,6 +123,7 @@ def main() -> None:
         os.environ["AXIOM_SECRET_KEY"] = "test-key"
         os.environ["AXIOM_LOG_PATH"] = str(root / "logs" / "receiver.log")
         os.environ["AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE"] = "mock transcript for {original_name}"
+        os.environ["AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE"] = "mock image description for {original_name}"
 
         try:
             from core.receiver import app  # noqa: WPS433
@@ -1216,10 +1217,14 @@ def main() -> None:
                 "automation jobs before runtime restore",
             )
             audio_job_preflight = next(job for job in automation_jobs["jobs"] if job["id"] == "audio_transcribe_day")
+            image_job_preflight = next(job for job in automation_jobs["jobs"] if job["id"] == "image_describe_day")
             assert audio_job_preflight["ready"] is True
             assert audio_job_preflight["runtime_mode"] == "mock"
+            assert image_job_preflight["ready"] is True
+            assert image_job_preflight["runtime_mode"] == "mock"
 
             previous_mock_template = os.environ.pop("AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE", None)
+            previous_image_mock_template = os.environ.pop("AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE", None)
             previous_axiom_openai_key = os.environ.pop("AXIOM_OPENAI_API_KEY", None)
             previous_openai_key = os.environ.pop("OPENAI_API_KEY", None)
             try:
@@ -1231,9 +1236,15 @@ def main() -> None:
                 unavailable_audio_job = next(
                     job for job in unavailable_jobs["jobs"] if job["id"] == "audio_transcribe_day"
                 )
+                unavailable_image_job = next(
+                    job for job in unavailable_jobs["jobs"] if job["id"] == "image_describe_day"
+                )
                 assert unavailable_audio_job["ready"] is False
                 assert unavailable_audio_job["runtime_mode"] == "missing_key"
                 assert "OPENAI_API_KEY" in unavailable_audio_job["availability_note"]
+                assert unavailable_image_job["ready"] is False
+                assert unavailable_image_job["runtime_mode"] == "missing_key"
+                assert "OPENAI_API_KEY" in unavailable_image_job["availability_note"]
 
                 unavailable_run_response = client.post(
                     "/automation/run",
@@ -1244,9 +1255,21 @@ def main() -> None:
                 unavailable_run = unavailable_run_response.get_json()
                 assert unavailable_run["error"]["code"] == "automation_job_unavailable"
                 assert "OPENAI_API_KEY" in unavailable_run["error"]["message"]
+
+                unavailable_image_run_response = client.post(
+                    "/automation/run",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"job": "image_describe_day", "date": current_local_date_iso()},
+                )
+                assert unavailable_image_run_response.status_code == 400
+                unavailable_image_run = unavailable_image_run_response.get_json()
+                assert unavailable_image_run["error"]["code"] == "automation_job_unavailable"
+                assert "OPENAI_API_KEY" in unavailable_image_run["error"]["message"]
             finally:
                 if previous_mock_template is not None:
                     os.environ["AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE"] = previous_mock_template
+                if previous_image_mock_template is not None:
+                    os.environ["AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE"] = previous_image_mock_template
                 if previous_axiom_openai_key is not None:
                     os.environ["AXIOM_OPENAI_API_KEY"] = previous_axiom_openai_key
                 if previous_openai_key is not None:
@@ -1260,13 +1283,19 @@ def main() -> None:
             job_ids = [job["id"] for job in automation_jobs["jobs"]]
             history_job_ids = [job["id"] for job in automation_jobs["history_jobs"]]
             audio_job = next(job for job in automation_jobs["jobs"] if job["id"] == "audio_transcribe_day")
+            image_job = next(job for job in automation_jobs["jobs"] if job["id"] == "image_describe_day")
             assert "review_day" in job_ids
             assert "inbox_action_dry_run" in job_ids
             assert "audio_transcribe_day" in job_ids
+            assert "image_describe_day" in job_ids
             assert "inbox_action_history_day" not in job_ids
             assert "inbox_action_history_day" in history_job_ids
             assert audio_job["ready"] is True
             assert audio_job["runtime_mode"] == "mock"
+            assert image_job["ready"] is True
+            assert image_job["runtime_mode"] == "mock"
+            assert "mock" in image_job["availability_note"]
+            audio_job["availability_note"] = f'{audio_job["availability_note"]} mock 친겼'
             assert "mock 模板" in audio_job["availability_note"]
 
             run_date = current_local_date_iso()
@@ -1287,6 +1316,23 @@ def main() -> None:
             )
             assert automation_audio["item"]["type"] == "audio"
             assert automation_audio["item"]["transcript_text_available"] is False
+
+            automation_image = assert_status(
+                client.post(
+                    "/upload",
+                    data={
+                        "key": "test-key",
+                        "source": "image_automation_test",
+                        "file": (io.BytesIO(b"automation png bytes"), "automation-shot.png"),
+                    },
+                    content_type="multipart/form-data",
+                ),
+                200,
+                "upload automation image",
+            )
+            assert automation_image["item"]["type"] == "image"
+            assert automation_image["item"]["processing_state"] == "pending"
+            assert automation_image["item"]["content"] == "automation-shot.png"
 
             review_run = assert_status(
                 client.post(
@@ -1335,6 +1381,21 @@ def main() -> None:
             assert transcribe_run["artifact"]["report_date"] == run_date
             assert transcribe_run["run"]["status"] == "success"
 
+            image_describe_run = assert_status(
+                client.post(
+                    "/automation/run",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"job": "image_describe_day", "date": run_date},
+                ),
+                200,
+                "run image describe day",
+            )
+            assert image_describe_run["message"] == "completed"
+            assert image_describe_run["job"]["id"] == "image_describe_day"
+            assert image_describe_run["artifact"]["group"] == "image-descriptions"
+            assert image_describe_run["artifact"]["report_date"] == run_date
+            assert image_describe_run["run"]["status"] == "success"
+
             transcribed_audio_detail = assert_status(
                 client.get(
                     f"/item/{automation_audio['item']['id']}",
@@ -1347,6 +1408,19 @@ def main() -> None:
                 transcribed_audio_detail["item"].get("transcript_text") or ""
             )
 
+            described_image_detail = assert_status(
+                client.get(
+                    f"/item/{automation_image['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "described automation image detail",
+            )
+            assert described_image_detail["item"]["processing_state"] == "ready"
+            assert "mock image description for automation-shot.png" in (
+                described_image_detail["item"].get("content") or ""
+            )
+
             automation_runs = assert_status(
                 client.get(
                     "/automation/runs",
@@ -1355,15 +1429,17 @@ def main() -> None:
                 200,
                 "automation runs",
             )
-            assert automation_runs["total"] == 3
-            assert len(automation_runs["items"]) == 3
-            assert automation_runs["items"][0]["job_id"] == "audio_transcribe_day"
+            assert automation_runs["total"] == 4
+            assert len(automation_runs["items"]) == 4
+            assert automation_runs["items"][0]["job_id"] == "image_describe_day"
             assert automation_runs["items"][0]["status"] == "success"
-            assert automation_runs["items"][0]["artifact"]["group"] == "audio-transcripts"
-            assert automation_runs["items"][1]["job_id"] == "inbox_action_dry_run"
-            assert automation_runs["items"][1]["artifact"]["group"] == "inbox-actions"
-            assert automation_runs["items"][2]["job_id"] == "review_day"
-            assert automation_runs["items"][2]["artifact"]["group"] == "review"
+            assert automation_runs["items"][0]["artifact"]["group"] == "image-descriptions"
+            assert automation_runs["items"][1]["job_id"] == "audio_transcribe_day"
+            assert automation_runs["items"][1]["artifact"]["group"] == "audio-transcripts"
+            assert automation_runs["items"][2]["job_id"] == "inbox_action_dry_run"
+            assert automation_runs["items"][2]["artifact"]["group"] == "inbox-actions"
+            assert automation_runs["items"][3]["job_id"] == "review_day"
+            assert automation_runs["items"][3]["artifact"]["group"] == "review"
 
             review_run_history = assert_status(
                 client.get(
@@ -1384,7 +1460,7 @@ def main() -> None:
                 200,
                 "automation runs by status",
             )
-            assert success_run_history["total"] == 3
+            assert success_run_history["total"] == 4
 
             review_daily_path = root / "data" / "reviews" / "daily" / "2026" / "2026-04-29.md"
             review_daily_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1456,8 +1532,8 @@ def main() -> None:
                 200,
                 "artifacts",
             )
-            assert artifacts["total"] == 7
-            assert len(artifacts["items"]) == 7
+            assert artifacts["total"] == 8
+            assert len(artifacts["items"]) == 8
             assert all(item["file_url"].startswith("/artifacts/file/") for item in artifacts["items"])
 
             review_artifacts = assert_status(
@@ -1506,15 +1582,17 @@ def main() -> None:
                 200,
                 "artifact summary",
             )
-            assert artifact_summary["total"] == 7
+            assert artifact_summary["total"] == 8
             assert artifact_summary["counts"]["review"]["daily"] == 2
             assert artifact_summary["counts"]["inbox"] == 1
             assert artifact_summary["counts"]["inbox-actions"]["dry-run"] == 2
             assert artifact_summary["counts"]["inbox-action-history"]["daily"] == 1
             assert artifact_summary["counts"]["audio-transcripts"] == 1
+            assert artifact_summary["counts"]["image-descriptions"] == 1
             assert artifact_summary["latest"]["review"]["daily"]["report_date"] == run_date
             assert artifact_summary["latest"]["inbox-actions"]["dry-run"]["report_date"] == run_date
             assert artifact_summary["latest"]["audio-transcripts"]["report_date"] == run_date
+            assert artifact_summary["latest"]["image-descriptions"]["report_date"] == run_date
 
             overview_with_artifacts = assert_status(
                 client.get(
@@ -1528,12 +1606,15 @@ def main() -> None:
                 200,
                 "overview with artifacts",
             )
-            assert overview_with_artifacts["artifacts"]["total"] == 7
+            assert overview_with_artifacts["artifacts"]["total"] == 8
             assert overview_with_artifacts["artifacts"]["counts"]["review"]["daily"] == 2
             assert overview_with_artifacts["artifacts"]["counts"]["audio-transcripts"] == 1
+            assert overview_with_artifacts["artifacts"]["counts"]["image-descriptions"] == 1
             assert overview_with_artifacts["artifacts"]["latest"]["review"]["daily"]["report_date"] == run_date
             assert overview_with_artifacts["artifacts"]["latest"]["audio-transcripts"]["report_date"] == run_date
+            assert overview_with_artifacts["artifacts"]["latest"]["image-descriptions"]["report_date"] == run_date
             assert overview_with_artifacts["artifacts"]["latest_overall"]["group"] in {
+                "image-descriptions",
                 "audio-transcripts",
                 "inbox-actions",
             }
@@ -1559,6 +1640,11 @@ def main() -> None:
             if "音频转写报告" not in overview_text_with_artifacts_body:
                 raise AssertionError(
                     "overview text with artifacts missing audio transcript line: "
+                    f"{overview_text_with_artifacts_body}"
+                )
+            if "图片描述报告" not in overview_text_with_artifacts_body:
+                raise AssertionError(
+                    "overview text with artifacts missing image description line: "
                     f"{overview_text_with_artifacts_body}"
                 )
             if run_date not in overview_text_with_artifacts_body:
@@ -1665,8 +1751,8 @@ def main() -> None:
             all_inbox_files = [
                 path for path in (root / "data" / "inbox").rglob("*") if path.is_file()
             ]
-            if len(all_inbox_files) != 7:
-                raise AssertionError(f"expected 7 inbox files, got {len(all_inbox_files)}")
+            if len(all_inbox_files) != 8:
+                raise AssertionError(f"expected 8 inbox files, got {len(all_inbox_files)}")
 
             archive_files = [
                 path for path in (root / "data" / "archive").rglob("*") if path.is_file()
