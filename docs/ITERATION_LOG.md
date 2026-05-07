@@ -433,3 +433,8 @@
 - 这两个 daily timer 会在 review 前先尝试补全前一天的 audio / image 文本层；若 VPS 还没配置 OpenAI key，会安全记成 `skipped`，不会把定时任务跑成失败
 - `scripts/smoke_test_receiver.py` 新增 `run_logged_automation.py --skip-when-unavailable` 覆盖：在 mock 和 key 都移除的环境下验证 `image_describe_day` 会被记录为 `skipped`
 - `scripts/smoke_test_web_app.py` 新增自动化运行状态筛选的 `skipped` 选项覆盖
+- 已用 `scripts/deploy_to_vps.py` 将这轮“安全定时 AI 预处理”部署到 VPS，当前线上代码更新到 `78e6121`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_084723_78e6121.tar.gz`
+- 新增的 `axiom-daily-audio-transcribe.timer` 与 `axiom-daily-image-describe.timer` 已安装到 `/etc/systemd/system/`，当前默认仍是 `disabled`
+- 线上手动启动 `axiom-daily-audio-transcribe.service` 与 `axiom-daily-image-describe.service` 后，运行历史已出现真实 `skipped` 记录，确认“缺 key 安全跳过”在线上生效
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/automation/jobs` 中 `audio_transcribe_day` 与 `image_describe_day` 均返回 `runtime_mode=missing_key`、鉴权 `/automation/runs?status=skipped` 已能返回 `skipped` 记录
