@@ -1028,6 +1028,45 @@ def main() -> None:
             assert pending_document_search["total"] == 1
             assert pending_document_search["items"][0]["id"] == docx_document["item"]["id"]
 
+            processing_backlog = assert_status(
+                client.get(
+                    "/processing/backlog",
+                    query_string={
+                        "key": "test-key",
+                        "group_limit": "2",
+                    },
+                ),
+                200,
+                "processing backlog",
+            )
+            assert processing_backlog["total"] == 1
+            assert processing_backlog["group_limit"] == 2
+            assert processing_backlog["by_type"]["document"] == 1
+            assert len(processing_backlog["groups"]) == 1
+            assert processing_backlog["groups"][0]["type"] == "document"
+            assert processing_backlog["groups"][0]["title"] == "文档待补正文"
+            assert processing_backlog["groups"][0]["count"] == 1
+            assert processing_backlog["groups"][0]["items"][0]["id"] == docx_document["item"]["id"]
+
+            overview_with_pending = assert_status(
+                client.get(
+                    "/overview",
+                    query_string={
+                        "key": "test-key",
+                        "recent_limit": "3",
+                        "preview_chars": "120",
+                    },
+                ),
+                200,
+                "overview with pending backlog",
+            )
+            assert overview_with_pending["processing_backlog"]["total"] == 1
+            assert overview_with_pending["processing_backlog"]["groups"][0]["type"] == "document"
+            assert (
+                overview_with_pending["processing_backlog"]["groups"][0]["items"][0]["id"]
+                == docx_document["item"]["id"]
+            )
+
             updated_document = assert_status(
                 client.post(
                     f"/item/{docx_document['item']['id']}/update",
@@ -1183,6 +1222,8 @@ def main() -> None:
             assert len(overview["recent"]["items"]) == 2
             assert overview["recent"]["items"][0]["id"] == audio["item"]["id"]
             assert overview["recent"]["items"][1]["id"] == docx_document["item"]["id"]
+            assert overview["processing_backlog"]["total"] == 0
+            assert overview["processing_backlog"]["groups"] == []
 
             overview_text = client.get(
                 "/overview/text",
@@ -1693,6 +1734,16 @@ def main() -> None:
                 "invalid overview",
             )
             assert invalid_overview["error"]["code"] == "invalid_overview_param"
+
+            invalid_processing_backlog = assert_status(
+                client.get(
+                    "/processing/backlog",
+                    query_string={"key": "test-key", "group_limit": "0"},
+                ),
+                400,
+                "invalid processing backlog",
+            )
+            assert invalid_processing_backlog["error"]["code"] == "invalid_processing_backlog_param"
 
             artifact_file = client.get(
                 "/artifacts/file/data/reviews/daily/2026/2026-04-29.md",

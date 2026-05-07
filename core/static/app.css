@@ -466,6 +466,29 @@ body::before {
     color: var(--ink);
 }
 
+.backlog-card {
+    display: grid;
+    gap: 12px;
+}
+
+.backlog-preview-list {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 8px;
+    color: var(--ink-soft);
+}
+
+.backlog-preview-list li {
+    display: grid;
+    gap: 2px;
+}
+
+.backlog-preview-list strong {
+    color: var(--ink);
+    font-size: 0.94rem;
+}
+
 .item-image {
     width: 100%;
     border-radius: var(--radius-md);
@@ -680,6 +703,10 @@ body::before {
 }
 
 @media (min-width: 1080px) {
+    .split-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .item-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }

@@ -438,3 +438,8 @@
 - 新增的 `axiom-daily-audio-transcribe.timer` 与 `axiom-daily-image-describe.timer` 已安装到 `/etc/systemd/system/`，当前默认仍是 `disabled`
 - 线上手动启动 `axiom-daily-audio-transcribe.service` 与 `axiom-daily-image-describe.service` 后，运行历史已出现真实 `skipped` 记录，确认“缺 key 安全跳过”在线上生效
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/automation/jobs` 中 `audio_transcribe_day` 与 `image_describe_day` 均返回 `runtime_mode=missing_key`、鉴权 `/automation/runs?status=skipped` 已能返回 `skipped` 记录
+- 新增 `/processing/backlog`，按 `document / audio / image / text` 聚合返回待补正文、待补转写、待补说明的积压条目
+- `/overview` 和 `/overview/text` 现在会同时返回处理积压摘要，不再只看 stats / recent / artifacts
+- `/app` 总览新增“待处理队列”面板，可一键跳转到 `processing_state=pending` 的 recent 过滤结果
+- `scripts/smoke_test_receiver.py` 新增积压接口、overview backlog 和非法 `group_limit` 覆盖
+- `scripts/smoke_test_web_app.py` 新增浏览器级“overview backlog -> recent pending filter”闭环覆盖，并补了 pending image backlog 可见性检查

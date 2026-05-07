@@ -352,9 +352,23 @@ def main() -> None:
                     wait_for_text(page, "#viewer-meta", "待补正文", "docx pending meta")
                     close_viewer(page)
 
-                    page.select_option("#recent-type-input", "document")
-                    page.select_option("#recent-processing-state-input", "pending")
-                    page.locator("#recent-filter-form button[type='submit']").click()
+                    wait_for_text(page, "#overview-processing-backlog", "文档待补正文", "overview docx backlog card")
+                    wait_for_text(page, "#overview-backlog-total", "待处理 1 条", "overview backlog total")
+                    click_first_action(
+                        page,
+                        "#overview-processing-backlog [data-action='apply-processing-backlog-filter']",
+                        "apply overview backlog filter",
+                    )
+                    page.wait_for_function(
+                        """
+                        () => {
+                            const typeInput = document.getElementById("recent-type-input");
+                            const stateInput = document.getElementById("recent-processing-state-input");
+                            return typeInput?.value === "document" && stateInput?.value === "pending";
+                        }
+                        """,
+                        timeout=15_000,
+                    )
                     wait_for_text(page, "#recent-list", docx_note, "pending docx recent result")
                     click_first_action(page, "#recent-list [data-action='view-item']", "open pending docx item")
                     wait_for_text(page, "#viewer-meta", "待补正文", "pending docx viewer meta")
@@ -438,6 +452,7 @@ def main() -> None:
                     page.fill("#file-source-input", "web_app_image_pending")
                     page.locator("#file-capture-form button[type='submit']").click()
                     page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
+                    wait_for_text(page, "#overview-processing-backlog", "图片待补说明", "overview pending image backlog card")
 
                     page.fill("#search-query-input", "pending-shot.png")
                     page.fill("#search-source-input", "web_app_image_pending")

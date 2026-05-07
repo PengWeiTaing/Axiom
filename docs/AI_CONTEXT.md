@@ -181,6 +181,7 @@ logs/
 - `/recent` 和 `/search` 支持分页、类型、存储区、来源、`processing_state`、时间范围过滤；`/search` 还会匹配 `original_name`、文档 `derived_text` 和音频 `transcript_text`
 - `/overview` 聚合返回 stats、最近 item 和最新 artifact 摘要，适合作为手机端或轻前端总览入口
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
+- `/processing/backlog` 会把待补正文、待补转写、待补说明的条目按类型聚合起来，并返回每组的最近样本和快速过滤参数
 - `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；当前已补 PDF 预览与正文预览、音频播放器与转写预览，以及 Word `.docx` 的正文预览，并支持直接筛出待补正文 / 待补转写 / 待补图片描述条目后在 viewer 中补齐
 - `/automation/jobs` 返回当前允许手动触发的任务清单，当前开放 review、inbox report、dry-run、`audio_transcribe_day` 和 `image_describe_day`
 - `/automation/runs` 返回自动化运行历史，覆盖手动任务与 systemd 定时任务，包含状态、产物、stdout/stderr 尾部和耗时；当前状态除了 `success / failed / timeout / running`，还包含 `skipped`

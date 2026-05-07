@@ -715,6 +715,15 @@ def read_recent_limit(default: int = 10) -> int:
     )
 
 
+def read_group_limit(default: int = 3) -> int:
+    return parse_positive_int(
+        request.args.get("group_limit"),
+        "group_limit",
+        default,
+        10,
+    )
+
+
 def read_optional_run_date(body: dict) -> str:
     run_date = str(body.get("date") or "").strip()
     return resolve_run_date_value(run_date or None)
@@ -906,6 +915,36 @@ def describe_primary_text_source(
     if normalized_original_name:
         return "original_name"
     return "empty"
+
+
+def get_item_primary_text(item: dict | None) -> str:
+    if not item:
+        return ""
+
+    item_type = str(item.get("type") or "")
+    content = strip_item_text(item.get("content"))
+    original_name = strip_item_text(item.get("original_name"))
+    derived_text = strip_item_text(item.get("derived_text_preview") or item.get("derived_text"))
+    transcript_text = strip_item_text(
+        item.get("transcript_text_preview") or item.get("transcript_text")
+    )
+    text_source = describe_primary_text_source(
+        item_type,
+        content,
+        original_name,
+        derived_text,
+        transcript_text,
+    )
+
+    if text_source == "derived_text":
+        return derived_text
+    if text_source == "transcript_text":
+        return transcript_text
+    if text_source == "content":
+        return content
+    if text_source == "original_name":
+        return original_name
+    return ""
 
 
 def describe_processing_state(
@@ -1749,6 +1788,116 @@ def fetch_recent_item_rows(limit: int) -> list[sqlite3.Row]:
         conn.close()
 
 
+def fetch_pending_item_rows(item_type: str, limit: int) -> list[sqlite3.Row]:
+    conditions, params = build_item_filter_conditions(
+        item_type,
+        None,
+        None,
+        None,
+        None,
+        "pending",
+    )
+    where_clause = join_conditions(conditions, "WHERE")
+
+    conn = get_db_connection()
+    try:
+        return conn.execute(
+            f"""
+            SELECT {ITEM_LIST_SELECT_FIELDS}
+            FROM items
+            {where_clause}
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (*params, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def get_processing_backlog_title(item_type: str) -> str:
+    if item_type == ITEM_TYPE_DOCUMENT:
+        return "文档待补正文"
+    if item_type == ITEM_TYPE_AUDIO:
+        return "音频待补转写"
+    if item_type == ITEM_TYPE_IMAGE:
+        return "图片待补说明"
+    return "文本待补内容"
+
+
+def get_processing_backlog_description(item_type: str) -> str:
+    if item_type == ITEM_TYPE_DOCUMENT:
+        return "优先补 PDF / Word 正文，后续搜索、回顾和导出都会直接消费正文。"
+    if item_type == ITEM_TYPE_AUDIO:
+        return "优先补音频转写，后续搜索、回顾和自动化会直接消费转写文本。"
+    if item_type == ITEM_TYPE_IMAGE:
+        return "优先补图片说明，后续搜索、回顾和描述自动化会直接读取说明文本。"
+    return "补齐文本内容，避免记录只剩空壳索引。"
+
+
+def build_processing_backlog_payload(group_limit: int = 3) -> dict:
+    ordered_types = [
+        ITEM_TYPE_DOCUMENT,
+        ITEM_TYPE_AUDIO,
+        ITEM_TYPE_IMAGE,
+        ITEM_TYPE_TEXT,
+    ]
+
+    conn = get_db_connection()
+    try:
+        type_rows = conn.execute(
+            f"""
+            SELECT type, COUNT(*) AS count
+            FROM items
+            WHERE ({ITEM_PROCESSING_STATE_SQL}) = 'pending'
+            GROUP BY type
+            ORDER BY CASE type
+                WHEN 'document' THEN 0
+                WHEN 'audio' THEN 1
+                WHEN 'image' THEN 2
+                WHEN 'text' THEN 3
+                ELSE 4
+            END
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    counts_by_type = rows_to_count_map(type_rows, "type")
+    groups = []
+
+    for item_type in ordered_types:
+        count = counts_by_type.get(item_type, 0)
+        if count <= 0:
+            continue
+
+        rows = fetch_pending_item_rows(item_type, group_limit)
+        groups.append(
+            {
+                "type": item_type,
+                "type_label": get_type_label(item_type),
+                "title": get_processing_backlog_title(item_type),
+                "description": get_processing_backlog_description(item_type),
+                "processing_note": describe_processing_note(item_type, "pending"),
+                "count": count,
+                "items": [row_to_item(row) for row in rows],
+                "filters": {
+                    "type": item_type,
+                    "processing_state": "pending",
+                },
+            }
+        )
+
+    total_pending = sum(counts_by_type.values())
+    return {
+        "generated_at": utc_now().isoformat(timespec="seconds"),
+        "total": total_pending,
+        "group_limit": group_limit,
+        "by_type": counts_by_type,
+        "groups": groups,
+    }
+
+
 def summarize_text(value: str | None, max_chars: int) -> str:
     if not value:
         return ""
@@ -1763,6 +1912,7 @@ def build_overview_payload(recent_limit: int, preview_chars: int) -> dict:
     recent_rows = fetch_recent_item_rows(recent_limit)
     artifacts = list_review_artifacts()
     latest_overall = max(artifacts, key=artifact_sort_key) if artifacts else None
+    backlog_limit = max(1, min(recent_limit, 3))
 
     return {
         "service": "axiom-receiver",
@@ -1772,6 +1922,7 @@ def build_overview_payload(recent_limit: int, preview_chars: int) -> dict:
             "items": [row_to_item(row) for row in recent_rows],
         },
         "stats": build_stats_payload(),
+        "processing_backlog": build_processing_backlog_payload(backlog_limit),
         "artifacts": {
             "preview_chars": preview_chars,
             "total": len(artifacts),
@@ -1785,6 +1936,7 @@ def build_overview_payload(recent_limit: int, preview_chars: int) -> dict:
 def build_overview_text(payload: dict, preview_chars: int) -> str:
     stats = payload["stats"]
     recent = payload["recent"]
+    backlog = payload["processing_backlog"]
     artifacts = payload["artifacts"]
     latest = artifacts["latest"]
     lines = [
@@ -1813,6 +1965,22 @@ def build_overview_text(payload: dict, preview_chars: int) -> str:
             )
     else:
         lines.append("- 暂无记录")
+
+    lines.extend(["", "处理积压"])
+    if backlog["total"] <= 0:
+        lines.append("- 当前没有待补正文 / 转写 / 描述项")
+    else:
+        lines.append(f"- 总待处理: {backlog['total']}")
+        for group in backlog["groups"]:
+            latest_item = group["items"][0] if group["items"] else None
+            item_preview = summarize_text(
+                get_item_primary_text(latest_item) if latest_item else "",
+                preview_chars,
+            ) or (latest_item.get("original_name") if latest_item else "")
+            suffix = ""
+            if latest_item:
+                suffix = f" | 最近: {item_preview or '(无内容)'}"
+            lines.append(f"- {group['title']}: {group['count']}{suffix}")
 
     lines.extend(["", "自动化产物", f"- 总数: {artifacts['total']}"])
 
@@ -2629,6 +2797,20 @@ def overview_text():
     payload = build_overview_payload(recent_limit, preview_chars)
     body = build_overview_text(payload, preview_chars)
     return app.response_class(body, mimetype="text/plain")
+
+
+@app.route("/processing/backlog", methods=["GET"])
+def processing_backlog():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        group_limit = read_group_limit()
+    except ValueError as exc:
+        return error_response(400, "invalid_processing_backlog_param", str(exc))
+
+    return ok_response(build_processing_backlog_payload(group_limit))
 
 
 @app.route("/add", methods=["GET", "POST"])

@@ -55,9 +55,12 @@ const elements = {
     captureFeedback: document.getElementById("capture-feedback"),
     overviewStats: document.getElementById("overview-stats"),
     overviewRecentHighlights: document.getElementById("overview-recent-highlights"),
+    overviewProcessingBacklog: document.getElementById("overview-processing-backlog"),
+    overviewBacklogTotal: document.getElementById("overview-backlog-total"),
     overviewArtifactHighlights: document.getElementById("overview-artifact-highlights"),
     overviewGeneratedAt: document.getElementById("overview-generated-at"),
     refreshOverviewButton: document.getElementById("refresh-overview-button"),
+    recentPanel: document.getElementById("recent-panel"),
     recentFilterForm: document.getElementById("recent-filter-form"),
     recentFeedback: document.getElementById("recent-feedback"),
     resetRecentFiltersButton: document.getElementById("reset-recent-filters-button"),
@@ -525,6 +528,55 @@ function renderOverviewRecent(items) {
                 </article>
             `
         )
+        .join("");
+}
+
+function renderOverviewBacklog(backlog) {
+    const groups = backlog?.groups || [];
+    const total = Number(backlog?.total || 0);
+    elements.overviewBacklogTotal.textContent = total > 0 ? `待处理 ${total} 条` : "当前已清空";
+
+    if (!groups.length) {
+        renderEmptyState(elements.overviewProcessingBacklog, "当前没有待补正文、待补转写或待补说明的条目。");
+        return;
+    }
+
+    elements.overviewProcessingBacklog.innerHTML = groups
+        .map((group) => {
+            const sampleItems = (group.items || [])
+                .map(
+                    (item) => `
+                        <li>
+                            <strong>${escapeHtml(getItemDisplayName(item))}</strong>
+                            <span>${escapeHtml(formatDateTime(item.created_at))}</span>
+                        </li>
+                    `,
+                )
+                .join("");
+            return `
+                <article class="summary-card backlog-card">
+                    <div class="item-meta">
+                        <span class="tag">${escapeHtml(group.type_label || formatType(group.type))}</span>
+                        <span>${escapeHtml(group.processing_note || formatProcessingState("pending"))}</span>
+                        <span>${escapeHtml(group.count)} 条</span>
+                    </div>
+                    <h3>${escapeHtml(group.title || "待处理队列")}</h3>
+                    <p class="item-preview">${escapeHtml(group.description || "")}</p>
+                    ${sampleItems ? `<ul class="backlog-preview-list">${sampleItems}</ul>` : ""}
+                    <div class="card-actions">
+                        <button
+                            class="secondary-button"
+                            type="button"
+                            data-action="apply-processing-backlog-filter"
+                            data-item-type="${escapeHtml(group.filters?.type || "")}"
+                            data-processing-state="${escapeHtml(group.filters?.processing_state || "pending")}"
+                        >
+                            查看这组待处理
+                        </button>
+                    </div>
+                </article>
+            `;
+        })
         .join("");
 }
 
@@ -1437,6 +1489,7 @@ async function loadOverview() {
     });
     renderOverviewStats(payload.stats);
     renderOverviewRecent(payload.recent.items || []);
+    renderOverviewBacklog(payload.processing_backlog || { total: 0, groups: [] });
     renderOverviewArtifacts(payload.artifacts.latest || {});
     elements.overviewGeneratedAt.textContent = `生成于 ${formatDateTime(payload.generated_at)}`;
     elements.lastSyncIndicator.textContent = `上次同步：${formatDateTime(payload.generated_at)}`;
@@ -1453,6 +1506,22 @@ function readRecentFilters() {
         created_from: toUtcIsoFromLocalInput(String(form.get("created_from") || "").trim()),
         created_to: toUtcIsoFromLocalInput(String(form.get("created_to") || "").trim()),
     };
+}
+
+async function applyProcessingBacklogFilter(itemType, processingState = "pending") {
+    try {
+        elements.recentFilterForm.reset();
+        document.getElementById("recent-sort-input").value = "newest";
+        document.getElementById("recent-type-input").value = itemType || "";
+        document.getElementById("recent-processing-state-input").value = processingState || "";
+        setConnectionState("busy", "正在切换到待处理队列");
+        await loadRecentPage({ reset: true });
+        setConnectionState("ready", elements.lastSyncIndicator.textContent);
+        elements.recentPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+        setConnectionState("error", error.message);
+        showToast(error.message);
+    }
 }
 
 async function loadRecentPage({ reset = false } = {}) {
@@ -1909,6 +1978,11 @@ function bindDelegatedActions() {
         const action = target.getAttribute("data-action");
         if (action === "toggle-storage") {
             await handleStorageToggle(target.getAttribute("data-item-id"));
+        } else if (action === "apply-processing-backlog-filter") {
+            await applyProcessingBacklogFilter(
+                target.getAttribute("data-item-type"),
+                target.getAttribute("data-processing-state") || "pending",
+            );
         } else if (action === "view-item") {
             await handleItemView(target.getAttribute("data-item-id"));
         } else if (action === "edit-item") {
@@ -2000,9 +2074,11 @@ function bindForms() {
         setFeedback(elements.automationRunsFeedback, "", "muted");
         setConnectionState("idle", "尚未同步");
         elements.overviewGeneratedAt.textContent = "";
+        elements.overviewBacklogTotal.textContent = "待处理 0 条";
         closeViewer();
         renderEmptyState(elements.overviewStats, "保存 key 后即可读取总览。");
         renderEmptyState(elements.overviewRecentHighlights, "保存 key 后即可查看最近记录。");
+        renderEmptyState(elements.overviewProcessingBacklog, "保存 key 后即可查看待处理队列。");
         renderEmptyState(elements.overviewArtifactHighlights, "保存 key 后即可查看自动化产物。");
         renderEmptyState(elements.recentList, "保存 key 后即可读取最近记录。");
         renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
@@ -2241,6 +2317,7 @@ async function registerServiceWorker() {
 function renderInitialEmptyStates() {
     renderEmptyState(elements.overviewStats, "保存 key 后即可读取总览。");
     renderEmptyState(elements.overviewRecentHighlights, "保存 key 后即可查看最近记录。");
+    renderEmptyState(elements.overviewProcessingBacklog, "保存 key 后即可查看待处理队列。");
     renderEmptyState(elements.overviewArtifactHighlights, "保存 key 后即可查看自动化产物。");
     renderEmptyState(elements.recentList, "保存 key 后即可读取最近记录。");
     renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
@@ -2248,6 +2325,7 @@ function renderInitialEmptyStates() {
     renderEmptyState(elements.automationRuns, "还没有自动化运行记录。");
     renderEmptyState(elements.artifactSummaryCards, "保存 key 后即可读取自动化摘要。");
     renderEmptyState(elements.artifactList, "保存 key 后即可读取自动化产物。");
+    elements.overviewBacklogTotal.textContent = "待处理 0 条";
     updateLoadMoreButton(elements.loadMoreRecentButton, 1, 1);
     updateLoadMoreButton(elements.loadMoreSearchButton, 1, 1, "还没有结果");
     updateLoadMoreButton(elements.loadMoreAutomationRunsButton, 1, 1);
