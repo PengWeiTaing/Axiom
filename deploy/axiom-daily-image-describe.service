@@ -1,0 +1,8 @@
+[Unit]
+Description=Axiom daily image describe snapshot
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/axiom
+EnvironmentFile=/opt/axiom/.env
+ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/run_logged_automation.py --job-id image_describe_day --root /opt/axiom --days-offset -1 --utc-offset +08:00 --skip-when-unavailable

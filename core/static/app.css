@@ -394,6 +394,11 @@ body::before {
     color: #1c5f43;
 }
 
+.status-tag[data-status="skipped"] {
+    background: rgba(60, 92, 132, 0.12);
+    color: #31557c;
+}
+
 .status-tag[data-status="failed"],
 .status-tag[data-status="timeout"] {
     background: rgba(153, 58, 44, 0.12);

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Axiom daily audio transcribe snapshot
+
+[Timer]
+OnCalendar=*-*-* 15:20:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=axiom-daily-audio-transcribe.service
+
+[Install]
+WantedBy=timers.target

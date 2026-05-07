@@ -224,6 +224,8 @@ def main() -> None:
                         raise AssertionError("audio transcribe job button should be enabled in mock mode")
                     if page.locator("[data-job-id='image_describe_day']").is_disabled():
                         raise AssertionError("image describe job button should be enabled in mock mode")
+                    if page.locator("#automation-runs-status-input option[value='skipped']").count() != 1:
+                        raise AssertionError("automation runs status filter missing skipped option")
 
                     has_service_worker = page.evaluate(
                         """

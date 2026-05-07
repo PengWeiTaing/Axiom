@@ -48,6 +48,11 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("AXIOM_LOCAL_UTC_OFFSET", "+08:00"),
         help="Local timezone offset, default +08:00.",
     )
+    parser.add_argument(
+        "--skip-when-unavailable",
+        action="store_true",
+        help="If the job runtime is unavailable, record a skipped run and exit 0.",
+    )
     return parser.parse_args()
 
 
@@ -72,7 +77,11 @@ def main() -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    payload, status = receiver.execute_logged_automation_job(args.job_id, run_date)
+    payload, status = receiver.execute_logged_automation_job(
+        args.job_id,
+        run_date,
+        skip_when_unavailable=args.skip_when_unavailable,
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
     if status == 200:

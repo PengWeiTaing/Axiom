@@ -427,3 +427,9 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“图片自动描述自动化”部署到 VPS，当前线上代码更新到 `70c8d29`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_082725_70c8d29.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/automation/jobs` 中 `image_describe_day` 已返回 `ready=false` 与 `runtime_mode=missing_key`、鉴权 `/overview` 与 `/artifacts/summary` 已出现 `image-descriptions` 分组、公网 `/app` 已出现 `image_describe_day` 任务按钮和 `image-descriptions` artifact 过滤项
+- `scripts/run_logged_automation.py` 新增 `--skip-when-unavailable`；当 job 依赖 OpenAI key 但环境未就绪时，会写一条 `skipped` 运行记录并退出 0
+- `automation_runs` 现在正式支持 `skipped` 状态；`/automation/runs`、`/app` 运行历史状态筛选和状态标签都已接入
+- 新增 `deploy/axiom-daily-audio-transcribe.service` / `.timer` 与 `deploy/axiom-daily-image-describe.service` / `.timer`
+- 这两个 daily timer 会在 review 前先尝试补全前一天的 audio / image 文本层；若 VPS 还没配置 OpenAI key，会安全记成 `skipped`，不会把定时任务跑成失败
+- `scripts/smoke_test_receiver.py` 新增 `run_logged_automation.py --skip-when-unavailable` 覆盖：在 mock 和 key 都移除的环境下验证 `image_describe_day` 会被记录为 `skipped`
+- `scripts/smoke_test_web_app.py` 新增自动化运行状态筛选的 `skipped` 选项覆盖

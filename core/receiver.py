@@ -182,7 +182,7 @@ ARTIFACT_GROUPS = {
 }
 ARTIFACT_WINDOWS = {"daily", "weekly"}
 ARTIFACT_MODES = {"dry-run", "apply"}
-AUTOMATION_RUN_STATUSES = {"running", "success", "failed", "timeout"}
+AUTOMATION_RUN_STATUSES = {"running", "success", "skipped", "failed", "timeout"}
 DOCX_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 AUTOMATION_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS = int(
     os.environ.get("AXIOM_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS", "300")
@@ -2274,6 +2274,8 @@ def derive_automation_message(
 ) -> str:
     if status == "success":
         return "completed"
+    if status == "skipped":
+        return "skipped"
     if stderr_tail:
         return stderr_tail[-1]
     if stdout_tail:
@@ -2298,8 +2300,36 @@ def run_automation_job(job_id: str, run_date: str) -> subprocess.CompletedProces
     )
 
 
-def execute_logged_automation_job(job_id: str, run_date: str) -> tuple[dict, int]:
-    job_payload = build_automation_job_payload(job_id, AUTOMATION_JOBS[job_id])
+def complete_skipped_automation_run(
+    run_id: int,
+    *,
+    message: str,
+    started_at_dt: datetime,
+) -> None:
+    finished_at_dt = utc_now()
+    finished_at = finished_at_dt.isoformat(timespec="seconds")
+    duration_ms = max(0, int((finished_at_dt - started_at_dt).total_seconds() * 1000))
+    finalize_automation_run(
+        run_id,
+        status="skipped",
+        return_code=0,
+        message=message,
+        artifact_path=None,
+        stdout_tail=[message],
+        stderr_tail=[],
+        finished_at=finished_at,
+        duration_ms=duration_ms,
+    )
+
+
+def execute_logged_automation_job(
+    job_id: str,
+    run_date: str,
+    *,
+    skip_when_unavailable: bool = False,
+) -> tuple[dict, int]:
+    job = AUTOMATION_JOBS[job_id]
+    job_payload = build_automation_job_payload(job_id, job)
 
     if not acquire_automation_lock(job_id, run_date):
         return (
@@ -2333,6 +2363,53 @@ def execute_logged_automation_job(job_id: str, run_date: str) -> tuple[dict, int
                 "date": run_date,
             },
             500,
+        )
+
+    if not job_payload["ready"]:
+        if not skip_when_unavailable:
+            finalize_automation_run(
+                run_id,
+                status="failed",
+                return_code=None,
+                message=job_payload["availability_note"],
+                artifact_path=None,
+                stdout_tail=[],
+                stderr_tail=[job_payload["availability_note"]],
+                finished_at=utc_now().isoformat(timespec="seconds"),
+                duration_ms=max(0, int((utc_now() - started_at_dt).total_seconds() * 1000)),
+            )
+            release_automation_lock()
+            run_row = get_automation_run_by_id(run_id)
+            return (
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "automation_job_unavailable",
+                        "message": job_payload["availability_note"],
+                    },
+                    "job": job_payload,
+                    "date": run_date,
+                    "run": row_to_automation_run(run_row) if run_row else None,
+                },
+                400,
+            )
+
+        complete_skipped_automation_run(
+            run_id,
+            message=job_payload["availability_note"],
+            started_at_dt=started_at_dt,
+        )
+        release_automation_lock()
+        run_row = get_automation_run_by_id(run_id)
+        return (
+            {
+                "ok": True,
+                "message": "skipped",
+                "job": job_payload,
+                "date": run_date,
+                "run": row_to_automation_run(run_row) if run_row else None,
+            },
+            200,
         )
 
     try:

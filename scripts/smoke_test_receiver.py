@@ -1742,6 +1742,64 @@ def main() -> None:
             assert history_run["items"][0]["artifact"]["window"] == "daily"
             assert history_run["items"][0]["artifact"]["report_date"] == run_date
 
+            skip_env = os.environ.copy()
+            skip_env.pop("AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE", None)
+            skip_env.pop("AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE", None)
+            skip_env.pop("AXIOM_OPENAI_API_KEY", None)
+            skip_env.pop("OPENAI_API_KEY", None)
+            skipped_image_result = subprocess.run(
+                [
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    str(REPO_ROOT / "scripts" / "run_logged_automation.py"),
+                    "--job-id",
+                    "image_describe_day",
+                    "--root",
+                    str(root),
+                    "--date",
+                    run_date,
+                    "--utc-offset",
+                    "+08:00",
+                    "--skip-when-unavailable",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=skip_env,
+            )
+            if skipped_image_result.returncode != 0:
+                raise AssertionError(
+                    "run_logged_automation skip-when-unavailable failed: "
+                    f"code={skipped_image_result.returncode}, "
+                    f"stdout={skipped_image_result.stdout!r}, stderr={skipped_image_result.stderr!r}"
+                )
+            if '"message": "skipped"' not in skipped_image_result.stdout:
+                raise AssertionError(
+                    "run_logged_automation skip result missing skipped message: "
+                    f"{skipped_image_result.stdout!r}"
+                )
+
+            skipped_image_run = assert_status(
+                client.get(
+                    "/automation/runs",
+                    query_string={
+                        "key": "test-key",
+                        "job": "image_describe_day",
+                        "status": "skipped",
+                    },
+                ),
+                200,
+                "automation runs skipped image describe",
+            )
+            assert skipped_image_run["total"] == 1
+            assert skipped_image_run["items"][0]["job_id"] == "image_describe_day"
+            assert skipped_image_run["items"][0]["status"] == "skipped"
+            assert skipped_image_run["items"][0]["artifact"] is None
+            assert "OPENAI_API_KEY" in skipped_image_run["items"][0]["message"]
+
             inbox_text_files = list((root / "data" / "inbox").glob("*.txt"))
             if len(inbox_text_files) != 2:
                 raise AssertionError(

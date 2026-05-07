@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Axiom daily image describe snapshot
+
+[Timer]
+OnCalendar=*-*-* 15:30:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=axiom-daily-image-describe.service
+
+[Install]
+WantedBy=timers.target

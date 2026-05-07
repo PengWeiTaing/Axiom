@@ -183,12 +183,13 @@ logs/
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
 - `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；当前已补 PDF 预览与正文预览、音频播放器与转写预览，以及 Word `.docx` 的正文预览，并支持直接筛出待补正文 / 待补转写 / 待补图片描述条目后在 viewer 中补齐
 - `/automation/jobs` 返回当前允许手动触发的任务清单，当前开放 review、inbox report、dry-run、`audio_transcribe_day` 和 `image_describe_day`
-- `/automation/runs` 返回自动化运行历史，覆盖手动任务与 systemd 定时任务，包含状态、产物、stdout/stderr 尾部和耗时
+- `/automation/runs` 返回自动化运行历史，覆盖手动任务与 systemd 定时任务，包含状态、产物、stdout/stderr 尾部和耗时；当前状态除了 `success / failed / timeout / running`，还包含 `skipped`
 - `/automation/run` 会在 receiver 进程里串行触发白名单脚本，默认不开放 destructive apply；`audio_transcribe_day` 会把音频自动转写写回 `transcript_text`，`image_describe_day` 会把图片描述写回 `content`，并分别产出 `audio-transcripts` 与 `image-descriptions` 报告
 - 前端请求统一通过 `X-Axiom-Key` header 访问后端接口，不在页面里到处拼 query key
 - `/sw.js` 和 `manifest.webmanifest` 组成当前 PWA 壳，目标是把浏览器入口稳定成手机主屏入口
 - `scripts/smoke_test_web_app.py` 会启动本地临时 receiver，并用 Playwright 真跑 `/app` 的关键交互
 - `scripts/run_logged_automation.py` 复用 receiver 的锁与运行记录逻辑，供 systemd timer 在不经过 HTTP 的情况下写入 `automation_runs`
+- `scripts/run_logged_automation.py` 现在支持 `--skip-when-unavailable`；当 job 依赖 OpenAI key 但环境未就绪时，会写一条 `skipped` 运行记录并退出 0，适合给 systemd timer 直接调用
 - `scripts/deploy_to_vps.py` 负责把本地当前 commit 打包、备份 VPS 代码、同步到 `/opt/axiom`、安装最新 systemd unit、重启服务并做基础验证
 - `/artifacts` 支持按 group、window、mode、日期范围分页读取自动化产物
 - `/artifacts/summary` 返回最新 review、inbox report、action snapshot、action history、audio transcript report、image description report 及其文本预览

@@ -276,6 +276,9 @@ function formatAutomationStatus(status) {
     if (status === "success") {
         return "成功";
     }
+    if (status === "skipped") {
+        return "已跳过";
+    }
     if (status === "failed") {
         return "失败";
     }

@@ -46,7 +46,7 @@ receiver 已提供：
 - `/overview/text`：返回适合快捷指令直接显示的纯文本总览
 - `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口；已补 PDF 预览与正文预览、音频播放器与转写预览，以及 Word 正文预览
 - `/automation/jobs`：返回当前允许手动触发的安全自动化任务；当前包含 review、inbox report、dry-run，以及可选的音频自动转写和图片自动描述
-- `/automation/runs`：读取自动化运行历史，覆盖手动触发和定时任务，并返回状态、产物和输出尾部
+- `/automation/runs`：读取自动化运行历史，覆盖手动触发和定时任务，并返回状态、产物和输出尾部；当前状态包含 `success / skipped / failed / timeout / running`
 - `/automation/run`：手动生成 review / inbox report / dry-run artifact / audio transcript report / image description report
 - `/artifacts`：列出 `data/reviews` 下的自动化产物
 - `/artifacts/summary`：直接读取各类自动化产物的最新摘要，当前包含 `audio-transcripts` 和 `image-descriptions`
@@ -140,7 +140,7 @@ flowchart TD
 - `scripts/smoke_test_receiver.py`：receiver 本地冒烟测试
 - `scripts/smoke_test_web_app.py`：Web App 浏览器级冒烟测试
 - `scripts/deploy_to_vps.py`：从本地当前 commit 生成发布包、备份 VPS 代码、同步代码和 systemd unit、重启并验证
-- `scripts/run_logged_automation.py`：统一执行并记录自动化任务，供 systemd timer 复用
+- `scripts/run_logged_automation.py`：统一执行并记录自动化任务，供 systemd timer 复用；支持 `--skip-when-unavailable`
 - `scripts/build_review_markdown.py`：生成日 / 周回顾 Markdown
 - `scripts/save_review_snapshot.py`：保存日 / 周回顾快照
 - `scripts/build_inbox_processing_report.py`：生成 inbox 处理建议
@@ -177,6 +177,8 @@ $env:AXIOM_IMAGE_DESCRIBE_MODEL="gpt-4.1-mini"
 ```
 
 没有配置 key 时，`audio_transcribe_day` 和 `image_describe_day` 任务仍会出现在自动化中心，但真实转写 / 描述不会成功；本地冒烟通过 mock 模板覆盖这两条链路。
+
+如果把 daily audio / image timer 启用到 VPS，但还没配置 key，它们会在运行历史里记成 `skipped`，不会把 systemd 跑成失败。
 
 如果要补浏览器级验证，再执行：
 
