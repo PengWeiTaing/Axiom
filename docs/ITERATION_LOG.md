@@ -443,3 +443,6 @@
 - `/app` 总览新增“待处理队列”面板，可一键跳转到 `processing_state=pending` 的 recent 过滤结果
 - `scripts/smoke_test_receiver.py` 新增积压接口、overview backlog 和非法 `group_limit` 覆盖
 - `scripts/smoke_test_web_app.py` 新增浏览器级“overview backlog -> recent pending filter”闭环覆盖，并补了 pending image backlog 可见性检查
+- 已用 `scripts/deploy_to_vps.py` 将这轮“processing backlog 视图”部署到 VPS，当前线上代码更新到 `01a34e1`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_114408_01a34e1.tar.gz`
+- 线上只读验证通过：`/processing/backlog?key=axiomnb` 当前返回 `total=0`，`/overview?key=axiomnb` 已包含 `processing_backlog` 字段，公网 `/app` 已能读到“待处理队列”面板
