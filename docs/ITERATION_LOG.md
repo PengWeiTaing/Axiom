@@ -451,3 +451,6 @@
 - `/app` 总览里的“待处理队列”现在支持一键直接打开下一条待处理 item，也保留原来的筛选跳转入口
 - `scripts/smoke_test_receiver.py` 新增 `/processing/next`、backlog `next_item` / `next_overall` 和非法 `type` 覆盖
 - `scripts/smoke_test_web_app.py` 新增浏览器级“总览 backlog 直接打开下一条待处理文档”覆盖
+- 已用 `scripts/deploy_to_vps.py` 将这轮“next pending processing flow”部署到 VPS，当前线上代码更新到 `3447f6a`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_143116_3447f6a.tar.gz`
+- 线上只读验证通过：`/processing/next?key=axiomnb` 当前返回 `item=null`，`/processing/backlog?key=axiomnb` 已返回 `next_overall=null`，公网 `/app` 的“待处理队列”面板当前显示“当前已清空”
