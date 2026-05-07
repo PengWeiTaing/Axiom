@@ -534,6 +534,7 @@ function renderOverviewRecent(items) {
 function renderOverviewBacklog(backlog) {
     const groups = backlog?.groups || [];
     const total = Number(backlog?.total || 0);
+    const nextOverall = backlog?.next_overall || null;
     elements.overviewBacklogTotal.textContent = total > 0 ? `待处理 ${total} 条` : "当前已清空";
 
     if (!groups.length) {
@@ -541,8 +542,33 @@ function renderOverviewBacklog(backlog) {
         return;
     }
 
-    elements.overviewProcessingBacklog.innerHTML = groups
+    const nextOverallCard = nextOverall
+        ? `
+            <article class="summary-card backlog-card backlog-next-card">
+                <div class="item-meta">
+                    <span class="tag">下一条</span>
+                    <span>${escapeHtml(formatType(nextOverall.type))}</span>
+                    <span>${escapeHtml(nextOverall.processing_note || formatProcessingState(nextOverall.processing_state))}</span>
+                </div>
+                <h3>${escapeHtml(getItemDisplayName(nextOverall))}</h3>
+                <p class="item-preview">${escapeHtml(getDocumentAwarePreviewText(nextOverall, 120))}</p>
+                <div class="card-actions">
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        data-action="view-item"
+                        data-item-id="${escapeHtml(nextOverall.id)}"
+                    >
+                        直接处理下一条
+                    </button>
+                </div>
+            </article>
+        `
+        : "";
+
+    elements.overviewProcessingBacklog.innerHTML = nextOverallCard + groups
         .map((group) => {
+            const nextItem = group.next_item || null;
             const sampleItems = (group.items || [])
                 .map(
                     (item) => `
@@ -562,10 +588,29 @@ function renderOverviewBacklog(backlog) {
                     </div>
                     <h3>${escapeHtml(group.title || "待处理队列")}</h3>
                     <p class="item-preview">${escapeHtml(group.description || "")}</p>
+                    ${
+                        nextItem
+                            ? `<p class="item-preview"><strong>下一条：</strong>${escapeHtml(getItemDisplayName(nextItem))}</p>`
+                            : ""
+                    }
                     ${sampleItems ? `<ul class="backlog-preview-list">${sampleItems}</ul>` : ""}
                     <div class="card-actions">
+                        ${
+                            nextItem
+                                ? `
+                                    <button
+                                        class="secondary-button"
+                                        type="button"
+                                        data-action="view-item"
+                                        data-item-id="${escapeHtml(nextItem.id)}"
+                                    >
+                                        直接处理最新一条
+                                    </button>
+                                `
+                                : ""
+                        }
                         <button
-                            class="secondary-button"
+                            class="${nextItem ? "text-button" : "secondary-button"}"
                             type="button"
                             data-action="apply-processing-backlog-filter"
                             data-item-type="${escapeHtml(group.filters?.type || "")}"

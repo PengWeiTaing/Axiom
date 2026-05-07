@@ -1042,11 +1042,35 @@ def main() -> None:
             assert processing_backlog["total"] == 1
             assert processing_backlog["group_limit"] == 2
             assert processing_backlog["by_type"]["document"] == 1
+            assert processing_backlog["next_overall"]["id"] == docx_document["item"]["id"]
             assert len(processing_backlog["groups"]) == 1
             assert processing_backlog["groups"][0]["type"] == "document"
             assert processing_backlog["groups"][0]["title"] == "文档待补正文"
             assert processing_backlog["groups"][0]["count"] == 1
             assert processing_backlog["groups"][0]["items"][0]["id"] == docx_document["item"]["id"]
+            assert processing_backlog["groups"][0]["next_item"]["id"] == docx_document["item"]["id"]
+
+            next_pending_document = assert_status(
+                client.get(
+                    "/processing/next",
+                    query_string={"key": "test-key", "type": "document"},
+                ),
+                200,
+                "processing next document",
+            )
+            assert next_pending_document["type"] == "document"
+            assert next_pending_document["item"]["id"] == docx_document["item"]["id"]
+
+            next_pending_overall = assert_status(
+                client.get(
+                    "/processing/next",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "processing next overall",
+            )
+            assert next_pending_overall["type"] is None
+            assert next_pending_overall["item"]["id"] == docx_document["item"]["id"]
 
             overview_with_pending = assert_status(
                 client.get(
@@ -1083,6 +1107,16 @@ def main() -> None:
             assert "Manual document recovery line" in (
                 updated_document["item"].get("derived_text") or ""
             )
+
+            next_ready_document = assert_status(
+                client.get(
+                    "/processing/next",
+                    query_string={"key": "test-key", "type": "document"},
+                ),
+                200,
+                "processing next after document recovery",
+            )
+            assert next_ready_document["item"] is None
 
             manual_document_search = assert_status(
                 client.get(
@@ -1744,6 +1778,16 @@ def main() -> None:
                 "invalid processing backlog",
             )
             assert invalid_processing_backlog["error"]["code"] == "invalid_processing_backlog_param"
+
+            invalid_processing_next = assert_status(
+                client.get(
+                    "/processing/next",
+                    query_string={"key": "test-key", "type": "video"},
+                ),
+                400,
+                "invalid processing next",
+            )
+            assert invalid_processing_next["error"]["code"] == "invalid_processing_next_param"
 
             artifact_file = client.get(
                 "/artifacts/file/data/reviews/daily/2026/2026-04-29.md",

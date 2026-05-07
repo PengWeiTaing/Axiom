@@ -1815,6 +1815,33 @@ def fetch_pending_item_rows(item_type: str, limit: int) -> list[sqlite3.Row]:
         conn.close()
 
 
+def fetch_next_pending_item_row(item_type: str | None = None) -> sqlite3.Row | None:
+    conditions, params = build_item_filter_conditions(
+        item_type,
+        None,
+        None,
+        None,
+        None,
+        "pending",
+    )
+    where_clause = join_conditions(conditions, "WHERE")
+
+    conn = get_db_connection()
+    try:
+        return conn.execute(
+            f"""
+            SELECT {ITEM_LIST_SELECT_FIELDS}
+            FROM items
+            {where_clause}
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            params,
+        ).fetchone()
+    finally:
+        conn.close()
+
+
 def get_processing_backlog_title(item_type: str) -> str:
     if item_type == ITEM_TYPE_DOCUMENT:
         return "文档待补正文"
@@ -1864,6 +1891,7 @@ def build_processing_backlog_payload(group_limit: int = 3) -> dict:
         conn.close()
 
     counts_by_type = rows_to_count_map(type_rows, "type")
+    next_overall_row = fetch_next_pending_item_row()
     groups = []
 
     for item_type in ordered_types:
@@ -1872,6 +1900,7 @@ def build_processing_backlog_payload(group_limit: int = 3) -> dict:
             continue
 
         rows = fetch_pending_item_rows(item_type, group_limit)
+        next_item_row = rows[0] if rows else fetch_next_pending_item_row(item_type)
         groups.append(
             {
                 "type": item_type,
@@ -1881,6 +1910,7 @@ def build_processing_backlog_payload(group_limit: int = 3) -> dict:
                 "processing_note": describe_processing_note(item_type, "pending"),
                 "count": count,
                 "items": [row_to_item(row) for row in rows],
+                "next_item": row_to_item(next_item_row) if next_item_row else None,
                 "filters": {
                     "type": item_type,
                     "processing_state": "pending",
@@ -1894,6 +1924,7 @@ def build_processing_backlog_payload(group_limit: int = 3) -> dict:
         "total": total_pending,
         "group_limit": group_limit,
         "by_type": counts_by_type,
+        "next_overall": row_to_item(next_overall_row) if next_overall_row else None,
         "groups": groups,
     }
 
@@ -2811,6 +2842,27 @@ def processing_backlog():
         return error_response(400, "invalid_processing_backlog_param", str(exc))
 
     return ok_response(build_processing_backlog_payload(group_limit))
+
+
+@app.route("/processing/next", methods=["GET"])
+def processing_next_item():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        item_type = read_item_type_filter()
+    except ValueError as exc:
+        return error_response(400, "invalid_processing_next_param", str(exc))
+
+    row = fetch_next_pending_item_row(item_type)
+    return ok_response(
+        {
+            "type": item_type,
+            "processing_state": "pending",
+            "item": row_to_item(row) if row else None,
+        }
+    )
 
 
 @app.route("/add", methods=["GET", "POST"])

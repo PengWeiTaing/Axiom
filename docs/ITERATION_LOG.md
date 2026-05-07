@@ -446,3 +446,8 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“processing backlog 视图”部署到 VPS，当前线上代码更新到 `01a34e1`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_114408_01a34e1.tar.gz`
 - 线上只读验证通过：`/processing/backlog?key=axiomnb` 当前返回 `total=0`，`/overview?key=axiomnb` 已包含 `processing_backlog` 字段，公网 `/app` 已能读到“待处理队列”面板
+- `/processing/backlog` 现在会同时返回全局 `next_overall` 和每组 `next_item`，待处理积压不再只能“先筛列表再点”
+- 新增 `/processing/next`，可直接取回当前下一条待处理记录，并支持 `type=document|audio|image|text` 过滤
+- `/app` 总览里的“待处理队列”现在支持一键直接打开下一条待处理 item，也保留原来的筛选跳转入口
+- `scripts/smoke_test_receiver.py` 新增 `/processing/next`、backlog `next_item` / `next_overall` 和非法 `type` 覆盖
+- `scripts/smoke_test_web_app.py` 新增浏览器级“总览 backlog 直接打开下一条待处理文档”覆盖

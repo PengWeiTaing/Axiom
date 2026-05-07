@@ -44,7 +44,7 @@ receiver 已提供：
 - `/search`：关键词检索，支持相关性、时间、处理状态等过滤条件，以及按原文件名、文档抽取正文和音频转写文本搜索
 - `/overview`：聚合返回统计、最近记录和最新自动化产物摘要
 - `/overview/text`：返回适合快捷指令直接显示的纯文本总览
-- `/processing/backlog`：按类型聚合返回待补正文、待补转写、待补说明的积压条目，并附带快速过滤参数
+- `/processing/backlog`：按类型聚合返回待补正文、待补转写、待补说明的积压条目，并附带快速过滤参数与“下一条待处理 item”
 - `/app`：移动优先 Web App，总览、记录、搜索、上传和自动化产物浏览入口；已补 PDF 预览与正文预览、音频播放器与转写预览，以及 Word 正文预览
 - `/automation/jobs`：返回当前允许手动触发的安全自动化任务；当前包含 review、inbox report、dry-run，以及可选的音频自动转写和图片自动描述
 - `/automation/runs`：读取自动化运行历史，覆盖手动触发和定时任务，并返回状态、产物和输出尾部；当前状态包含 `success / skipped / failed / timeout / running`
