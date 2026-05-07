@@ -138,9 +138,13 @@ def click_first_action(page, selector: str, label: str) -> None:
     locator = page.locator(selector).first
     try:
         locator.wait_for(timeout=15_000)
+        locator.scroll_into_view_if_needed(timeout=15_000)
         locator.click()
     except Exception as exc:  # noqa: BLE001
-        raise AssertionError(f"{label}: could not click {selector}") from exc
+        try:
+            locator.evaluate("(element) => element.click()")
+        except Exception as fallback_exc:  # noqa: BLE001
+            raise AssertionError(f"{label}: could not click {selector}") from fallback_exc
 
 
 def close_viewer(page) -> None:
@@ -331,8 +335,42 @@ def main() -> None:
                     wait_for_text(page, "#search-results", docx_note, "docx search result")
                     click_first_action(page, "#search-results [data-action='view-item']", "open docx item")
                     wait_for_text(page, "#viewer-meta", "Weekly Plan.docx", "docx meta")
+                    wait_for_text(page, "#viewer-meta", "正文已就绪", "docx ready meta")
                     wait_for_text(page, "#viewer-content", "Docx body line for browser search", "docx extracted text")
+                    page.locator("#viewer-actions").evaluate(
+                        "(element) => element.scrollIntoView({ block: 'start', behavior: 'auto' })"
+                    )
+                    click_first_action(page, "#viewer-actions [data-action='edit-item']", "edit docx item")
+                    page.locator("[data-role='item-edit-form'] textarea[name='derived_text']").fill("")
+                    click_first_action(page, "#viewer-actions [data-action='save-item-edit']", "save empty docx derived text")
+                    wait_for_text(page, "#viewer-meta", "待补正文", "docx pending meta")
                     close_viewer(page)
+
+                    page.select_option("#recent-type-input", "document")
+                    page.select_option("#recent-processing-state-input", "pending")
+                    page.locator("#recent-filter-form button[type='submit']").click()
+                    wait_for_text(page, "#recent-list", docx_note, "pending docx recent result")
+                    click_first_action(page, "#recent-list [data-action='view-item']", "open pending docx item")
+                    wait_for_text(page, "#viewer-meta", "待补正文", "pending docx viewer meta")
+                    page.locator("#viewer-actions").evaluate(
+                        "(element) => element.scrollIntoView({ block: 'start', behavior: 'auto' })"
+                    )
+                    click_first_action(page, "#viewer-actions [data-action='edit-item']", "edit pending docx item")
+                    page.locator("[data-role='item-edit-form'] textarea[name='derived_text']").fill(
+                        "Browser manual document recovery line"
+                    )
+                    click_first_action(page, "#viewer-actions [data-action='save-item-edit']", "save docx derived text")
+                    wait_for_text(page, "#viewer-meta", "正文已就绪", "updated docx ready meta")
+                    wait_for_text(page, "#viewer-content", "Browser manual document recovery line", "updated docx derived text")
+                    close_viewer(page)
+                    page.locator("#reset-recent-filters-button").click()
+
+                    page.fill("#search-query-input", "Browser manual document recovery line")
+                    page.fill("#search-source-input", "web_app_docx")
+                    page.select_option("#search-processing-state-input", "ready")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", docx_note, "updated docx search result")
+                    page.select_option("#search-processing-state-input", "")
 
                     page.set_input_files(
                         "#file-input",

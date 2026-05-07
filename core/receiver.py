@@ -53,6 +53,19 @@ ITEM_TYPE_TEXT = "text"
 ITEM_TYPE_IMAGE = "image"
 ITEM_TYPE_DOCUMENT = "document"
 ITEM_TYPE_AUDIO = "audio"
+ITEM_TEXT_SOURCES = {"content", "derived_text", "transcript_text", "original_name", "empty"}
+ITEM_PROCESSING_STATES = {"ready", "pending"}
+ITEM_TEXT_SOURCE_LABELS = {
+    "content": "内容说明",
+    "derived_text": "文档正文",
+    "transcript_text": "音频转写",
+    "original_name": "仅文件名",
+    "empty": "无可读文本",
+}
+ITEM_PROCESSING_LABELS = {
+    "ready": "已就绪",
+    "pending": "待处理",
+}
 ITEM_TYPES = {ITEM_TYPE_TEXT, ITEM_TYPE_IMAGE, ITEM_TYPE_DOCUMENT, ITEM_TYPE_AUDIO}
 STORAGE_AREAS = {"inbox": INBOX_PATH, "archive": ARCHIVE_PATH}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
@@ -106,6 +119,41 @@ ITEM_BASE_SELECT_FIELDS = """
     original_name,
     mime_type,
     size_bytes
+"""
+ITEM_TEXT_SOURCE_SQL = """
+    CASE
+        WHEN type = 'document' AND COALESCE(TRIM(derived_text), '') != '' THEN 'derived_text'
+        WHEN type = 'audio' AND COALESCE(TRIM(transcript_text), '') != '' THEN 'transcript_text'
+        WHEN COALESCE(TRIM(content), '') != '' THEN 'content'
+        WHEN COALESCE(TRIM(derived_text), '') != '' THEN 'derived_text'
+        WHEN COALESCE(TRIM(transcript_text), '') != '' THEN 'transcript_text'
+        WHEN COALESCE(TRIM(original_name), '') != '' THEN 'original_name'
+        ELSE 'empty'
+    END
+"""
+ITEM_PROCESSING_STATE_SQL = """
+    CASE
+        WHEN type = 'document' THEN
+            CASE
+                WHEN COALESCE(TRIM(derived_text), '') != '' THEN 'ready'
+                ELSE 'pending'
+            END
+        WHEN type = 'audio' THEN
+            CASE
+                WHEN COALESCE(TRIM(transcript_text), '') != '' THEN 'ready'
+                ELSE 'pending'
+            END
+        WHEN type = 'image' THEN
+            CASE
+                WHEN COALESCE(TRIM(content), '') != '' AND COALESCE(TRIM(content), '') != COALESCE(TRIM(original_name), '') THEN 'ready'
+                ELSE 'pending'
+            END
+        ELSE
+            CASE
+                WHEN COALESCE(TRIM(content), '') != '' THEN 'ready'
+                ELSE 'pending'
+            END
+    END
 """
 ITEM_LIST_SELECT_FIELDS = f"""
     {ITEM_BASE_SELECT_FIELDS},
@@ -470,6 +518,16 @@ def read_source_filter() -> str | None:
     return source or None
 
 
+def read_processing_state_filter() -> str | None:
+    processing_state = request.args.get("processing_state", "").strip().lower()
+    if not processing_state:
+        return None
+    if processing_state not in ITEM_PROCESSING_STATES:
+        allowed = "、".join(sorted(ITEM_PROCESSING_STATES))
+        raise ValueError(f"processing_state 只能是 {allowed}")
+    return processing_state
+
+
 def parse_date_filter(value: str, field_name: str) -> date:
     text = value.strip()
     if not text:
@@ -655,6 +713,7 @@ def build_item_filter_conditions(
     source: str | None,
     created_from: str | None,
     created_to: str | None,
+    processing_state: str | None = None,
 ) -> tuple[list[str], list[str]]:
     conditions: list[str] = []
     params: list[str] = []
@@ -679,6 +738,10 @@ def build_item_filter_conditions(
     if created_to:
         conditions.append("created_at <= ?")
         params.append(created_to)
+
+    if processing_state:
+        conditions.append(f"({ITEM_PROCESSING_STATE_SQL}) = ?")
+        params.append(processing_state)
 
     return conditions, params
 
@@ -784,6 +847,72 @@ def get_storage_area(file_path: str | Path | None) -> str | None:
     return "external"
 
 
+def strip_item_text(value: str | None) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def describe_primary_text_source(
+    item_type: str,
+    content: str | None,
+    original_name: str | None,
+    derived_text: str | None,
+    transcript_text: str | None,
+) -> str:
+    normalized_content = strip_item_text(content)
+    normalized_original_name = strip_item_text(original_name)
+    normalized_derived_text = strip_item_text(derived_text)
+    normalized_transcript_text = strip_item_text(transcript_text)
+
+    if item_type == ITEM_TYPE_DOCUMENT and normalized_derived_text:
+        return "derived_text"
+    if item_type == ITEM_TYPE_AUDIO and normalized_transcript_text:
+        return "transcript_text"
+    if normalized_content:
+        return "content"
+    if normalized_derived_text:
+        return "derived_text"
+    if normalized_transcript_text:
+        return "transcript_text"
+    if normalized_original_name:
+        return "original_name"
+    return "empty"
+
+
+def describe_processing_state(
+    item_type: str,
+    content: str | None,
+    original_name: str | None,
+    derived_text: str | None,
+    transcript_text: str | None,
+) -> str:
+    normalized_content = strip_item_text(content)
+    normalized_original_name = strip_item_text(original_name)
+    normalized_derived_text = strip_item_text(derived_text)
+    normalized_transcript_text = strip_item_text(transcript_text)
+
+    if item_type == ITEM_TYPE_DOCUMENT:
+        return "ready" if normalized_derived_text else "pending"
+    if item_type == ITEM_TYPE_AUDIO:
+        return "ready" if normalized_transcript_text else "pending"
+    if item_type == ITEM_TYPE_IMAGE:
+        return "ready" if normalized_content and normalized_content != normalized_original_name else "pending"
+    return "ready" if normalized_content else "pending"
+
+
+def describe_processing_note(item_type: str, processing_state: str) -> str:
+    if item_type == ITEM_TYPE_DOCUMENT:
+        return "正文已就绪" if processing_state == "ready" else "待补正文"
+    if item_type == ITEM_TYPE_AUDIO:
+        return "转写已就绪" if processing_state == "ready" else "待补转写"
+    if item_type == ITEM_TYPE_IMAGE:
+        return "说明已就绪" if processing_state == "ready" else "待补说明"
+    if item_type == ITEM_TYPE_TEXT:
+        return "文本已就绪"
+    return "内容已就绪" if processing_state == "ready" else "待补内容"
+
+
 def build_item_payload(
     item_id: int,
     item_type: str,
@@ -804,6 +933,20 @@ def build_item_payload(
     normalized_derived_text = normalize_extracted_text(derived_text)
     normalized_transcript_preview = normalize_extracted_text(transcript_text_preview)
     normalized_transcript_text = normalize_extracted_text(transcript_text)
+    text_source = describe_primary_text_source(
+        item_type,
+        content,
+        original_name,
+        normalized_derived_text,
+        normalized_transcript_text,
+    )
+    processing_state = describe_processing_state(
+        item_type,
+        content,
+        original_name,
+        normalized_derived_text,
+        normalized_transcript_text,
+    )
     item = {
         "id": item_id,
         "type": item_type,
@@ -823,6 +966,11 @@ def build_item_payload(
         "derived_text_preview": normalized_preview or normalized_derived_text,
         "transcript_text_available": bool(normalized_transcript_preview or normalized_transcript_text),
         "transcript_text_preview": normalized_transcript_preview or normalized_transcript_text,
+        "text_source": text_source,
+        "text_source_label": ITEM_TEXT_SOURCE_LABELS[text_source],
+        "processing_state": processing_state,
+        "processing_label": ITEM_PROCESSING_LABELS[processing_state],
+        "processing_note": describe_processing_note(item_type, processing_state),
     }
     if derived_text is not None:
         item["derived_text"] = normalized_derived_text
@@ -1245,10 +1393,11 @@ def update_item_file_path(item_id: int, file_path: Path) -> None:
         conn.close()
 
 
-def update_item_content_source_and_transcript(
+def update_item_content_source_text_fields(
     item_id: int,
     content: str | None,
     source: str | None,
+    derived_text: str | None,
     transcript_text: str | None,
 ) -> None:
     conn = get_db_connection()
@@ -1256,10 +1405,10 @@ def update_item_content_source_and_transcript(
         conn.execute(
             """
             UPDATE items
-            SET content = ?, source = ?, transcript_text = ?
+            SET content = ?, source = ?, derived_text = ?, transcript_text = ?
             WHERE id = ?
             """,
-            (content, source, transcript_text, item_id),
+            (content, source, derived_text, transcript_text, item_id),
         )
         conn.commit()
     finally:
@@ -1518,6 +1667,22 @@ def build_stats_payload() -> dict:
             ORDER BY source
             """
         ).fetchall()
+        text_source_rows = conn.execute(
+            f"""
+            SELECT {ITEM_TEXT_SOURCE_SQL} AS text_source, COUNT(*) AS count
+            FROM items
+            GROUP BY text_source
+            ORDER BY text_source
+            """
+        ).fetchall()
+        processing_rows = conn.execute(
+            f"""
+            SELECT {ITEM_PROCESSING_STATE_SQL} AS processing_state, COUNT(*) AS count
+            FROM items
+            GROUP BY processing_state
+            ORDER BY processing_state
+            """
+        ).fetchall()
         storage_rows = conn.execute(
             """
             SELECT file_path
@@ -1534,6 +1699,8 @@ def build_stats_payload() -> dict:
         "latest_created_at": summary["latest_created_at"],
         "by_type": rows_to_count_map(type_rows, "type"),
         "by_source": rows_to_count_map(source_rows, "source"),
+        "by_text_source": rows_to_count_map(text_source_rows, "text_source"),
+        "by_processing_state": rows_to_count_map(processing_rows, "processing_state"),
         "by_storage": count_storage_areas(storage_rows),
     }
 
@@ -1602,6 +1769,8 @@ def build_overview_text(payload: dict, preview_chars: int) -> str:
         f"- 图片: {stats['by_type'].get('image', 0)}",
         f"- 文档: {stats['by_type'].get('document', 0)}",
         f"- 音频: {stats['by_type'].get('audio', 0)}",
+        f"- 已就绪: {stats['by_processing_state'].get('ready', 0)}",
+        f"- 待处理: {stats['by_processing_state'].get('pending', 0)}",
         f"- inbox: {stats['by_storage'].get('inbox', 0)}",
         f"- archive: {stats['by_storage'].get('archive', 0)}",
         "",
@@ -2578,13 +2747,16 @@ def update_item(item_id: int):
 
     content_provided, raw_content = read_optional_body_field(body, "content")
     source_provided, raw_source = read_optional_body_field(body, "source")
+    derived_provided, raw_derived_text = read_optional_body_field(body, "derived_text")
     transcript_provided, raw_transcript_text = read_optional_body_field(body, "transcript_text")
 
+    if derived_provided and row["type"] != ITEM_TYPE_DOCUMENT:
+        return error_response(400, "invalid_derived_text_target", "derived_text 目前只支持 document item")
     if transcript_provided and row["type"] != ITEM_TYPE_AUDIO:
         return error_response(400, "invalid_transcript_target", "transcript_text 目前只支持 audio item")
 
-    if not content_provided and not source_provided and not transcript_provided:
-        return error_response(400, "missing_update_fields", "至少要提供 content、source 或 transcript_text")
+    if not content_provided and not source_provided and not derived_provided and not transcript_provided:
+        return error_response(400, "missing_update_fields", "至少要提供 content、source、derived_text 或 transcript_text")
 
     next_content = row["content"]
     if content_provided:
@@ -2602,6 +2774,10 @@ def update_item(item_id: int):
             return error_response(400, "empty_source", "source 不能为空")
         next_source = cleaned_source
 
+    next_derived_text = row["derived_text"] if "derived_text" in row.keys() else None
+    if derived_provided:
+        next_derived_text = normalize_extracted_text(raw_derived_text)
+
     next_transcript_text = row["transcript_text"] if "transcript_text" in row.keys() else None
     if transcript_provided:
         next_transcript_text = normalize_extracted_text(raw_transcript_text)
@@ -2611,6 +2787,8 @@ def update_item(item_id: int):
         updated_fields.append("content")
     if next_source != row["source"]:
         updated_fields.append("source")
+    if next_derived_text != row["derived_text"]:
+        updated_fields.append("derived_text")
     if next_transcript_text != row["transcript_text"]:
         updated_fields.append("transcript_text")
 
@@ -2645,10 +2823,11 @@ def update_item(item_id: int):
             return error_response(500, "file_write_failed", "文本文件更新失败")
 
     try:
-        update_item_content_source_and_transcript(
+        update_item_content_source_text_fields(
             item_id,
             next_content,
             next_source,
+            next_derived_text,
             next_transcript_text,
         )
     except sqlite3.Error:
@@ -2933,6 +3112,11 @@ def recent_items():
     except ValueError as exc:
         return error_response(400, "invalid_created_range", str(exc))
 
+    try:
+        processing_state = read_processing_state_filter()
+    except ValueError as exc:
+        return error_response(400, "invalid_processing_state", str(exc))
+
     source = read_source_filter()
     filter_conditions, filter_params = build_item_filter_conditions(
         item_type,
@@ -2940,6 +3124,7 @@ def recent_items():
         source,
         created_from,
         created_to,
+        processing_state,
     )
     where_clause = join_conditions(filter_conditions, "WHERE")
 
@@ -2974,6 +3159,7 @@ def recent_items():
             "source": source,
             "created_from": created_from,
             "created_to": created_to,
+            "processing_state": processing_state,
             "page": page,
             "page_size": page_size,
             "total": total,
@@ -3017,6 +3203,11 @@ def search_items():
     except ValueError as exc:
         return error_response(400, "invalid_created_range", str(exc))
 
+    try:
+        processing_state = read_processing_state_filter()
+    except ValueError as exc:
+        return error_response(400, "invalid_processing_state", str(exc))
+
     source = read_source_filter()
     escaped_query = escape_like(query)
     exact_match = query
@@ -3037,6 +3228,7 @@ def search_items():
         source,
         created_from,
         created_to,
+        processing_state,
     )
     filter_clause = join_conditions(filter_conditions, "AND")
 
@@ -3160,6 +3352,7 @@ def search_items():
             "source": source,
             "created_from": created_from,
             "created_to": created_to,
+            "processing_state": processing_state,
             "page": page,
             "page_size": page_size,
             "total": total,

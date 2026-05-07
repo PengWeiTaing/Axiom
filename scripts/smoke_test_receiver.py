@@ -452,6 +452,9 @@ def main() -> None:
             assert document["item"]["download_name"] == "Project Spec.pdf"
             assert document["item"]["size_bytes"] == len(pdf_bytes)
             assert document["item"]["derived_text_available"] is True
+            assert document["item"]["text_source"] == "derived_text"
+            assert document["item"]["processing_state"] == "ready"
+            assert document["item"]["processing_note"] == "正文已就绪"
             assert "Axiom pdf summary line" in (
                 document["item"]["derived_text_preview"] or ""
             )
@@ -500,6 +503,8 @@ def main() -> None:
             assert docx_document["item"]["type"] == "document"
             assert docx_document["item"]["extension"] == "docx"
             assert docx_document["item"]["derived_text_available"] is True
+            assert docx_document["item"]["text_source"] == "derived_text"
+            assert docx_document["item"]["processing_state"] == "ready"
             assert "Document body line for extracted search" in (
                 docx_document["item"]["derived_text_preview"] or ""
             )
@@ -585,6 +590,8 @@ def main() -> None:
             assert audio["item"]["download_name"] == "meeting-note.m4a"
             assert audio["item"]["size_bytes"] == len(b"fake m4a bytes")
             assert audio["item"]["transcript_text_available"] is True
+            assert audio["item"]["text_source"] == "transcript_text"
+            assert audio["item"]["processing_state"] == "ready"
             assert "Axiom audio transcript line" in (
                 audio["item"]["transcript_text_preview"] or ""
             )
@@ -965,6 +972,95 @@ def main() -> None:
             assert "derived_text: Axiom pdf summary line" in review_result.stdout
             assert "transcript_text: updated audio transcript" in review_result.stdout
 
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute(
+                    "UPDATE items SET derived_text = NULL WHERE id = ?",
+                    (docx_document["item"]["id"],),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            pending_docx_detail = assert_status(
+                client.get(
+                    f"/item/{docx_document['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "pending docx detail",
+            )
+            assert pending_docx_detail["item"]["derived_text_available"] is False
+            assert pending_docx_detail["item"]["processing_state"] == "pending"
+            assert pending_docx_detail["item"]["processing_note"] == "待补正文"
+
+            pending_recent_documents = assert_status(
+                client.get(
+                    "/recent",
+                    query_string={
+                        "key": "test-key",
+                        "type": "document",
+                        "processing_state": "pending",
+                    },
+                ),
+                200,
+                "recent pending document filter",
+            )
+            assert pending_recent_documents["processing_state"] == "pending"
+            assert pending_recent_documents["total"] == 1
+            assert pending_recent_documents["items"][0]["id"] == docx_document["item"]["id"]
+
+            pending_document_search = assert_status(
+                client.get(
+                    "/search",
+                    query_string={
+                        "key": "test-key",
+                        "q": "Weekly Plan",
+                        "type": "document",
+                        "processing_state": "pending",
+                    },
+                ),
+                200,
+                "search pending document",
+            )
+            assert pending_document_search["processing_state"] == "pending"
+            assert pending_document_search["total"] == 1
+            assert pending_document_search["items"][0]["id"] == docx_document["item"]["id"]
+
+            updated_document = assert_status(
+                client.post(
+                    f"/item/{docx_document['item']['id']}/update",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"derived_text": "Manual document recovery line"},
+                ),
+                200,
+                "update document derived text",
+            )
+            assert updated_document["updated_fields"] == ["derived_text"]
+            assert updated_document["item"]["derived_text_available"] is True
+            assert updated_document["item"]["text_source"] == "derived_text"
+            assert updated_document["item"]["processing_state"] == "ready"
+            assert "Manual document recovery line" in (
+                updated_document["item"].get("derived_text") or ""
+            )
+
+            manual_document_search = assert_status(
+                client.get(
+                    "/search",
+                    query_string={
+                        "key": "test-key",
+                        "q": "Manual document recovery",
+                        "type": "document",
+                        "processing_state": "ready",
+                    },
+                ),
+                200,
+                "search manually updated document text",
+            )
+            assert manual_document_search["processing_state"] == "ready"
+            assert manual_document_search["total"] == 1
+            assert manual_document_search["items"][0]["id"] == docx_document["item"]["id"]
+
             archive_search = assert_status(
                 client.get(
                     "/search",
@@ -1062,6 +1158,11 @@ def main() -> None:
             assert stats["by_source"]["audio_test"] == 1
             assert stats["by_storage"].get("archive", 0) == 0
             assert stats["by_storage"]["inbox"] == 6
+            assert stats["by_text_source"]["content"] == 3
+            assert stats["by_text_source"]["derived_text"] == 2
+            assert stats["by_text_source"]["transcript_text"] == 1
+            assert stats["by_processing_state"]["ready"] == 6
+            assert stats["by_processing_state"].get("pending", 0) == 0
 
             overview = assert_status(
                 client.get(
@@ -1104,6 +1205,8 @@ def main() -> None:
                 or "总条目: 6" not in overview_text_body
                 or "文档: 2" not in overview_text_body
                 or "音频: 1" not in overview_text_body
+                or "已就绪: 6" not in overview_text_body
+                or "待处理: 0" not in overview_text_body
             ):
                 raise AssertionError(f"overview text body unexpected: {overview_text_body}")
 

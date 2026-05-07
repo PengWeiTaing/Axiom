@@ -174,11 +174,12 @@ logs/
 - 文本和二进制文件写入都先落临时文件，再替换为正式文件
 - 数据库写入失败时会清理本次已写入文件
 - `/file/<id>` 会限制路径只能在 `AXIOM_ROOT` 下
-- `/item/<id>/update` 支持更新 `content`、`source`，以及 audio item 的 `transcript_text`；文本 item 会同步改写 txt 文件，数据库失败时会尝试回滚文本文件
-- `/recent` 和 `/search` 支持分页、类型、存储区、来源、时间范围过滤；`/search` 还会匹配 `original_name`、文档 `derived_text` 和音频 `transcript_text`
+- `/item/<id>/update` 支持更新 `content`、`source`，document item 的 `derived_text`，以及 audio item 的 `transcript_text`；文本 item 会同步改写 txt 文件，数据库失败时会尝试回滚文本文件
+- item payload 现在会额外返回 `text_source`、`text_source_label`、`processing_state`、`processing_label` 和 `processing_note`，用于区分“正文 / 转写已就绪”与“还待补处理”
+- `/recent` 和 `/search` 支持分页、类型、存储区、来源、`processing_state`、时间范围过滤；`/search` 还会匹配 `original_name`、文档 `derived_text` 和音频 `transcript_text`
 - `/overview` 聚合返回 stats、最近 item 和最新 artifact 摘要，适合作为手机端或轻前端总览入口
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
-- `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；当前已补 PDF 预览与正文预览、音频播放器与转写预览，以及 Word `.docx` 的正文预览
+- `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；当前已补 PDF 预览与正文预览、音频播放器与转写预览，以及 Word `.docx` 的正文预览，并支持直接筛出待补正文 / 待补转写条目后在 viewer 中补齐
 - `/automation/jobs` 返回当前允许手动触发的任务清单，当前开放 review、inbox report、dry-run 和 `audio_transcribe_day`
 - `/automation/runs` 返回自动化运行历史，覆盖手动任务与 systemd 定时任务，包含状态、产物、stdout/stderr 尾部和耗时
 - `/automation/run` 会在 receiver 进程里串行触发白名单脚本，默认不开放 destructive apply；`audio_transcribe_day` 会把音频自动转写写回 `transcript_text`，并产出 `audio-transcripts` 报告

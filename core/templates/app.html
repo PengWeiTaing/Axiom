@@ -200,6 +200,14 @@
                     </div>
                     <div class="form-grid">
                         <label class="field">
+                            <span>处理状态</span>
+                            <select id="recent-processing-state-input" name="processing_state">
+                                <option value="">全部</option>
+                                <option value="ready">已就绪</option>
+                                <option value="pending">待处理</option>
+                            </select>
+                        </label>
+                        <label class="field">
                             <span>起始时间</span>
                             <input id="recent-created-from-input" name="created_from" type="datetime-local">
                         </label>
@@ -265,6 +273,14 @@
                         </label>
                     </div>
                     <div class="form-grid">
+                        <label class="field">
+                            <span>处理状态</span>
+                            <select id="search-processing-state-input" name="processing_state">
+                                <option value="">全部</option>
+                                <option value="ready">已就绪</option>
+                                <option value="pending">待处理</option>
+                            </select>
+                        </label>
                         <label class="field">
                             <span>起始时间</span>
                             <input id="search-created-from-input" name="created_from" type="datetime-local">

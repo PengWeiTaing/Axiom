@@ -227,6 +227,26 @@ function formatStorage(storage) {
     return "inbox";
 }
 
+function formatTextSource(textSource) {
+    if (textSource === "derived_text") {
+        return "文档正文";
+    }
+    if (textSource === "transcript_text") {
+        return "音频转写";
+    }
+    if (textSource === "original_name") {
+        return "仅文件名";
+    }
+    if (textSource === "empty") {
+        return "无可读文本";
+    }
+    return "内容说明";
+}
+
+function formatProcessingState(processingState) {
+    return processingState === "pending" ? "待处理" : "已就绪";
+}
+
 function formatArtifactLabel(artifact) {
     if (!artifact) {
         return "未生成";
@@ -462,6 +482,8 @@ function renderOverviewStats(stats) {
         ["图片", stats.by_type?.image || 0],
         ["文档", stats.by_type?.document || 0],
         ["音频", stats.by_type?.audio || 0],
+        ["已就绪", stats.by_processing_state?.ready || 0],
+        ["待处理", stats.by_processing_state?.pending || 0],
         ["Inbox", stats.by_storage?.inbox || 0],
         ["Archive", stats.by_storage?.archive || 0],
     ];
@@ -549,6 +571,7 @@ function renderItemCards(container, items, emptyText) {
                     <div class="item-meta">
                         <span class="tag">${escapeHtml(formatType(item.type))}</span>
                         <span class="tag">${escapeHtml(formatStorage(item.storage))}</span>
+                        <span class="tag">${escapeHtml(formatProcessingState(item.processing_state))}</span>
                         <span>${escapeHtml(formatDateTime(item.created_at))}</span>
                     </div>
                     <h3>${escapeHtml(getItemDisplayName(item))}</h3>
@@ -562,6 +585,7 @@ function renderItemCards(container, items, emptyText) {
                             ? `<p class="helper-text">文件：${escapeHtml(fileDetail)}</p>`
                             : ""
                     }
+                    <p class="helper-text">文本层：${escapeHtml(formatTextSource(item.text_source))} · ${escapeHtml(item.processing_note || formatProcessingState(item.processing_state))}</p>
                     <p class="helper-text">来源：${escapeHtml(item.source || "unknown")}</p>
                     <div class="card-actions">
                         <button class="secondary-button" type="button" data-action="view-item" data-item-id="${escapeHtml(item.id)}">查看</button>
@@ -793,6 +817,8 @@ function buildItemMetaRows(item) {
         { label: "ID", value: `#${item.id}` },
         { label: "类型", value: formatType(item.type) },
         { label: "存储区", value: formatStorage(item.storage) },
+        { label: "处理状态", value: item.processing_note || formatProcessingState(item.processing_state) },
+        { label: "主要文本", value: item.text_source_label || formatTextSource(item.text_source) },
         { label: "来源", value: item.source || "unknown" },
         { label: "原文件名", value: item.original_name || "无" },
         { label: "格式", value: item.extension ? item.extension.toUpperCase() : null },
@@ -802,13 +828,13 @@ function buildItemMetaRows(item) {
         { label: "文件路径", value: item.file_path || "无文件" },
     ];
     if (item.type === "document") {
-        rows.splice(8, 0, {
-            label: "姝ｆ枃鎶藉彇",
-            value: item.derived_text_available ? "宸叉彁鍙?" : "鏆傛湭鎻愬彇",
+        rows.splice(10, 0, {
+            label: "正文抽取",
+            value: item.derived_text_available ? "已就绪" : "暂未提取",
         });
     }
     if (item.type === "audio") {
-        rows.splice(8, 0, {
+        rows.splice(10, 0, {
             label: "音频转写",
             value: item.transcript_text_available ? "已填写" : "暂未填写",
         });
@@ -1202,6 +1228,21 @@ function buildItemEditorForm(item) {
         ),
     );
 
+    if (item.type === "document") {
+        const derivedInput = document.createElement("textarea");
+        derivedInput.name = "derived_text";
+        derivedInput.rows = 10;
+        derivedInput.placeholder = "可选：补充或修正文档正文，后续搜索会直接命中这里";
+        derivedInput.value = item.derived_text || "";
+        form.append(
+            createViewerField(
+                "文档正文",
+                derivedInput,
+                "适合粘贴 PDF / Word 的可读正文，后续搜索和回顾都会优先消费这里。",
+            ),
+        );
+    }
+
     if (item.type === "audio") {
         const transcriptInput = document.createElement("textarea");
         transcriptInput.name = "transcript_text";
@@ -1329,10 +1370,10 @@ async function openItemViewer(itemId) {
         const derivedText = String(item.derived_text || "").trim();
 
         if (contentText && contentText !== originalName) {
-            sections.push("????", contentText);
+            sections.push("文件说明", contentText);
         }
         if (derivedText) {
-            sections.push("????", derivedText);
+            sections.push("文档正文", derivedText);
         }
 
         openViewerWithText(
@@ -1395,6 +1436,7 @@ function readRecentFilters() {
         type: String(form.get("type") || "").trim(),
         storage: String(form.get("storage") || "").trim(),
         source: String(form.get("source") || "").trim(),
+        processing_state: String(form.get("processing_state") || "").trim(),
         sort: String(form.get("sort") || "newest").trim(),
         created_from: toUtcIsoFromLocalInput(String(form.get("created_from") || "").trim()),
         created_to: toUtcIsoFromLocalInput(String(form.get("created_to") || "").trim()),
@@ -1435,6 +1477,7 @@ function readSearchFilters() {
         type: String(form.get("type") || "").trim(),
         storage: String(form.get("storage") || "").trim(),
         source: String(form.get("source") || "").trim(),
+        processing_state: String(form.get("processing_state") || "").trim(),
         sort: String(form.get("sort") || "relevance").trim(),
         created_from: toUtcIsoFromLocalInput(String(form.get("created_from") || "").trim()),
         created_to: toUtcIsoFromLocalInput(String(form.get("created_to") || "").trim()),
@@ -1741,6 +1784,7 @@ async function handleItemEditSubmit(form) {
     const formData = new FormData(form);
     const content = String(formData.get("content") || "");
     const source = String(formData.get("source") || "");
+    const derivedText = String(formData.get("derived_text") || "");
     const transcriptText = String(formData.get("transcript_text") || "");
     const feedback = form.querySelector("[data-edit-feedback]");
     const submitButton = elements.viewerActions.querySelector("[data-action='save-item-edit']");
@@ -1763,6 +1807,7 @@ async function handleItemEditSubmit(form) {
             json: {
                 content,
                 source,
+                derived_text: itemType === "document" ? derivedText : undefined,
                 transcript_text: itemType === "audio" ? transcriptText : undefined,
             },
         });
