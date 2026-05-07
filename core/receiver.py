@@ -202,6 +202,7 @@ AUTOMATION_JOBS = {
         "artifact_mode": None,
         "build_args": lambda run_date: ["--date", run_date],
         "manual_enabled": True,
+        "requires_openai": True,
         "timeout_seconds": AUTOMATION_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS,
     },
 }
@@ -1937,8 +1938,37 @@ def iter_automation_job_items(*, manual_only: bool = False):
         yield job_id, job
 
 
-def build_automation_job_payload(job_id: str, job: dict) -> dict:
+def build_automation_job_runtime_payload(job: dict) -> dict:
+    if not job.get("requires_openai"):
+        return {
+            "ready": True,
+            "runtime_mode": "local",
+            "availability_note": "当前环境已就绪。",
+        }
+
+    if os.environ.get("AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE", "").strip():
+        return {
+            "ready": True,
+            "runtime_mode": "mock",
+            "availability_note": "当前环境已配置 mock 模板，这次运行不会调用 OpenAI。",
+        }
+
+    if os.environ.get("AXIOM_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY"):
+        return {
+            "ready": True,
+            "runtime_mode": "openai",
+            "availability_note": "当前环境已配置 OpenAI key，可以执行真实音频自动转写。",
+        }
+
     return {
+        "ready": False,
+        "runtime_mode": "missing_key",
+        "availability_note": "当前环境未配置 AXIOM_OPENAI_API_KEY 或 OPENAI_API_KEY，暂时不能执行真实音频自动转写。",
+    }
+
+
+def build_automation_job_payload(job_id: str, job: dict) -> dict:
+    payload = {
         "id": job_id,
         "label": job["label"],
         "description": job["description"],
@@ -1949,6 +1979,8 @@ def build_automation_job_payload(job_id: str, job: dict) -> dict:
         "destructive": False,
         "default_date": current_local_date_iso(),
     }
+    payload.update(build_automation_job_runtime_payload(job))
+    return payload
 
 
 def build_automation_command(job_id: str, run_date: str) -> list[str]:
@@ -2514,8 +2546,12 @@ def run_automation():
         return error_response(400, "missing_job", "job 不能为空")
     if job_id not in AUTOMATION_JOBS:
         return error_response(400, "invalid_job", "job 不存在")
-    if not AUTOMATION_JOBS[job_id].get("manual_enabled", True):
+    job = AUTOMATION_JOBS[job_id]
+    if not job.get("manual_enabled", True):
         return error_response(400, "manual_job_disabled", "job 不支持手动触发")
+    job_payload = build_automation_job_payload(job_id, job)
+    if not job_payload["ready"]:
+        return error_response(400, "automation_job_unavailable", job_payload["availability_note"])
 
     try:
         run_date = read_optional_run_date(body)

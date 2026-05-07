@@ -1110,15 +1110,61 @@ def main() -> None:
             automation_jobs = assert_status(
                 client.get("/automation/jobs", query_string={"key": "test-key"}),
                 200,
+                "automation jobs before runtime restore",
+            )
+            audio_job_preflight = next(job for job in automation_jobs["jobs"] if job["id"] == "audio_transcribe_day")
+            assert audio_job_preflight["ready"] is True
+            assert audio_job_preflight["runtime_mode"] == "mock"
+
+            previous_mock_template = os.environ.pop("AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE", None)
+            previous_axiom_openai_key = os.environ.pop("AXIOM_OPENAI_API_KEY", None)
+            previous_openai_key = os.environ.pop("OPENAI_API_KEY", None)
+            try:
+                unavailable_jobs = assert_status(
+                    client.get("/automation/jobs", query_string={"key": "test-key"}),
+                    200,
+                    "automation jobs unavailable",
+                )
+                unavailable_audio_job = next(
+                    job for job in unavailable_jobs["jobs"] if job["id"] == "audio_transcribe_day"
+                )
+                assert unavailable_audio_job["ready"] is False
+                assert unavailable_audio_job["runtime_mode"] == "missing_key"
+                assert "OPENAI_API_KEY" in unavailable_audio_job["availability_note"]
+
+                unavailable_run_response = client.post(
+                    "/automation/run",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"job": "audio_transcribe_day", "date": current_local_date_iso()},
+                )
+                assert unavailable_run_response.status_code == 400
+                unavailable_run = unavailable_run_response.get_json()
+                assert unavailable_run["error"]["code"] == "automation_job_unavailable"
+                assert "OPENAI_API_KEY" in unavailable_run["error"]["message"]
+            finally:
+                if previous_mock_template is not None:
+                    os.environ["AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE"] = previous_mock_template
+                if previous_axiom_openai_key is not None:
+                    os.environ["AXIOM_OPENAI_API_KEY"] = previous_axiom_openai_key
+                if previous_openai_key is not None:
+                    os.environ["OPENAI_API_KEY"] = previous_openai_key
+
+            automation_jobs = assert_status(
+                client.get("/automation/jobs", query_string={"key": "test-key"}),
+                200,
                 "automation jobs",
             )
             job_ids = [job["id"] for job in automation_jobs["jobs"]]
             history_job_ids = [job["id"] for job in automation_jobs["history_jobs"]]
+            audio_job = next(job for job in automation_jobs["jobs"] if job["id"] == "audio_transcribe_day")
             assert "review_day" in job_ids
             assert "inbox_action_dry_run" in job_ids
             assert "audio_transcribe_day" in job_ids
             assert "inbox_action_history_day" not in job_ids
             assert "inbox_action_history_day" in history_job_ids
+            assert audio_job["ready"] is True
+            assert audio_job["runtime_mode"] == "mock"
+            assert "mock 模板" in audio_job["availability_note"]
 
             run_date = current_local_date_iso()
 

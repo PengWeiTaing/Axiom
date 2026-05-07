@@ -265,6 +265,22 @@ function formatAutomationStatus(status) {
     return status || "未知";
 }
 
+function formatAutomationRuntime(job) {
+    if (!job) {
+        return "未知";
+    }
+    if (!job.ready) {
+        return "未就绪";
+    }
+    if (job.runtime_mode === "openai") {
+        return "OpenAI";
+    }
+    if (job.runtime_mode === "mock") {
+        return "mock";
+    }
+    return "local";
+}
+
 function formatDuration(durationMs) {
     if (durationMs === null || durationMs === undefined) {
         return "未知";
@@ -641,17 +657,20 @@ function renderAutomationJobs(jobs) {
                     <div class="item-meta">
                         <span class="tag">safe</span>
                         <span>${escapeHtml(job.artifact_group)}</span>
+                        <span>${escapeHtml(formatAutomationRuntime(job))}</span>
                     </div>
                     <h3>${escapeHtml(job.label)}</h3>
                     <p class="item-preview">${escapeHtml(job.description)}</p>
+                    <p class="helper-text">${escapeHtml(job.availability_note || "当前环境已就绪。")}</p>
                     <div class="card-actions">
                         <button
                             class="primary-button"
                             type="button"
                             data-action="run-automation-job"
                             data-job-id="${escapeHtml(job.id)}"
+                            ${job.ready ? "" : 'disabled aria-disabled="true"'}
                         >
-                            立即生成
+                            ${job.ready ? "立即生成" : "未就绪"}
                         </button>
                     </div>
                 </article>
@@ -1762,6 +1781,13 @@ async function handleItemEditSubmit(form) {
 
 async function handleAutomationRun(jobId, button, options = {}) {
     const runDate = options.runDate || elements.automationDateInput.value.trim();
+    const job = state.automation.jobs.find((entry) => entry.id === jobId);
+
+    if (job && !job.ready) {
+        setFeedback(elements.automationFeedback, job.availability_note || "当前任务暂不可用。", "error");
+        showToast(job.availability_note || "当前任务暂不可用。");
+        return;
+    }
 
     try {
         setFeedback(elements.automationFeedback, "", "muted");

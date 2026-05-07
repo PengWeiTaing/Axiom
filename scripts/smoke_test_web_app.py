@@ -213,6 +213,9 @@ def main() -> None:
                     page.locator("#connection-indicator[data-state='ready']").wait_for(timeout=15_000)
                     page.locator("#overview-stats").wait_for(timeout=15_000)
                     wait_for_text(page, "#automation-jobs", "音频自动转写", "audio transcribe job card")
+                    wait_for_text(page, "#automation-jobs", "mock", "audio transcribe runtime badge")
+                    if page.locator("[data-job-id='audio_transcribe_day']").is_disabled():
+                        raise AssertionError("audio transcribe job button should be enabled in mock mode")
 
                     has_service_worker = page.evaluate(
                         """
@@ -240,6 +243,7 @@ def main() -> None:
                     wait_for_text(page, "#viewer-meta", note_source, "text source in viewer")
                     wait_for_text(page, "#viewer-content", note_text, "text content in viewer")
                     click_first_action(page, "#viewer-actions [data-action='viewer-toggle-storage']", "archive text item")
+                    wait_for_text(page, "#viewer-meta", "archive", "archived storage in viewer")
                     close_viewer(page)
 
                     ensure_viewer_closed(page)
@@ -249,6 +253,7 @@ def main() -> None:
 
                     click_first_action(page, "#recent-list [data-action='view-item']", "open archived text item")
                     click_first_action(page, "#viewer-actions [data-action='viewer-toggle-storage']", "restore text item")
+                    wait_for_text(page, "#viewer-meta", "inbox", "restored storage in viewer")
                     close_viewer(page)
                     page.locator("#reset-recent-filters-button").click()
                     wait_for_text(page, "#recent-list", note_text, "recent note after restore")
