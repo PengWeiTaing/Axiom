@@ -162,12 +162,15 @@ logs/
 
 - 默认根路径是 `/opt/axiom`
 - 可用 `AXIOM_ROOT`、`AXIOM_INBOX_PATH`、`AXIOM_ARCHIVE_PATH`、`AXIOM_DB_PATH`、`AXIOM_SECRET_KEY`、`AXIOM_LOG_PATH` 覆盖配置
+- 可用 `AXIOM_AUDIO_TRANSCRIBE_MODEL`、`AXIOM_AUDIO_TRANSCRIBE_LANGUAGE`、`AXIOM_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS` 调整音频自动转写；真实运行依赖 `AXIOM_OPENAI_API_KEY` 或 `OPENAI_API_KEY`
 - `/add` 支持 query、form、JSON 读取 `text`
 - `/upload` 支持 `file`、`image`、`document` 或 `audio` 表单字段
 - `/upload` 当前支持图片、PDF、Word 和常见音频格式；入库时会补 `original_name`、`mime_type`、`size_bytes`，其中 `.pdf` 与 `.docx` 会自动抽取正文写入 `derived_text`，音频既可直接接收 `transcript_text`，也可同时上传 `transcript_file`
 - `transcript_file` 当前支持 `txt / md / srt / vtt`；`.srt` 与 `.vtt` 会自动清洗时间轴、cue 序号和基础标签后写入 `transcript_text`
 - `scripts/backfill_document_text.py` 可为旧 PDF / DOCX 记录补跑正文抽取，把历史文档也补齐到 `derived_text` 检索层
 - `scripts/backfill_audio_transcript.py` 可为旧 audio 记录从同名 sidecar 转写文件回填 `transcript_text`，支持 `--transcript-dir`、`--item-id`、`--limit`、`--force` 和 `--dry-run`
+- `scripts/transcribe_audio_items.py` 可为当日 audio item 批量补全 `transcript_text`，并把执行结果保存到 `data/reviews/audio-transcripts/<year>/<date>.md`
+- `scripts/transcribe_audio_items.py` 支持 `--item-id`、`--source`、`--limit`、`--force`、`--dry-run`、`--model`、`--language` 和 `--prompt`；本地冒烟可通过 `AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE` 走 mock
 - 文本和二进制文件写入都先落临时文件，再替换为正式文件
 - 数据库写入失败时会清理本次已写入文件
 - `/file/<id>` 会限制路径只能在 `AXIOM_ROOT` 下
@@ -176,16 +179,16 @@ logs/
 - `/overview` 聚合返回 stats、最近 item 和最新 artifact 摘要，适合作为手机端或轻前端总览入口
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
 - `/app` 提供移动优先 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；当前已补 PDF 预览与正文预览、音频播放器与转写预览，以及 Word `.docx` 的正文预览
-- `/automation/jobs` 返回当前允许手动触发的任务清单，当前只开放 review、inbox report 和 dry-run
+- `/automation/jobs` 返回当前允许手动触发的任务清单，当前开放 review、inbox report、dry-run 和 `audio_transcribe_day`
 - `/automation/runs` 返回自动化运行历史，覆盖手动任务与 systemd 定时任务，包含状态、产物、stdout/stderr 尾部和耗时
-- `/automation/run` 会在 receiver 进程里串行触发白名单脚本，默认不开放 destructive apply
+- `/automation/run` 会在 receiver 进程里串行触发白名单脚本，默认不开放 destructive apply；`audio_transcribe_day` 会把音频自动转写写回 `transcript_text`，并产出 `audio-transcripts` 报告
 - 前端请求统一通过 `X-Axiom-Key` header 访问后端接口，不在页面里到处拼 query key
 - `/sw.js` 和 `manifest.webmanifest` 组成当前 PWA 壳，目标是把浏览器入口稳定成手机主屏入口
 - `scripts/smoke_test_web_app.py` 会启动本地临时 receiver，并用 Playwright 真跑 `/app` 的关键交互
 - `scripts/run_logged_automation.py` 复用 receiver 的锁与运行记录逻辑，供 systemd timer 在不经过 HTTP 的情况下写入 `automation_runs`
 - `scripts/deploy_to_vps.py` 负责把本地当前 commit 打包、备份 VPS 代码、同步到 `/opt/axiom`、安装最新 systemd unit、重启服务并做基础验证
 - `/artifacts` 支持按 group、window、mode、日期范围分页读取自动化产物
-- `/artifacts/summary` 返回最新 review、inbox report、action snapshot、action history 及其文本预览
+- `/artifacts/summary` 返回最新 review、inbox report、action snapshot、action history、audio transcript report 及其文本预览
 - `/artifacts/file/<path>` 只允许读取 `data/reviews` 下的 markdown 文件
 - API 错误统一返回 JSON
 

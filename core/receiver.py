@@ -124,11 +124,14 @@ ITEM_DETAIL_SELECT_FIELDS = f"""
     transcript_text
 """
 REVIEWS_PATH = Path(os.environ.get("AXIOM_REVIEWS_PATH", AXIOM_ROOT / "data" / "reviews")).resolve()
-ARTIFACT_GROUPS = {"review", "inbox", "inbox-actions", "inbox-action-history"}
+ARTIFACT_GROUPS = {"review", "inbox", "inbox-actions", "inbox-action-history", "audio-transcripts"}
 ARTIFACT_WINDOWS = {"daily", "weekly"}
 ARTIFACT_MODES = {"dry-run", "apply"}
 AUTOMATION_RUN_STATUSES = {"running", "success", "failed", "timeout"}
 DOCX_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+AUTOMATION_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS = int(
+    os.environ.get("AXIOM_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS", "300")
+)
 AUTOMATION_JOBS = {
     "review_day": {
         "label": "生成今日日回顾",
@@ -189,6 +192,17 @@ AUTOMATION_JOBS = {
         "artifact_mode": None,
         "build_args": lambda run_date: ["--window", "week", "--date", run_date, "--details", "--force"],
         "manual_enabled": False,
+    },
+    "audio_transcribe_day": {
+        "label": "生成音频自动转写",
+        "description": "为当日新入库的 audio item 补全 OpenAI 转写文本，并生成一份可回看的转写报告。",
+        "script_name": "transcribe_audio_items.py",
+        "artifact_group": "audio-transcripts",
+        "artifact_window": None,
+        "artifact_mode": None,
+        "build_args": lambda run_date: ["--date", run_date],
+        "manual_enabled": True,
+        "timeout_seconds": AUTOMATION_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS,
     },
 }
 
@@ -1619,6 +1633,7 @@ def build_overview_text(payload: dict, preview_chars: int) -> str:
         ("Inbox 动作执行", latest["inbox-actions"]["apply"]),
         ("动作历史日报", latest["inbox-action-history"]["daily"]),
         ("动作历史周报", latest["inbox-action-history"]["weekly"]),
+        ("音频转写报告", latest["audio-transcripts"]),
     ]
     for label, artifact in artifact_sections:
         if artifact is None:
@@ -1714,6 +1729,17 @@ def build_artifact_payload(file_path: Path) -> dict | None:
                 "window": window,
                 "mode": None,
                 "report_date": Path(parts[5]).stem,
+            }
+        )
+        return payload
+
+    if group_dir == "audio-transcripts" and len(parts) == 5:
+        payload.update(
+            {
+                "group": "audio-transcripts",
+                "window": None,
+                "mode": None,
+                "report_date": Path(parts[4]).stem,
             }
         )
         return payload
@@ -1842,6 +1868,7 @@ def build_artifact_counts(artifacts: list[dict]) -> dict:
         "inbox": 0,
         "inbox-actions": {"dry-run": 0, "apply": 0},
         "inbox-action-history": {"daily": 0, "weekly": 0},
+        "audio-transcripts": 0,
     }
 
     for artifact in artifacts:
@@ -1854,6 +1881,8 @@ def build_artifact_counts(artifacts: list[dict]) -> dict:
             counts["inbox-actions"][artifact["mode"]] += 1
         elif group == "inbox-action-history":
             counts["inbox-action-history"][artifact["window"]] += 1
+        elif group == "audio-transcripts":
+            counts["audio-transcripts"] += 1
 
     return counts
 
@@ -1894,6 +1923,10 @@ def build_artifact_latest_summary(artifacts: list[dict], preview_chars: int) -> 
                 preview_chars,
             ),
         },
+        "audio-transcripts": build_artifact_summary_payload(
+            select_latest_artifact(artifacts, group="audio-transcripts"),
+            preview_chars,
+        ),
     }
 
 
@@ -1997,6 +2030,7 @@ def derive_automation_message(
 
 def run_automation_job(job_id: str, run_date: str) -> subprocess.CompletedProcess[str]:
     command = build_automation_command(job_id, run_date)
+    timeout_seconds = AUTOMATION_JOBS[job_id].get("timeout_seconds", AUTOMATION_TIMEOUT_SECONDS)
     return subprocess.run(
         command,
         cwd=str(PROJECT_ROOT),
@@ -2004,7 +2038,7 @@ def run_automation_job(job_id: str, run_date: str) -> subprocess.CompletedProces
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=AUTOMATION_TIMEOUT_SECONDS,
+        timeout=timeout_seconds,
         check=False,
     )
 

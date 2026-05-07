@@ -122,6 +122,7 @@ def main() -> None:
         os.environ["AXIOM_ROOT"] = str(root)
         os.environ["AXIOM_SECRET_KEY"] = "test-key"
         os.environ["AXIOM_LOG_PATH"] = str(root / "logs" / "receiver.log")
+        os.environ["AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE"] = "mock transcript for {original_name}"
 
         try:
             from core.receiver import app  # noqa: WPS433
@@ -1115,10 +1116,28 @@ def main() -> None:
             history_job_ids = [job["id"] for job in automation_jobs["history_jobs"]]
             assert "review_day" in job_ids
             assert "inbox_action_dry_run" in job_ids
+            assert "audio_transcribe_day" in job_ids
             assert "inbox_action_history_day" not in job_ids
             assert "inbox_action_history_day" in history_job_ids
 
             run_date = current_local_date_iso()
+
+            automation_audio = assert_status(
+                client.post(
+                    "/upload",
+                    data={
+                        "key": "test-key",
+                        "content": "automation voice note",
+                        "source": "audio_automation_test",
+                        "file": (io.BytesIO(b"automation m4a bytes"), "automation-note.m4a"),
+                    },
+                    content_type="multipart/form-data",
+                ),
+                200,
+                "upload automation audio",
+            )
+            assert automation_audio["item"]["type"] == "audio"
+            assert automation_audio["item"]["transcript_text_available"] is False
 
             review_run = assert_status(
                 client.post(
@@ -1152,6 +1171,33 @@ def main() -> None:
             assert action_run["artifact"]["report_date"] == run_date
             assert action_run["run"]["status"] == "success"
 
+            transcribe_run = assert_status(
+                client.post(
+                    "/automation/run",
+                    headers={"X-Axiom-Key": "test-key"},
+                    json={"job": "audio_transcribe_day", "date": run_date},
+                ),
+                200,
+                "run audio transcribe day",
+            )
+            assert transcribe_run["message"] == "completed"
+            assert transcribe_run["job"]["id"] == "audio_transcribe_day"
+            assert transcribe_run["artifact"]["group"] == "audio-transcripts"
+            assert transcribe_run["artifact"]["report_date"] == run_date
+            assert transcribe_run["run"]["status"] == "success"
+
+            transcribed_audio_detail = assert_status(
+                client.get(
+                    f"/item/{automation_audio['item']['id']}",
+                    query_string={"key": "test-key"},
+                ),
+                200,
+                "transcribed automation audio detail",
+            )
+            assert "mock transcript for automation-note.m4a" in (
+                transcribed_audio_detail["item"].get("transcript_text") or ""
+            )
+
             automation_runs = assert_status(
                 client.get(
                     "/automation/runs",
@@ -1160,13 +1206,15 @@ def main() -> None:
                 200,
                 "automation runs",
             )
-            assert automation_runs["total"] == 2
-            assert len(automation_runs["items"]) == 2
-            assert automation_runs["items"][0]["job_id"] == "inbox_action_dry_run"
+            assert automation_runs["total"] == 3
+            assert len(automation_runs["items"]) == 3
+            assert automation_runs["items"][0]["job_id"] == "audio_transcribe_day"
             assert automation_runs["items"][0]["status"] == "success"
-            assert automation_runs["items"][0]["artifact"]["group"] == "inbox-actions"
-            assert automation_runs["items"][1]["job_id"] == "review_day"
-            assert automation_runs["items"][1]["artifact"]["group"] == "review"
+            assert automation_runs["items"][0]["artifact"]["group"] == "audio-transcripts"
+            assert automation_runs["items"][1]["job_id"] == "inbox_action_dry_run"
+            assert automation_runs["items"][1]["artifact"]["group"] == "inbox-actions"
+            assert automation_runs["items"][2]["job_id"] == "review_day"
+            assert automation_runs["items"][2]["artifact"]["group"] == "review"
 
             review_run_history = assert_status(
                 client.get(
@@ -1187,7 +1235,7 @@ def main() -> None:
                 200,
                 "automation runs by status",
             )
-            assert success_run_history["total"] == 2
+            assert success_run_history["total"] == 3
 
             review_daily_path = root / "data" / "reviews" / "daily" / "2026" / "2026-04-29.md"
             review_daily_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1259,8 +1307,8 @@ def main() -> None:
                 200,
                 "artifacts",
             )
-            assert artifacts["total"] == 6
-            assert len(artifacts["items"]) == 6
+            assert artifacts["total"] == 7
+            assert len(artifacts["items"]) == 7
             assert all(item["file_url"].startswith("/artifacts/file/") for item in artifacts["items"])
 
             review_artifacts = assert_status(
@@ -1309,13 +1357,15 @@ def main() -> None:
                 200,
                 "artifact summary",
             )
-            assert artifact_summary["total"] == 6
+            assert artifact_summary["total"] == 7
             assert artifact_summary["counts"]["review"]["daily"] == 2
             assert artifact_summary["counts"]["inbox"] == 1
             assert artifact_summary["counts"]["inbox-actions"]["dry-run"] == 2
             assert artifact_summary["counts"]["inbox-action-history"]["daily"] == 1
+            assert artifact_summary["counts"]["audio-transcripts"] == 1
             assert artifact_summary["latest"]["review"]["daily"]["report_date"] == run_date
             assert artifact_summary["latest"]["inbox-actions"]["dry-run"]["report_date"] == run_date
+            assert artifact_summary["latest"]["audio-transcripts"]["report_date"] == run_date
 
             overview_with_artifacts = assert_status(
                 client.get(
@@ -1329,10 +1379,15 @@ def main() -> None:
                 200,
                 "overview with artifacts",
             )
-            assert overview_with_artifacts["artifacts"]["total"] == 6
+            assert overview_with_artifacts["artifacts"]["total"] == 7
             assert overview_with_artifacts["artifacts"]["counts"]["review"]["daily"] == 2
+            assert overview_with_artifacts["artifacts"]["counts"]["audio-transcripts"] == 1
             assert overview_with_artifacts["artifacts"]["latest"]["review"]["daily"]["report_date"] == run_date
-            assert overview_with_artifacts["artifacts"]["latest_overall"]["group"] == "inbox-actions"
+            assert overview_with_artifacts["artifacts"]["latest"]["audio-transcripts"]["report_date"] == run_date
+            assert overview_with_artifacts["artifacts"]["latest_overall"]["group"] in {
+                "audio-transcripts",
+                "inbox-actions",
+            }
             assert overview_with_artifacts["artifacts"]["latest_overall"]["report_date"] == run_date
 
             overview_text_with_artifacts = client.get(
@@ -1352,9 +1407,9 @@ def main() -> None:
             overview_text_with_artifacts_body = overview_text_with_artifacts.get_data(
                 as_text=True
             )
-            if "Inbox 动作预演" not in overview_text_with_artifacts_body:
+            if "音频转写报告" not in overview_text_with_artifacts_body:
                 raise AssertionError(
-                    "overview text with artifacts missing dry-run line: "
+                    "overview text with artifacts missing audio transcript line: "
                     f"{overview_text_with_artifacts_body}"
                 )
             if run_date not in overview_text_with_artifacts_body:
@@ -1461,8 +1516,8 @@ def main() -> None:
             all_inbox_files = [
                 path for path in (root / "data" / "inbox").rglob("*") if path.is_file()
             ]
-            if len(all_inbox_files) != 6:
-                raise AssertionError(f"expected 6 inbox files, got {len(all_inbox_files)}")
+            if len(all_inbox_files) != 7:
+                raise AssertionError(f"expected 7 inbox files, got {len(all_inbox_files)}")
 
             archive_files = [
                 path for path in (root / "data" / "archive").rglob("*") if path.is_file()

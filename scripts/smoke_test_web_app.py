@@ -151,12 +151,23 @@ def close_viewer(page) -> None:
         raise AssertionError("close viewer: viewer backdrop did not disappear") from exc
 
 
+def ensure_viewer_closed(page) -> None:
+    try:
+        backdrop = page.locator("#viewer-backdrop")
+        if backdrop.is_visible():
+            close_viewer(page)
+            page.wait_for_timeout(150)
+    except Exception as exc:  # noqa: BLE001
+        raise AssertionError("ensure viewer closed: viewer backdrop is still active") from exc
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="axiom_web_app_") as temp_dir:
         root = Path(temp_dir)
         os.environ["AXIOM_ROOT"] = str(root)
         os.environ["AXIOM_SECRET_KEY"] = "test-key"
         os.environ["AXIOM_LOG_PATH"] = ""
+        os.environ["AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE"] = "browser mock transcript for {original_name}"
         create_sample_artifact(root)
 
         try:
@@ -201,6 +212,7 @@ def main() -> None:
                     page.locator("#key-form button[type='submit']").click()
                     page.locator("#connection-indicator[data-state='ready']").wait_for(timeout=15_000)
                     page.locator("#overview-stats").wait_for(timeout=15_000)
+                    wait_for_text(page, "#automation-jobs", "音频自动转写", "audio transcribe job card")
 
                     has_service_worker = page.evaluate(
                         """
@@ -230,6 +242,7 @@ def main() -> None:
                     click_first_action(page, "#viewer-actions [data-action='viewer-toggle-storage']", "archive text item")
                     close_viewer(page)
 
+                    ensure_viewer_closed(page)
                     page.select_option("#recent-storage-input", "archive")
                     page.locator("#recent-filter-form button[type='submit']").click()
                     wait_for_text(page, "#recent-list", note_text, "archived recent note")

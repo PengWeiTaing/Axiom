@@ -243,6 +243,9 @@ function formatArtifactLabel(artifact) {
     if (artifact.group === "inbox-action-history") {
         return artifact.window === "weekly" ? "动作历史周报" : "动作历史日报";
     }
+    if (artifact.group === "audio-transcripts") {
+        return "音频转写报告";
+    }
     return artifact.group;
 }
 
@@ -490,6 +493,7 @@ function renderOverviewArtifacts(artifactSummary) {
             artifactSummary["inbox-action-history"]?.daily,
             artifactSummary["inbox-action-history"]?.weekly,
         ),
+        artifactSummary["audio-transcripts"],
     ].filter(Boolean);
 
     if (!summaryEntries.length) {
@@ -589,6 +593,11 @@ function flattenArtifactCards(summaryPayload) {
                 latest["inbox-action-history"]?.daily,
                 latest["inbox-action-history"]?.weekly,
             ),
+        },
+        {
+            title: "Audio Transcripts",
+            countText: `${summaryPayload.counts["audio-transcripts"]} 份`,
+            artifact: latest["audio-transcripts"],
         },
     ];
 }
