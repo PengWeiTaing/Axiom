@@ -424,3 +424,6 @@
 - 已本地运行：`python -m compileall -q core scripts`
 - 已本地运行：`python scripts/smoke_test_receiver.py`
 - 已本地运行：`python scripts/smoke_test_web_app.py`
+- 已用 `scripts/deploy_to_vps.py` 将这轮“图片自动描述自动化”部署到 VPS，当前线上代码更新到 `70c8d29`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_082725_70c8d29.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/automation/jobs` 中 `image_describe_day` 已返回 `ready=false` 与 `runtime_mode=missing_key`、鉴权 `/overview` 与 `/artifacts/summary` 已出现 `image-descriptions` 分组、公网 `/app` 已出现 `image_describe_day` 任务按钮和 `image-descriptions` artifact 过滤项
