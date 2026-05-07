@@ -352,3 +352,22 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“导出与回顾脚本感知正文 / 转写”部署到 VPS，当前线上代码更新到 `5e9f059`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260506_110400_5e9f059.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常；并已在 VPS 上成功跑通 `export_items_markdown.py` 与 `build_review_markdown.py` 的生产环境输出检查
+
+## 2026-05-07
+
+- `/upload` 现在支持音频同时上传 `transcript_file`，当前接受 `txt / md / srt / vtt`
+- `.srt` 与 `.vtt` 现在会在入库前自动清洗时间轴、cue 序号和基础标签，再写入 `transcript_text`
+- Web App 的“文件上传”面板新增“转写文件”输入框，浏览器端可直接同时上传音频和 sidecar transcript
+- 新增 `scripts/backfill_audio_transcript.py`，可为旧 audio item 从同名 sidecar 转写文件回填 `transcript_text`
+- `backfill_audio_transcript.py` 支持 `--transcript-dir`、`--item-id`、`--limit`、`--force` 和 `--dry-run`
+- `scripts/smoke_test_receiver.py` 新增音频 sidecar 导入、SRT 清洗和旧音频 transcript 回填覆盖
+- `scripts/smoke_test_web_app.py` 新增浏览器级音频 + SRT sidecar 上传、检索和查看覆盖
+- 已本地运行：`python -m compileall -q core scripts`
+- 已本地运行：`python scripts/smoke_test_receiver.py`
+- 已本地运行：`python scripts/smoke_test_web_app.py`
+- 已本地运行：`python scripts/smoke_test_inbox_processing.py`
+- 已本地运行：`python scripts/generate_deepwiki_cache.py`
+- 已用 `scripts/deploy_to_vps.py` 将这轮“音频转写文件导入与历史回填”部署到 VPS，当前线上代码更新到 `af61873`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260507_023441_af61873.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、鉴权 `/overview` 正常、公网 `/app` 已出现 `file-transcript-file-input`
+- VPS 上 `python3 scripts/backfill_audio_transcript.py --root /opt/axiom --dry-run` 已跑通；当前生产库扫描到 `0` 条 audio item
