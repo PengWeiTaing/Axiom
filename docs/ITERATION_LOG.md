@@ -496,3 +496,8 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“batch processing workbench actions”部署到 VPS，当前线上运行代码更新到 `119f6fa`
 - 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_052512_119f6fa.tar.gz`
 - 线上只读核验通过：`https://pengweitai.me/health` 正常，`/processing/backlog?key=axiomnb&group_limit=4` 当前返回 `total=0`，`/overview?key=axiomnb&recent_limit=3&preview_chars=120` 已继续正常返回 `processing_backlog`
+- `/recent` 和 `/search` 新增 `processing_override=ready` 过滤，手动完成条目现在可以独立筛出，不再混在普通 ready 结果里
+- `/stats` 新增 `by_processing_override`，`/app` 总览统计卡片补上“手动完成”计数
+- `/app` 的浏览和搜索筛选新增“手动完成”选项；处理工作台批量清积压后，可以直接在 recent / search 里追踪这批条目
+- `scripts/smoke_test_receiver.py` 新增 manual ready 的 recent/search 过滤、非法 `processing_override` 过滤和 stats 覆盖
+- `scripts/smoke_test_web_app.py` 新增浏览器级回归：批量标记 image preview 为手动完成后，再用 recent / search 的“手动完成”筛选把它找回

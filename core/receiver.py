@@ -595,6 +595,16 @@ def read_processing_state_filter() -> str | None:
     return processing_state
 
 
+def read_processing_override_filter() -> str | None:
+    processing_override = request.args.get("processing_override", "").strip().lower()
+    if not processing_override:
+        return None
+    if processing_override not in ITEM_PROCESSING_OVERRIDES:
+        allowed = "、".join(sorted(ITEM_PROCESSING_OVERRIDES))
+        raise ValueError(f"processing_override 只能是 {allowed}")
+    return processing_override
+
+
 def parse_date_filter(value: str, field_name: str) -> date:
     text = value.strip()
     if not text:
@@ -790,6 +800,7 @@ def build_item_filter_conditions(
     created_from: str | None,
     created_to: str | None,
     processing_state: str | None = None,
+    processing_override: str | None = None,
 ) -> tuple[list[str], list[str]]:
     conditions: list[str] = []
     params: list[str] = []
@@ -818,6 +829,10 @@ def build_item_filter_conditions(
     if processing_state:
         conditions.append(f"({ITEM_PROCESSING_STATE_SQL}) = ?")
         params.append(processing_state)
+
+    if processing_override:
+        conditions.append("processing_override = ?")
+        params.append(processing_override)
 
     return conditions, params
 
@@ -1851,6 +1866,15 @@ def build_stats_payload() -> dict:
             ORDER BY processing_state
             """
         ).fetchall()
+        processing_override_rows = conn.execute(
+            """
+            SELECT processing_override, COUNT(*) AS count
+            FROM items
+            WHERE processing_override IS NOT NULL AND processing_override != ''
+            GROUP BY processing_override
+            ORDER BY processing_override
+            """
+        ).fetchall()
         storage_rows = conn.execute(
             """
             SELECT file_path
@@ -1869,6 +1893,7 @@ def build_stats_payload() -> dict:
         "by_source": rows_to_count_map(source_rows, "source"),
         "by_text_source": rows_to_count_map(text_source_rows, "text_source"),
         "by_processing_state": rows_to_count_map(processing_rows, "processing_state"),
+        "by_processing_override": rows_to_count_map(processing_override_rows, "processing_override"),
         "by_storage": count_storage_areas(storage_rows),
     }
 
@@ -3662,6 +3687,11 @@ def recent_items():
     except ValueError as exc:
         return error_response(400, "invalid_processing_state", str(exc))
 
+    try:
+        processing_override = read_processing_override_filter()
+    except ValueError as exc:
+        return error_response(400, "invalid_processing_override_filter", str(exc))
+
     source = read_source_filter()
     filter_conditions, filter_params = build_item_filter_conditions(
         item_type,
@@ -3670,6 +3700,7 @@ def recent_items():
         created_from,
         created_to,
         processing_state,
+        processing_override,
     )
     where_clause = join_conditions(filter_conditions, "WHERE")
 
@@ -3705,6 +3736,7 @@ def recent_items():
             "created_from": created_from,
             "created_to": created_to,
             "processing_state": processing_state,
+            "processing_override": processing_override,
             "page": page,
             "page_size": page_size,
             "total": total,
@@ -3753,6 +3785,11 @@ def search_items():
     except ValueError as exc:
         return error_response(400, "invalid_processing_state", str(exc))
 
+    try:
+        processing_override = read_processing_override_filter()
+    except ValueError as exc:
+        return error_response(400, "invalid_processing_override_filter", str(exc))
+
     source = read_source_filter()
     escaped_query = escape_like(query)
     exact_match = query
@@ -3774,6 +3811,7 @@ def search_items():
         created_from,
         created_to,
         processing_state,
+        processing_override,
     )
     filter_clause = join_conditions(filter_conditions, "AND")
 
@@ -3898,6 +3936,7 @@ def search_items():
             "created_from": created_from,
             "created_to": created_to,
             "processing_state": processing_state,
+            "processing_override": processing_override,
             "page": page,
             "page_size": page_size,
             "total": total,

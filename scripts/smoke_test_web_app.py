@@ -268,7 +268,6 @@ def main() -> None:
                     click_first_action(page, "#viewer-actions [data-action='viewer-toggle-storage']", "archive text item")
                     wait_for_text(page, "#viewer-meta", "archive", "archived storage in viewer")
                     close_viewer(page)
-
                     ensure_viewer_closed(page)
                     page.select_option("#recent-storage-input", "archive")
                     page.locator("#recent-filter-form button[type='submit']").click()
@@ -311,7 +310,6 @@ def main() -> None:
                     click_first_action(page, "#search-results [data-action='view-item']", "open image item")
                     page.locator("#viewer-content img").wait_for(timeout=15_000)
                     close_viewer(page)
-
                     page.set_input_files(
                         "#file-input",
                         {
@@ -334,7 +332,6 @@ def main() -> None:
                     page.locator("#viewer-content iframe").wait_for(timeout=15_000)
                     wait_for_text(page, "#viewer-content", "Axiom pdf browser line", "pdf extracted text")
                     close_viewer(page)
-
                     page.set_input_files(
                         "#file-input",
                         {
@@ -461,6 +458,21 @@ def main() -> None:
                     wait_for_text(page, "#viewer-meta", "已手动标记完成", "batch image manual ready meta")
                     wait_for_text(page, "#viewer-meta", "手动完成", "batch image override meta")
                     close_viewer(page)
+
+                    page.locator("#reset-search-button").click()
+                    page.select_option("#search-type-input", "image")
+                    page.select_option("#search-processing-override-input", "ready")
+                    page.fill("#search-query-input", "batch-image.png")
+                    page.fill("#search-source-input", "web_app_image_batch")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", "batch-image.png", "manual ready search filter result")
+                    page.locator("#reset-recent-filters-button").click()
+                    page.select_option("#recent-type-input", "image")
+                    page.select_option("#recent-processing-override-input", "ready")
+                    page.locator("#recent-filter-form button[type='submit']").click()
+                    wait_for_text(page, "#recent-list", "batch-image.png", "manual ready recent filter result")
+                    page.locator("#reset-search-button").click()
+                    page.locator("#reset-recent-filters-button").click()
 
                     page.set_input_files(
                         "#file-input",

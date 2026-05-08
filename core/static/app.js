@@ -511,6 +511,7 @@ function renderOverviewStats(stats) {
         ["音频", stats.by_type?.audio || 0],
         ["已就绪", stats.by_processing_state?.ready || 0],
         ["待处理", stats.by_processing_state?.pending || 0],
+        ["手动完成", stats.by_processing_override?.ready || 0],
         ["Inbox", stats.by_storage?.inbox || 0],
         ["Archive", stats.by_storage?.archive || 0],
     ];
@@ -2002,6 +2003,7 @@ function readRecentFilters() {
         storage: String(form.get("storage") || "").trim(),
         source: String(form.get("source") || "").trim(),
         processing_state: String(form.get("processing_state") || "").trim(),
+        processing_override: String(form.get("processing_override") || "").trim(),
         sort: String(form.get("sort") || "newest").trim(),
         created_from: toUtcIsoFromLocalInput(String(form.get("created_from") || "").trim()),
         created_to: toUtcIsoFromLocalInput(String(form.get("created_to") || "").trim()),
@@ -2014,6 +2016,7 @@ async function applyProcessingBacklogFilter(itemType, processingState = "pending
         document.getElementById("recent-sort-input").value = "newest";
         document.getElementById("recent-type-input").value = itemType || "";
         document.getElementById("recent-processing-state-input").value = processingState || "";
+        document.getElementById("recent-processing-override-input").value = "";
         setConnectionState("busy", "正在切换到待处理队列");
         await loadRecentPage({ reset: true });
         setConnectionState("ready", elements.lastSyncIndicator.textContent);
@@ -2059,6 +2062,7 @@ function readSearchFilters() {
         storage: String(form.get("storage") || "").trim(),
         source: String(form.get("source") || "").trim(),
         processing_state: String(form.get("processing_state") || "").trim(),
+        processing_override: String(form.get("processing_override") || "").trim(),
         sort: String(form.get("sort") || "relevance").trim(),
         created_from: toUtcIsoFromLocalInput(String(form.get("created_from") || "").trim()),
         created_to: toUtcIsoFromLocalInput(String(form.get("created_to") || "").trim()),

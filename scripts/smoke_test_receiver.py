@@ -1144,6 +1144,38 @@ def main() -> None:
             assert marked_ready_document["item"]["processing_state"] == "ready"
             assert marked_ready_document["item"]["processing_is_overridden"] is True
             assert marked_ready_document["item"]["processing_override"] == "ready"
+            recent_manual_ready_document = assert_status(
+                client.get(
+                    "/recent",
+                    query_string={
+                        "key": "test-key",
+                        "type": "document",
+                        "processing_override": "ready",
+                    },
+                ),
+                200,
+                "recent manual ready document filter",
+            )
+            assert recent_manual_ready_document["processing_override"] == "ready"
+            assert recent_manual_ready_document["total"] == 1
+            assert recent_manual_ready_document["items"][0]["id"] == docx_document["item"]["id"]
+
+            search_manual_ready_document = assert_status(
+                client.get(
+                    "/search",
+                    query_string={
+                        "key": "test-key",
+                        "q": "Weekly Plan",
+                        "type": "document",
+                        "processing_override": "ready",
+                    },
+                ),
+                200,
+                "search manual ready document filter",
+            )
+            assert search_manual_ready_document["processing_override"] == "ready"
+            assert search_manual_ready_document["total"] == 1
+            assert search_manual_ready_document["items"][0]["id"] == docx_document["item"]["id"]
             assert marked_ready_document["item"]["processing_note"] == "已手动标记完成"
 
             processing_backlog_after_override = assert_status(
@@ -1312,6 +1344,23 @@ def main() -> None:
             assert invalid_created_range["ok"] is False
             assert invalid_created_range["error"]["code"] == "invalid_created_range"
 
+            invalid_processing_override_filter = assert_status(
+                client.get(
+                    "/recent",
+                    query_string={
+                        "key": "test-key",
+                        "processing_override": "done",
+                    },
+                ),
+                400,
+                "invalid processing override filter",
+            )
+            assert invalid_processing_override_filter["ok"] is False
+            assert (
+                invalid_processing_override_filter["error"]["code"]
+                == "invalid_processing_override_filter"
+            )
+
             stats = assert_status(
                 client.get("/stats", query_string={"key": "test-key"}),
                 200,
@@ -1335,6 +1384,7 @@ def main() -> None:
             assert stats["by_text_source"]["transcript_text"] == 1
             assert stats["by_processing_state"]["ready"] == 6
             assert stats["by_processing_state"].get("pending", 0) == 0
+            assert stats["by_processing_override"].get("ready", 0) == 0
 
             overview = assert_status(
                 client.get(
