@@ -517,3 +517,6 @@
 - `/app` 的 search 面板现在也支持批量处理动作：`processing_state=pending` 时可直接“批量标记为已处理”，`processing_override=ready` 时可直接“批量恢复为待处理”
 - `scripts/smoke_test_web_app.py` 新增浏览器级回归：从 search 结果里批量把 pending image 标成手动完成，再从 recent 找回并恢复为 pending；同时验证 manual-ready 的 search 结果可直接批量恢复
 - 本地已补跑 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_web_app.py`
+- 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮 “search batch processing actions” 部署到 VPS，当前线上运行代码更新到 `6770e79`
+- 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_113206_6770e79.tar.gz`
+- 线上只读核验通过：`https://pengweitai.me/health` 正常，`/search?key=axiomnb&q=test&processing_override=ready` 与 `/search?key=axiomnb&q=test&processing_state=pending` 均正常接受过滤参数，`/app` HTML 已包含 `search-batch-actions` 容器
