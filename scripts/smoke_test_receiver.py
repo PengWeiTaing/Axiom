@@ -1059,7 +1059,27 @@ def main() -> None:
                 "processing next document",
             )
             assert next_pending_document["type"] == "document"
+            assert next_pending_document["exclude_id"] is None
             assert next_pending_document["item"]["id"] == docx_document["item"]["id"]
+
+            next_pending_document_excluding_current = assert_status(
+                client.get(
+                    "/processing/next",
+                    query_string={
+                        "key": "test-key",
+                        "type": "document",
+                        "exclude_id": str(docx_document["item"]["id"]),
+                    },
+                ),
+                200,
+                "processing next document excluding current",
+            )
+            assert next_pending_document_excluding_current["type"] == "document"
+            assert (
+                next_pending_document_excluding_current["exclude_id"]
+                == docx_document["item"]["id"]
+            )
+            assert next_pending_document_excluding_current["item"] is None
 
             next_pending_overall = assert_status(
                 client.get(
@@ -1788,6 +1808,16 @@ def main() -> None:
                 "invalid processing next",
             )
             assert invalid_processing_next["error"]["code"] == "invalid_processing_next_param"
+
+            invalid_processing_next_exclude = assert_status(
+                client.get(
+                    "/processing/next",
+                    query_string={"key": "test-key", "exclude_id": "oops"},
+                ),
+                400,
+                "invalid processing next exclude",
+            )
+            assert invalid_processing_next_exclude["error"]["code"] == "invalid_processing_next_param"
 
             artifact_file = client.get(
                 "/artifacts/file/data/reviews/daily/2026/2026-04-29.md",

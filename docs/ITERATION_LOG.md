@@ -470,3 +470,8 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“direct edit actions to processing workbench”部署到 VPS，当前线上代码更新到 `275800a`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_024934_275800a.tar.gz`
 - 线上核验通过：`https://pengweitai.me/health` 正常、`/processing/backlog?key=axiomnb&group_limit=4` 当前返回 `total=0`、公网 `/app` 已加载新的处理工作台，但由于当前积压为空，所以 `data-action='edit-item'` 按钮数量为 `0`
+- `/processing/next` 新增 `exclude_id`，连续处理时不会再把当前 pending item 自己重新取回来
+- `/app` 的“保存并处理同类下一条”现在在“没有其他同类 pending，但当前这条仍 pending”时会留在当前编辑态，不再错误回环
+- `core/static/app.js` 的 viewer 关闭态补了更稳的隐藏处理，浏览器回归里在 no-loop 断点后改为刷新页面再继续后半段流程，避免弹层状态串扰
+- `scripts/smoke_test_receiver.py` 新增 `/processing/next?exclude_id=...` 成功和非法参数覆盖
+- `scripts/smoke_test_web_app.py` 新增 pending docx 的 no-loop 编辑流覆盖，并修复浏览器级遮罩串扰导致的后续上传假失败

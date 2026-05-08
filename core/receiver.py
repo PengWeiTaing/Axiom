@@ -1815,7 +1815,10 @@ def fetch_pending_item_rows(item_type: str, limit: int) -> list[sqlite3.Row]:
         conn.close()
 
 
-def fetch_next_pending_item_row(item_type: str | None = None) -> sqlite3.Row | None:
+def fetch_next_pending_item_row(
+    item_type: str | None = None,
+    exclude_item_id: int | None = None,
+) -> sqlite3.Row | None:
     conditions, params = build_item_filter_conditions(
         item_type,
         None,
@@ -1824,6 +1827,9 @@ def fetch_next_pending_item_row(item_type: str | None = None) -> sqlite3.Row | N
         None,
         "pending",
     )
+    if exclude_item_id is not None:
+        conditions.append("id <> ?")
+        params.append(exclude_item_id)
     where_clause = join_conditions(conditions, "WHERE")
 
     conn = get_db_connection()
@@ -2852,14 +2858,23 @@ def processing_next_item():
 
     try:
         item_type = read_item_type_filter()
+        exclude_id_value = request.args.get("exclude_id")
+        exclude_item_id = None
+        if exclude_id_value not in {None, ""}:
+            exclude_item_id = parse_positive_int(
+                exclude_id_value,
+                "exclude_id",
+                1,
+            )
     except ValueError as exc:
         return error_response(400, "invalid_processing_next_param", str(exc))
 
-    row = fetch_next_pending_item_row(item_type)
+    row = fetch_next_pending_item_row(item_type, exclude_item_id)
     return ok_response(
         {
             "type": item_type,
             "processing_state": "pending",
+            "exclude_id": exclude_item_id,
             "item": row_to_item(row) if row else None,
         }
     )

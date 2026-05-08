@@ -1174,9 +1174,16 @@ async function fetchItemDetail(itemId) {
     return payload.item;
 }
 
-async function fetchNextPendingItem(itemType = "") {
+async function fetchNextPendingItem(itemType = "", excludeItemId = null) {
+    const query = {};
+    if (itemType) {
+        query.type = itemType;
+    }
+    if (excludeItemId !== null && excludeItemId !== undefined && excludeItemId !== "") {
+        query.exclude_id = excludeItemId;
+    }
     const payload = await apiRequest("/processing/next", {
-        query: itemType ? { type: itemType } : {},
+        query,
     });
     if (payload.item) {
         updateKnownItem(payload.item);
@@ -1228,6 +1235,8 @@ function openViewerShell(title, contentClass = "viewer-content") {
     elements.viewerTitle.textContent = title;
     elements.viewerContent.className = contentClass;
     elements.viewerContent.innerHTML = "";
+    elements.viewerBackdrop.style.pointerEvents = "auto";
+    elements.viewerBackdrop.setAttribute("aria-hidden", "false");
     elements.viewerBackdrop.classList.remove("hidden");
 }
 
@@ -1642,6 +1651,8 @@ async function openItemViewer(itemId) {
 function closeViewer() {
     releaseViewerObjectUrl();
     clearViewerChrome();
+    elements.viewerBackdrop.style.pointerEvents = "none";
+    elements.viewerBackdrop.setAttribute("aria-hidden", "true");
     elements.viewerBackdrop.classList.add("hidden");
     elements.viewerContent.innerHTML = "";
     elements.viewerContent.className = "viewer-content";
@@ -2089,10 +2100,17 @@ async function handleItemEditSubmit(form, { openNext = false } = {}) {
         updateKnownItem(payload.item);
         await syncDashboard();
         if (openNext) {
-            const nextItem = await fetchNextPendingItem(itemType);
+            const nextItem = await fetchNextPendingItem(itemType, itemId);
             if (nextItem) {
                 await openItemEditor(nextItem.id);
                 showToast(payload.message === "unchanged" ? "已跳到同类下一条待处理" : "已保存，并打开同类下一条");
+            } else if (payload.item?.processing_state === "pending") {
+                await openItemEditor(itemId);
+                showToast(
+                    payload.message === "unchanged"
+                        ? "当前这条仍待处理，且没有其他同类待处理记录"
+                        : "已保存，但当前这条仍待处理；没有其他同类待处理记录",
+                );
             } else {
                 await openItemViewer(itemId);
                 showToast(payload.message === "unchanged" ? "没有检测到变化，同类待处理已清空" : "已保存，同类待处理已清空");
