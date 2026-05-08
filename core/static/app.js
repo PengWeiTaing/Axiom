@@ -659,10 +659,18 @@ function renderProcessingWorkbench(backlog) {
                     <button
                         class="primary-button"
                         type="button"
+                        data-action="edit-item"
+                        data-item-id="${escapeHtml(nextOverall.id)}"
+                    >
+                        连续处理
+                    </button>
+                    <button
+                        class="secondary-button"
+                        type="button"
                         data-action="view-item"
                         data-item-id="${escapeHtml(nextOverall.id)}"
                     >
-                        打开这一条
+                        查看详情
                     </button>
                 </div>
             </article>
@@ -698,10 +706,18 @@ function renderProcessingWorkbench(backlog) {
                                     <button
                                         class="primary-button"
                                         type="button"
+                                        data-action="edit-item"
+                                        data-item-id="${escapeHtml(nextItem.id)}"
+                                    >
+                                        连续处理
+                                    </button>
+                                    <button
+                                        class="secondary-button"
+                                        type="button"
                                         data-action="view-item"
                                         data-item-id="${escapeHtml(nextItem.id)}"
                                     >
-                                        直接处理
+                                        查看这条
                                     </button>
                                 `
                                 : ""

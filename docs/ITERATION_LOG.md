@@ -465,3 +465,5 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“processing workbench panel”部署到 VPS，当前线上代码更新到 `3e7fe8b`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_023754_3e7fe8b.tar.gz`
 - 线上核验通过：`https://pengweitai.me/health` 正常、`/processing/backlog?key=axiomnb&group_limit=4` 当前返回 `total=0`、公网 `/app` 已出现“处理工作台”面板，当前显示“当前已清空”
+- “处理工作台”现在支持从全局下一条和各类型卡片直接进入编辑态，用现有“保存并处理同类下一条”继续清队列，不必先看详情再点编辑
+- `scripts/smoke_test_web_app.py` 已补浏览器级覆盖：会从 processing workbench 直接打开 pending docx 的编辑态，并确认 `save-item-edit-next` 按钮可用

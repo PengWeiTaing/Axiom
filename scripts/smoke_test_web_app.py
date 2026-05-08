@@ -358,11 +358,12 @@ def main() -> None:
                     wait_for_text(page, "#processing-queue-total", "待处理 1 条", "processing workbench total")
                     click_first_action(
                         page,
-                        "#processing-workbench .processing-next-card [data-action='view-item']",
-                        "open next pending item from processing workbench",
+                        "#processing-workbench .processing-next-card [data-action='edit-item']",
+                        "open next pending item editor from processing workbench",
                     )
-                    wait_for_text(page, "#viewer-title", docx_note, "processing workbench viewer title")
                     wait_for_text(page, "#viewer-meta", "待补正文", "processing workbench viewer meta")
+                    page.wait_for_selector("#viewer-actions [data-action='save-item-edit-next']")
+                    page.wait_for_selector("[data-role='item-edit-form'] textarea[name='derived_text']")
                     close_viewer(page)
                     wait_for_text(page, "#overview-processing-backlog", "下一条", "overview backlog next item")
                     click_first_action(
