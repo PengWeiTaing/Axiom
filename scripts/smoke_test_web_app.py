@@ -488,10 +488,10 @@ def main() -> None:
                     wait_for_text(page, "#recent-list", "batch-image.png", "manual ready overview stat result")
                     click_first_action(
                         page,
-                        "#recent-batch-actions [data-action='mark-processing-batch-pending']",
-                        "restore manual ready batch to pending",
+                        "#search-batch-actions [data-action='mark-processing-batch-pending']",
+                        "restore manual ready search batch to pending",
                     )
-                    wait_for_text(page, "#recent-feedback", "共 0 条记录", "manual ready recent cleared after batch pending")
+                    wait_for_text(page, "#search-feedback", "共 0 条结果", "manual ready search cleared after batch pending")
                     page.locator("#reset-recent-filters-button").click()
                     page.select_option("#recent-type-input", "image")
                     page.select_option("#recent-processing-state-input", "pending")
@@ -564,8 +564,28 @@ def main() -> None:
 
                     page.fill("#search-query-input", "pending-shot.png")
                     page.fill("#search-source-input", "web_app_image_pending")
+                    page.select_option("#search-type-input", "image")
+                    page.select_option("#search-processing-state-input", "pending")
                     page.locator("#search-form button[type='submit']").click()
                     wait_for_text(page, "#search-results", "pending-shot.png", "pending image search result")
+                    click_first_action(
+                        page,
+                        "#search-batch-actions [data-action='mark-processing-batch-ready']",
+                        "mark pending search batch ready",
+                    )
+                    wait_for_text(page, "#search-feedback", "共 0 条结果", "pending search cleared after batch ready")
+                    page.locator("#reset-recent-filters-button").click()
+                    page.select_option("#recent-type-input", "image")
+                    page.select_option("#recent-processing-override-input", "ready")
+                    page.locator("#recent-filter-form button[type='submit']").click()
+                    wait_for_text(page, "#recent-list", "pending-shot.png", "search batch ready image recent result")
+                    click_first_action(
+                        page,
+                        "#recent-batch-actions [data-action='mark-processing-batch-pending']",
+                        "restore search batch ready image to pending",
+                    )
+                    wait_for_text(page, "#recent-feedback", "共 0 条记录", "manual ready recent cleared after second batch pending")
+                    page.locator("#reset-search-button").click()
 
                     page.fill("#automation-date-input", run_date)
                     click_first_action(page, "[data-job-id='image_describe_day']", "run image describe day")

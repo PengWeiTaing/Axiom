@@ -74,6 +74,7 @@ const elements = {
     loadMoreRecentButton: document.getElementById("load-more-recent-button"),
     searchForm: document.getElementById("search-form"),
     searchFeedback: document.getElementById("search-feedback"),
+    searchBatchActions: document.getElementById("search-batch-actions"),
     searchResults: document.getElementById("search-results"),
     loadMoreSearchButton: document.getElementById("load-more-search-button"),
     resetSearchButton: document.getElementById("reset-search-button"),
@@ -2120,6 +2121,9 @@ async function loadSearchPage({ reset = false } = {}) {
     if (!filters.q) {
         setFeedback(elements.searchFeedback, "请输入关键词后再搜索。", "error");
         renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
+        if (elements.searchBatchActions) {
+            elements.searchBatchActions.innerHTML = "";
+        }
         updateLoadMoreButton(elements.loadMoreSearchButton, 1, 1, "还没有结果");
         return;
     }
@@ -2142,6 +2146,7 @@ async function loadSearchPage({ reset = false } = {}) {
         : [...state.search.items, ...payload.items];
 
     renderItemCards(elements.searchResults, state.search.items, "没有匹配结果。");
+    renderSearchBatchActions(state.search.items);
     updateLoadMoreButton(elements.loadMoreSearchButton, state.search.page, state.search.totalPages);
     setFeedback(
         elements.searchFeedback,
@@ -2505,6 +2510,53 @@ function renderRecentBatchActions(items) {
             批量恢复${escapeHtml(typeLabel)}为待处理
         </button>
     `;
+}
+
+function renderSearchBatchActions(items) {
+    if (!elements.searchBatchActions) {
+        return;
+    }
+
+    const filters = readSearchFilters();
+    const itemIds = buildItemIdsValue(items);
+    if (!itemIds) {
+        elements.searchBatchActions.innerHTML = "";
+        return;
+    }
+
+    if (filters.processing_state === "pending") {
+        const typeLabel = filters.type ? formatType(filters.type) : "当前搜索结果";
+        elements.searchBatchActions.innerHTML = `
+            <button
+                class="secondary-button"
+                type="button"
+                data-action="mark-processing-batch-ready"
+                data-item-ids="${escapeHtml(itemIds)}"
+                data-item-type="${escapeHtml(filters.type || "")}"
+            >
+                批量标记${escapeHtml(typeLabel)}为已处理
+            </button>
+        `;
+        return;
+    }
+
+    if (filters.processing_override === "ready") {
+        const typeLabel = filters.type ? formatType(filters.type) : "当前搜索结果";
+        elements.searchBatchActions.innerHTML = `
+            <button
+                class="secondary-button"
+                type="button"
+                data-action="mark-processing-batch-pending"
+                data-item-ids="${escapeHtml(itemIds)}"
+                data-item-type="${escapeHtml(filters.type || "")}"
+            >
+                批量恢复${escapeHtml(typeLabel)}为待处理
+            </button>
+        `;
+        return;
+    }
+
+    elements.searchBatchActions.innerHTML = "";
 }
 
 async function handleItemEditSubmit(form, { openNext = false } = {}) {

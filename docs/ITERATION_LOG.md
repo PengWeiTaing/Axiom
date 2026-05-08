@@ -514,3 +514,6 @@
 - `/app` 的 recent 列表在 `processing_override=ready` 过滤下会显示“批量恢复为待处理”按钮，不用再逐条撤销手动完成
 - `scripts/smoke_test_receiver.py` 新增“批量完成 -> 批量恢复待处理”接口级闭环；`scripts/smoke_test_web_app.py` 新增浏览器级回归，验证从 recent 批量恢复后能再次在 `processing_state=pending` 里找回条目
 - 本地已补跑 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_receiver.py`、`python scripts/smoke_test_web_app.py`
+- `/app` 的 search 面板现在也支持批量处理动作：`processing_state=pending` 时可直接“批量标记为已处理”，`processing_override=ready` 时可直接“批量恢复为待处理”
+- `scripts/smoke_test_web_app.py` 新增浏览器级回归：从 search 结果里批量把 pending image 标成手动完成，再从 recent 找回并恢复为 pending；同时验证 manual-ready 的 search 结果可直接批量恢复
+- 本地已补跑 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_web_app.py`
