@@ -2493,23 +2493,43 @@ function renderRecentBatchActions(items) {
 
     const filters = readRecentFilters();
     const itemIds = buildItemIdsValue(items);
-    if (!itemIds || filters.processing_override !== "ready") {
+    if (!itemIds) {
         elements.recentBatchActions.innerHTML = "";
         return;
     }
 
     const typeLabel = filters.type ? formatType(filters.type) : "当前列表";
-    elements.recentBatchActions.innerHTML = `
-        <button
-            class="secondary-button"
-            type="button"
-            data-action="mark-processing-batch-pending"
-            data-item-ids="${escapeHtml(itemIds)}"
-            data-item-type="${escapeHtml(filters.type || "")}"
-        >
-            批量恢复${escapeHtml(typeLabel)}为待处理
-        </button>
-    `;
+    if (filters.processing_state === "pending") {
+        elements.recentBatchActions.innerHTML = `
+            <button
+                class="secondary-button"
+                type="button"
+                data-action="mark-processing-batch-ready"
+                data-item-ids="${escapeHtml(itemIds)}"
+                data-item-type="${escapeHtml(filters.type || "")}"
+            >
+                批量标记${escapeHtml(typeLabel)}为已处理
+            </button>
+        `;
+        return;
+    }
+
+    if (filters.processing_override === "ready") {
+        elements.recentBatchActions.innerHTML = `
+            <button
+                class="secondary-button"
+                type="button"
+                data-action="mark-processing-batch-pending"
+                data-item-ids="${escapeHtml(itemIds)}"
+                data-item-type="${escapeHtml(filters.type || "")}"
+            >
+                批量恢复${escapeHtml(typeLabel)}为待处理
+            </button>
+        `;
+        return;
+    }
+
+    elements.recentBatchActions.innerHTML = "";
 }
 
 function renderSearchBatchActions(items) {

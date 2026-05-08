@@ -497,6 +497,25 @@ def main() -> None:
                     page.select_option("#recent-processing-state-input", "pending")
                     page.locator("#recent-filter-form button[type='submit']").click()
                     wait_for_text(page, "#recent-list", "batch-image.png", "restored pending image recent result")
+                    click_first_action(
+                        page,
+                        "#recent-batch-actions [data-action='mark-processing-batch-ready']",
+                        "mark restored pending recent batch ready",
+                    )
+                    wait_for_text(page, "#recent-feedback", "共 0 条记录", "pending recent cleared after batch ready")
+                    page.locator("#reset-search-button").click()
+                    page.select_option("#search-type-input", "image")
+                    page.select_option("#search-processing-override-input", "ready")
+                    page.fill("#search-query-input", "batch-image.png")
+                    page.fill("#search-source-input", "web_app_image_batch")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", "batch-image.png", "recent batch ready search result")
+                    click_first_action(
+                        page,
+                        "#search-batch-actions [data-action='mark-processing-batch-pending']",
+                        "restore recent batch ready image to pending",
+                    )
+                    wait_for_text(page, "#search-feedback", "共 0 条结果", "recent batch ready search cleared after batch pending")
                     page.locator("#reset-search-button").click()
                     page.locator("#reset-recent-filters-button").click()
 

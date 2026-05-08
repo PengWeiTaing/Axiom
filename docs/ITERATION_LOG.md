@@ -520,3 +520,6 @@
 - 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮 “search batch processing actions” 部署到 VPS，当前线上运行代码更新到 `6770e79`
 - 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_113206_6770e79.tar.gz`
 - 线上只读核验通过：`https://pengweitai.me/health` 正常，`/search?key=axiomnb&q=test&processing_override=ready` 与 `/search?key=axiomnb&q=test&processing_state=pending` 均正常接受过滤参数，`/app` HTML 已包含 `search-batch-actions` 容器
+- `/app` 的 recent 列表现在也支持双向批量动作：`processing_state=pending` 时可直接“批量标记为已处理”，`processing_override=ready` 时可直接“批量恢复为待处理”，与 search / 处理工作台保持一致
+- `scripts/smoke_test_web_app.py` 新增浏览器级回归：同一批 image 条目可在 recent 里从 pending 批量标成手动完成，再从 search 里确认 ready 结果，最后再恢复成 pending
+- 本地已补跑 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_web_app.py`
