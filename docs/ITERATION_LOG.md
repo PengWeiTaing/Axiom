@@ -505,3 +505,5 @@
 - 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮“manual ready filtering”部署到 VPS，当前线上运行代码更新到 `c76ed29`
 - 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_082714_c76ed29.tar.gz`
 - 线上只读核验通过：`https://pengweitai.me/health` 正常，`/overview?key=axiomnb&recent_limit=3&preview_chars=120` 已返回 `stats.by_processing_override`，`/recent?key=axiomnb&processing_override=ready` 与 `/search?key=axiomnb&q=test&processing_override=ready` 均正常接受新过滤参数
+- `/app` 总览统计卡片现在支持一键跳 recent 筛选：类型、storage、ready、pending、手动完成都可以直接点，不用再手填筛选表单
+- `scripts/smoke_test_web_app.py` 新增浏览器级回归：批量把 image preview 标成手动完成后，再从总览统计卡片直接点“手动完成”，验证能跳到 `recent?processing_override=ready`

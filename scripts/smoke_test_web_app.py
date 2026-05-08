@@ -471,6 +471,21 @@ def main() -> None:
                     page.select_option("#recent-processing-override-input", "ready")
                     page.locator("#recent-filter-form button[type='submit']").click()
                     wait_for_text(page, "#recent-list", "batch-image.png", "manual ready recent filter result")
+                    click_first_action(
+                        page,
+                        "#overview-stats [data-action='apply-overview-filter'][data-filter-kind='processing_override'][data-filter-value='ready']",
+                        "apply manual ready overview stat filter",
+                    )
+                    page.wait_for_function(
+                        """
+                        () => {
+                            const overrideInput = document.getElementById("recent-processing-override-input");
+                            return overrideInput?.value === "ready";
+                        }
+                        """,
+                        timeout=15_000,
+                    )
+                    wait_for_text(page, "#recent-list", "batch-image.png", "manual ready overview stat result")
                     page.locator("#reset-search-button").click()
                     page.locator("#reset-recent-filters-button").click()
 

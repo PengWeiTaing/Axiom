@@ -516,16 +516,60 @@ function renderOverviewStats(stats) {
         ["Archive", stats.by_storage?.archive || 0],
     ];
 
+    const filterMap = [
+        { kind: "all", value: "" },
+        { kind: "type", value: "text" },
+        { kind: "type", value: "image" },
+        { kind: "type", value: "document" },
+        { kind: "type", value: "audio" },
+        { kind: "processing_state", value: "ready" },
+        { kind: "processing_state", value: "pending" },
+        { kind: "processing_override", value: "ready" },
+        { kind: "storage", value: "inbox" },
+        { kind: "storage", value: "archive" },
+    ];
+
     elements.overviewStats.innerHTML = cards
         .map(
-            ([label, value]) => `
-                <article class="stat-card">
+            ([label, value], index) => `
+                <button
+                    class="stat-card"
+                    type="button"
+                    data-action="apply-overview-filter"
+                    data-filter-kind="${escapeHtml(filterMap[index].kind)}"
+                    data-filter-value="${escapeHtml(filterMap[index].value)}"
+                >
                     <span class="subtle-text">${escapeHtml(label)}</span>
                     <strong>${escapeHtml(value)}</strong>
-                </article>
+                </button>
             `
         )
         .join("");
+}
+
+async function applyOverviewQuickFilter(filterKind, filterValue) {
+    try {
+        elements.recentFilterForm.reset();
+        document.getElementById("recent-sort-input").value = "newest";
+
+        if (filterKind === "type") {
+            document.getElementById("recent-type-input").value = filterValue || "";
+        } else if (filterKind === "storage") {
+            document.getElementById("recent-storage-input").value = filterValue || "";
+        } else if (filterKind === "processing_state") {
+            document.getElementById("recent-processing-state-input").value = filterValue || "";
+        } else if (filterKind === "processing_override") {
+            document.getElementById("recent-processing-override-input").value = filterValue || "";
+        }
+
+        setConnectionState("busy", "正在切换总览筛选");
+        await loadRecentPage({ reset: true });
+        setConnectionState("ready", elements.lastSyncIndicator.textContent);
+        elements.recentPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+        setConnectionState("error", error.message);
+        showToast(error.message);
+    }
 }
 
 function renderOverviewRecent(items) {
@@ -2550,6 +2594,11 @@ function bindDelegatedActions() {
         const action = target.getAttribute("data-action");
         if (action === "toggle-storage") {
             await handleStorageToggle(target.getAttribute("data-item-id"));
+        } else if (action === "apply-overview-filter") {
+            await applyOverviewQuickFilter(
+                target.getAttribute("data-filter-kind") || "all",
+                target.getAttribute("data-filter-value") || "",
+            );
         } else if (action === "apply-processing-backlog-filter") {
             await applyProcessingBacklogFilter(
                 target.getAttribute("data-item-type"),
