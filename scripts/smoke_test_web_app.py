@@ -373,6 +373,7 @@ def main() -> None:
                     )
                     wait_for_text(page, "#viewer-meta", "待补正文", "processing workbench viewer meta")
                     page.wait_for_selector("#viewer-actions [data-action='save-item-edit-next']")
+                    page.wait_for_selector("#viewer-actions [data-action='open-next-pending-item-edit']")
                     page.wait_for_selector("[data-role='item-edit-form'] textarea[name='derived_text']")
                     close_viewer(page)
                     wait_for_text(page, "#overview-processing-backlog", "下一条", "overview backlog next item")
@@ -587,6 +588,15 @@ def main() -> None:
                     page.select_option("#search-processing-state-input", "pending")
                     page.locator("#search-form button[type='submit']").click()
                     wait_for_text(page, "#search-results", "pending-shot.png", "pending image search result")
+                    click_first_action(page, "#search-results [data-action='view-item']", "open pending image item")
+                    click_first_action(
+                        page,
+                        "#viewer-actions [data-action='open-next-pending-item']",
+                        "open next pending image from viewer",
+                    )
+                    wait_for_text(page, "#viewer-title", "batch-image.png", "next pending image viewer title")
+                    wait_for_text(page, "#viewer-meta", "待补说明", "next pending image viewer meta")
+                    close_viewer(page)
                     click_first_action(
                         page,
                         "#search-batch-actions [data-action='mark-processing-batch-ready']",

@@ -1414,6 +1414,17 @@ function buildItemViewerActions(item) {
                 },
             }
             : null,
+        item.processing_state === "pending"
+            ? {
+                label: "同类下一条",
+                className: "secondary-button",
+                dataset: {
+                    action: "open-next-pending-item",
+                    itemId: item.id,
+                    itemType: item.type,
+                },
+            }
+            : null,
         item.processing_is_overridden
             ? {
                 label: "恢复待处理",
@@ -1514,6 +1525,26 @@ async function fetchNextPendingItem(itemType = "", excludeItemId = null) {
         updateKnownItem(payload.item);
     }
     return payload.item || null;
+}
+
+async function handleOpenNextPendingItem(itemId, itemType, { edit = false } = {}) {
+    try {
+        const nextItem = await fetchNextPendingItem(itemType, itemId);
+        if (!nextItem) {
+            showToast(itemType ? `${formatType(itemType)} 待处理已清空` : "当前没有下一条待处理");
+            return;
+        }
+        if (edit) {
+            await openItemEditor(nextItem.id);
+            showToast("已打开同类下一条待处理");
+        } else {
+            await openItemViewer(nextItem.id);
+            showToast("已切换到同类下一条待处理");
+        }
+    } catch (error) {
+        setConnectionState("error", error.message);
+        showToast(error.message);
+    }
 }
 
 function buildArtifactFilePath(relativePath) {
@@ -1896,6 +1927,17 @@ async function openItemEditor(itemId) {
                 dataset: {
                     action: "mark-processing-ready",
                     itemId: item.id,
+                },
+            }
+            : null,
+        canContinuePending
+            ? {
+                label: "跳到下一条",
+                className: "secondary-button",
+                dataset: {
+                    action: "open-next-pending-item-edit",
+                    itemId: item.id,
+                    itemType: item.type,
                 },
             }
             : null,
@@ -2759,6 +2801,17 @@ function bindDelegatedActions() {
         } else if (action === "mark-processing-ready") {
             const reopenEditor = state.viewerContext?.kind === "item-edit";
             await handleProcessingOverride(target.getAttribute("data-item-id"), "ready", { reopenEditor });
+        } else if (action === "open-next-pending-item") {
+            await handleOpenNextPendingItem(
+                target.getAttribute("data-item-id"),
+                target.getAttribute("data-item-type") || "",
+            );
+        } else if (action === "open-next-pending-item-edit") {
+            await handleOpenNextPendingItem(
+                target.getAttribute("data-item-id"),
+                target.getAttribute("data-item-type") || "",
+                { edit: true },
+            );
         } else if (action === "clear-processing-override") {
             const reopenEditor = state.viewerContext?.kind === "item-edit";
             await handleProcessingOverride(target.getAttribute("data-item-id"), "", { reopenEditor });
