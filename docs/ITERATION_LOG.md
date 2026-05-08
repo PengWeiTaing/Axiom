@@ -501,3 +501,7 @@
 - `/app` 的浏览和搜索筛选新增“手动完成”选项；处理工作台批量清积压后，可以直接在 recent / search 里追踪这批条目
 - `scripts/smoke_test_receiver.py` 新增 manual ready 的 recent/search 过滤、非法 `processing_override` 过滤和 stats 覆盖
 - `scripts/smoke_test_web_app.py` 新增浏览器级回归：批量标记 image preview 为手动完成后，再用 recent / search 的“手动完成”筛选把它找回
+- 本地已跑通 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_receiver.py`、`python scripts/smoke_test_web_app.py`、`python scripts/smoke_test_inbox_processing.py`、`python scripts/generate_deepwiki_cache.py`
+- 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮“manual ready filtering”部署到 VPS，当前线上运行代码更新到 `c76ed29`
+- 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_082714_c76ed29.tar.gz`
+- 线上只读核验通过：`https://pengweitai.me/health` 正常，`/overview?key=axiomnb&recent_limit=3&preview_chars=120` 已返回 `stats.by_processing_override`，`/recent?key=axiomnb&processing_override=ready` 与 `/search?key=axiomnb&q=test&processing_override=ready` 均正常接受新过滤参数
