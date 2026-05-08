@@ -55,6 +55,7 @@ ITEM_TYPE_DOCUMENT = "document"
 ITEM_TYPE_AUDIO = "audio"
 ITEM_TEXT_SOURCES = {"content", "derived_text", "transcript_text", "original_name", "empty"}
 ITEM_PROCESSING_STATES = {"ready", "pending"}
+ITEM_PROCESSING_OVERRIDES = {"ready"}
 ITEM_TEXT_SOURCE_LABELS = {
     "content": "内容说明",
     "derived_text": "文档正文",
@@ -65,6 +66,9 @@ ITEM_TEXT_SOURCE_LABELS = {
 ITEM_PROCESSING_LABELS = {
     "ready": "已就绪",
     "pending": "待处理",
+}
+ITEM_PROCESSING_OVERRIDE_LABELS = {
+    "ready": "手动完成",
 }
 ITEM_TYPES = {ITEM_TYPE_TEXT, ITEM_TYPE_IMAGE, ITEM_TYPE_DOCUMENT, ITEM_TYPE_AUDIO}
 STORAGE_AREAS = {"inbox": INBOX_PATH, "archive": ARCHIVE_PATH}
@@ -118,7 +122,8 @@ ITEM_BASE_SELECT_FIELDS = """
     created_at,
     original_name,
     mime_type,
-    size_bytes
+    size_bytes,
+    processing_override
 """
 ITEM_TEXT_SOURCE_SQL = """
     CASE
@@ -133,6 +138,7 @@ ITEM_TEXT_SOURCE_SQL = """
 """
 ITEM_PROCESSING_STATE_SQL = """
     CASE
+        WHEN processing_override = 'ready' THEN 'ready'
         WHEN type = 'document' THEN
             CASE
                 WHEN COALESCE(TRIM(derived_text), '') != '' THEN 'ready'
@@ -333,6 +339,7 @@ def ensure_items_table_columns(conn: sqlite3.Connection) -> None:
         "size_bytes": "INTEGER",
         "derived_text": "TEXT",
         "transcript_text": "TEXT",
+        "processing_override": "TEXT",
     }
     for column_name, column_type in required_columns.items():
         if column_name in existing_columns:
@@ -359,7 +366,8 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 mime_type TEXT,
                 size_bytes INTEGER,
                 derived_text TEXT,
-                transcript_text TEXT
+                transcript_text TEXT,
+                processing_override TEXT
             )
             """
         )
@@ -456,6 +464,16 @@ def read_optional_body_field(body: dict, name: str) -> tuple[bool, str]:
     if value is None:
         return True, ""
     return True, str(value)
+
+
+def normalize_processing_override(value: str | None) -> str | None:
+    text = str(value or "").strip().lower()
+    if not text:
+        return None
+    if text not in ITEM_PROCESSING_OVERRIDES:
+        allowed = "、".join(sorted(ITEM_PROCESSING_OVERRIDES))
+        raise ValueError(f"processing_override 只能是空值或 {allowed}")
+    return text
 
 
 def get_request_key() -> str:
@@ -953,7 +971,11 @@ def describe_processing_state(
     original_name: str | None,
     derived_text: str | None,
     transcript_text: str | None,
+    processing_override: str | None = None,
 ) -> str:
+    if processing_override == "ready":
+        return "ready"
+
     normalized_content = strip_item_text(content)
     normalized_original_name = strip_item_text(original_name)
     normalized_derived_text = strip_item_text(derived_text)
@@ -968,7 +990,13 @@ def describe_processing_state(
     return "ready" if normalized_content else "pending"
 
 
-def describe_processing_note(item_type: str, processing_state: str) -> str:
+def describe_processing_note(
+    item_type: str,
+    processing_state: str,
+    processing_override: str | None = None,
+) -> str:
+    if processing_override == "ready":
+        return "已手动标记完成"
     if item_type == ITEM_TYPE_DOCUMENT:
         return "正文已就绪" if processing_state == "ready" else "待补正文"
     if item_type == ITEM_TYPE_AUDIO:
@@ -994,6 +1022,7 @@ def build_item_payload(
     derived_text: str | None = None,
     transcript_text_preview: str | None = None,
     transcript_text: str | None = None,
+    processing_override: str | None = None,
 ) -> dict:
     extension = get_file_extension(original_name or file_path)
     normalized_preview = normalize_extracted_text(derived_text_preview)
@@ -1013,6 +1042,7 @@ def build_item_payload(
         original_name,
         normalized_derived_text,
         normalized_transcript_text,
+        processing_override,
     )
     item = {
         "id": item_id,
@@ -1037,7 +1067,10 @@ def build_item_payload(
         "text_source_label": ITEM_TEXT_SOURCE_LABELS[text_source],
         "processing_state": processing_state,
         "processing_label": ITEM_PROCESSING_LABELS[processing_state],
-        "processing_note": describe_processing_note(item_type, processing_state),
+        "processing_note": describe_processing_note(item_type, processing_state, processing_override),
+        "processing_override": processing_override,
+        "processing_override_label": ITEM_PROCESSING_OVERRIDE_LABELS.get(processing_override),
+        "processing_is_overridden": bool(processing_override),
     }
     if derived_text is not None:
         item["derived_text"] = normalized_derived_text
@@ -1062,6 +1095,7 @@ def row_to_item(row: sqlite3.Row, include_score: bool = False) -> dict:
         row["derived_text"] if "derived_text" in row_keys else None,
         row["transcript_text_preview"] if "transcript_text_preview" in row_keys else None,
         row["transcript_text"] if "transcript_text" in row_keys else None,
+        row["processing_override"] if "processing_override" in row_keys else None,
     )
     if include_score and "score" in row.keys():
         item["score"] = row["score"]
@@ -1387,6 +1421,7 @@ def insert_item(
     size_bytes: int | None = None,
     derived_text: str | None = None,
     transcript_text: str | None = None,
+    processing_override: str | None = None,
 ) -> int:
     conn = get_db_connection()
     try:
@@ -1402,9 +1437,10 @@ def insert_item(
                 mime_type,
                 size_bytes,
                 derived_text,
-                transcript_text
+                transcript_text,
+                processing_override
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 item_type,
@@ -1417,6 +1453,7 @@ def insert_item(
                 size_bytes,
                 derived_text,
                 transcript_text,
+                processing_override,
             ),
         )
         conn.commit()
@@ -1466,16 +1503,17 @@ def update_item_content_source_text_fields(
     source: str | None,
     derived_text: str | None,
     transcript_text: str | None,
+    processing_override: str | None,
 ) -> None:
     conn = get_db_connection()
     try:
         conn.execute(
             """
             UPDATE items
-            SET content = ?, source = ?, derived_text = ?, transcript_text = ?
+            SET content = ?, source = ?, derived_text = ?, transcript_text = ?, processing_override = ?
             WHERE id = ?
             """,
-            (content, source, derived_text, transcript_text, item_id),
+            (content, source, derived_text, transcript_text, processing_override, item_id),
         )
         conn.commit()
     finally:
@@ -3129,14 +3167,25 @@ def update_item(item_id: int):
     source_provided, raw_source = read_optional_body_field(body, "source")
     derived_provided, raw_derived_text = read_optional_body_field(body, "derived_text")
     transcript_provided, raw_transcript_text = read_optional_body_field(body, "transcript_text")
+    processing_override_provided, raw_processing_override = read_optional_body_field(body, "processing_override")
 
     if derived_provided and row["type"] != ITEM_TYPE_DOCUMENT:
         return error_response(400, "invalid_derived_text_target", "derived_text 目前只支持 document item")
     if transcript_provided and row["type"] != ITEM_TYPE_AUDIO:
         return error_response(400, "invalid_transcript_target", "transcript_text 目前只支持 audio item")
 
-    if not content_provided and not source_provided and not derived_provided and not transcript_provided:
-        return error_response(400, "missing_update_fields", "至少要提供 content、source、derived_text 或 transcript_text")
+    if (
+        not content_provided
+        and not source_provided
+        and not derived_provided
+        and not transcript_provided
+        and not processing_override_provided
+    ):
+        return error_response(
+            400,
+            "missing_update_fields",
+            "至少要提供 content、source、derived_text、transcript_text 或 processing_override",
+        )
 
     next_content = row["content"]
     if content_provided:
@@ -3162,6 +3211,13 @@ def update_item(item_id: int):
     if transcript_provided:
         next_transcript_text = normalize_extracted_text(raw_transcript_text)
 
+    next_processing_override = row["processing_override"] if "processing_override" in row.keys() else None
+    if processing_override_provided:
+        try:
+            next_processing_override = normalize_processing_override(raw_processing_override)
+        except ValueError as exc:
+            return error_response(400, "invalid_processing_override", str(exc))
+
     updated_fields: list[str] = []
     if next_content != row["content"]:
         updated_fields.append("content")
@@ -3171,6 +3227,8 @@ def update_item(item_id: int):
         updated_fields.append("derived_text")
     if next_transcript_text != row["transcript_text"]:
         updated_fields.append("transcript_text")
+    if next_processing_override != row["processing_override"]:
+        updated_fields.append("processing_override")
 
     if not updated_fields:
         return ok_response(
@@ -3209,6 +3267,7 @@ def update_item(item_id: int):
             next_source,
             next_derived_text,
             next_transcript_text,
+            next_processing_override,
         )
     except sqlite3.Error:
         if content_written and file_path is not None:

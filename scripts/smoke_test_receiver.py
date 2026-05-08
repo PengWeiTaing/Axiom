@@ -1092,6 +1092,44 @@ def main() -> None:
             assert next_pending_overall["type"] is None
             assert next_pending_overall["item"]["id"] == docx_document["item"]["id"]
 
+            marked_ready_document = assert_status(
+                client.post(
+                    f"/item/{docx_document['item']['id']}/update",
+                    json={"key": "test-key", "processing_override": "ready"},
+                ),
+                200,
+                "mark pending document ready",
+            )
+            assert marked_ready_document["updated_fields"] == ["processing_override"]
+            assert marked_ready_document["item"]["processing_state"] == "ready"
+            assert marked_ready_document["item"]["processing_is_overridden"] is True
+            assert marked_ready_document["item"]["processing_override"] == "ready"
+            assert marked_ready_document["item"]["processing_note"] == "已手动标记完成"
+
+            processing_backlog_after_override = assert_status(
+                client.get(
+                    "/processing/backlog",
+                    query_string={"key": "test-key", "group_limit": "2"},
+                ),
+                200,
+                "processing backlog after override",
+            )
+            assert processing_backlog_after_override["total"] == 0
+            assert processing_backlog_after_override["next_overall"] is None
+
+            cleared_ready_override = assert_status(
+                client.post(
+                    f"/item/{docx_document['item']['id']}/update",
+                    json={"key": "test-key", "processing_override": ""},
+                ),
+                200,
+                "clear pending document override",
+            )
+            assert cleared_ready_override["updated_fields"] == ["processing_override"]
+            assert cleared_ready_override["item"]["processing_state"] == "pending"
+            assert cleared_ready_override["item"]["processing_is_overridden"] is False
+            assert cleared_ready_override["item"]["processing_override"] is None
+
             overview_with_pending = assert_status(
                 client.get(
                     "/overview",
@@ -1818,6 +1856,16 @@ def main() -> None:
                 "invalid processing next exclude",
             )
             assert invalid_processing_next_exclude["error"]["code"] == "invalid_processing_next_param"
+
+            invalid_processing_override = assert_status(
+                client.post(
+                    f"/item/{docx_document['item']['id']}/update",
+                    json={"key": "test-key", "processing_override": "done"},
+                ),
+                400,
+                "invalid processing override",
+            )
+            assert invalid_processing_override["error"]["code"] == "invalid_processing_override"
 
             artifact_file = client.get(
                 "/artifacts/file/data/reviews/daily/2026/2026-04-29.md",

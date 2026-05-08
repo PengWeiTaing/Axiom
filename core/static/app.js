@@ -1063,6 +1063,9 @@ function buildItemMetaRows(item) {
             value: item.transcript_text_available ? "已填写" : "暂未填写",
         });
     }
+    if (item.processing_is_overridden && item.processing_override_label) {
+        rows.splice(4, 0, { label: "处理覆盖", value: item.processing_override_label });
+    }
     if (item.type === "image" && item.content) {
         rows.splice(4, 0, { label: "图片说明", value: item.content });
     } else if (item.type !== "text" && item.content) {
@@ -1096,6 +1099,26 @@ function buildItemViewerActions(item) {
                     action: "download-item-file",
                     itemId: item.id,
                     downloadName: item.download_name || `item-${item.id}`,
+                },
+            }
+            : null,
+        item.processing_state === "pending"
+            ? {
+                label: "标记已处理",
+                className: "secondary-button",
+                dataset: {
+                    action: "mark-processing-ready",
+                    itemId: item.id,
+                },
+            }
+            : null,
+        item.processing_is_overridden
+            ? {
+                label: "恢复待处理",
+                className: "secondary-button",
+                dataset: {
+                    action: "clear-processing-override",
+                    itemId: item.id,
                 },
             }
             : null,
@@ -1561,6 +1584,26 @@ async function openItemEditor(itemId) {
                     action: "save-item-edit-next",
                     itemId: item.id,
                     itemType: item.type,
+                },
+            }
+            : null,
+        item.processing_state === "pending"
+            ? {
+                label: "标记已处理",
+                className: "secondary-button",
+                dataset: {
+                    action: "mark-processing-ready",
+                    itemId: item.id,
+                },
+            }
+            : null,
+        item.processing_is_overridden
+            ? {
+                label: "恢复待处理",
+                className: "secondary-button",
+                dataset: {
+                    action: "clear-processing-override",
+                    itemId: item.id,
                 },
             }
             : null,
@@ -2062,6 +2105,29 @@ async function handleItemEdit(itemId) {
     }
 }
 
+async function handleProcessingOverride(itemId, processingOverride, { reopenEditor = false } = {}) {
+    try {
+        setConnectionState("busy", processingOverride ? "正在标记已处理" : "正在恢复待处理");
+        const payload = await apiRequest(`/item/${itemId}/update`, {
+            method: "POST",
+            json: {
+                processing_override: processingOverride || "",
+            },
+        });
+        updateKnownItem(payload.item);
+        await syncDashboard();
+        if (reopenEditor) {
+            await openItemEditor(itemId);
+        } else {
+            await openItemViewer(itemId);
+        }
+        showToast(processingOverride ? "已标记为处理完成" : "已恢复为待处理");
+    } catch (error) {
+        setConnectionState("error", error.message);
+        showToast(error.message);
+    }
+}
+
 async function handleItemEditSubmit(form, { openNext = false } = {}) {
     const itemId = form.dataset.itemId;
     const itemType = form.dataset.itemType;
@@ -2224,6 +2290,12 @@ function bindDelegatedActions() {
                 return;
             }
             await handleItemEditSubmit(form, { openNext: true });
+        } else if (action === "mark-processing-ready") {
+            const reopenEditor = state.viewerContext?.kind === "item-edit";
+            await handleProcessingOverride(target.getAttribute("data-item-id"), "ready", { reopenEditor });
+        } else if (action === "clear-processing-override") {
+            const reopenEditor = state.viewerContext?.kind === "item-edit";
+            await handleProcessingOverride(target.getAttribute("data-item-id"), "", { reopenEditor });
         } else if (action === "viewer-toggle-storage") {
             await handleStorageToggle(target.getAttribute("data-item-id"), { reopenViewer: true });
         } else if (action === "download-item-file") {

@@ -422,6 +422,13 @@ def main() -> None:
                     )
                     page.wait_for_selector("[data-role='item-edit-form'] textarea[name='derived_text']")
                     wait_for_text(page, "#viewer-meta", "待补正文", "pending docx still pending meta")
+                    click_first_action(
+                        page,
+                        "#viewer-actions [data-action='mark-processing-ready']",
+                        "mark pending docx ready from editor",
+                    )
+                    wait_for_text(page, "#viewer-meta", "已手动标记完成", "docx manual ready meta")
+                    wait_for_text(page, "#viewer-meta", "手动完成", "docx override meta")
                     page.reload(wait_until="domcontentloaded")
                     page.locator("#connection-indicator[data-state='ready']").wait_for(timeout=15_000)
                     page.locator("#overview-stats").wait_for(timeout=15_000)

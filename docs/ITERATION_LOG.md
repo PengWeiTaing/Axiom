@@ -478,3 +478,8 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“avoid reopening current pending item”部署到 VPS，当前线上代码更新到 `4cf9126`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_040942_4cf9126.tar.gz`
 - 线上核验通过：`http://127.0.0.1:5000/health` 正常、`python3 /opt/axiom/scripts/check_consistency.py --root /opt/axiom` 通过，公网链路继续由 `https://pengweitai.me` 提供
+- `items` 新增 `processing_override`，允许把 document / audio / image / text 手动标记为已处理，不再强制每条 pending 都必须补正文才能出队
+- `/item/<id>/update` 现在支持 `processing_override=ready` 或清空覆盖；`/processing/backlog`、`/processing/next`、`/stats`、`/overview` 都会按覆盖后的状态计算
+- `/app` 的 viewer / editor 新增“标记已处理”和“恢复待处理”动作，适合手动清掉不需要补正文的 pending 条目
+- `scripts/smoke_test_receiver.py` 新增 processing override 的成功、恢复和非法参数覆盖
+- `scripts/smoke_test_web_app.py` 新增浏览器级覆盖：pending docx 经过 no-loop 断点后，可直接在编辑态点“标记已处理”，并在元数据区看到“已手动标记完成 / 手动完成”
