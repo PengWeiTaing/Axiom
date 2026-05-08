@@ -67,6 +67,7 @@ const elements = {
     recentPanel: document.getElementById("recent-panel"),
     recentFilterForm: document.getElementById("recent-filter-form"),
     recentFeedback: document.getElementById("recent-feedback"),
+    recentBatchActions: document.getElementById("recent-batch-actions"),
     resetRecentFiltersButton: document.getElementById("reset-recent-filters-button"),
     recentList: document.getElementById("recent-list"),
     refreshRecentButton: document.getElementById("refresh-recent-button"),
@@ -2090,6 +2091,7 @@ async function loadRecentPage({ reset = false } = {}) {
         : [...state.recent.items, ...payload.items];
 
     renderItemCards(elements.recentList, state.recent.items, "还没有记录。");
+    renderRecentBatchActions(state.recent.items);
     updateLoadMoreButton(elements.loadMoreRecentButton, state.recent.page, state.recent.totalPages);
     setFeedback(
         elements.recentFeedback,
@@ -2455,6 +2457,56 @@ async function handleProcessingBatchReady(itemIds, itemType = "") {
     }
 }
 
+async function handleProcessingBatchPending(itemIds, itemType = "") {
+    if (!itemIds.length) {
+        showToast("当前没有可恢复为待处理的记录");
+        return;
+    }
+
+    try {
+        const typeLabel = itemType ? formatType(itemType) : "当前列表";
+        setConnectionState("busy", `正在恢复待处理：${typeLabel}`);
+        const payload = await apiRequest("/processing/mark-pending", {
+            method: "POST",
+            json: {
+                ids: itemIds,
+            },
+        });
+        payload.items?.forEach((item) => updateKnownItem(item));
+        await syncDashboard();
+        showToast(`已恢复 ${payload.count || itemIds.length} 条${typeLabel}为待处理`);
+    } catch (error) {
+        setConnectionState("error", error.message);
+        showToast(error.message);
+    }
+}
+
+function renderRecentBatchActions(items) {
+    if (!elements.recentBatchActions) {
+        return;
+    }
+
+    const filters = readRecentFilters();
+    const itemIds = buildItemIdsValue(items);
+    if (!itemIds || filters.processing_override !== "ready") {
+        elements.recentBatchActions.innerHTML = "";
+        return;
+    }
+
+    const typeLabel = filters.type ? formatType(filters.type) : "当前列表";
+    elements.recentBatchActions.innerHTML = `
+        <button
+            class="secondary-button"
+            type="button"
+            data-action="mark-processing-batch-pending"
+            data-item-ids="${escapeHtml(itemIds)}"
+            data-item-type="${escapeHtml(filters.type || "")}"
+        >
+            批量恢复${escapeHtml(typeLabel)}为待处理
+        </button>
+    `;
+}
+
 async function handleItemEditSubmit(form, { openNext = false } = {}) {
     const itemId = form.dataset.itemId;
     const itemType = form.dataset.itemType;
@@ -2606,6 +2658,11 @@ function bindDelegatedActions() {
             );
         } else if (action === "mark-processing-batch-ready") {
             await handleProcessingBatchReady(
+                parseItemIdsValue(target.getAttribute("data-item-ids")),
+                target.getAttribute("data-item-type") || "",
+            );
+        } else if (action === "mark-processing-batch-pending") {
+            await handleProcessingBatchPending(
                 parseItemIdsValue(target.getAttribute("data-item-ids")),
                 target.getAttribute("data-item-type") || "",
             );

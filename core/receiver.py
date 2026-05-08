@@ -3049,6 +3049,49 @@ def processing_mark_ready():
     )
 
 
+@app.route("/processing/mark-pending", methods=["POST"])
+def processing_mark_pending():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        body = get_request_body_data()
+    except ValueError as exc:
+        return error_response(400, "invalid_request_body", str(exc))
+
+    try:
+        item_ids = normalize_item_id_list(body.get("ids"))
+    except ValueError as exc:
+        return error_response(400, "invalid_processing_ids", str(exc))
+
+    rows = get_items_by_ids(item_ids)
+    found_ids = {int(row["id"]) for row in rows}
+    missing_ids = [item_id for item_id in item_ids if item_id not in found_ids]
+    if missing_ids:
+        missing_text = ", ".join(str(item_id) for item_id in missing_ids)
+        return error_response(404, "item_not_found", f"找不到这些 item id: {missing_text}")
+
+    update_items_processing_override(item_ids, None)
+    updated_rows = get_items_by_ids(item_ids)
+
+    counts_by_type: dict[str, int] = {}
+    for row in updated_rows:
+        item_type = str(row["type"])
+        counts_by_type[item_type] = counts_by_type.get(item_type, 0) + 1
+
+    return ok_response(
+        {
+            "message": "marked_pending",
+            "processing_override": None,
+            "count": len(updated_rows),
+            "ids": item_ids,
+            "by_type": counts_by_type,
+            "items": [row_to_item(row) for row in updated_rows],
+        }
+    )
+
+
 @app.route("/add", methods=["GET", "POST"])
 def add_note():
     auth_error = require_key()

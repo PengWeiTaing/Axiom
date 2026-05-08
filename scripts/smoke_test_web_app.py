@@ -486,6 +486,17 @@ def main() -> None:
                         timeout=15_000,
                     )
                     wait_for_text(page, "#recent-list", "batch-image.png", "manual ready overview stat result")
+                    click_first_action(
+                        page,
+                        "#recent-batch-actions [data-action='mark-processing-batch-pending']",
+                        "restore manual ready batch to pending",
+                    )
+                    wait_for_text(page, "#recent-feedback", "共 0 条记录", "manual ready recent cleared after batch pending")
+                    page.locator("#reset-recent-filters-button").click()
+                    page.select_option("#recent-type-input", "image")
+                    page.select_option("#recent-processing-state-input", "pending")
+                    page.locator("#recent-filter-form button[type='submit']").click()
+                    wait_for_text(page, "#recent-list", "batch-image.png", "restored pending image recent result")
                     page.locator("#reset-search-button").click()
                     page.locator("#reset-recent-filters-button").click()
 

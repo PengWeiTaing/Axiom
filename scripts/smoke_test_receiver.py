@@ -1068,16 +1068,46 @@ def main() -> None:
             assert batch_mark_ready["items"][0]["processing_state"] == "ready"
             assert batch_mark_ready["items"][0]["processing_override"] == "ready"
 
+            batch_mark_pending = assert_status(
+                client.post(
+                    "/processing/mark-pending",
+                    json={
+                        "key": "test-key",
+                        "ids": [docx_document["item"]["id"]],
+                    },
+                ),
+                200,
+                "processing batch mark pending",
+            )
+            assert batch_mark_pending["message"] == "marked_pending"
+            assert batch_mark_pending["count"] == 1
+            assert batch_mark_pending["items"][0]["processing_state"] == "pending"
+            assert batch_mark_pending["items"][0]["processing_override"] is None
+
             processing_backlog_after_batch = assert_status(
                 client.get(
                     "/processing/backlog",
                     query_string={"key": "test-key", "group_limit": "2"},
                 ),
                 200,
-                "processing backlog after batch ready",
+                "processing backlog after batch pending",
             )
-            assert processing_backlog_after_batch["total"] == 0
-            assert processing_backlog_after_batch["next_overall"] is None
+            assert processing_backlog_after_batch["total"] == 1
+            assert processing_backlog_after_batch["next_overall"]["id"] == docx_document["item"]["id"]
+
+            reapply_batch_mark_ready = assert_status(
+                client.post(
+                    "/processing/mark-ready",
+                    json={
+                        "key": "test-key",
+                        "ids": [docx_document["item"]["id"]],
+                    },
+                ),
+                200,
+                "reapply batch ready override",
+            )
+            assert reapply_batch_mark_ready["items"][0]["processing_state"] == "ready"
+            assert reapply_batch_mark_ready["items"][0]["processing_override"] == "ready"
 
             reset_batch_mark_ready = assert_status(
                 client.post(

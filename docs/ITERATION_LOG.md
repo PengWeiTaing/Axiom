@@ -510,3 +510,7 @@
 - 本地已补跑 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_web_app.py`
 - 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮“overview stat quick filters”部署到 VPS，当前线上运行代码更新到 `93656e0`
 - 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_083535_93656e0.tar.gz`
+- 新增 `/processing/mark-pending`，允许按显式 `ids` 批量撤销 `processing_override=ready`，把手动完成条目恢复成待处理
+- `/app` 的 recent 列表在 `processing_override=ready` 过滤下会显示“批量恢复为待处理”按钮，不用再逐条撤销手动完成
+- `scripts/smoke_test_receiver.py` 新增“批量完成 -> 批量恢复待处理”接口级闭环；`scripts/smoke_test_web_app.py` 新增浏览器级回归，验证从 recent 批量恢复后能再次在 `processing_state=pending` 里找回条目
+- 本地已补跑 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_receiver.py`、`python scripts/smoke_test_web_app.py`
