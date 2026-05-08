@@ -529,3 +529,6 @@
 - `/app` 的 item viewer / editor 现在新增“同类下一条 / 跳到下一条”动作，基于现有 `/processing/next` 直接切到同类型下一条 pending 条目，不必先保存再跳
 - `scripts/smoke_test_web_app.py` 新增浏览器级回归：从 `pending-shot.png` 的查看态直接跳到另一条待处理 image，并继续完成后续批量 ready / pending 闭环
 - 本地已补跑 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_web_app.py`
+- 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮 “next pending viewer navigation” 部署到 VPS，当前线上运行代码更新到 `b51c929`
+- 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_121830_b51c929.tar.gz`
+- 线上只读核验通过：`https://pengweitai.me/health` 正常，`/processing/next?key=axiomnb&type=image` 正常返回空结果结构，`/overview?key=axiomnb&recent_limit=3&preview_chars=120` 正常返回
