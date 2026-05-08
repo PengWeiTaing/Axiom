@@ -456,3 +456,6 @@
 - 线上只读验证通过：`/processing/next?key=axiomnb` 当前返回 `item=null`，`/processing/backlog?key=axiomnb` 已返回 `next_overall=null`，公网 `/app` 的“待处理队列”面板当前显示“当前已清空”
 - `/app` 的 item 编辑态现在支持“保存并处理同类下一条”，适合连续清 document / audio / image 的 pending 积压
 - `scripts/smoke_test_web_app.py` 已补浏览器级覆盖：pending docx 在 viewer 中点击“保存并处理同类下一条”后，会回到已就绪查看态并确认同类积压已清空
+- 已用 `scripts/deploy_to_vps.py` 将这轮“save-and-next pending workflow”部署到 VPS，当前线上代码更新到 `a257d58`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_022706_a257d58.tar.gz`
+- 线上只读验证通过：`https://pengweitai.me/health` 正常、`/processing/next?key=axiomnb&type=document` 当前返回 `item=null`、公网 `/app` 当前仍显示“待处理队列已清空”
