@@ -1406,6 +1406,17 @@ function buildItemViewerActions(item) {
             : null,
         item.processing_state === "pending"
             ? {
+                label: "完成并跳下一条",
+                className: "secondary-button",
+                dataset: {
+                    action: "mark-processing-ready-next",
+                    itemId: item.id,
+                    itemType: item.type,
+                },
+            }
+            : null,
+        item.processing_state === "pending"
+            ? {
                 label: "标记已处理",
                 className: "secondary-button",
                 dataset: {
@@ -1915,6 +1926,17 @@ async function openItemEditor(itemId) {
                 className: "primary-button",
                 dataset: {
                     action: "save-item-edit-next",
+                    itemId: item.id,
+                    itemType: item.type,
+                },
+            }
+            : null,
+        item.processing_state === "pending"
+            ? {
+                label: "完成并跳下一条",
+                className: "secondary-button",
+                dataset: {
+                    action: "mark-processing-ready-next",
                     itemId: item.id,
                     itemType: item.type,
                 },
@@ -2457,7 +2479,11 @@ async function handleItemEdit(itemId) {
     }
 }
 
-async function handleProcessingOverride(itemId, processingOverride, { reopenEditor = false } = {}) {
+async function handleProcessingOverride(
+    itemId,
+    processingOverride,
+    { reopenEditor = false, openNextSameType = false } = {},
+) {
     try {
         setConnectionState("busy", processingOverride ? "正在标记已处理" : "正在恢复待处理");
         const payload = await apiRequest(`/item/${itemId}/update`, {
@@ -2468,6 +2494,25 @@ async function handleProcessingOverride(itemId, processingOverride, { reopenEdit
         });
         updateKnownItem(payload.item);
         await syncDashboard();
+        if (processingOverride === "ready" && openNextSameType) {
+            const nextItem = await fetchNextPendingItem(payload.item?.type || "", itemId);
+            if (nextItem) {
+                if (reopenEditor) {
+                    await openItemEditor(nextItem.id);
+                } else {
+                    await openItemViewer(nextItem.id);
+                }
+                showToast("已标记完成，并打开同类下一条待处理");
+                return;
+            }
+            if (reopenEditor) {
+                await openItemEditor(itemId);
+            } else {
+                await openItemViewer(itemId);
+            }
+            showToast("已标记完成，同类待处理已清空");
+            return;
+        }
         if (reopenEditor) {
             await openItemEditor(itemId);
         } else {
@@ -2801,6 +2846,12 @@ function bindDelegatedActions() {
         } else if (action === "mark-processing-ready") {
             const reopenEditor = state.viewerContext?.kind === "item-edit";
             await handleProcessingOverride(target.getAttribute("data-item-id"), "ready", { reopenEditor });
+        } else if (action === "mark-processing-ready-next") {
+            const reopenEditor = state.viewerContext?.kind === "item-edit";
+            await handleProcessingOverride(target.getAttribute("data-item-id"), "ready", {
+                reopenEditor,
+                openNextSameType: true,
+            });
         } else if (action === "open-next-pending-item") {
             await handleOpenNextPendingItem(
                 target.getAttribute("data-item-id"),

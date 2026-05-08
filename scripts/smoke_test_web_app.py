@@ -422,8 +422,8 @@ def main() -> None:
                     wait_for_text(page, "#viewer-meta", "待补正文", "pending docx still pending meta")
                     click_first_action(
                         page,
-                        "#viewer-actions [data-action='mark-processing-ready']",
-                        "mark pending docx ready from editor",
+                        "#viewer-actions [data-action='mark-processing-ready-next']",
+                        "mark pending docx ready and continue from editor",
                     )
                     wait_for_text(page, "#viewer-meta", "已手动标记完成", "docx manual ready meta")
                     wait_for_text(page, "#viewer-meta", "手动完成", "docx override meta")
