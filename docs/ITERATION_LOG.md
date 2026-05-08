@@ -535,3 +535,6 @@
 - `/app` 的 item viewer / editor 现在新增“完成并跳下一条”动作：把当前 pending 条目标记为已处理后，若同类还有下一条待处理就直接打开；若没有则留在当前条目并提示已清空
 - `scripts/smoke_test_web_app.py` 新增浏览器级回归：pending docx 在编辑态可直接走“完成并跳下一条”，pending image 在查看态可继续走“同类下一条”再接批量处理闭环
 - 本地已补跑 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_web_app.py`
+- 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮 “complete-and-next pending action” 部署到 VPS，当前线上运行代码更新到 `3a963e3`
+- 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_122711_3a963e3.tar.gz`
+- 线上只读核验通过：`https://pengweitai.me/health` 正常，`/processing/next?key=axiomnb&type=document` 与 `/processing/next?key=axiomnb&type=image` 均正常返回空结果结构
