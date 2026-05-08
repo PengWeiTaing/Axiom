@@ -475,3 +475,6 @@
 - `core/static/app.js` 的 viewer 关闭态补了更稳的隐藏处理，浏览器回归里在 no-loop 断点后改为刷新页面再继续后半段流程，避免弹层状态串扰
 - `scripts/smoke_test_receiver.py` 新增 `/processing/next?exclude_id=...` 成功和非法参数覆盖
 - `scripts/smoke_test_web_app.py` 新增 pending docx 的 no-loop 编辑流覆盖，并修复浏览器级遮罩串扰导致的后续上传假失败
+- 已用 `scripts/deploy_to_vps.py` 将这轮“avoid reopening current pending item”部署到 VPS，当前线上代码更新到 `4cf9126`
+- 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_040942_4cf9126.tar.gz`
+- 线上核验通过：`http://127.0.0.1:5000/health` 正常、`python3 /opt/axiom/scripts/check_consistency.py --root /opt/axiom` 通过，公网链路继续由 `https://pengweitai.me` 提供
