@@ -492,3 +492,7 @@
 - `/app` 的 overview backlog 和 processing workbench 都新增了“将预览项标记为已处理 / 批量标记预览项”入口，适合快速清掉一小组无需继续补正文的 pending
 - `scripts/smoke_test_receiver.py` 新增批量 `mark-ready` 成功路径和非法 `ids` 覆盖
 - `scripts/smoke_test_web_app.py` 新增浏览器级覆盖：上传一个 pending image 后，直接在 processing workbench 点击批量标记按钮，再回到 search / viewer 验证它已变成手动完成
+- 本地已跑通 `python -m compileall -q core scripts`、`node --check core/static/app.js`、`python scripts/smoke_test_receiver.py`、`python scripts/smoke_test_web_app.py`、`python scripts/smoke_test_inbox_processing.py`
+- 已用 `scripts/deploy_to_vps.py` 将这轮“batch processing workbench actions”部署到 VPS，当前线上运行代码更新到 `119f6fa`
+- 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_052512_119f6fa.tar.gz`
+- 线上只读核验通过：`https://pengweitai.me/health` 正常，`/processing/backlog?key=axiomnb&group_limit=4` 当前返回 `total=0`，`/overview?key=axiomnb&recent_limit=3&preview_chars=120` 已继续正常返回 `processing_backlog`
