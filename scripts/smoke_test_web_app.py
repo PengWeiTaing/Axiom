@@ -385,10 +385,20 @@ def main() -> None:
                         "(element) => element.scrollIntoView({ block: 'start', behavior: 'auto' })"
                     )
                     click_first_action(page, "#viewer-actions [data-action='edit-item']", "edit pending docx item")
+                    wait_for_text(
+                        page,
+                        "#viewer-actions",
+                        "保存并处理同类下一条",
+                        "pending docx save-next action",
+                    )
                     page.locator("[data-role='item-edit-form'] textarea[name='derived_text']").fill(
                         "Browser manual document recovery line"
                     )
-                    click_first_action(page, "#viewer-actions [data-action='save-item-edit']", "save docx derived text")
+                    click_first_action(
+                        page,
+                        "#viewer-actions [data-action='save-item-edit-next']",
+                        "save docx derived text and continue",
+                    )
                     wait_for_text(page, "#viewer-meta", "正文已就绪", "updated docx ready meta")
                     wait_for_text(page, "#viewer-content", "Browser manual document recovery line", "updated docx derived text")
                     close_viewer(page)

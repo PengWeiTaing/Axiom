@@ -1059,6 +1059,16 @@ async function fetchItemDetail(itemId) {
     return payload.item;
 }
 
+async function fetchNextPendingItem(itemType = "") {
+    const payload = await apiRequest("/processing/next", {
+        query: itemType ? { type: itemType } : {},
+    });
+    if (payload.item) {
+        updateKnownItem(payload.item);
+    }
+    return payload.item || null;
+}
+
 function buildArtifactFilePath(relativePath) {
     return `/artifacts/file/${String(relativePath || "")
         .split("/")
@@ -1409,15 +1419,27 @@ async function openItemEditor(itemId) {
     state.viewerContext = { kind: "item-edit", itemId: item.id };
     openViewerShell(title);
     renderViewerMeta(buildItemMetaRows(item));
+    const canContinuePending = item.processing_state === "pending";
     renderViewerActions([
         {
             label: "保存修改",
-            className: "primary-button",
+            className: canContinuePending ? "secondary-button" : "primary-button",
             dataset: {
                 action: "save-item-edit",
                 itemId: item.id,
             },
         },
+        canContinuePending
+            ? {
+                label: "保存并处理同类下一条",
+                className: "primary-button",
+                dataset: {
+                    action: "save-item-edit-next",
+                    itemId: item.id,
+                    itemType: item.type,
+                },
+            }
+            : null,
         {
             label: "返回查看",
             className: "secondary-button",
@@ -1904,7 +1926,7 @@ async function handleItemEdit(itemId) {
     }
 }
 
-async function handleItemEditSubmit(form) {
+async function handleItemEditSubmit(form, { openNext = false } = {}) {
     const itemId = form.dataset.itemId;
     const itemType = form.dataset.itemType;
     const formData = new FormData(form);
@@ -1913,7 +1935,9 @@ async function handleItemEditSubmit(form) {
     const derivedText = String(formData.get("derived_text") || "");
     const transcriptText = String(formData.get("transcript_text") || "");
     const feedback = form.querySelector("[data-edit-feedback]");
-    const submitButton = elements.viewerActions.querySelector("[data-action='save-item-edit']");
+    const submitButton = elements.viewerActions.querySelector(
+        openNext ? "[data-action='save-item-edit-next']" : "[data-action='save-item-edit']",
+    );
 
     if (itemType === "text" && !content.trim()) {
         setFeedback(feedback, "文本内容不能为空。", "error");
@@ -1926,7 +1950,7 @@ async function handleItemEditSubmit(form) {
 
     try {
         setFeedback(feedback, "", "muted");
-        setButtonDisabled(submitButton, true, "保存中...");
+        setButtonDisabled(submitButton, true, openNext ? "保存并继续中..." : "保存中...");
         setConnectionState("busy", "正在保存修改");
         const payload = await apiRequest(`/item/${itemId}/update`, {
             method: "POST",
@@ -1939,8 +1963,19 @@ async function handleItemEditSubmit(form) {
         });
         updateKnownItem(payload.item);
         await syncDashboard();
-        await openItemViewer(itemId);
-        showToast(payload.message === "unchanged" ? "没有检测到变化" : "修改已保存");
+        if (openNext) {
+            const nextItem = await fetchNextPendingItem(itemType);
+            if (nextItem) {
+                await openItemEditor(nextItem.id);
+                showToast(payload.message === "unchanged" ? "已跳到同类下一条待处理" : "已保存，并打开同类下一条");
+            } else {
+                await openItemViewer(itemId);
+                showToast(payload.message === "unchanged" ? "没有检测到变化，同类待处理已清空" : "已保存，同类待处理已清空");
+            }
+        } else {
+            await openItemViewer(itemId);
+            showToast(payload.message === "unchanged" ? "没有检测到变化" : "修改已保存");
+        }
     } catch (error) {
         setConnectionState("error", error.message);
         setFeedback(feedback, error.message, "error");
@@ -2039,6 +2074,13 @@ function bindDelegatedActions() {
                 return;
             }
             await handleItemEditSubmit(form);
+        } else if (action === "save-item-edit-next") {
+            const form = elements.viewerContent.querySelector("[data-role='item-edit-form']");
+            if (!form) {
+                showToast("当前没有可保存的编辑表单");
+                return;
+            }
+            await handleItemEditSubmit(form, { openNext: true });
         } else if (action === "viewer-toggle-storage") {
             await handleStorageToggle(target.getAttribute("data-item-id"), { reopenViewer: true });
         } else if (action === "download-item-file") {
