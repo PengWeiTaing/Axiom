@@ -35,6 +35,7 @@
         <nav class="quick-nav panel" aria-label="页面导航">
             <button type="button" data-scroll-target="capture-panel">记录</button>
             <button type="button" data-scroll-target="overview-panel">总览</button>
+            <button type="button" data-scroll-target="processing-panel">处理</button>
             <button type="button" data-scroll-target="recent-panel">浏览</button>
             <button type="button" data-scroll-target="search-panel">搜索</button>
             <button type="button" data-scroll-target="artifacts-panel">自动化</button>
@@ -162,6 +163,24 @@
                         </div>
                         <div id="overview-artifact-highlights" class="stack-list"></div>
                     </div>
+                </div>
+            </section>
+
+            <section class="panel processing-panel" id="processing-panel">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">Processing</p>
+                        <h2>处理工作台</h2>
+                    </div>
+                    <button class="secondary-button" id="refresh-processing-button" type="button">刷新队列</button>
+                </div>
+                <div class="subpanel">
+                    <div class="subpanel-head">
+                        <h3>当前积压</h3>
+                        <span id="processing-queue-total" class="subtle-text">待处理 0 条</span>
+                    </div>
+                    <p id="processing-queue-next-label" class="helper-text">保存 key 后即可查看下一条待处理记录。</p>
+                    <div id="processing-workbench" class="item-grid"></div>
                 </div>
             </section>
 
@@ -429,6 +448,7 @@
         <div class="bottom-bar">
             <button type="button" data-scroll-target="capture-panel">记录</button>
             <button type="button" data-scroll-target="overview-panel">总览</button>
+            <button type="button" data-scroll-target="processing-panel">处理</button>
             <button type="button" data-scroll-target="recent-panel">浏览</button>
             <button type="button" data-scroll-target="search-panel">搜索</button>
             <button type="button" data-scroll-target="artifacts-panel">自动化</button>

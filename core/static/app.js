@@ -60,6 +60,10 @@ const elements = {
     overviewArtifactHighlights: document.getElementById("overview-artifact-highlights"),
     overviewGeneratedAt: document.getElementById("overview-generated-at"),
     refreshOverviewButton: document.getElementById("refresh-overview-button"),
+    processingWorkbench: document.getElementById("processing-workbench"),
+    processingQueueTotal: document.getElementById("processing-queue-total"),
+    processingQueueNextLabel: document.getElementById("processing-queue-next-label"),
+    refreshProcessingButton: document.getElementById("refresh-processing-button"),
     recentPanel: document.getElementById("recent-panel"),
     recentFilterForm: document.getElementById("recent-filter-form"),
     recentFeedback: document.getElementById("recent-feedback"),
@@ -623,6 +627,101 @@ function renderOverviewBacklog(backlog) {
             `;
         })
         .join("");
+}
+
+function renderProcessingWorkbench(backlog) {
+    const groups = backlog?.groups || [];
+    const total = Number(backlog?.total || 0);
+    const nextOverall = backlog?.next_overall || null;
+
+    elements.processingQueueTotal.textContent = total > 0 ? `待处理 ${total} 条` : "当前已清空";
+    elements.processingQueueNextLabel.textContent = nextOverall
+        ? `下一条待处理：${getItemDisplayName(nextOverall)}`
+        : "当前没有待补正文、待补转写或待补说明的记录。";
+
+    if (!groups.length) {
+        renderEmptyState(elements.processingWorkbench, "当前工作台没有待处理条目。");
+        return;
+    }
+
+    const cards = [];
+    if (nextOverall) {
+        cards.push(`
+            <article class="item-card processing-workbench-card processing-next-card">
+                <div class="item-meta">
+                    <span class="tag">全局下一条</span>
+                    <span>${escapeHtml(formatType(nextOverall.type))}</span>
+                    <span>${escapeHtml(nextOverall.processing_note || formatProcessingState(nextOverall.processing_state))}</span>
+                </div>
+                <h3>${escapeHtml(getItemDisplayName(nextOverall))}</h3>
+                <p class="item-preview">${escapeHtml(getDocumentAwarePreviewText(nextOverall, 140))}</p>
+                <div class="card-actions">
+                    <button
+                        class="primary-button"
+                        type="button"
+                        data-action="view-item"
+                        data-item-id="${escapeHtml(nextOverall.id)}"
+                    >
+                        打开这一条
+                    </button>
+                </div>
+            </article>
+        `);
+    }
+
+    cards.push(
+        ...groups.map((group) => {
+            const nextItem = group.next_item || null;
+            return `
+                <article class="item-card processing-workbench-card">
+                    <div class="item-meta">
+                        <span class="tag">${escapeHtml(group.type_label || formatType(group.type))}</span>
+                        <span>${escapeHtml(group.processing_note || formatProcessingState("pending"))}</span>
+                        <span>${escapeHtml(group.count)} 条</span>
+                    </div>
+                    <h3>${escapeHtml(group.title || "待处理队列")}</h3>
+                    <p class="item-preview">${escapeHtml(group.description || "")}</p>
+                    ${
+                        nextItem
+                            ? `
+                                <div class="processing-next-inline">
+                                    <strong>下一条</strong>
+                                    <span>${escapeHtml(getItemDisplayName(nextItem))}</span>
+                                </div>
+                            `
+                            : ""
+                    }
+                    <div class="card-actions">
+                        ${
+                            nextItem
+                                ? `
+                                    <button
+                                        class="primary-button"
+                                        type="button"
+                                        data-action="view-item"
+                                        data-item-id="${escapeHtml(nextItem.id)}"
+                                    >
+                                        直接处理
+                                    </button>
+                                `
+                                : ""
+                        }
+                        <button
+                            class="secondary-button"
+                            type="button"
+                            data-action="apply-processing-backlog-filter"
+                            data-item-type="${escapeHtml(group.filters?.type || "")}"
+                            data-processing-state="${escapeHtml(group.filters?.processing_state || "pending")}"
+                        >
+                            看这一组
+                        </button>
+                    </div>
+                </article>
+            `;
+        }),
+    );
+
+    elements.processingWorkbench.innerHTML = cards.join("");
 }
 
 function renderOverviewArtifacts(artifactSummary) {
@@ -1562,6 +1661,15 @@ async function loadOverview() {
     elements.lastSyncIndicator.textContent = `上次同步：${formatDateTime(payload.generated_at)}`;
 }
 
+async function loadProcessingQueue() {
+    const payload = await apiRequest("/processing/backlog", {
+        query: {
+            group_limit: 4,
+        },
+    });
+    renderProcessingWorkbench(payload);
+}
+
 function readRecentFilters() {
     const form = new FormData(elements.recentFilterForm);
     return {
@@ -1779,6 +1887,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         requireKey();
         setConnectionState("busy", "正在同步总览、最近记录和自动化产物");
         await loadOverview();
+        await loadProcessingQueue();
         await loadRecentPage({ reset: true });
         await loadAutomationJobs();
         await loadAutomationRuns({ reset: true });
@@ -2162,11 +2271,14 @@ function bindForms() {
         setConnectionState("idle", "尚未同步");
         elements.overviewGeneratedAt.textContent = "";
         elements.overviewBacklogTotal.textContent = "待处理 0 条";
+        elements.processingQueueTotal.textContent = "待处理 0 条";
+        elements.processingQueueNextLabel.textContent = "保存 key 后即可查看下一条待处理记录。";
         closeViewer();
         renderEmptyState(elements.overviewStats, "保存 key 后即可读取总览。");
         renderEmptyState(elements.overviewRecentHighlights, "保存 key 后即可查看最近记录。");
         renderEmptyState(elements.overviewProcessingBacklog, "保存 key 后即可查看待处理队列。");
         renderEmptyState(elements.overviewArtifactHighlights, "保存 key 后即可查看自动化产物。");
+        renderEmptyState(elements.processingWorkbench, "保存 key 后即可查看处理工作台。");
         renderEmptyState(elements.recentList, "保存 key 后即可读取最近记录。");
         renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
         renderEmptyState(elements.automationJobs, "保存 key 后即可读取可执行任务。");
@@ -2242,6 +2354,18 @@ function bindForms() {
             await loadOverview();
             setConnectionState("ready", elements.lastSyncIndicator.textContent);
             showToast("总览已刷新");
+        } catch (error) {
+            setConnectionState("error", error.message);
+            showToast(error.message);
+        }
+    });
+
+    elements.refreshProcessingButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "正在刷新处理工作台");
+            await loadProcessingQueue();
+            setConnectionState("ready", elements.lastSyncIndicator.textContent);
+            showToast("处理工作台已刷新");
         } catch (error) {
             setConnectionState("error", error.message);
             showToast(error.message);
@@ -2406,6 +2530,7 @@ function renderInitialEmptyStates() {
     renderEmptyState(elements.overviewRecentHighlights, "保存 key 后即可查看最近记录。");
     renderEmptyState(elements.overviewProcessingBacklog, "保存 key 后即可查看待处理队列。");
     renderEmptyState(elements.overviewArtifactHighlights, "保存 key 后即可查看自动化产物。");
+    renderEmptyState(elements.processingWorkbench, "保存 key 后即可查看处理工作台。");
     renderEmptyState(elements.recentList, "保存 key 后即可读取最近记录。");
     renderEmptyState(elements.searchResults, "输入关键词后再开始搜索。");
     renderEmptyState(elements.automationJobs, "保存 key 后即可读取可执行任务。");
@@ -2413,6 +2538,8 @@ function renderInitialEmptyStates() {
     renderEmptyState(elements.artifactSummaryCards, "保存 key 后即可读取自动化摘要。");
     renderEmptyState(elements.artifactList, "保存 key 后即可读取自动化产物。");
     elements.overviewBacklogTotal.textContent = "待处理 0 条";
+    elements.processingQueueTotal.textContent = "待处理 0 条";
+    elements.processingQueueNextLabel.textContent = "保存 key 后即可查看下一条待处理记录。";
     updateLoadMoreButton(elements.loadMoreRecentButton, 1, 1);
     updateLoadMoreButton(elements.loadMoreSearchButton, 1, 1, "还没有结果");
     updateLoadMoreButton(elements.loadMoreAutomationRunsButton, 1, 1);

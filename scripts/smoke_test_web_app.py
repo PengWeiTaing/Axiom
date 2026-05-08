@@ -354,6 +354,16 @@ def main() -> None:
 
                     wait_for_text(page, "#overview-processing-backlog", "文档待补正文", "overview docx backlog card")
                     wait_for_text(page, "#overview-backlog-total", "待处理 1 条", "overview backlog total")
+                    wait_for_text(page, "#processing-workbench", "文档待补正文", "processing workbench docx card")
+                    wait_for_text(page, "#processing-queue-total", "待处理 1 条", "processing workbench total")
+                    click_first_action(
+                        page,
+                        "#processing-workbench .processing-next-card [data-action='view-item']",
+                        "open next pending item from processing workbench",
+                    )
+                    wait_for_text(page, "#viewer-title", docx_note, "processing workbench viewer title")
+                    wait_for_text(page, "#viewer-meta", "待补正文", "processing workbench viewer meta")
+                    close_viewer(page)
                     wait_for_text(page, "#overview-processing-backlog", "下一条", "overview backlog next item")
                     click_first_action(
                         page,

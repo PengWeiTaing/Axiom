@@ -189,7 +189,7 @@ body::before {
 .quick-nav,
 .bottom-bar {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 8px;
     padding: 10px;
     position: sticky;
@@ -487,6 +487,30 @@ body::before {
 .backlog-preview-list strong {
     color: var(--ink);
     font-size: 0.94rem;
+}
+
+.processing-workbench-card {
+    display: grid;
+    gap: 12px;
+}
+
+.processing-next-card {
+    background: linear-gradient(135deg, rgba(31, 76, 68, 0.14), rgba(255, 255, 255, 0.78));
+    border-color: rgba(31, 76, 68, 0.18);
+}
+
+.processing-next-inline {
+    display: grid;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    background: rgba(31, 76, 68, 0.08);
+    color: var(--ink);
+}
+
+.processing-next-inline strong {
+    color: var(--secondary);
+    font-size: 0.88rem;
 }
 
 .item-image {

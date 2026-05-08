@@ -459,3 +459,6 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“save-and-next pending workflow”部署到 VPS，当前线上代码更新到 `a257d58`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_022706_a257d58.tar.gz`
 - 线上只读验证通过：`https://pengweitai.me/health` 正常、`/processing/next?key=axiomnb&type=document` 当前返回 `item=null`、公网 `/app` 当前仍显示“待处理队列已清空”
+- `/app` 新增独立“处理工作台”面板，直接消费 `/processing/backlog`，把全局下一条和各类型 pending 队列拆成可点击卡片
+- 处理工作台支持按类型直接打开下一条待处理 item，也保留“看这一组”跳转到 recent `processing_state=pending` 的入口
+- `scripts/smoke_test_web_app.py` 已补浏览器级覆盖：pending docx 会同时出现在 overview backlog 和 processing workbench 中，并可从 workbench 直接打开
