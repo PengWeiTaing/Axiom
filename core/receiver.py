@@ -476,6 +476,27 @@ def normalize_processing_override(value: str | None) -> str | None:
     return text
 
 
+def normalize_item_id_list(raw_ids) -> list[int]:
+    if not isinstance(raw_ids, list):
+        raise ValueError("ids 蹇呴』鏄暟缁?")
+    if not raw_ids:
+        raise ValueError("ids 涓嶈兘涓虹┖")
+
+    normalized_ids: list[int] = []
+    seen_ids: set[int] = set()
+    for index, raw_item_id in enumerate(raw_ids):
+        item_id = parse_positive_int(raw_item_id, f"ids[{index}]", 1)
+        if item_id in seen_ids:
+            continue
+        seen_ids.add(item_id)
+        normalized_ids.append(item_id)
+
+    if len(normalized_ids) > 20:
+        raise ValueError("涓€娆℃渶澶氬彧鑳芥壒閲忓鐞?20 鏉¤褰?")
+
+    return normalized_ids
+
+
 def get_request_key() -> str:
     return get_request_field("key") or request.headers.get("X-Axiom-Key", "")
 
@@ -1481,6 +1502,28 @@ def get_item_by_id(item_id: int) -> sqlite3.Row | None:
         conn.close()
 
 
+def get_items_by_ids(item_ids: list[int]) -> list[sqlite3.Row]:
+    if not item_ids:
+        return []
+
+    placeholders = ", ".join("?" for _ in item_ids)
+    conn = get_db_connection()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT {ITEM_DETAIL_SELECT_FIELDS}
+            FROM items
+            WHERE id IN ({placeholders})
+            """,
+            item_ids,
+        ).fetchall()
+    finally:
+        conn.close()
+
+    rows_by_id = {int(row["id"]): row for row in rows}
+    return [rows_by_id[item_id] for item_id in item_ids if item_id in rows_by_id]
+
+
 def update_item_file_path(item_id: int, file_path: Path) -> None:
     conn = get_db_connection()
     try:
@@ -1514,6 +1557,26 @@ def update_item_content_source_text_fields(
             WHERE id = ?
             """,
             (content, source, derived_text, transcript_text, processing_override, item_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_items_processing_override(item_ids: list[int], processing_override: str | None) -> None:
+    if not item_ids:
+        return
+
+    placeholders = ", ".join("?" for _ in item_ids)
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            f"""
+            UPDATE items
+            SET processing_override = ?
+            WHERE id IN ({placeholders})
+            """,
+            (processing_override, *item_ids),
         )
         conn.commit()
     finally:
@@ -2914,6 +2977,49 @@ def processing_next_item():
             "processing_state": "pending",
             "exclude_id": exclude_item_id,
             "item": row_to_item(row) if row else None,
+        }
+    )
+
+
+@app.route("/processing/mark-ready", methods=["POST"])
+def processing_mark_ready():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    try:
+        body = get_request_body_data()
+    except ValueError as exc:
+        return error_response(400, "invalid_request_body", str(exc))
+
+    try:
+        item_ids = normalize_item_id_list(body.get("ids"))
+    except ValueError as exc:
+        return error_response(400, "invalid_processing_ids", str(exc))
+
+    rows = get_items_by_ids(item_ids)
+    found_ids = {int(row["id"]) for row in rows}
+    missing_ids = [item_id for item_id in item_ids if item_id not in found_ids]
+    if missing_ids:
+        missing_text = ", ".join(str(item_id) for item_id in missing_ids)
+        return error_response(404, "item_not_found", f"浠ヤ笅 item 涓嶅瓨鍦? {missing_text}")
+
+    update_items_processing_override(item_ids, "ready")
+    updated_rows = get_items_by_ids(item_ids)
+
+    counts_by_type: dict[str, int] = {}
+    for row in updated_rows:
+        item_type = str(row["type"])
+        counts_by_type[item_type] = counts_by_type.get(item_type, 0) + 1
+
+    return ok_response(
+        {
+            "message": "marked_ready",
+            "processing_override": "ready",
+            "count": len(updated_rows),
+            "ids": item_ids,
+            "by_type": counts_by_type,
+            "items": [row_to_item(row) for row in updated_rows],
         }
     )
 

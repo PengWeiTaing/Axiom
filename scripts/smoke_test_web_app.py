@@ -436,6 +436,35 @@ def main() -> None:
                     page.set_input_files(
                         "#file-input",
                         {
+                            "name": "batch-image.png",
+                            "mimeType": "image/png",
+                            "buffer": PNG_1X1_BYTES,
+                        },
+                    )
+                    page.fill("#file-note-input", "")
+                    page.fill("#file-source-input", "web_app_image_batch")
+                    page.locator("#file-capture-form button[type='submit']").click()
+                    page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
+                    wait_for_text(page, "#processing-workbench", "图片待补说明", "processing workbench batch image card")
+                    click_first_action(
+                        page,
+                        "#processing-workbench [data-action='mark-processing-batch-ready']",
+                        "mark image preview batch ready",
+                    )
+                    wait_for_text(page, "#processing-queue-total", "当前已清空", "processing queue cleared after batch ready")
+
+                    page.fill("#search-query-input", "batch-image.png")
+                    page.fill("#search-source-input", "web_app_image_batch")
+                    page.locator("#search-form button[type='submit']").click()
+                    wait_for_text(page, "#search-results", "batch-image.png", "batch image search result")
+                    click_first_action(page, "#search-results [data-action='view-item']", "open batch image item")
+                    wait_for_text(page, "#viewer-meta", "已手动标记完成", "batch image manual ready meta")
+                    wait_for_text(page, "#viewer-meta", "手动完成", "batch image override meta")
+                    close_viewer(page)
+
+                    page.set_input_files(
+                        "#file-input",
+                        {
                             "name": "meeting-note.m4a",
                             "mimeType": "audio/mp4",
                             "buffer": b"fake playwright m4a bytes",

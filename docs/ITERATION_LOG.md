@@ -486,3 +486,9 @@
 - 已用 `scripts/deploy_to_vps.py` 将这轮“manual processing override”部署到 VPS，当前线上代码更新到 `d513989`
 - 这次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_042515_d513989.tar.gz`
 - 线上核验通过：`http://127.0.0.1:5000/health` 正常、`python3 /opt/axiom/scripts/check_consistency.py --root /opt/axiom` 通过
+## 2026-05-08
+
+- 新增 `/processing/mark-ready`，只接受显式 `ids`，用于把工作台里当前预览出来的 pending 条目成组标记为已处理
+- `/app` 的 overview backlog 和 processing workbench 都新增了“将预览项标记为已处理 / 批量标记预览项”入口，适合快速清掉一小组无需继续补正文的 pending
+- `scripts/smoke_test_receiver.py` 新增批量 `mark-ready` 成功路径和非法 `ids` 覆盖
+- `scripts/smoke_test_web_app.py` 新增浏览器级覆盖：上传一个 pending image 后，直接在 processing workbench 点击批量标记按钮，再回到 search / viewer 验证它已变成手动完成

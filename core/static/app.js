@@ -127,6 +127,20 @@ function summarizeText(value, maxChars = 120) {
     return `${text.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
 }
 
+function buildItemIdsValue(items) {
+    return (items || [])
+        .map((item) => String(item?.id || "").trim())
+        .filter(Boolean)
+        .join(",");
+}
+
+function parseItemIdsValue(value) {
+    return String(value || "")
+        .split(",")
+        .map((part) => Number.parseInt(part.trim(), 10))
+        .filter((itemId) => Number.isInteger(itemId) && itemId > 0);
+}
+
 function formatDateTime(value) {
     if (!value) {
         return "未知时间";
@@ -535,7 +549,7 @@ function renderOverviewRecent(items) {
         .join("");
 }
 
-function renderOverviewBacklog(backlog) {
+function renderOverviewBacklogV2(backlog) {
     const groups = backlog?.groups || [];
     const total = Number(backlog?.total || 0);
     const nextOverall = backlog?.next_overall || null;
@@ -629,7 +643,7 @@ function renderOverviewBacklog(backlog) {
         .join("");
 }
 
-function renderProcessingWorkbench(backlog) {
+function renderProcessingWorkbenchV2(backlog) {
     const groups = backlog?.groups || [];
     const total = Number(backlog?.total || 0);
     const nextOverall = backlog?.next_overall || null;
@@ -731,6 +745,247 @@ function renderProcessingWorkbench(backlog) {
                         >
                             看这一组
                         </button>
+                    </div>
+                </article>
+            `;
+        }),
+    );
+
+    elements.processingWorkbench.innerHTML = cards.join("");
+}
+
+function renderOverviewBacklog(backlog) {
+    const groups = backlog?.groups || [];
+    const total = Number(backlog?.total || 0);
+    const nextOverall = backlog?.next_overall || null;
+    elements.overviewBacklogTotal.textContent = total > 0 ? `待处理 ${total} 条` : "当前已清空";
+
+    if (!groups.length) {
+        renderEmptyState(elements.overviewProcessingBacklog, "当前没有待补正文、待补转写或待补说明的条目。");
+        return;
+    }
+
+    const nextOverallCard = nextOverall
+        ? `
+            <article class="summary-card backlog-card backlog-next-card">
+                <div class="item-meta">
+                    <span class="tag">下一条</span>
+                    <span>${escapeHtml(formatType(nextOverall.type))}</span>
+                    <span>${escapeHtml(nextOverall.processing_note || formatProcessingState(nextOverall.processing_state))}</span>
+                </div>
+                <h3>${escapeHtml(getItemDisplayName(nextOverall))}</h3>
+                <p class="item-preview">${escapeHtml(getDocumentAwarePreviewText(nextOverall, 120))}</p>
+                <div class="card-actions">
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        data-action="view-item"
+                        data-item-id="${escapeHtml(nextOverall.id)}"
+                    >
+                        直接处理下一条
+                    </button>
+                </div>
+            </article>
+        `
+        : "";
+
+    elements.overviewProcessingBacklog.innerHTML =
+        nextOverallCard +
+        groups
+            .map((group) => {
+                const nextItem = group.next_item || null;
+                const previewItems = group.items || [];
+                const previewItemIds = buildItemIdsValue(previewItems);
+                const sampleItems = previewItems
+                    .map(
+                        (item) => `
+                            <li>
+                                <strong>${escapeHtml(getItemDisplayName(item))}</strong>
+                                <span>${escapeHtml(formatDateTime(item.created_at))}</span>
+                            </li>
+                        `,
+                    )
+                    .join("");
+                return `
+                    <article class="summary-card backlog-card">
+                        <div class="item-meta">
+                            <span class="tag">${escapeHtml(group.type_label || formatType(group.type))}</span>
+                            <span>${escapeHtml(group.processing_note || formatProcessingState("pending"))}</span>
+                            <span>${escapeHtml(group.count)} 条</span>
+                        </div>
+                        <h3>${escapeHtml(group.title || "待处理队列")}</h3>
+                        <p class="item-preview">${escapeHtml(group.description || "")}</p>
+                        ${
+                            nextItem
+                                ? `<p class="item-preview"><strong>下一条：</strong>${escapeHtml(getItemDisplayName(nextItem))}</p>`
+                                : ""
+                        }
+                        ${sampleItems ? `<ul class="backlog-preview-list">${sampleItems}</ul>` : ""}
+                        <div class="card-actions">
+                            ${
+                                nextItem
+                                    ? `
+                                        <button
+                                            class="secondary-button"
+                                            type="button"
+                                            data-action="view-item"
+                                            data-item-id="${escapeHtml(nextItem.id)}"
+                                        >
+                                            直接处理最新一条
+                                        </button>
+                                    `
+                                    : ""
+                            }
+                            <button
+                                class="${nextItem ? "text-button" : "secondary-button"}"
+                                type="button"
+                                data-action="apply-processing-backlog-filter"
+                                data-item-type="${escapeHtml(group.filters?.type || "")}"
+                                data-processing-state="${escapeHtml(group.filters?.processing_state || "pending")}"
+                            >
+                                查看这组待处理
+                            </button>
+                            ${
+                                previewItemIds
+                                    ? `
+                                        <button
+                                            class="text-button"
+                                            type="button"
+                                            data-action="mark-processing-batch-ready"
+                                            data-item-ids="${escapeHtml(previewItemIds)}"
+                                            data-item-type="${escapeHtml(group.type || "")}"
+                                        >
+                                            将预览项标记为已处理
+                                        </button>
+                                    `
+                                    : ""
+                            }
+                        </div>
+                    </article>
+                `;
+            })
+            .join("");
+}
+
+function renderProcessingWorkbench(backlog) {
+    const groups = backlog?.groups || [];
+    const total = Number(backlog?.total || 0);
+    const nextOverall = backlog?.next_overall || null;
+
+    elements.processingQueueTotal.textContent = total > 0 ? `待处理 ${total} 条` : "当前已清空";
+    elements.processingQueueNextLabel.textContent = nextOverall
+        ? `下一条待处理：${getItemDisplayName(nextOverall)}`
+        : "当前没有待补正文、待补转写或待补说明的记录。";
+
+    if (!groups.length) {
+        renderEmptyState(elements.processingWorkbench, "当前工作台没有待处理条目。");
+        return;
+    }
+
+    const cards = [];
+    if (nextOverall) {
+        cards.push(`
+            <article class="item-card processing-workbench-card processing-next-card">
+                <div class="item-meta">
+                    <span class="tag">全局下一条</span>
+                    <span>${escapeHtml(formatType(nextOverall.type))}</span>
+                    <span>${escapeHtml(nextOverall.processing_note || formatProcessingState(nextOverall.processing_state))}</span>
+                </div>
+                <h3>${escapeHtml(getItemDisplayName(nextOverall))}</h3>
+                <p class="item-preview">${escapeHtml(getDocumentAwarePreviewText(nextOverall, 140))}</p>
+                <div class="card-actions">
+                    <button
+                        class="primary-button"
+                        type="button"
+                        data-action="edit-item"
+                        data-item-id="${escapeHtml(nextOverall.id)}"
+                    >
+                        连续处理
+                    </button>
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        data-action="view-item"
+                        data-item-id="${escapeHtml(nextOverall.id)}"
+                    >
+                        查看详情
+                    </button>
+                </div>
+            </article>
+        `);
+    }
+
+    cards.push(
+        ...groups.map((group) => {
+            const nextItem = group.next_item || null;
+            const previewItems = group.items || [];
+            const previewItemIds = buildItemIdsValue(previewItems);
+            return `
+                <article class="item-card processing-workbench-card">
+                    <div class="item-meta">
+                        <span class="tag">${escapeHtml(group.type_label || formatType(group.type))}</span>
+                        <span>${escapeHtml(group.processing_note || formatProcessingState("pending"))}</span>
+                        <span>${escapeHtml(group.count)} 条</span>
+                    </div>
+                    <h3>${escapeHtml(group.title || "待处理队列")}</h3>
+                    <p class="item-preview">${escapeHtml(group.description || "")}</p>
+                    ${
+                        nextItem
+                            ? `
+                                <div class="processing-next-inline">
+                                    <strong>下一条</strong>
+                                    <span>${escapeHtml(getItemDisplayName(nextItem))}</span>
+                                </div>
+                            `
+                            : ""
+                    }
+                    <div class="card-actions">
+                        ${
+                            nextItem
+                                ? `
+                                    <button
+                                        class="primary-button"
+                                        type="button"
+                                        data-action="edit-item"
+                                        data-item-id="${escapeHtml(nextItem.id)}"
+                                    >
+                                        连续处理
+                                    </button>
+                                    <button
+                                        class="secondary-button"
+                                        type="button"
+                                        data-action="view-item"
+                                        data-item-id="${escapeHtml(nextItem.id)}"
+                                    >
+                                        查看这条
+                                    </button>
+                                `
+                                : ""
+                        }
+                        <button
+                            class="secondary-button"
+                            type="button"
+                            data-action="apply-processing-backlog-filter"
+                            data-item-type="${escapeHtml(group.filters?.type || "")}"
+                            data-processing-state="${escapeHtml(group.filters?.processing_state || "pending")}"
+                        >
+                            看这组
+                        </button>
+                        ${
+                            previewItemIds
+                                ? `
+                                    <button
+                                        class="text-button"
+                                        type="button"
+                                        data-action="mark-processing-batch-ready"
+                                        data-item-ids="${escapeHtml(previewItemIds)}"
+                                        data-item-type="${escapeHtml(group.type || "")}"
+                                    >
+                                        批量标记预览项
+                                    </button>
+                                `
+                                : ""
+                        }
                     </div>
                 </article>
             `;
@@ -2128,6 +2383,30 @@ async function handleProcessingOverride(itemId, processingOverride, { reopenEdit
     }
 }
 
+async function handleProcessingBatchReady(itemIds, itemType = "") {
+    if (!itemIds.length) {
+        showToast("褰撳墠娌℃湁鍙壒閲忓鐞嗙殑璁板綍");
+        return;
+    }
+
+    try {
+        const typeLabel = itemType ? formatType(itemType) : "璁板綍";
+        setConnectionState("busy", `姝ｅ湪鎵归噺鏍囪${typeLabel}`);
+        const payload = await apiRequest("/processing/mark-ready", {
+            method: "POST",
+            json: {
+                ids: itemIds,
+            },
+        });
+        payload.items?.forEach((item) => updateKnownItem(item));
+        await syncDashboard();
+        showToast(`宸叉壒閲忔爣璁?${payload.count || itemIds.length} 鏉?${typeLabel}涓哄凡澶勭悊`);
+    } catch (error) {
+        setConnectionState("error", error.message);
+        showToast(error.message);
+    }
+}
+
 async function handleItemEditSubmit(form, { openNext = false } = {}) {
     const itemId = form.dataset.itemId;
     const itemType = form.dataset.itemType;
@@ -2271,6 +2550,11 @@ function bindDelegatedActions() {
             await applyProcessingBacklogFilter(
                 target.getAttribute("data-item-type"),
                 target.getAttribute("data-processing-state") || "pending",
+            );
+        } else if (action === "mark-processing-batch-ready") {
+            await handleProcessingBatchReady(
+                parseItemIdsValue(target.getAttribute("data-item-ids")),
+                target.getAttribute("data-item-type") || "",
             );
         } else if (action === "view-item") {
             await handleItemView(target.getAttribute("data-item-id"));

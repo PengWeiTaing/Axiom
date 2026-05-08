@@ -1050,6 +1050,46 @@ def main() -> None:
             assert processing_backlog["groups"][0]["items"][0]["id"] == docx_document["item"]["id"]
             assert processing_backlog["groups"][0]["next_item"]["id"] == docx_document["item"]["id"]
 
+            batch_mark_ready = assert_status(
+                client.post(
+                    "/processing/mark-ready",
+                    json={
+                        "key": "test-key",
+                        "ids": [docx_document["item"]["id"]],
+                    },
+                ),
+                200,
+                "processing batch mark ready",
+            )
+            assert batch_mark_ready["message"] == "marked_ready"
+            assert batch_mark_ready["count"] == 1
+            assert batch_mark_ready["ids"] == [docx_document["item"]["id"]]
+            assert batch_mark_ready["by_type"]["document"] == 1
+            assert batch_mark_ready["items"][0]["processing_state"] == "ready"
+            assert batch_mark_ready["items"][0]["processing_override"] == "ready"
+
+            processing_backlog_after_batch = assert_status(
+                client.get(
+                    "/processing/backlog",
+                    query_string={"key": "test-key", "group_limit": "2"},
+                ),
+                200,
+                "processing backlog after batch ready",
+            )
+            assert processing_backlog_after_batch["total"] == 0
+            assert processing_backlog_after_batch["next_overall"] is None
+
+            reset_batch_mark_ready = assert_status(
+                client.post(
+                    f"/item/{docx_document['item']['id']}/update",
+                    json={"key": "test-key", "processing_override": ""},
+                ),
+                200,
+                "reset batch ready override",
+            )
+            assert reset_batch_mark_ready["item"]["processing_state"] == "pending"
+            assert reset_batch_mark_ready["item"]["processing_override"] is None
+
             next_pending_document = assert_status(
                 client.get(
                     "/processing/next",
@@ -1866,6 +1906,16 @@ def main() -> None:
                 "invalid processing override",
             )
             assert invalid_processing_override["error"]["code"] == "invalid_processing_override"
+
+            invalid_processing_ids = assert_status(
+                client.post(
+                    "/processing/mark-ready",
+                    json={"key": "test-key", "ids": []},
+                ),
+                400,
+                "invalid processing ids",
+            )
+            assert invalid_processing_ids["error"]["code"] == "invalid_processing_ids"
 
             artifact_file = client.get(
                 "/artifacts/file/data/reviews/daily/2026/2026-04-29.md",
