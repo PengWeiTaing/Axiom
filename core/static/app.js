@@ -2861,9 +2861,13 @@ async function loadSuggestions() {
         if (lines.length === 0) {
             elements.overviewSuggestions.innerHTML = `<p class="item-meta">${escapeHtml(text)}</p>`;
         } else {
-            elements.overviewSuggestions.innerHTML = lines.map(l =>
-                `<p class="item-meta" style="margin:2px 0">${escapeHtml(l.trim().replace(/^-\s*/, "→ "))}</p>`
-            ).join("");
+            elements.overviewSuggestions.innerHTML = lines.map(l => {
+                const clean = l.trim().replace(/^-\s*/, "");
+                return `<div class="suggestion-row" style="display:flex;align-items:center;gap:var(--space-sm);margin:2px 0">
+                    <span class="item-meta" style="flex:1">→ ${escapeHtml(clean)}</span>
+                    <button type="button" class="text-button" data-action="suggestion-to-task" data-title="${escapeHtml(clean)}">＋任务</button>
+                </div>`;
+            }).join("");
         }
     } catch (error) {
         renderEmptyState(elements.overviewSuggestions, error.message);
@@ -3457,6 +3461,17 @@ function bindDelegatedActions() {
             await handleDeleteMemory(target.getAttribute("data-memory-id"));
         } else if (action === "review-decision") {
             await handleReviewDecision(target.getAttribute("data-decision-id"));
+        } else if (action === "suggestion-to-task") {
+            const title = target.getAttribute("data-title");
+            try {
+                setConnectionState("busy", "正在从建议创建任务");
+                await apiRequest("/tasks", { method: "POST", json: { title, priority: "medium" } });
+                await loadTasksToday();
+                await loadTasks({ reset: true });
+                target.disabled = true;
+                target.textContent = "已添加";
+                setConnectionState("ready", "任务已创建");
+            } catch (e) { showToast(e.message); }
         } else if (action === "task-done") {
             await handleTaskDone(target.getAttribute("data-task-id"));
         } else if (action === "task-todo") {
