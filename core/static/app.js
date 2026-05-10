@@ -87,6 +87,7 @@ const elements = {
     overviewProcessingBacklog: document.getElementById("overview-processing-backlog"),
     overviewBacklogTotal: document.getElementById("overview-backlog-total"),
     overviewSuggestions: document.getElementById("overview-suggestions"),
+    overviewAiReview: document.getElementById("overview-ai-review"),
     refreshSuggestionsButton: document.getElementById("refresh-suggestions-button"),
     overviewArtifactHighlights: document.getElementById("overview-artifact-highlights"),
     overviewGeneratedAt: document.getElementById("overview-generated-at"),
@@ -2872,6 +2873,32 @@ async function handleReviewDecision(decisionId) {
     }
 }
 
+async function loadAiReview() {
+    try {
+        const summaryPayload = await apiRequest("/artifacts/summary");
+        const latest = summaryPayload.latest || {};
+        const dailyReview = latest.review?.daily;
+        if (!dailyReview || !dailyReview.path) {
+            elements.overviewAiReview.innerHTML = '<p class="item-meta">暂无 AI 回顾，等待今晚自动生成。</p>';
+            return;
+        }
+        const path = dailyReview.path;
+        const filePayload = await apiRequest(`/artifacts/file/${encodeURIComponent(path)}`, { responseType: "text" });
+        const text = typeof filePayload === "string" ? filePayload : "";
+        const aiIdx = text.indexOf("## AI 分析");
+        if (aiIdx === -1) {
+            elements.overviewAiReview.innerHTML = '<p class="item-meta">回顾尚未包含 AI 分析。</p>';
+            return;
+        }
+        let aiText = text.slice(aiIdx + 8).trim();
+        const nextHeader = aiText.search(/\n## /);
+        if (nextHeader !== -1) aiText = aiText.slice(0, nextHeader);
+        elements.overviewAiReview.innerHTML = `<p class="item-meta" style="white-space:pre-wrap">${escapeHtml(aiText.trim())}</p>`;
+    } catch (e) {
+        elements.overviewAiReview.innerHTML = '<p class="item-meta">暂无 AI 回顾。</p>';
+    }
+}
+
 async function loadSuggestions() {
     try {
         const payload = await apiRequest("/suggestions");
@@ -2913,6 +2940,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadTasks({ reset: true });
         await loadDecisions({ reset: true });
         await loadSuggestions();
+        await loadAiReview();
         if (state.search.active) {
             await loadSearchPage({ reset: true });
         } else {
