@@ -4629,6 +4629,9 @@ def init_modules(app):
     app.config["AXIOM_PROMPT_LOADER"] = prompt_loader
 
 
+init_modules(app)
+
+
 @app.route("/modules", methods=["GET"])
 def list_modules():
     return ok_response({
