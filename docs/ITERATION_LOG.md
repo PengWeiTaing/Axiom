@@ -578,3 +578,12 @@
 - `ITEM_PROCESSING_STATE_SQL` 列名加 `items.` 前缀，解决 FTS5 JOIN 时的歧义
 - 空查询（纯特殊字符）直接返回 0 结果
 - README 和 AI_CONTEXT 同步更新：新增记忆/任务/治理/检索/模块五类能力文档
+
+## 2026-05-10（再续）
+
+- 新增 `decisions` 表：title/context/decision/reasoning/expected_outcome/actual_outcome，pending→reviewed 状态流转
+- 新增 6 个决策 API：`GET/POST /decisions`、`GET/PUT/DELETE /decisions/<id>`、`POST /decisions/<id>/review`
+- `app.html` 新增 `decisions-panel`：快速记录表单 + 筛选列表 + 回顾交互
+- `app.js` 新增 `loadDecisions`、`renderDecisionCards`、`handleDecisionQuickCreate`、`handleReviewDecision`
+- 导航栏新增"决策"按钮
+- 本地验证通过：决策 API 8 项测试全部通过
