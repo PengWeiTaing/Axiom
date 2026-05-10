@@ -242,6 +242,10 @@ AUTOMATION_AUDIO_TRANSCRIBE_TIMEOUT_SECONDS = int(
 AUTOMATION_IMAGE_DESCRIBE_TIMEOUT_SECONDS = int(
     os.environ.get("AXIOM_IMAGE_DESCRIBE_TIMEOUT_SECONDS", "300")
 )
+DEEPSEEK_API_KEY = os.environ.get("AXIOM_DEEPSEEK_API_KEY", "")
+DEEPSEEK_MODEL = os.environ.get("AXIOM_DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_BASE_URL = os.environ.get("AXIOM_DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+SUGGESTIONS_CACHE: dict = {"text": "", "generated_at": "", "ttl_seconds": 300}
 AUTOMATION_JOBS = {
     "review_day": {
         "label": "生成今日日回顾",
@@ -4853,6 +4857,119 @@ def review_decision(decision_id: int):
         return ok_response({"decision": row_to_decision(row)})
     finally:
         conn.close()
+
+
+# ===== AI 建议 =====
+
+@app.route("/suggestions", methods=["GET"])
+def ai_suggestions():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    now = utc_now().isoformat(timespec="seconds")
+    if SUGGESTIONS_CACHE["text"] and SUGGESTIONS_CACHE["generated_at"]:
+        age = (utc_now() - datetime.fromisoformat(SUGGESTIONS_CACHE["generated_at"])).total_seconds()
+        if age < SUGGESTIONS_CACHE["ttl_seconds"]:
+            return ok_response({
+                "suggestions": SUGGESTIONS_CACHE["text"],
+                "generated_at": SUGGESTIONS_CACHE["generated_at"],
+                "cached": True,
+            })
+
+    if not DEEPSEEK_API_KEY:
+        return error_response(503, "ai_unavailable", "未配置 AI API key")
+
+    conn = get_db_connection()
+    try:
+        week_ago = (utc_now() - timedelta(days=7)).isoformat(timespec="seconds")
+
+        recent_items = conn.execute(
+            "SELECT id, type, content, original_name, created_at FROM items WHERE created_at >= ? ORDER BY created_at DESC LIMIT 30",
+            (week_ago,),
+        ).fetchall()
+
+        pending_tasks = conn.execute(
+            "SELECT id, title, priority, due_date, created_at FROM tasks WHERE status = 'todo' ORDER BY created_at DESC LIMIT 10"
+        ).fetchall()
+
+        candidate_memories = conn.execute(
+            "SELECT id, category, content FROM memories WHERE status = 'candidate' ORDER BY created_at DESC LIMIT 5"
+        ).fetchall()
+
+        pending_decisions = conn.execute(
+            "SELECT id, title, decision, expected_outcome, created_at FROM decisions WHERE status = 'pending' ORDER BY created_at DESC LIMIT 5"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    # Build context
+    lines = ["你是 Axiom 个人外脑系统的 AI 助手。以下是用户最近一周的状态摘要：", ""]
+
+    if recent_items:
+        lines.append("## 最近记录")
+        for r in recent_items:
+            text = (r["content"] or r["original_name"] or "")[:120]
+            lines.append(f"- [{r['type']}] {text}")
+        lines.append("")
+
+    if pending_tasks:
+        lines.append("## 待办任务")
+        for r in pending_tasks:
+            lines.append(f"- [{r['priority']}] {r['title']}")
+        lines.append("")
+
+    if candidate_memories:
+        lines.append("## 待确认记忆")
+        for r in candidate_memories:
+            lines.append(f"- [{r['category']}] {r['content']}")
+        lines.append("")
+
+    if pending_decisions:
+        lines.append("## 待回顾决策")
+        for r in pending_decisions:
+            lines.append(f"- {r['title']}：{r['decision'][:80]}")
+        lines.append("")
+
+    if not recent_items and not pending_tasks:
+        lines.append("用户最近一周没有新增记录。")
+        lines.append("")
+
+    lines.extend([
+        "请根据以上信息，给出 3 到 5 条具体、可执行的下一步建议。",
+        "每条建议一行，以 '- ' 开头。",
+        "建议应该简短（20 字以内）、可立刻执行、不需要额外准备。",
+        "如果有待办任务长时间未完成，提醒用户拆分或降低优先级。",
+        "如果有待确认记忆，提醒用户处理。",
+        "如果有待回顾决策，提醒用户复盘。",
+        "如果没有足够信息，建议用户先记录今天的内容。",
+        "用温暖、鼓励的语气，中文输出。",
+    ])
+
+    prompt = "\n".join(lines)
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        response = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.7,
+        )
+        text = response.choices[0].message.content.strip()
+    except Exception as exc:
+        logger.exception("AI suggestions failed")
+        return error_response(500, "ai_error", str(exc))
+
+    SUGGESTIONS_CACHE["text"] = text
+    SUGGESTIONS_CACHE["generated_at"] = now
+
+    return ok_response({
+        "suggestions": text,
+        "generated_at": now,
+        "cached": False,
+    })
 
 
 # ===== 治理路由 =====

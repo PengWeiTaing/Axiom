@@ -86,6 +86,8 @@ const elements = {
     overviewRecentHighlights: document.getElementById("overview-recent-highlights"),
     overviewProcessingBacklog: document.getElementById("overview-processing-backlog"),
     overviewBacklogTotal: document.getElementById("overview-backlog-total"),
+    overviewSuggestions: document.getElementById("overview-suggestions"),
+    refreshSuggestionsButton: document.getElementById("refresh-suggestions-button"),
     overviewArtifactHighlights: document.getElementById("overview-artifact-highlights"),
     overviewGeneratedAt: document.getElementById("overview-generated-at"),
     refreshOverviewButton: document.getElementById("refresh-overview-button"),
@@ -2847,6 +2849,27 @@ async function handleReviewDecision(decisionId) {
     }
 }
 
+async function loadSuggestions() {
+    try {
+        const payload = await apiRequest("/suggestions");
+        const text = payload.suggestions || "";
+        if (!text) {
+            renderEmptyState(elements.overviewSuggestions, "暂无建议。");
+            return;
+        }
+        const lines = text.split("\n").filter(l => l.trim().startsWith("-"));
+        if (lines.length === 0) {
+            elements.overviewSuggestions.innerHTML = `<p class="item-meta">${escapeHtml(text)}</p>`;
+        } else {
+            elements.overviewSuggestions.innerHTML = lines.map(l =>
+                `<p class="item-meta" style="margin:2px 0">${escapeHtml(l.trim().replace(/^-\s*/, "→ "))}</p>`
+            ).join("");
+        }
+    } catch (error) {
+        renderEmptyState(elements.overviewSuggestions, error.message);
+    }
+}
+
 async function syncDashboard({ showMessage = false } = {}) {
     try {
         requireKey();
@@ -2862,6 +2885,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadTasksToday();
         await loadTasks({ reset: true });
         await loadDecisions({ reset: true });
+        await loadSuggestions();
         if (state.search.active) {
             await loadSearchPage({ reset: true });
         } else {
@@ -3611,6 +3635,22 @@ function bindForms() {
             setFeedback(elements.automationRunsFeedback, error.message, "error");
             showToast(error.message);
         }
+    });
+
+    elements.refreshSuggestionsButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "正在获取AI建议");
+            await loadSuggestions();
+            setConnectionState("ready", suggestions.refreshed);
+        } catch (e) { showToast(e.message); }
+    });
+
+    elements.refreshSuggestionsButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "正在获取AI建议");
+            await loadSuggestions();
+            setConnectionState("ready", "建议已刷新");
+        } catch (e) { showToast(e.message); }
     });
 
     elements.refreshOverviewButton.addEventListener("click", async () => {
