@@ -3568,16 +3568,16 @@ function bindSidebarTabs() {
     sidebar.querySelectorAll("button[data-panel]").forEach(btn => {
         btn.addEventListener("click", () => {
             const panelId = btn.getAttribute("data-panel");
-            // Desktop: show only the selected panel
-            if (window.innerWidth >= 768) {
-                document.querySelectorAll(".layout > .panel").forEach(p => {
-                    p.style.display = p.id === panelId ? "" : "none";
-                });
-            }
+            // Desktop: toggle active class on panels
+            document.querySelectorAll(".layout > .panel").forEach(p => {
+                p.classList.toggle("active", p.id === panelId);
+            });
             // Mobile: scroll to the panel
             const target = document.getElementById(panelId);
-            if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-            // Update active state
+            if (target && window.innerWidth < 768) {
+                target.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+            // Update sidebar active state
             sidebar.querySelectorAll("button[data-panel]").forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
         });
@@ -4136,28 +4136,7 @@ function init() {
         setConnectionState("idle", "尚未同步");
     }
 
-    // Desktop: show only overview panel initially
-    if (window.innerWidth >= 768) {
-        document.querySelectorAll(".layout > .panel").forEach(p => {
-            p.style.display = p.id === "overview-panel" ? "" : "none";
-        });
-    }
-
     window.addEventListener("beforeunload", releaseAllObjectUrls);
-    window.addEventListener("resize", () => {
-        const isDesktop = window.innerWidth >= 768;
-        if (isDesktop) {
-            const activeBtn = document.querySelector("#desktop-sidebar button.active");
-            const activePanel = activeBtn?.getAttribute("data-panel");
-            document.querySelectorAll(".layout > .panel").forEach(p => {
-                p.style.display = p.id === activePanel ? "" : "none";
-            });
-        } else {
-            document.querySelectorAll(".layout > .panel").forEach(p => {
-                p.style.display = "";
-            });
-        }
-    });
 }
 
 init();

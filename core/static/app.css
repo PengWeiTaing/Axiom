@@ -161,7 +161,7 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
     backdrop-filter: blur(24px) saturate(120%);
     -webkit-backdrop-filter: blur(24px) saturate(120%);
     box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    transition: border-color var(--ease), box-shadow var(--ease);
+    transition: border-color var(--ease), box-shadow var(--ease), opacity var(--ease);
 }
 
 .panel:hover {
@@ -171,6 +171,12 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 .panel {
     padding: 24px;
     margin-bottom: 14px;
+}
+
+/* Desktop: hide all panels by default, show active */
+@media (min-width: 768px) {
+    .layout > .panel { display: none; }
+    .layout > .panel.active { display: block; }
 }
 
 .subpanel {
