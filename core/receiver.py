@@ -164,25 +164,25 @@ ITEM_TEXT_SOURCE_SQL = """
 """
 ITEM_PROCESSING_STATE_SQL = """
     CASE
-        WHEN processing_override = 'ready' THEN 'ready'
-        WHEN type = 'document' THEN
+        WHEN items.processing_override = 'ready' THEN 'ready'
+        WHEN items.type = 'document' THEN
             CASE
-                WHEN COALESCE(TRIM(derived_text), '') != '' THEN 'ready'
+                WHEN COALESCE(TRIM(items.derived_text), '') != '' THEN 'ready'
                 ELSE 'pending'
             END
-        WHEN type = 'audio' THEN
+        WHEN items.type = 'audio' THEN
             CASE
-                WHEN COALESCE(TRIM(transcript_text), '') != '' THEN 'ready'
+                WHEN COALESCE(TRIM(items.transcript_text), '') != '' THEN 'ready'
                 ELSE 'pending'
             END
-        WHEN type = 'image' THEN
+        WHEN items.type = 'image' THEN
             CASE
-                WHEN COALESCE(TRIM(content), '') != '' AND COALESCE(TRIM(content), '') != COALESCE(TRIM(original_name), '') THEN 'ready'
+                WHEN COALESCE(TRIM(items.content), '') != '' AND COALESCE(TRIM(items.content), '') != COALESCE(TRIM(items.original_name), '') THEN 'ready'
                 ELSE 'pending'
             END
         ELSE
             CASE
-                WHEN COALESCE(TRIM(content), '') != '' THEN 'ready'
+                WHEN COALESCE(TRIM(items.content), '') != '' THEN 'ready'
                 ELSE 'pending'
             END
     END
@@ -195,6 +195,26 @@ ITEM_LIST_SELECT_FIELDS = f"""
     END AS derived_text_preview,
     CASE
         WHEN COALESCE(TRIM(transcript_text), '') != '' THEN SUBSTR(transcript_text, 1, 600)
+        ELSE NULL
+    END AS transcript_text_preview
+"""
+ITEM_JOIN_SELECT_FIELDS = f"""
+    items.id,
+    items.type,
+    items.content,
+    items.file_path,
+    items.source,
+    items.created_at,
+    items.original_name,
+    items.mime_type,
+    items.size_bytes,
+    items.processing_override,
+    CASE
+        WHEN COALESCE(TRIM(items.derived_text), '') != '' THEN SUBSTR(items.derived_text, 1, 600)
+        ELSE NULL
+    END AS derived_text_preview,
+    CASE
+        WHEN COALESCE(TRIM(items.transcript_text), '') != '' THEN SUBSTR(items.transcript_text, 1, 600)
         ELSE NULL
     END AS transcript_text_preview
 """
@@ -506,6 +526,21 @@ def init_db(db_path: Path = DB_PATH) -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)"
         )
+
+        # FTS5 full-text search (standalone mode, CJK-tokenized)
+        conn.execute(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+                content,
+                original_name,
+                derived_text,
+                transcript_text,
+                tokenize='unicode61 remove_diacritics 0'
+            )
+            """
+        )
+        fts_backfill(conn)
+
         conn.commit()
     finally:
         conn.close()
@@ -1233,6 +1268,95 @@ def row_to_item(row: sqlite3.Row, include_score: bool = False) -> dict:
 
 def escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def escape_fts_query(query: str) -> str:
+    """构建 FTS5 查询字符串，对 CJK 做字符级分词。"""
+    tokenized = cjk_tokenize(query) or ""
+    special = set('*"^(){}[]:+~-&|!%')
+    result = []
+    for ch in tokenized:
+        if ch in special:
+            result.append(" ")
+        else:
+            result.append(ch)
+    cleaned = " ".join("".join(result).split())
+    if not cleaned:
+        return '""'
+    terms = cleaned.split()
+    return " AND ".join(t for t in terms)
+
+
+def has_cjk(text: str) -> bool:
+    """检查文本是否包含 CJK 字符。"""
+    for ch in text:
+        cp = ord(ch)
+        if (0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF
+                or 0xF900 <= cp <= 0xFAFF or 0x3040 <= cp <= 0x30FF):
+            return True
+    return False
+
+
+def cjk_tokenize(text: str | None) -> str | None:
+    """在 CJK 字符之间插入空格，使 FTS5 unicode61 能正确分词。"""
+    if not text:
+        return text
+    result = []
+    for ch in text:
+        if has_cjk(ch):
+            result.append(" ")
+            result.append(ch)
+            result.append(" ")
+        else:
+            result.append(ch)
+    return "".join(result).strip()
+
+
+def fts_sync_item(item_id: int, content: str | None, original_name: str | None,
+                  derived_text: str | None, transcript_text: str | None) -> None:
+    """同步单条 items 到 FTS5（先删后插）。"""
+    conn = get_db_connection()
+    try:
+        conn.execute("DELETE FROM items_fts WHERE rowid = ?", (item_id,))
+        conn.execute(
+            "INSERT INTO items_fts(rowid, content, original_name, derived_text, transcript_text) VALUES (?, ?, ?, ?, ?)",
+            (item_id,
+             cjk_tokenize(content),
+             cjk_tokenize(original_name),
+             cjk_tokenize(derived_text),
+             cjk_tokenize(transcript_text)),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        logger.exception("fts_sync_item failed for id=%s", item_id)
+    finally:
+        conn.close()
+
+
+def fts_delete_item(item_id: int) -> None:
+    """从 FTS5 中删除单条。"""
+    conn = get_db_connection()
+    try:
+        conn.execute("DELETE FROM items_fts WHERE rowid = ?", (item_id,))
+        conn.commit()
+    except sqlite3.Error:
+        logger.exception("fts_delete_item failed for id=%s", item_id)
+    finally:
+        conn.close()
+
+
+def fts_backfill(conn: sqlite3.Connection) -> None:
+    """回填所有已有 items 到 FTS5。"""
+    existing = conn.execute("SELECT COUNT(*) FROM items_fts").fetchone()[0]
+    if existing > 0:
+        return
+    rows = conn.execute("SELECT id, content, original_name, derived_text, transcript_text FROM items").fetchall()
+    for r in rows:
+        conn.execute(
+            "INSERT INTO items_fts(rowid, content, original_name, derived_text, transcript_text) VALUES (?, ?, ?, ?, ?)",
+            (r["id"], cjk_tokenize(r["content"]), cjk_tokenize(r["original_name"]),
+             cjk_tokenize(r["derived_text"]), cjk_tokenize(r["transcript_text"])),
+        )
 
 
 def is_path_under(path: Path, parent: Path) -> bool:
@@ -3268,6 +3392,7 @@ def add_note():
         return error_response(500, "database_write_failed", "数据库写入失败")
 
     write_audit_log("item_create", "item", item_id)
+    fts_sync_item(item_id, text, None, None, None)
     logger.info("saved text item id=%s file=%s", item_id, file_path.name)
     return ok_response(
         {
@@ -3361,6 +3486,7 @@ def upload_file():
 
     type_label = get_type_label(item_type)
     write_audit_log("item_create", "item", item_id)
+    fts_sync_item(item_id, content, original_name, derived_text, transcript_text)
     logger.info("saved %s item id=%s file=%s", item_type, item_id, file_path.name)
     return ok_response(
         {
@@ -3603,6 +3729,8 @@ def update_item(item_id: int):
 
     updated_row = get_item_by_id(item_id)
     write_audit_log("item_update", "item", item_id, ",".join(updated_fields))
+    if updated_row:
+        fts_sync_item(item_id, updated_row["content"], updated_row["original_name"], updated_row["derived_text"], updated_row["transcript_text"])
     logger.info("updated item id=%s fields=%s", item_id, ",".join(updated_fields))
     return ok_response(
         {
@@ -3986,18 +4114,22 @@ def search_items():
         return error_response(400, "invalid_processing_override_filter", str(exc))
 
     source = read_source_filter()
-    escaped_query = escape_like(query)
-    exact_match = query
-    prefix_match = f"{escaped_query}%"
-    fuzzy_match = f"%{escaped_query}%"
+    fts_query = escape_fts_query(query)
+    if fts_query == '""':
+        return ok_response({
+            "query": query, "sort": sort, "type": item_type, "storage": storage,
+            "source": source, "created_from": created_from, "created_to": created_to,
+            "processing_state": processing_state, "processing_override": processing_override,
+            "page": page, "page_size": page_size, "total": 0, "total_pages": 0, "items": [],
+        })
     offset = (page - 1) * page_size
 
     if sort == "newest":
-        order_clause = "id DESC"
+        order_clause = "items.id DESC"
     elif sort == "oldest":
-        order_clause = "id ASC"
+        order_clause = "items.id ASC"
     else:
-        order_clause = "score DESC, id DESC"
+        order_clause = "score DESC"
 
     filter_conditions, filter_params = build_item_filter_conditions(
         item_type,
@@ -4009,114 +4141,33 @@ def search_items():
         processing_override,
     )
     filter_clause = join_conditions(filter_conditions, "AND")
+    extra_where = f" {filter_clause}" if filter_clause else ""
 
     conn = get_db_connection()
     try:
         total = conn.execute(
             f"""
             SELECT COUNT(*) AS total
-            FROM items
-            WHERE (
-                COALESCE(content, '') LIKE ? ESCAPE '\\'
-                OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
-                OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
-                OR COALESCE(transcript_text, '') LIKE ? ESCAPE '\\'
-            )
-            {filter_clause}
+            FROM items_fts
+            JOIN items ON items_fts.rowid = items.id
+            WHERE items_fts MATCH ?{extra_where}
             """,
-            (fuzzy_match, fuzzy_match, fuzzy_match, fuzzy_match, *filter_params),
+            (fts_query, *filter_params),
         ).fetchone()["total"]
 
-        if sort == "relevance":
-            rows = conn.execute(
-                f"""
-                SELECT
-                    {ITEM_LIST_SELECT_FIELDS},
-                    (
-                        CASE
-                            WHEN COALESCE(content, '') = ? THEN 100
-                            WHEN COALESCE(content, '') LIKE ? ESCAPE '\\' THEN 60
-                            WHEN COALESCE(content, '') LIKE ? ESCAPE '\\' THEN 30
-                            ELSE 0
-                        END
-                        +
-                        CASE
-                            WHEN COALESCE(original_name, '') = ? THEN 90
-                            WHEN COALESCE(original_name, '') LIKE ? ESCAPE '\\' THEN 50
-                            WHEN COALESCE(original_name, '') LIKE ? ESCAPE '\\' THEN 25
-                            ELSE 0
-                        END
-                        +
-                        CASE
-                            WHEN COALESCE(derived_text, '') = ? THEN 70
-                            WHEN COALESCE(derived_text, '') LIKE ? ESCAPE '\\' THEN 35
-                            WHEN COALESCE(derived_text, '') LIKE ? ESCAPE '\\' THEN 15
-                            ELSE 0
-                        END
-                        +
-                        CASE
-                            WHEN COALESCE(transcript_text, '') = ? THEN 75
-                            WHEN COALESCE(transcript_text, '') LIKE ? ESCAPE '\\' THEN 38
-                            WHEN COALESCE(transcript_text, '') LIKE ? ESCAPE '\\' THEN 18
-                            ELSE 0
-                        END
-                        +
-                        CASE
-                            WHEN LENGTH(COALESCE(content, original_name, transcript_text, derived_text, '')) <= 20 THEN 8
-                            WHEN LENGTH(COALESCE(content, original_name, transcript_text, derived_text, '')) <= 50 THEN 4
-                            ELSE 0
-                        END
-                    ) AS score
-                FROM items
-                WHERE (
-                    COALESCE(content, '') LIKE ? ESCAPE '\\'
-                    OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
-                    OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
-                    OR COALESCE(transcript_text, '') LIKE ? ESCAPE '\\'
-                )
-                {filter_clause}
-                ORDER BY {order_clause}
-                LIMIT ? OFFSET ?
-                """,
-                (
-                    exact_match,
-                    prefix_match,
-                    fuzzy_match,
-                    exact_match,
-                    prefix_match,
-                    fuzzy_match,
-                    exact_match,
-                    prefix_match,
-                    fuzzy_match,
-                    exact_match,
-                    prefix_match,
-                    fuzzy_match,
-                    fuzzy_match,
-                    fuzzy_match,
-                    fuzzy_match,
-                    fuzzy_match,
-                    *filter_params,
-                    page_size,
-                    offset,
-                ),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                f"""
-                SELECT {ITEM_LIST_SELECT_FIELDS}
-                FROM items
-                WHERE (
-                    COALESCE(content, '') LIKE ? ESCAPE '\\'
-                    OR COALESCE(original_name, '') LIKE ? ESCAPE '\\'
-                    OR COALESCE(derived_text, '') LIKE ? ESCAPE '\\'
-                    OR COALESCE(transcript_text, '') LIKE ? ESCAPE '\\'
-                )
-                {filter_clause}
-                ORDER BY {order_clause}
-                LIMIT ? OFFSET ?
-                """,
-                (fuzzy_match, fuzzy_match, fuzzy_match, fuzzy_match, *filter_params, page_size, offset),
-            ).fetchall()
+        rows = conn.execute(
+            f"""
+            SELECT
+                {ITEM_JOIN_SELECT_FIELDS},
+                -rank AS score
+            FROM items_fts
+            JOIN items ON items_fts.rowid = items.id
+            WHERE items_fts MATCH ?{extra_where}
+            ORDER BY {order_clause}
+            LIMIT ? OFFSET ?
+            """,
+            (fts_query, *filter_params, page_size, offset),
+        ).fetchall()
     finally:
         conn.close()
 
@@ -4654,6 +4705,7 @@ def delete_item(item_id: int):
                 cleanup_file(file_path)
 
         write_audit_log("item_delete", "item", item_id)
+        fts_delete_item(item_id)
         logger.info("deleted item id=%s type=%s", item_id, row["type"])
         return ok_response({"deleted": item_id})
     finally:
