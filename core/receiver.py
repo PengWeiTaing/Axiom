@@ -1350,6 +1350,7 @@ def fts_backfill(conn: sqlite3.Connection) -> None:
     existing = conn.execute("SELECT COUNT(*) FROM items_fts").fetchone()[0]
     if existing > 0:
         return
+    conn.row_factory = sqlite3.Row
     rows = conn.execute("SELECT id, content, original_name, derived_text, transcript_text FROM items").fetchall()
     for r in rows:
         conn.execute(
