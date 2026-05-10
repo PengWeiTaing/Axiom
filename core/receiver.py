@@ -4301,10 +4301,18 @@ def tasks_today():
     finally:
         conn.close()
 
+    overdue_with_age = []
+    for r in overdue_rows:
+        task = row_to_task(r)
+        if r["due_date"]:
+            due = date.fromisoformat(r["due_date"])
+            task["overdue_days"] = (date.fromisoformat(today_str) - due).days
+        overdue_with_age.append(task)
+
     return ok_response({
         "date": today_str,
         "today": [row_to_task(r) for r in today_rows],
-        "overdue": [row_to_task(r) for r in overdue_rows],
+        "overdue": overdue_with_age,
     })
 
 
@@ -4460,6 +4468,36 @@ def task_todo(task_id: int):
     if err:
         return err
     return ok_response({"task": row_to_task(row)})
+
+
+@app.route("/tasks/<int:task_id>/reschedule", methods=["POST"])
+def task_reschedule(task_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute("SELECT id, status FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if row is None:
+            return error_response(404, "not_found", "任务不存在")
+
+        body = request.get_json(silent=True) or {}
+        new_date = str(body.get("due_date", "")).strip()
+        if not new_date:
+            new_date = local_date_now().isoformat()
+
+        now = utc_now().isoformat(timespec="seconds")
+        conn.execute(
+            "UPDATE tasks SET due_date = ?, updated_at = ? WHERE id = ?",
+            (new_date, now, task_id),
+        )
+        conn.commit()
+        write_audit_log("task_reschedule", "task", task_id)
+        row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return ok_response({"task": row_to_task(row)})
+    finally:
+        conn.close()
 
 
 @app.route("/tasks/<int:task_id>/cancel", methods=["POST"])

@@ -2596,7 +2596,7 @@ function renderTasksToday(data) {
             <div class="section-head section-head-compact">
                 <div><p class="eyebrow" style="color:var(--color-warn)">已过期 (${sorted.length})</p></div>
             </div>
-            ${sorted.map(t => renderTaskCard(t)).join("")}
+            ${sorted.map(t => renderOverdueTaskCard(t)).join("")}
         `;
     } else {
         elements.tasksOverdueList.innerHTML = "";
@@ -2608,6 +2608,28 @@ function renderTasksToday(data) {
     } else {
         renderEmptyState(elements.tasksTodayList, "今天还没有安排任务，在下方添加吧。");
     }
+}
+
+function renderOverdueTaskCard(task) {
+    const overdueDays = task.overdue_days || 1;
+    const ageBadge = `<span class="tag tag-warn">过期 ${overdueDays} 天</span>`;
+    const priorityDot = task.priority === "high" ? '<span class="tag tag-warn">高</span>' : task.priority === "low" ? '<span class="tag tag-dim">低</span>' : "";
+    const detailHtml = task.detail ? `<p class="item-meta">${escapeHtml(task.detail)}</p>` : "";
+    return `
+        <div class="item-card">
+            <div class="item-card-body">
+                <div class="item-card-tags">${ageBadge} ${priorityDot}</div>
+                <p class="item-card-text">${escapeHtml(task.title)}</p>
+                ${detailHtml}
+                <p class="item-meta">${formatDateTime(task.created_at)} · 截止 ${task.due_date}</p>
+            </div>
+            <div class="item-card-actions">
+                <button type="button" class="text-button" data-action="task-reschedule" data-task-id="${task.id}">今天做</button>
+                <button type="button" class="text-button" data-action="task-done" data-task-id="${task.id}">完成</button>
+                <button type="button" class="text-button" data-action="task-cancel" data-task-id="${task.id}">取消</button>
+            </div>
+        </div>
+    `;
 }
 
 function renderTaskCard(task) {
@@ -3476,6 +3498,14 @@ function bindDelegatedActions() {
             await handleTaskDone(target.getAttribute("data-task-id"));
         } else if (action === "task-todo") {
             await handleTaskTodo(target.getAttribute("data-task-id"));
+        } else if (action === "task-reschedule") {
+            const tid = target.getAttribute("data-task-id");
+            try {
+                await apiRequest(`/tasks/${tid}/reschedule`, { method: "POST", json: {} });
+                await loadTasksToday();
+                await loadTasks({ reset: true });
+                showToast("任务已重新安排到今天");
+            } catch (e) { showToast(e.message); }
         } else if (action === "task-cancel") {
             await handleTaskCancel(target.getAttribute("data-task-id"));
         } else if (action === "delete-item") {
