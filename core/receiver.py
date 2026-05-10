@@ -488,6 +488,24 @@ def init_db(db_path: Path = DB_PATH) -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date)"
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                target_type TEXT NOT NULL,
+                target_id INTEGER,
+                detail TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)"
+        )
         conn.commit()
     finally:
         conn.close()
@@ -2994,6 +3012,21 @@ def execute_logged_automation_job(
     )
 
 
+def write_audit_log(action: str, target_type: str, target_id: int | None = None,
+                     detail: str | None = None) -> None:
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            "INSERT INTO audit_log (action, target_type, target_id, detail, created_at) VALUES (?, ?, ?, ?, ?)",
+            (action, target_type, target_id, detail, utc_now().isoformat(timespec="seconds")),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        logger.exception("failed to write audit log: %s %s %s", action, target_type, target_id)
+    finally:
+        conn.close()
+
+
 def cleanup_file(file_path: Path) -> None:
     try:
         file_path.unlink(missing_ok=True)
@@ -3234,6 +3267,7 @@ def add_note():
         logger.exception("failed to insert item into database")
         return error_response(500, "database_write_failed", "数据库写入失败")
 
+    write_audit_log("item_create", "item", item_id)
     logger.info("saved text item id=%s file=%s", item_id, file_path.name)
     return ok_response(
         {
@@ -3326,6 +3360,7 @@ def upload_file():
         return error_response(500, "database_write_failed", "数据库写入失败")
 
     type_label = get_type_label(item_type)
+    write_audit_log("item_create", "item", item_id)
     logger.info("saved %s item id=%s file=%s", item_type, item_id, file_path.name)
     return ok_response(
         {
@@ -3567,6 +3602,7 @@ def update_item(item_id: int):
         return error_response(500, "database_write_failed", "数据库写入失败")
 
     updated_row = get_item_by_id(item_id)
+    write_audit_log("item_update", "item", item_id, ",".join(updated_fields))
     logger.info("updated item id=%s fields=%s", item_id, ",".join(updated_fields))
     return ok_response(
         {
@@ -3765,6 +3801,7 @@ def archive_item(item_id: int):
         return error_response(500, "archive_failed", "归档失败")
 
     updated_row = get_item_by_id(item_id)
+    write_audit_log("item_archive", "item", item_id)
     logger.info("archived item id=%s file=%s", item_id, archive_path.name)
     return ok_response({"message": "archived", "item": row_to_item(updated_row)})
 
@@ -3805,6 +3842,7 @@ def restore_item(item_id: int):
         return error_response(500, "restore_failed", "恢复失败")
 
     updated_row = get_item_by_id(item_id)
+    write_audit_log("item_restore", "item", item_id)
     logger.info("restored item id=%s file=%s", item_id, restore_path.name)
     return ok_response({"message": "restored", "item": row_to_item(updated_row)})
 
@@ -4223,6 +4261,7 @@ def tasks():
             )
             conn.commit()
             task_id = cursor.lastrowid
+            write_audit_log("task_create", "task", task_id)
             row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
             return ok_response({"task": row_to_task(row)}, 201)
 
@@ -4269,6 +4308,7 @@ def task_detail(task_id: int):
         if request.method == "DELETE":
             conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
             conn.commit()
+            write_audit_log("task_delete", "task", task_id)
             return ok_response({"deleted": task_id})
 
         body = request.get_json(silent=True) or {}
@@ -4296,6 +4336,7 @@ def task_detail(task_id: int):
             (title, detail, status, priority, completed_at, now, task_id),
         )
         conn.commit()
+        write_audit_log("task_update", "task", task_id)
         row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return ok_response({"task": row_to_task(row)})
     except ValueError as exc:
@@ -4317,6 +4358,7 @@ def _set_task_status(task_id: int, status: str) -> tuple:
             (status, completed_at, now, task_id),
         )
         conn.commit()
+        write_audit_log(f"task_{status}", "task", task_id)
         row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return None, row
     finally:
@@ -4357,6 +4399,11 @@ def task_cancel(task_id: int):
 
 
 # ===== 记忆路由 =====
+
+MEMORY_SELECT_FIELDS = """
+    id, category, content, detail, status,
+    source_item_id, source_text, created_at, updated_at
+"""
 
 
 def row_to_memory(row: sqlite3.Row) -> dict:
@@ -4460,6 +4507,7 @@ def memories():
             )
             conn.commit()
             memory_id = cursor.lastrowid
+            write_audit_log("memory_create", "memory", memory_id)
             row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
             return ok_response({"memory": row_to_memory(row)}, 201)
 
@@ -4506,6 +4554,7 @@ def memory_detail(memory_id: int):
         if request.method == "DELETE":
             conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
             conn.commit()
+            write_audit_log("memory_delete", "memory", memory_id)
             return ok_response({"deleted": memory_id})
 
         body = request.get_json(silent=True) or {}
@@ -4527,6 +4576,7 @@ def memory_detail(memory_id: int):
             (category, content, detail, status, now, memory_id),
         )
         conn.commit()
+        write_audit_log("memory_update", "memory", memory_id)
         row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
         return ok_response({"memory": row_to_memory(row)})
     except ValueError as exc:
@@ -4549,6 +4599,7 @@ def confirm_memory(memory_id: int):
         now = utc_now().isoformat(timespec="seconds")
         conn.execute("UPDATE memories SET status = 'confirmed', updated_at = ? WHERE id = ?", (now, memory_id))
         conn.commit()
+        write_audit_log("memory_confirm", "memory", memory_id)
         row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
         return ok_response({"memory": row_to_memory(row)})
     finally:
@@ -4569,8 +4620,156 @@ def archive_memory(memory_id: int):
         now = utc_now().isoformat(timespec="seconds")
         conn.execute("UPDATE memories SET status = 'archived', updated_at = ? WHERE id = ?", (now, memory_id))
         conn.commit()
+        write_audit_log("memory_archive", "memory", memory_id)
         row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
         return ok_response({"memory": row_to_memory(row)})
+    finally:
+        conn.close()
+
+
+# ===== 治理路由 =====
+
+@app.route("/item/<int:item_id>", methods=["DELETE"])
+def delete_item(item_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            f"SELECT id, type, file_path FROM items WHERE id = ?",
+            (item_id,),
+        ).fetchone()
+        if row is None:
+            return error_response(404, "not_found", "条目不存在")
+
+        conn.execute("UPDATE memories SET source_item_id = NULL WHERE source_item_id = ?", (item_id,))
+        conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+        conn.commit()
+
+        if row["file_path"]:
+            file_path = resolve_stored_file_path(row["file_path"])
+            if file_path and file_path.exists():
+                cleanup_file(file_path)
+
+        write_audit_log("item_delete", "item", item_id)
+        logger.info("deleted item id=%s type=%s", item_id, row["type"])
+        return ok_response({"deleted": item_id})
+    finally:
+        conn.close()
+
+
+@app.route("/export", methods=["POST"])
+def export_data():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    import tempfile
+    import zipfile
+    from io import BytesIO
+
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    try:
+        items_rows = conn.execute("SELECT * FROM items ORDER BY id").fetchall()
+        memories_rows = conn.execute("SELECT * FROM memories ORDER BY id").fetchall()
+        tasks_rows = conn.execute("SELECT * FROM tasks ORDER BY id").fetchall()
+    finally:
+        conn.close()
+
+    timestamp = local_date_now().isoformat()
+    export_name = f"axiom_export_{timestamp}"
+
+    items_json = json.dumps([dict(r) for r in items_rows], ensure_ascii=False, indent=2)
+    memories_json = json.dumps([dict(r) for r in memories_rows], ensure_ascii=False, indent=2)
+    tasks_json = json.dumps([dict(r) for r in tasks_rows], ensure_ascii=False, indent=2)
+
+    file_count = 0
+    for r in items_rows:
+        if r["file_path"]:
+            fp = resolve_stored_file_path(r["file_path"])
+            if fp and fp.exists():
+                file_count += 1
+
+    manifest = (
+        f"Axiom Data Export\n"
+        f"exported_at: {utc_now().isoformat(timespec='seconds')}\n"
+        f"items: {len(items_rows)}\n"
+        f"memories: {len(memories_rows)}\n"
+        f"tasks: {len(tasks_rows)}\n"
+        f"files: {file_count}\n"
+    )
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{export_name}/manifest.txt", manifest)
+        zf.writestr(f"{export_name}/items.json", items_json)
+        zf.writestr(f"{export_name}/memories.json", memories_json)
+        zf.writestr(f"{export_name}/tasks.json", tasks_json)
+        for r in items_rows:
+            if r["file_path"]:
+                fp = resolve_stored_file_path(r["file_path"])
+                if fp and fp.exists():
+                    arcname = f"{export_name}/files/{fp.relative_to(AXIOM_ROOT)}"
+                    zf.write(fp, arcname)
+
+    buf.seek(0)
+    write_audit_log("export", "system")
+    logger.info("exported %d items, %d memories, %d tasks", len(items_rows), len(memories_rows), len(tasks_rows))
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{export_name}.zip",
+    )
+
+
+@app.route("/audit-log", methods=["GET"])
+def audit_log():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    action = request.args.get("action", "").strip() or None
+    target_type = request.args.get("target_type", "").strip() or None
+    page = parse_positive_int(request.args.get("page"), "page", 1)
+    page_size = parse_positive_int(request.args.get("page_size"), "page_size", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+
+    conn = get_db_connection()
+    try:
+        conditions = []
+        params = []
+        if action:
+            conditions.append("action = ?")
+            params.append(action)
+        if target_type:
+            conditions.append("target_type = ?")
+            params.append(target_type)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        total = conn.execute(f"SELECT COUNT(*) FROM audit_log {where}", params).fetchone()[0]
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        offset = (page - 1) * page_size
+        rows = conn.execute(
+            f"SELECT * FROM audit_log {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params + [page_size, offset],
+        ).fetchall()
+
+        return ok_response({
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+            "entries": [{
+                "id": r["id"],
+                "action": r["action"],
+                "target_type": r["target_type"],
+                "target_id": r["target_id"],
+                "detail": r["detail"],
+                "created_at": r["created_at"],
+            } for r in rows],
+        })
     finally:
         conn.close()
 
@@ -4596,6 +4795,8 @@ AXIOM_MODULES: list = []
 
 def init_modules(app):
     global AXIOM_MODULES, AUTOMATION_JOBS
+    if AXIOM_MODULES:
+        return  # already loaded
     from modules.registry import discover_modules, get_module_dir
     from modules.prompt_loader import PromptLoader
 

@@ -562,3 +562,11 @@
 - 导航栏新增"任务"按钮
 - `build_review_markdown.py` 新增已完成任务统计区块：窗口内完成数、当前待办数、已完成任务列表
 - 本地验证通过：`python -m compileall -q core scripts`、`python scripts/smoke_test_receiver.py`、记忆 API 12 项测试、任务 API 10 项测试
+
+- 新增 `audit_log` 表 + `write_audit_log()`，在 items/memories/tasks 所有 CUD 操作点写入审计
+- 新增 `DELETE /item/<id>`：删除条目、清理文件、清 NULL FK
+- 新增 `POST /export`：导出 items/memories/tasks JSON + 文件 ZIP
+- 新增 `GET /audit-log`：审计日志查询（action/target_type 筛选 + 分页）
+- 前端：查看器"删除"按钮（带 confirm）、设置面板"导出数据"按钮
+- 修复 `init_modules()` 幂等、修复误删 `MEMORY_SELECT_FIELDS`
+- 本地验证通过：治理 API 6 项测试、冒烟测试仍通过

@@ -66,6 +66,7 @@ const elements = {
     keyForm: document.getElementById("key-form"),
     keyInput: document.getElementById("key-input"),
     keyFeedback: document.getElementById("key-feedback"),
+    exportDataButton: document.getElementById("export-data-button"),
     clearKeyButton: document.getElementById("clear-key-button"),
     syncNowButton: document.getElementById("sync-now-button"),
     connectionIndicator: document.getElementById("connection-indicator"),
@@ -1498,6 +1499,15 @@ function buildItemViewerActions(item) {
             className: "secondary-button",
             dataset: {
                 action: "viewer-toggle-storage",
+                itemId: item.id,
+            },
+        },
+        {
+            label: "删除",
+            className: "text-button",
+            style: "color:var(--color-error)",
+            dataset: {
+                action: "delete-item",
                 itemId: item.id,
             },
         },
@@ -3301,6 +3311,20 @@ function bindDelegatedActions() {
             await handleTaskTodo(target.getAttribute("data-task-id"));
         } else if (action === "task-cancel") {
             await handleTaskCancel(target.getAttribute("data-task-id"));
+        } else if (action === "delete-item") {
+            const itemId = target.getAttribute("data-item-id");
+            if (!confirm(`确定要删除条目 #${itemId} 吗？删除后无法恢复。`)) return;
+            try {
+                setConnectionState("busy", "正在删除条目");
+                await apiRequest(`/item/${itemId}`, { method: "DELETE" });
+                closeViewer();
+                await syncDashboard({ showMessage: false });
+                setConnectionState("ready", "条目已删除");
+                showToast(`条目 #${itemId} 已删除`);
+            } catch (error) {
+                showToast(error.message);
+                setConnectionState("error", error.message);
+            }
         }
     });
 
@@ -3335,6 +3359,26 @@ function bindForms() {
         saveKey(key);
         setFeedback(elements.keyFeedback, "key 已保存在当前浏览器。", "ok");
         await syncDashboard({ showMessage: true });
+    });
+
+    elements.exportDataButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "正在导出数据");
+            const blob = await apiRequest("/export", { method: "POST", responseType: "blob" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `axiom_export_${new Date().toISOString().slice(0, 10)}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            setConnectionState("ready", "数据已导出");
+            showToast("导出完成");
+        } catch (error) {
+            setConnectionState("error", error.message);
+            showToast(error.message);
+        }
     });
 
     elements.clearKeyButton.addEventListener("click", () => {
