@@ -54,6 +54,30 @@ receiver 已提供：
 - `/artifacts/file/<path>`：取回 markdown artifact 文件
 - `/sw.js` + `manifest.webmanifest`：PWA 壳，可添加到手机主屏幕
 
+记忆与任务系统：
+
+- `/memories`：记忆列表（五类：事实/偏好/目标/人际关系/事件，三态：候选→确认→归档）
+- `/memories/<id>`：记忆 CRUD + confirm/archive
+- `/memories/stats`：记忆统计
+- `/tasks`：任务列表（三态：待办→完成→取消，三级优先级：高/中/低）
+- `/tasks/<id>`：任务 CRUD + done/todo/cancel
+- `/tasks/today`：今日任务汇总（含过期提醒）
+
+治理系统：
+
+- `DELETE /item/<id>`：删除条目（清理文件 + DB + FK 关联）
+- `POST /export`：导出全部数据（items/memories/tasks JSON + 文件 ZIP）
+- `GET /audit-log`：审计日志查询（记录所有 CUD 操作）
+
+检索增强：
+
+- `/search`：已升级为 SQLite FTS5 全文搜索（BM25 排序，CJK 字符级分词，支持中文）
+
+模块系统：
+
+- `modules/` 目录：可插拔模块框架（AxiomModule 基类，自动发现）
+- `modules/jianzhi/`：减脂模块（`/m/jianzhi/*`，体重/饮食/运动/围度/备注记录）
+
 脚本侧已提供：
 
 - 备份与恢复演练基础

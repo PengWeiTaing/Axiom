@@ -570,3 +570,11 @@
 - 前端：查看器"删除"按钮（带 confirm）、设置面板"导出数据"按钮
 - 修复 `init_modules()` 幂等、修复误删 `MEMORY_SELECT_FIELDS`
 - 本地验证通过：治理 API 6 项测试、冒烟测试仍通过
+
+- 新增 `items_fts` FTS5 虚拟表，`unicode61` 分词器 + CJK 字符级分词（`cjk_tokenize` 在 CJK 字符间插入空格）
+- FTS5 同步采用手动模式：`fts_sync_item` / `fts_delete_item` / `fts_backfill`，嵌入 add/upload/update/delete 成功路径
+- `/search` 重写为 FTS5 MATCH，BM25 排序（`-rank AS score`），比 LIKE 快且支持中文
+- `escape_fts_query`：CJK 分词 + FTS5 特殊字符过滤
+- `ITEM_PROCESSING_STATE_SQL` 列名加 `items.` 前缀，解决 FTS5 JOIN 时的歧义
+- 空查询（纯特殊字符）直接返回 0 结果
+- README 和 AI_CONTEXT 同步更新：新增记忆/任务/治理/检索/模块五类能力文档

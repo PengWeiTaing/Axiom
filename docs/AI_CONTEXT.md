@@ -110,6 +110,16 @@ deploy/
   axiom-daily-inbox-action.service / .timer
   axiom-daily-inbox-action-history.service / .timer
   axiom-weekly-inbox-action-history.service / .timer
+modules/
+  __init__.py
+  base.py               # AxiomModule 基类
+  registry.py           # 自动发现
+  prompt_loader.py      # Prompt 模板加载
+  jianzhi/              # 减脂模块
+    routes.py            # /m/jianzhi/*
+    models.py            # module_jianzhi_entries 表
+    prompts/             # AI 教练 prompt
+    static/jianzhi.js    # 前端面板
 docs/
   AI_CONTEXT.md
   HUMAN_CONTEXT.md
@@ -165,6 +175,15 @@ logs/
 - `/artifacts/summary`
 - `/artifacts/file/<path>`
 - `/sw.js`
+- `/memories` / `/memories/<id>` — 记忆 CRUD + confirm/archive
+- `/memories/stats` — 分类统计
+- `/tasks` / `/tasks/<id>` — 任务 CRUD + done/todo/cancel
+- `/tasks/today` — 今日任务
+- `DELETE /item/<id>` — 删除条目
+- `POST /export` — 数据导出 ZIP
+- `GET /audit-log` — 审计日志
+- `/modules` — 模块元数据
+- `/m/jianzhi/*` — 减脂模块 API
 
 重要行为：
 
