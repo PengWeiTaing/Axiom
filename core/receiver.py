@@ -378,6 +378,12 @@ def ensure_storage_dirs() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
+def ensure_tasks_table_columns(conn: sqlite3.Connection) -> None:
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()}
+    if "estimated_minutes" not in existing:
+        conn.execute("ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER")
+
+
 def ensure_items_table_columns(conn: sqlite3.Connection) -> None:
     existing_columns = {
         row[1]
@@ -497,6 +503,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 priority TEXT NOT NULL DEFAULT 'medium',
                 memory_id INTEGER REFERENCES memories(id) ON DELETE SET NULL,
                 due_date TEXT,
+                estimated_minutes INTEGER,
                 completed_at TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -512,6 +519,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date)"
         )
+        ensure_tasks_table_columns(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS audit_log (
@@ -4220,7 +4228,7 @@ def search_items():
 
 TASK_SELECT_FIELDS = """
     id, title, detail, status, priority,
-    memory_id, due_date, completed_at, created_at, updated_at
+    memory_id, due_date, estimated_minutes, completed_at, created_at, updated_at
 """
 
 
@@ -4235,6 +4243,7 @@ def row_to_task(row: sqlite3.Row) -> dict:
         "priority_label": TASK_PRIORITY_LABELS.get(row["priority"], row["priority"]),
         "memory_id": row["memory_id"],
         "due_date": row["due_date"],
+        "estimated_minutes": row["estimated_minutes"],
         "completed_at": row["completed_at"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -4329,6 +4338,9 @@ def tasks():
             title = str(body.get("title", "")).strip()
             detail = str(body.get("detail", "")).strip() or None
             priority = str(body.get("priority", "medium")).strip()
+            estimated_minutes = body.get("estimated_minutes")
+            if estimated_minutes is not None:
+                estimated_minutes = int(estimated_minutes)
             due_date = str(body.get("due_date", "")).strip() or None
             memory_id = body.get("memory_id")
 
@@ -4339,8 +4351,8 @@ def tasks():
 
             now = utc_now().isoformat(timespec="seconds")
             cursor = conn.execute(
-                "INSERT INTO tasks (title, detail, status, priority, memory_id, due_date, created_at, updated_at) VALUES (?, ?, 'todo', ?, ?, ?, ?, ?)",
-                (title, detail, priority, memory_id, due_date, now, now),
+                "INSERT INTO tasks (title, detail, status, priority, memory_id, due_date, estimated_minutes, created_at, updated_at) VALUES (?, ?, 'todo', ?, ?, ?, ?, ?, ?)",
+                (title, detail, priority, memory_id, due_date, estimated_minutes, now, now),
             )
             conn.commit()
             task_id = cursor.lastrowid
