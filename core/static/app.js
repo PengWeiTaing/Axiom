@@ -57,6 +57,12 @@ const state = {
         todayItems: [],
         overdueItems: [],
     },
+    decisions: {
+        page: 1,
+        totalPages: 1,
+        items: [],
+        total: 0,
+    },
     objectUrls: new Set(),
     viewerObjectUrl: null,
     viewerContext: null,
@@ -138,6 +144,18 @@ const elements = {
     memoryList: document.getElementById("memory-list"),
     loadMoreMemoriesButton: document.getElementById("load-more-memories-button"),
     refreshMemoriesButton: document.getElementById("refresh-memories-button"),
+    decisionQuickForm: document.getElementById("decision-quick-form"),
+    decisionQuickTitle: document.getElementById("decision-quick-title"),
+    decisionQuickContext: document.getElementById("decision-quick-context"),
+    decisionQuickDecision: document.getElementById("decision-quick-decision"),
+    decisionQuickReasoning: document.getElementById("decision-quick-reasoning"),
+    decisionQuickExpected: document.getElementById("decision-quick-expected"),
+    decisionQuickFeedback: document.getElementById("decision-quick-feedback"),
+    decisionFilterStatus: document.getElementById("decision-filter-status"),
+    applyDecisionFilterButton: document.getElementById("apply-decision-filter-button"),
+    decisionList: document.getElementById("decision-list"),
+    loadMoreDecisionsButton: document.getElementById("load-more-decisions-button"),
+    refreshDecisionsButton: document.getElementById("refresh-decisions-button"),
     tasksTodayList: document.getElementById("tasks-today-list"),
     tasksOverdueList: document.getElementById("tasks-overdue-list"),
     taskQuickForm: document.getElementById("task-quick-form"),
@@ -2722,6 +2740,113 @@ async function handleTaskCancel(taskId) {
     }
 }
 
+async function loadDecisions({ reset = false } = {}) {
+    if (reset) {
+        state.decisions = { page: 1, totalPages: 1, items: [], total: 0 };
+    }
+    const query = { page: state.decisions.page, page_size: RECENT_PAGE_SIZE };
+    const st = elements.decisionFilterStatus.value;
+    if (st) query.status = st;
+
+    try {
+        const payload = await apiRequest("/decisions", { query });
+        if (reset) {
+            state.decisions.items = payload.decisions;
+        } else {
+            state.decisions.items.push(...payload.decisions);
+        }
+        state.decisions.page = payload.page;
+        state.decisions.totalPages = payload.total_pages;
+        state.decisions.total = payload.total;
+        renderDecisionCards(state.decisions);
+        updateLoadMoreButton(elements.loadMoreDecisionsButton, state.decisions.page, state.decisions.totalPages);
+    } catch (error) {
+        renderEmptyState(elements.decisionList, error.message);
+    }
+}
+
+function renderDecisionCards(data) {
+    if (!data || data.items.length === 0) {
+        renderEmptyState(elements.decisionList, "还没有决策记录。");
+        updateLoadMoreButton(elements.loadMoreDecisionsButton, data.page, data.totalPages, "没有更多");
+        return;
+    }
+    elements.decisionList.innerHTML = data.items.map(d => {
+        const statusTag = d.status === "reviewed"
+            ? '<span class="tag tag-ok">已回顾</span>'
+            : '<span class="tag tag-warn">待回顾</span>';
+        const contextHtml = d.context ? `<p class="item-meta">背景：${escapeHtml(d.context)}</p>` : "";
+        const reasonHtml = d.reasoning ? `<p class="item-meta">理由：${escapeHtml(d.reasoning)}</p>` : "";
+        const expectedHtml = d.expected_outcome ? `<p class="item-meta">预期：${escapeHtml(d.expected_outcome)}</p>` : "";
+        const outcomeHtml = d.actual_outcome
+            ? `<p class="item-meta" style="color:var(--color-ok)">实际：${escapeHtml(d.actual_outcome)}</p>`
+            : "";
+        const reviewBtn = d.status === "pending"
+            ? `<button type="button" class="text-button" data-action="review-decision" data-decision-id="${d.id}">回顾</button>`
+            : "";
+        return `
+            <div class="item-card">
+                <div class="item-card-body">
+                    <div class="item-card-tags">${statusTag}</div>
+                    <p class="item-card-text">${escapeHtml(d.title)}</p>
+                    ${contextHtml}
+                    <p class="item-card-text" style="font-weight:500">决定：${escapeHtml(d.decision)}</p>
+                    ${reasonHtml}${expectedHtml}${outcomeHtml}
+                    <p class="item-meta">${formatDateTime(d.created_at)}</p>
+                </div>
+                <div class="item-card-actions">${reviewBtn}</div>
+            </div>
+        `;
+    }).join("");
+}
+
+async function handleDecisionQuickCreate(event) {
+    event.preventDefault();
+    const title = elements.decisionQuickTitle.value.trim();
+    const context = elements.decisionQuickContext.value.trim();
+    const decision = elements.decisionQuickDecision.value.trim();
+    const reasoning = elements.decisionQuickReasoning.value.trim();
+    const expected = elements.decisionQuickExpected.value.trim();
+
+    if (!title || !decision) {
+        setFeedback(elements.decisionQuickFeedback, "标题和决定不能为空。", "error");
+        return;
+    }
+    try {
+        setConnectionState("busy", "正在记录决策");
+        await apiRequest("/decisions", {
+            method: "POST",
+            json: { title, context: context || undefined, decision, reasoning: reasoning || undefined, expected_outcome: expected || undefined },
+        });
+        elements.decisionQuickTitle.value = "";
+        elements.decisionQuickContext.value = "";
+        elements.decisionQuickDecision.value = "";
+        elements.decisionQuickReasoning.value = "";
+        elements.decisionQuickExpected.value = "";
+        setFeedback(elements.decisionQuickFeedback, "已记录。", "ok");
+        await loadDecisions({ reset: true });
+        setConnectionState("ready", "决策已记录");
+    } catch (error) {
+        setFeedback(elements.decisionQuickFeedback, error.message, "error");
+    }
+}
+
+async function handleReviewDecision(decisionId) {
+    const outcome = prompt("实际结果是什么？");
+    if (!outcome) return;
+    try {
+        setConnectionState("busy", "正在回顾决策");
+        await apiRequest(`/decisions/${decisionId}/review`, {
+            method: "POST",
+            json: { actual_outcome: outcome },
+        });
+        await loadDecisions({ reset: true });
+        setConnectionState("ready", "决策已回顾");
+    } catch (error) {
+        showToast(error.message);
+    }
+}
+
 async function syncDashboard({ showMessage = false } = {}) {
     try {
         requireKey();
@@ -2736,6 +2861,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         try { const ms = await apiRequest("/memories/stats"); renderMemoryStats(ms); } catch (e) { /* noop */ }
         await loadTasksToday();
         await loadTasks({ reset: true });
+        await loadDecisions({ reset: true });
         if (state.search.active) {
             await loadSearchPage({ reset: true });
         } else {
@@ -3305,6 +3431,8 @@ function bindDelegatedActions() {
             await handleArchiveMemory(target.getAttribute("data-memory-id"));
         } else if (action === "delete-memory") {
             await handleDeleteMemory(target.getAttribute("data-memory-id"));
+        } else if (action === "review-decision") {
+            await handleReviewDecision(target.getAttribute("data-decision-id"));
         } else if (action === "task-done") {
             await handleTaskDone(target.getAttribute("data-task-id"));
         } else if (action === "task-todo") {
@@ -3390,6 +3518,7 @@ function bindForms() {
         state.automation = { jobs: [], historyJobs: [], jobsLoaded: false, runs: [], runsPage: 1, runsTotalPages: 1, runsTotal: 0 };
         state.memories = { page: 1, totalPages: 1, items: [], total: 0 };
         state.tasks = { page: 1, totalPages: 1, items: [], total: 0, todayItems: [], overdueItems: [] };
+        state.decisions = { page: 1, totalPages: 1, items: [], total: 0 };
         elements.memoryStats.innerHTML = "";
         elements.automationDateInput.value = "";
         elements.automationRunsFilterForm.reset();
@@ -3691,6 +3820,26 @@ function bindForms() {
         } catch (error) {
             showToast(error.message);
         }
+    });
+
+    elements.decisionQuickForm.addEventListener("submit", handleDecisionQuickCreate);
+
+    elements.refreshDecisionsButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "正在刷新决策");
+            await loadDecisions({ reset: true });
+            setConnectionState("ready", "决策已刷新");
+        } catch (error) {
+            setConnectionState("error", error.message);
+        }
+    });
+
+    elements.applyDecisionFilterButton.addEventListener("click", async () => {
+        try { await loadDecisions({ reset: true }); } catch (e) { showToast(e.message); }
+    });
+
+    elements.loadMoreDecisionsButton.addEventListener("click", async () => {
+        try { await loadDecisions(); } catch (e) { showToast(e.message); }
     });
 }
 

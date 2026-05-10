@@ -37,6 +37,7 @@
             <button type="button" data-scroll-target="overview-panel">总览</button>
             <button type="button" data-scroll-target="tasks-panel">任务</button>
             <button type="button" data-scroll-target="memories-panel">记忆</button>
+            <button type="button" data-scroll-target="decisions-panel">决策</button>
             <button type="button" data-scroll-target="processing-panel">处理</button>
             <button type="button" data-scroll-target="recent-panel">浏览</button>
             <button type="button" data-scroll-target="search-panel">搜索</button>
@@ -292,6 +293,53 @@
                 <div id="memory-list" class="item-grid"></div>
                 <div class="load-more-row">
                     <button class="secondary-button" id="load-more-memories-button" type="button">加载更多</button>
+                </div>
+            </section>
+
+            <section class="panel decisions-panel" id="decisions-panel">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">Decisions</p>
+                        <h2>决策日志</h2>
+                    </div>
+                    <button class="secondary-button" id="refresh-decisions-button" type="button">刷新</button>
+                </div>
+                <form id="decision-quick-form" class="stack-form">
+                    <label class="field"><span>标题</span>
+                        <input id="decision-quick-title" type="text" placeholder="做了什么决定？" autocomplete="off">
+                    </label>
+                    <label class="field"><span>背景（可选）</span>
+                        <input id="decision-quick-context" type="text" placeholder="当时的处境是什么？">
+                    </label>
+                    <div class="field-row">
+                        <label class="field"><span>决定</span>
+                            <input id="decision-quick-decision" type="text" placeholder="你选择了什么？">
+                        </label>
+                        <button class="primary-button" type="submit">记录</button>
+                    </div>
+                    <label class="field"><span>理由（可选）</span>
+                        <input id="decision-quick-reasoning" type="text" placeholder="为什么这样选？">
+                    </label>
+                    <label class="field"><span>预期结果（可选）</span>
+                        <input id="decision-quick-expected" type="text" placeholder="预期会发生什么？">
+                    </label>
+                </form>
+                <p class="feedback-text" id="decision-quick-feedback"></p>
+
+                <div class="section-head section-head-compact">
+                    <div><p class="eyebrow">历史决策</p></div>
+                    <div class="filter-row">
+                        <select id="decision-filter-status">
+                            <option value="">全部</option>
+                            <option value="pending">待回顾</option>
+                            <option value="reviewed">已回顾</option>
+                        </select>
+                        <button class="secondary-button" id="apply-decision-filter-button" type="button">筛选</button>
+                    </div>
+                </div>
+                <div id="decision-list" class="item-grid"></div>
+                <div class="load-more-row">
+                    <button class="secondary-button" id="load-more-decisions-button" type="button">加载更多</button>
                 </div>
             </section>
 
@@ -597,6 +645,7 @@
             <button type="button" data-scroll-target="overview-panel">总览</button>
             <button type="button" data-scroll-target="tasks-panel">任务</button>
             <button type="button" data-scroll-target="memories-panel">记忆</button>
+            <button type="button" data-scroll-target="decisions-panel">决策</button>
             <button type="button" data-scroll-target="processing-panel">处理</button>
             <button type="button" data-scroll-target="recent-panel">浏览</button>
             <button type="button" data-scroll-target="search-panel">搜索</button>
