@@ -145,6 +145,7 @@ const elements = {
     applyMemoryFilterButton: document.getElementById("apply-memory-filter-button"),
     memoryList: document.getElementById("memory-list"),
     loadMoreMemoriesButton: document.getElementById("load-more-memories-button"),
+    suggestMemoriesButton: document.getElementById("suggest-memories-button"),
     refreshMemoriesButton: document.getElementById("refresh-memories-button"),
     decisionQuickForm: document.getElementById("decision-quick-form"),
     decisionQuickTitle: document.getElementById("decision-quick-title"),
@@ -3849,6 +3850,32 @@ function bindForms() {
     });
 
     elements.memoryQuickForm.addEventListener("submit", handleMemoryQuickCreate);
+
+    elements.suggestMemoriesButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "AI 正在分析记录，提取记忆...");
+            const payload = await apiRequest("/memories/suggest", { method: "POST" });
+            const suggestions = payload.suggestions || [];
+            if (suggestions.length === 0) {
+                showToast("没有发现新的可提取记忆。");
+                setConnectionState("ready", "暂无新记忆");
+                return;
+            }
+            let created = 0;
+            for (const s of suggestions) {
+                await apiRequest("/memories", { method: "POST", json: s });
+                created++;
+            }
+            await loadMemories({ reset: true });
+            const stats = await apiRequest("/memories/stats");
+            renderMemoryStats(stats);
+            setConnectionState("ready", `已提取 ${created} 条候选记忆`);
+            showToast(`AI 提取了 ${created} 条候选记忆，请确认。`);
+        } catch (error) {
+            setConnectionState("error", error.message);
+            showToast(error.message);
+        }
+    });
 
     elements.refreshMemoriesButton.addEventListener("click", async () => {
         try {

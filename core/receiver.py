@@ -4731,6 +4731,73 @@ def confirm_memory(memory_id: int):
         conn.close()
 
 
+@app.route("/memories/suggest", methods=["POST"])
+def suggest_memories():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    if not DEEPSEEK_API_KEY:
+        return error_response(503, "ai_unavailable", "未配置 AI API key")
+
+    conn = get_db_connection()
+    try:
+        week_ago = (utc_now() - timedelta(days=7)).isoformat(timespec="seconds")
+        rows = conn.execute(
+            "SELECT id, type, content, original_name, derived_text, transcript_text FROM items WHERE created_at >= ? ORDER BY created_at DESC LIMIT 20",
+            (week_ago,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    if not rows:
+        return ok_response({"suggestions": []})
+
+    lines = [
+        "你是一个个人知识助手。请从以下用户记录中提取可以作为长期记忆的信息。",
+        "每条建议一行，格式为：category|content",
+        "category 可选：fact（事实）、preference（偏好）、goal（目标）、relationship（人际关系）、event（事件）",
+        "只提取稳定、值得长期保留的信息，不要提取临时或琐碎的内容。",
+        "最多提取 5 条。如果没有值得长期记忆的内容，输出 NONE。",
+        "",
+    ]
+    for r in rows:
+        text = (r["content"] or r["original_name"] or r["derived_text"] or r["transcript_text"] or "")[:200]
+        if text.strip():
+            lines.append(f"- [{r['type']}] {text}")
+
+    prompt = "\n".join(lines)
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        response = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.5,
+        )
+        text = response.choices[0].message.content.strip()
+    except Exception as exc:
+        logger.exception("memory suggest failed")
+        return error_response(500, "ai_error", str(exc))
+
+    if text.upper().startswith("NONE"):
+        return ok_response({"suggestions": []})
+
+    suggestions = []
+    for line in text.split("\n"):
+        line = line.strip().lstrip("- ").strip()
+        if "|" in line:
+            parts = line.split("|", 1)
+            cat = parts[0].strip()
+            content = parts[1].strip()
+            if cat in MEMORY_CATEGORIES and content:
+                suggestions.append({"category": cat, "content": content})
+
+    return ok_response({"suggestions": suggestions})
+
+
 @app.route("/memories/<int:memory_id>/archive", methods=["POST"])
 def archive_memory(memory_id: int):
     auth_error = require_key()
