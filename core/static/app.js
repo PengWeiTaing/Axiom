@@ -75,6 +75,7 @@ const elements = {
     exportDataButton: document.getElementById("export-data-button"),
     clearKeyButton: document.getElementById("clear-key-button"),
     syncNowButton: document.getElementById("sync-now-button"),
+    connectionBar: document.getElementById("connection-bar"),
     connectionIndicator: document.getElementById("connection-indicator"),
     lastSyncIndicator: document.getElementById("last-sync-indicator"),
     textCaptureForm: document.getElementById("text-capture-form"),
@@ -430,15 +431,8 @@ function setFeedback(element, message, tone = "muted") {
 
 function setConnectionState(status, message) {
     elements.connectionIndicator.dataset.state = status;
-    if (status === "ready") {
-        elements.connectionIndicator.textContent = "已连接";
-    } else if (status === "busy") {
-        elements.connectionIndicator.textContent = "同步中";
-    } else if (status === "error") {
-        elements.connectionIndicator.textContent = "连接异常";
-    } else {
-        elements.connectionIndicator.textContent = "未连接";
-    }
+    elements.connectionIndicator.className = "conn-dot " + status;
+    elements.connectionBar.style.display = state.key ? "flex" : "none";
 
     if (message) {
         elements.lastSyncIndicator.textContent = message;
@@ -3564,6 +3558,28 @@ function bindDelegatedActions() {
     });
 }
 
+function bindSidebarTabs() {
+    const sidebar = document.getElementById("desktop-sidebar");
+    if (!sidebar) return;
+    sidebar.querySelectorAll("button[data-panel]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const panelId = btn.getAttribute("data-panel");
+            // Desktop: show only the selected panel
+            if (window.innerWidth >= 768) {
+                document.querySelectorAll(".layout > .panel").forEach(p => {
+                    p.style.display = p.id === panelId ? "" : "none";
+                });
+            }
+            // Mobile: scroll to the panel
+            const target = document.getElementById(panelId);
+            if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+            // Update active state
+            sidebar.querySelectorAll("button[data-panel]").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+        });
+    });
+}
+
 function bindScrollButtons() {
     document.querySelectorAll("[data-scroll-target]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -3610,6 +3626,7 @@ function bindForms() {
     elements.clearKeyButton.addEventListener("click", () => {
         saveKey("");
         elements.keyInput.value = "";
+        elements.connectionBar.style.display = "none";
         state.recent = { page: 1, totalPages: 1, items: [], total: 0 };
         state.search = { page: 1, totalPages: 1, items: [], active: false, total: 0 };
         state.artifacts = { page: 1, totalPages: 1, items: [] };
@@ -4098,6 +4115,7 @@ async function initModules() {
 
 function init() {
     bindScrollButtons();
+    bindSidebarTabs();
     bindForms();
     bindViewer();
     bindDelegatedActions();
@@ -4107,13 +4125,29 @@ function init() {
 
     if (state.key) {
         setFeedback(elements.keyFeedback, "已读取浏览器中的本地 key。", "ok");
+        elements.connectionBar.style.display = "flex";
         void syncDashboard();
         void initModules();
     } else {
         setConnectionState("idle", "尚未同步");
     }
 
+    // Desktop: show only overview panel initially, hide others
+    if (window.innerWidth >= 768) {
+        document.querySelectorAll(".layout > .panel").forEach(p => {
+            if (p.id !== "setup-panel" && p.id !== "overview-panel") {
+                p.style.display = "none";
+            }
+        });
+    }
+
     window.addEventListener("beforeunload", releaseAllObjectUrls);
+    window.addEventListener("resize", () => {
+        const isDesktop = window.innerWidth >= 768;
+        document.querySelectorAll(".layout > .panel").forEach(p => {
+            p.style.display = isDesktop && p.id !== "overview-panel" && p.id !== "setup-panel" ? "none" : "";
+        });
+    });
 }
 
 init();
