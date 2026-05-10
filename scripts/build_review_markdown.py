@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import sys
 from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone
@@ -90,11 +91,99 @@ def build_query_args(args: argparse.Namespace, start_utc: str, end_utc: str) -> 
     )
 
 
+def fetch_memory_rows(root: Path, start_utc: str, end_utc: str) -> list[sqlite3.Row]:
+    """读取指定时间窗口内的记忆行。"""
+    db_path = root / "db" / "axiom.db"
+    if not db_path.exists():
+        return []
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        return conn.execute(
+            """
+            SELECT id, category, content, detail, status, source_item_id, created_at, updated_at
+            FROM memories
+            WHERE created_at >= ? AND created_at < ?
+            ORDER BY created_at DESC
+            """,
+            (start_utc, end_utc),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def fetch_task_summary(root: Path, start_utc: str, end_utc: str) -> dict:
+    """读取指定窗口内的任务完成统计。"""
+    db_path = root / "db" / "axiom.db"
+    if not db_path.exists():
+        return {"done": 0, "created": 0, "todo": 0}
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        done = conn.execute(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'done' AND completed_at >= ? AND completed_at < ?",
+            (start_utc, end_utc),
+        ).fetchone()[0]
+        created = conn.execute(
+            "SELECT COUNT(*) FROM tasks WHERE created_at >= ? AND created_at < ?",
+            (start_utc, end_utc),
+        ).fetchone()[0]
+        todo = conn.execute("SELECT COUNT(*) FROM tasks WHERE status = 'todo'").fetchone()[0]
+        done_rows = conn.execute(
+            "SELECT id, title, priority, completed_at FROM tasks WHERE status = 'done' AND completed_at >= ? AND completed_at < ? ORDER BY completed_at DESC LIMIT 30",
+            (start_utc, end_utc),
+        ).fetchall()
+        return {"done": done, "created": created, "todo": todo, "done_rows": done_rows}
+    finally:
+        conn.close()
+
+
+TASK_PRIORITY_LABELS = {"high": "高", "medium": "中", "low": "低"}
+
+
+def fetch_candidate_memories(root: Path) -> list[sqlite3.Row]:
+    """读取所有待确认的记忆。"""
+    db_path = root / "db" / "axiom.db"
+    if not db_path.exists():
+        return []
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        return conn.execute(
+            """
+            SELECT id, category, content, detail, status, source_item_id, created_at, updated_at
+            FROM memories
+            WHERE status = 'candidate'
+            ORDER BY created_at DESC
+            LIMIT 20
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+MEMORY_CATEGORY_LABELS = {
+    "fact": "事实",
+    "preference": "偏好",
+    "goal": "目标",
+    "relationship": "人际关系",
+    "event": "事件",
+}
+MEMORY_STATUS_LABELS = {
+    "candidate": "待确认",
+    "confirmed": "已确认",
+    "archived": "已归档",
+}
+
+
 def build_markdown(
     args: argparse.Namespace,
     start_local: datetime,
     end_local: datetime,
     rows: list,
+    memory_rows: list | None = None,
+    candidate_rows: list | None = None,
+    task_summary: dict | None = None,
 ) -> str:
     generated_at = datetime.now(timezone.utc).isoformat()
     local_tz = parse_utc_offset(args.utc_offset)
@@ -137,9 +226,24 @@ def build_markdown(
         "- by_source: " + (", ".join(f"{key}={value}" for key, value in sorted(source_counter.items())) or "None"),
         "- by_storage: " + (", ".join(f"{key}={value}" for key, value in sorted(storage_counter.items())) or "None"),
         "",
-        "## Days",
-        "",
     ]
+
+    if task_summary:
+        lines.extend(
+            [
+                f"- tasks_created: {task_summary['created']}",
+                f"- tasks_done: {task_summary['done']}",
+                f"- tasks_todo_remaining: {task_summary['todo']}",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            "## Days",
+            "",
+        ]
+    )
 
     if not rows:
         lines.append("_No items matched._")
@@ -183,6 +287,63 @@ def build_markdown(
                 lines.append(f"   derived_text: {derived_preview}")
             if transcript_preview:
                 lines.append(f"   transcript_text: {transcript_preview}")
+            lines.append("")
+
+    if task_summary and task_summary.get("done_rows"):
+        lines.extend(
+            [
+                "## 已完成任务",
+                "",
+                f"- 本窗口完成: {task_summary['done']} 条",
+                f"- 仍有待办: {task_summary['todo']} 条",
+                "",
+            ]
+        )
+        for r in task_summary["done_rows"]:
+            p_label = TASK_PRIORITY_LABELS.get(r["priority"], r["priority"])
+            lines.append(f"- [✓] [{p_label}] {r['title']}")
+        lines.append("")
+
+    if memory_rows:
+        lines.extend(
+            [
+                "## 新增记忆",
+                "",
+                f"- 本窗口内新增记忆: {len(memory_rows)} 条",
+                "",
+            ]
+        )
+        confirmed = [r for r in memory_rows if r["status"] == "confirmed"]
+        new_candidates = [r for r in memory_rows if r["status"] == "candidate"]
+        if confirmed:
+            lines.append("### 已确认")
+            lines.append("")
+            for r in confirmed:
+                cat_label = MEMORY_CATEGORY_LABELS.get(r["category"], r["category"])
+                lines.append(f"- [{cat_label}] {r['content']}")
+            lines.append("")
+        if new_candidates:
+            lines.append("### 新增候选（待确认）")
+            lines.append("")
+            for r in new_candidates:
+                cat_label = MEMORY_CATEGORY_LABELS.get(r["category"], r["category"])
+                lines.append(f"- [{cat_label}] {r['content']}")
+            lines.append("")
+
+    if candidate_rows and len(candidate_rows) > 0:
+        pending = [r for r in candidate_rows if not memory_rows or r["id"] not in {m["id"] for m in memory_rows}]
+        if pending:
+            lines.extend(
+                [
+                    "## 待确认记忆",
+                    "",
+                    f"- 当前有 {len(pending)} 条记忆尚未确认",
+                    "",
+                ]
+            )
+            for r in pending[:10]:
+                cat_label = MEMORY_CATEGORY_LABELS.get(r["category"], r["category"])
+                lines.append(f"- [{cat_label}] {r['content']}")
             lines.append("")
 
     lines.extend(
@@ -282,7 +443,10 @@ def main() -> int:
         args = parse_args()
         query_args = build_query_args(args, args.created_from, args.created_to)
         rows = export_tools.read_rows(query_args, args.root)
-        markdown = build_markdown(args, args.start_local, args.end_local, rows)
+        memory_rows = fetch_memory_rows(args.root, args.created_from, args.created_to)
+        candidate_rows = fetch_candidate_memories(args.root)
+        task_summary = fetch_task_summary(args.root, args.created_from, args.created_to)
+        markdown = build_markdown(args, args.start_local, args.end_local, rows, memory_rows, candidate_rows, task_summary)
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

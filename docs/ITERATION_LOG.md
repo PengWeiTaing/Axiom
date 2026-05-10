@@ -538,3 +538,27 @@
 - 已用 `scripts/deploy_to_vps.py --allow-dirty` 将这轮 “complete-and-next pending action” 部署到 VPS，当前线上运行代码更新到 `3a963e3`
 - 本次部署前生成的 VPS 代码备份为 `/opt/axiom/backup/code/axiom_code_backup_20260508_122711_3a963e3.tar.gz`
 - 线上只读核验通过：`https://pengweitai.me/health` 正常，`/processing/next?key=axiomnb&type=document` 与 `/processing/next?key=axiomnb&type=image` 均正常返回空结果结构
+
+## 2026-05-10
+
+- 新增 `memories` 表和完整长期记忆系统：`fact / preference / goal / relationship / event` 五类记忆，`candidate → confirmed → archived` 三态流转
+- 新增 9 个记忆 API：`GET/POST /memories`、`GET/PUT/DELETE /memories/<id>`、`POST /memories/<id>/confirm`、`POST /memories/<id>/archive`、`GET /memories/stats`
+- 记忆 API 复用了 core 的 `require_key()` + `get_db_connection()` + `ok_response()` / `error_response()` 模式
+- 增强 `/stats` 返回 `memory_total`、`memory_candidate`、`memory_confirmed`、`memory_by_category`
+- 增强 `/overview/text` 增加记忆统计行和待确认记忆提醒
+- `app.html` 新增 `memories-panel`：快速添加表单、统计卡片、分类/状态筛选、分页列表
+- `app.js` 新增 `loadMemories()`、`renderMemoryStats()`、`renderMemoryCards()`、`handleMemoryQuickCreate()`、`handleConfirmMemory()`、`handleArchiveMemory()`、`handleDeleteMemory()`
+- 导航栏（顶部和底部）新增"记忆"按钮
+- `build_review_markdown.py` 新增记忆回顾区块：窗口内新增的已确认记忆列表、待确认记忆提示
+- `build_inbox_processing_report.py` 新增关键词规则：检测"我决定/我计划/我偏好/我的目标是/我认识了"等信号，在 inbox 报告中建议提取为记忆
+
+- 新增 `tasks` 表和任务系统：`todo → done → cancelled` 三态，`high/medium/low` 优先级，可选 `due_date` 和关联 `memory_id`
+- 新增 9 个任务 API：`GET/POST /tasks`、`GET/PUT/DELETE /tasks/<id>`、`POST /tasks/<id>/done`、`POST /tasks/<id>/todo`、`POST /tasks/<id>/cancel`、`GET /tasks/today`
+- 新增 `local_date_now()` 工具函数，基于 `AXIOM_LOCAL_UTC_OFFSET` 计算本地日期
+- 增强 `/stats` 返回 `task_total`、`task_todo`、`task_done`
+- 增强 `/overview/text` 增加任务统计行
+- `app.html` 新增 `tasks-panel`：今日任务列表（含过期提醒）、快速添加表单、全部任务筛选列表
+- `app.js` 新增 `loadTasksToday()`、`renderTasksToday()`、`renderTaskCard()`、`loadTasks()`、`renderTaskList()`、`handleTaskQuickCreate()`、`handleTaskDone()`、`handleTaskTodo()`、`handleTaskCancel()`
+- 导航栏新增"任务"按钮
+- `build_review_markdown.py` 新增已完成任务统计区块：窗口内完成数、当前待办数、已完成任务列表
+- 本地验证通过：`python -m compileall -q core scripts`、`python scripts/smoke_test_receiver.py`、记忆 API 12 项测试、任务 API 10 项测试

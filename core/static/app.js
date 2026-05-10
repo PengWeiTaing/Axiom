@@ -35,6 +35,20 @@ const state = {
         runsTotalPages: 1,
         runsTotal: 0,
     },
+    memories: {
+        page: 1,
+        totalPages: 1,
+        items: [],
+        total: 0,
+    },
+    tasks: {
+        page: 1,
+        totalPages: 1,
+        items: [],
+        total: 0,
+        todayItems: [],
+        overdueItems: [],
+    },
     objectUrls: new Set(),
     viewerObjectUrl: null,
     viewerContext: null,
@@ -103,6 +117,31 @@ const elements = {
     viewerContent: document.getElementById("viewer-content"),
     closeViewerButton: document.getElementById("close-viewer-button"),
     toast: document.getElementById("toast"),
+    memoryStats: document.getElementById("memory-stats"),
+    memoryQuickForm: document.getElementById("memory-quick-form"),
+    memoryQuickCategory: document.getElementById("memory-quick-category"),
+    memoryQuickContent: document.getElementById("memory-quick-content"),
+    memoryQuickDetail: document.getElementById("memory-quick-detail"),
+    memoryQuickFeedback: document.getElementById("memory-quick-feedback"),
+    memoryFilterCategory: document.getElementById("memory-filter-category"),
+    memoryFilterStatus: document.getElementById("memory-filter-status"),
+    applyMemoryFilterButton: document.getElementById("apply-memory-filter-button"),
+    memoryList: document.getElementById("memory-list"),
+    loadMoreMemoriesButton: document.getElementById("load-more-memories-button"),
+    refreshMemoriesButton: document.getElementById("refresh-memories-button"),
+    tasksTodayList: document.getElementById("tasks-today-list"),
+    tasksOverdueList: document.getElementById("tasks-overdue-list"),
+    taskQuickForm: document.getElementById("task-quick-form"),
+    taskQuickTitle: document.getElementById("task-quick-title"),
+    taskQuickDetail: document.getElementById("task-quick-detail"),
+    taskQuickPriority: document.getElementById("task-quick-priority"),
+    taskQuickDueDate: document.getElementById("task-quick-due-date"),
+    taskQuickFeedback: document.getElementById("task-quick-feedback"),
+    taskFilterStatus: document.getElementById("task-filter-status"),
+    applyTaskFilterButton: document.getElementById("apply-task-filter-button"),
+    taskList: document.getElementById("task-list"),
+    loadMoreTasksButton: document.getElementById("load-more-tasks-button"),
+    refreshTasksButton: document.getElementById("refresh-tasks-button"),
 };
 
 function escapeHtml(value) {
@@ -2326,6 +2365,345 @@ async function loadAutomationRuns({ reset = false } = {}) {
     );
 }
 
+async function loadMemories({ reset = false } = {}) {
+    if (reset) {
+        state.memories = { page: 1, totalPages: 1, items: [], total: 0 };
+    }
+    const query = {
+        page: state.memories.page,
+        page_size: RECENT_PAGE_SIZE,
+    };
+    const cat = elements.memoryFilterCategory.value;
+    const st = elements.memoryFilterStatus.value;
+    if (cat) query.category = cat;
+    if (st) query.status = st;
+
+    try {
+        const payload = await apiRequest("/memories", { query });
+        if (reset) {
+            state.memories.items = payload.memories;
+        } else {
+            state.memories.items.push(...payload.memories);
+        }
+        state.memories.page = payload.page;
+        state.memories.totalPages = payload.total_pages;
+        state.memories.total = payload.total;
+        renderMemoryCards(state.memories);
+        updateLoadMoreButton(elements.loadMoreMemoriesButton, state.memories.page, state.memories.totalPages);
+    } catch (error) {
+        renderEmptyState(elements.memoryList, error.message);
+    }
+}
+
+function renderMemoryStats(stats) {
+    if (!stats || !stats.total) {
+        elements.memoryStats.innerHTML = "";
+        return;
+    }
+    const categories = Object.entries(stats.by_category || {});
+    const catBadges = categories.map(([cat, data]) =>
+        `<span class="tag tag-${cat}">${escapeHtml(data.label)} ${data.confirmed || 0}</span>`
+    ).join("");
+    elements.memoryStats.innerHTML = `
+        <div class="stat-card">
+            <p class="stat-value">${stats.total}</p>
+            <p class="stat-label">全部记忆</p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-value">${categories.reduce((s, [, d]) => s + (d.confirmed || 0), 0)}</p>
+            <p class="stat-label">已确认</p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-value">${categories.reduce((s, [, d]) => s + (d.candidate || 0), 0)}</p>
+            <p class="stat-label">待确认</p>
+        </div>
+        <div class="stat-card stat-card-wide">
+            <p class="stat-label">分类分布</p>
+            <p>${catBadges || "暂无"}</p>
+        </div>
+    `;
+}
+
+function renderMemoryCards(data) {
+    if (!data || data.items.length === 0) {
+        renderEmptyState(elements.memoryList, "还没有记忆，在上方添加第一条吧。");
+        updateLoadMoreButton(elements.loadMoreMemoriesButton, data.page, data.totalPages, "没有更多");
+        return;
+    }
+
+    const cardsHtml = data.items.map((mem) => {
+        const statusClass = mem.status === "confirmed" ? "tag-ok" : mem.status === "archived" ? "tag-dim" : "tag-warn";
+        const catClass = `tag-${mem.category}`;
+        const sourceLink = mem.source_item_id
+            ? `<button type="button" class="text-button" data-action="view-item" data-item-id="${mem.source_item_id}">来源 #${mem.source_item_id}</button>`
+            : "";
+        const detailHtml = mem.detail ? `<p class="item-meta">${escapeHtml(mem.detail)}</p>` : "";
+        const actions = [];
+        if (mem.status === "candidate") {
+            actions.push(`<button type="button" class="text-button" data-action="confirm-memory" data-memory-id="${mem.id}">确认</button>`);
+        }
+        if (mem.status !== "archived") {
+            actions.push(`<button type="button" class="text-button" data-action="archive-memory" data-memory-id="${mem.id}">归档</button>`);
+        }
+        actions.push(`<button type="button" class="text-button" data-action="delete-memory" data-memory-id="${mem.id}">删除</button>`);
+        return `
+            <div class="item-card">
+                <div class="item-card-body">
+                    <div class="item-card-tags">
+                        <span class="tag ${catClass}">${escapeHtml(mem.category_label)}</span>
+                        <span class="tag ${statusClass}">${escapeHtml(mem.status_label)}</span>
+                    </div>
+                    <p class="item-card-text">${escapeHtml(mem.content)}</p>
+                    ${detailHtml}
+                    <p class="item-meta">${formatDateTime(mem.created_at)}${sourceLink ? " · " + sourceLink : ""}</p>
+                </div>
+                <div class="item-card-actions">${actions.join("")}</div>
+            </div>
+        `;
+    }).join("");
+
+    elements.memoryList.innerHTML = cardsHtml;
+}
+
+async function handleMemoryQuickCreate(event) {
+    event.preventDefault();
+    const category = elements.memoryQuickCategory.value;
+    const content = elements.memoryQuickContent.value.trim();
+    const detail = elements.memoryQuickDetail.value.trim();
+
+    if (!content) {
+        setFeedback(elements.memoryQuickFeedback, "内容不能为空。", "error");
+        return;
+    }
+
+    try {
+        setConnectionState("busy", "正在写入记忆");
+        await apiRequest("/memories", {
+            method: "POST",
+            json: { category, content, detail: detail || undefined },
+        });
+        elements.memoryQuickContent.value = "";
+        elements.memoryQuickDetail.value = "";
+        setFeedback(elements.memoryQuickFeedback, "已添加。", "ok");
+        await loadMemories({ reset: true });
+        const statsPayload = await apiRequest("/memories/stats");
+        renderMemoryStats(statsPayload);
+        setConnectionState("ready", "记忆已写入");
+    } catch (error) {
+        setFeedback(elements.memoryQuickFeedback, error.message, "error");
+        setConnectionState("error", error.message);
+    }
+}
+
+async function handleConfirmMemory(memoryId) {
+    try {
+        setConnectionState("busy", "正在确认记忆");
+        await apiRequest(`/memories/${memoryId}/confirm`, { method: "POST" });
+        await loadMemories({ reset: true });
+        const statsPayload = await apiRequest("/memories/stats");
+        renderMemoryStats(statsPayload);
+        setConnectionState("ready", "记忆已确认");
+    } catch (error) {
+        showToast(error.message);
+        setConnectionState("error", error.message);
+    }
+}
+
+async function handleArchiveMemory(memoryId) {
+    try {
+        setConnectionState("busy", "正在归档记忆");
+        await apiRequest(`/memories/${memoryId}/archive`, { method: "POST" });
+        await loadMemories({ reset: true });
+        const statsPayload = await apiRequest("/memories/stats");
+        renderMemoryStats(statsPayload);
+        setConnectionState("ready", "记忆已归档");
+    } catch (error) {
+        showToast(error.message);
+        setConnectionState("error", error.message);
+    }
+}
+
+async function handleDeleteMemory(memoryId) {
+    if (!confirm("确定要删除这条记忆吗？")) return;
+    try {
+        setConnectionState("busy", "正在删除记忆");
+        await apiRequest(`/memories/${memoryId}`, { method: "DELETE" });
+        await loadMemories({ reset: true });
+        const statsPayload = await apiRequest("/memories/stats");
+        renderMemoryStats(statsPayload);
+        setConnectionState("ready", "记忆已删除");
+    } catch (error) {
+        showToast(error.message);
+        setConnectionState("error", error.message);
+    }
+}
+
+async function loadTasksToday() {
+    try {
+        const payload = await apiRequest("/tasks/today");
+        state.tasks.todayItems = payload.today;
+        state.tasks.overdueItems = payload.overdue;
+        renderTasksToday(payload);
+    } catch (error) {
+        renderEmptyState(elements.tasksTodayList, error.message);
+    }
+}
+
+function renderTasksToday(data) {
+    const prioritySort = { high: 0, medium: 1, low: 2 };
+
+    if (data.overdue && data.overdue.length > 0) {
+        const sorted = [...data.overdue].sort((a, b) => prioritySort[a.priority] - prioritySort[b.priority]);
+        elements.tasksOverdueList.innerHTML = `
+            <div class="section-head section-head-compact">
+                <div><p class="eyebrow" style="color:var(--color-warn)">已过期 (${sorted.length})</p></div>
+            </div>
+            ${sorted.map(t => renderTaskCard(t)).join("")}
+        `;
+    } else {
+        elements.tasksOverdueList.innerHTML = "";
+    }
+
+    if (data.today && data.today.length > 0) {
+        const sorted = [...data.today].sort((a, b) => prioritySort[a.priority] - prioritySort[b.priority]);
+        elements.tasksTodayList.innerHTML = sorted.map(t => renderTaskCard(t)).join("");
+    } else {
+        renderEmptyState(elements.tasksTodayList, "今天还没有安排任务，在下方添加吧。");
+    }
+}
+
+function renderTaskCard(task) {
+    const priorityDot = task.priority === "high"
+        ? '<span class="tag tag-warn">高</span>'
+        : task.priority === "low"
+            ? '<span class="tag tag-dim">低</span>'
+            : "";
+    const doneClass = task.status === "done" ? "task-done" : "";
+    const dueInfo = task.due_date ? ` · 截止 ${task.due_date}` : "";
+    const detailHtml = task.detail ? `<p class="item-meta">${escapeHtml(task.detail)}</p>` : "";
+
+    let actions = "";
+    if (task.status === "todo") {
+        actions = `<button type="button" class="text-button" data-action="task-done" data-task-id="${task.id}">完成</button>
+                   <button type="button" class="text-button" data-action="task-cancel" data-task-id="${task.id}">取消</button>`;
+    } else if (task.status === "done" || task.status === "cancelled") {
+        actions = `<button type="button" class="text-button" data-action="task-todo" data-task-id="${task.id}">恢复</button>`;
+    }
+
+    return `
+        <div class="item-card ${doneClass}">
+            <div class="item-card-body">
+                <div class="item-card-tags">
+                    <span class="tag tag-${task.status === 'done' ? 'ok' : task.status === 'cancelled' ? 'dim' : 'todo'}">${escapeHtml(task.status_label)}</span>
+                    ${priorityDot}
+                </div>
+                <p class="item-card-text">${escapeHtml(task.title)}</p>
+                ${detailHtml}
+                <p class="item-meta">${formatDateTime(task.created_at)}${dueInfo}</p>
+            </div>
+            <div class="item-card-actions">${actions}</div>
+        </div>
+    `;
+}
+
+async function loadTasks({ reset = false } = {}) {
+    if (reset) {
+        state.tasks = { page: 1, totalPages: 1, items: [], total: 0, todayItems: [], overdueItems: [] };
+    }
+    const query = { page: state.tasks.page, page_size: RECENT_PAGE_SIZE };
+    const st = elements.taskFilterStatus.value;
+    if (st) query.status = st;
+
+    try {
+        const payload = await apiRequest("/tasks", { query });
+        if (reset) {
+            state.tasks.items = payload.tasks;
+        } else {
+            state.tasks.items.push(...payload.tasks);
+        }
+        state.tasks.page = payload.page;
+        state.tasks.totalPages = payload.total_pages;
+        state.tasks.total = payload.total;
+        renderTaskList(state.tasks);
+        updateLoadMoreButton(elements.loadMoreTasksButton, state.tasks.page, state.tasks.totalPages);
+    } catch (error) {
+        renderEmptyState(elements.taskList, error.message);
+    }
+}
+
+function renderTaskList(data) {
+    if (!data || data.items.length === 0) {
+        renderEmptyState(elements.taskList, "还没有任务，在上方添加第一条吧。");
+        updateLoadMoreButton(elements.loadMoreTasksButton, data.page, data.totalPages, "没有更多");
+        return;
+    }
+    elements.taskList.innerHTML = data.items.map(t => renderTaskCard(t)).join("");
+}
+
+async function handleTaskQuickCreate(event) {
+    event.preventDefault();
+    const title = elements.taskQuickTitle.value.trim();
+    const detail = elements.taskQuickDetail.value.trim();
+    const priority = elements.taskQuickPriority.value;
+    const dueDate = elements.taskQuickDueDate.value || undefined;
+
+    if (!title) {
+        setFeedback(elements.taskQuickFeedback, "任务标题不能为空。", "error");
+        return;
+    }
+
+    try {
+        setConnectionState("busy", "正在添加任务");
+        await apiRequest("/tasks", {
+            method: "POST",
+            json: { title, detail: detail || undefined, priority, due_date: dueDate },
+        });
+        elements.taskQuickTitle.value = "";
+        elements.taskQuickDetail.value = "";
+        setFeedback(elements.taskQuickFeedback, "已添加。", "ok");
+        await loadTasksToday();
+        await loadTasks({ reset: true });
+        setConnectionState("ready", "任务已添加");
+    } catch (error) {
+        setFeedback(elements.taskQuickFeedback, error.message, "error");
+        setConnectionState("error", error.message);
+    }
+}
+
+async function handleTaskDone(taskId) {
+    try {
+        setConnectionState("busy", "正在标记完成");
+        await apiRequest(`/tasks/${taskId}/done`, { method: "POST" });
+        await loadTasksToday();
+        await loadTasks({ reset: true });
+        setConnectionState("ready", "任务已完成");
+    } catch (error) {
+        showToast(error.message);
+    }
+}
+
+async function handleTaskTodo(taskId) {
+    try {
+        await apiRequest(`/tasks/${taskId}/todo`, { method: "POST" });
+        await loadTasksToday();
+        await loadTasks({ reset: true });
+        setConnectionState("ready", "任务已恢复");
+    } catch (error) {
+        showToast(error.message);
+    }
+}
+
+async function handleTaskCancel(taskId) {
+    try {
+        await apiRequest(`/tasks/${taskId}/cancel`, { method: "POST" });
+        await loadTasksToday();
+        await loadTasks({ reset: true });
+        setConnectionState("ready", "任务已取消");
+    } catch (error) {
+        showToast(error.message);
+    }
+}
+
 async function syncDashboard({ showMessage = false } = {}) {
     try {
         requireKey();
@@ -2336,6 +2714,10 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadAutomationJobs();
         await loadAutomationRuns({ reset: true });
         await loadArtifactPanels({ reset: true });
+        await loadMemories({ reset: true });
+        try { const ms = await apiRequest("/memories/stats"); renderMemoryStats(ms); } catch (e) { /* noop */ }
+        await loadTasksToday();
+        await loadTasks({ reset: true });
         if (state.search.active) {
             await loadSearchPage({ reset: true });
         } else {
@@ -2893,6 +3275,18 @@ function bindDelegatedActions() {
             await handleAutomationRunRerun(target.getAttribute("data-run-id"), target);
         } else if (action === "run-automation-job") {
             await handleAutomationRun(target.getAttribute("data-job-id"), target);
+        } else if (action === "confirm-memory") {
+            await handleConfirmMemory(target.getAttribute("data-memory-id"));
+        } else if (action === "archive-memory") {
+            await handleArchiveMemory(target.getAttribute("data-memory-id"));
+        } else if (action === "delete-memory") {
+            await handleDeleteMemory(target.getAttribute("data-memory-id"));
+        } else if (action === "task-done") {
+            await handleTaskDone(target.getAttribute("data-task-id"));
+        } else if (action === "task-todo") {
+            await handleTaskTodo(target.getAttribute("data-task-id"));
+        } else if (action === "task-cancel") {
+            await handleTaskCancel(target.getAttribute("data-task-id"));
         }
     });
 
@@ -2936,6 +3330,9 @@ function bindForms() {
         state.search = { page: 1, totalPages: 1, items: [], active: false, total: 0 };
         state.artifacts = { page: 1, totalPages: 1, items: [] };
         state.automation = { jobs: [], historyJobs: [], jobsLoaded: false, runs: [], runsPage: 1, runsTotalPages: 1, runsTotal: 0 };
+        state.memories = { page: 1, totalPages: 1, items: [], total: 0 };
+        state.tasks = { page: 1, totalPages: 1, items: [], total: 0, todayItems: [], overdueItems: [] };
+        elements.memoryStats.innerHTML = "";
         elements.automationDateInput.value = "";
         elements.automationRunsFilterForm.reset();
         renderAutomationRunJobOptions([]);
@@ -2961,10 +3358,15 @@ function bindForms() {
         renderEmptyState(elements.automationRuns, "还没有自动化运行记录。");
         renderEmptyState(elements.artifactSummaryCards, "保存 key 后即可读取自动化摘要。");
         renderEmptyState(elements.artifactList, "保存 key 后即可读取自动化产物。");
+        renderEmptyState(elements.memoryList, "保存 key 后即可读取记忆。");
+        renderEmptyState(elements.tasksTodayList, "保存 key 后即可读取今日任务。");
+        renderEmptyState(elements.taskList, "保存 key 后即可读取全部任务。");
         updateLoadMoreButton(elements.loadMoreRecentButton, 1, 1);
         updateLoadMoreButton(elements.loadMoreSearchButton, 1, 1, "还没有结果");
         updateLoadMoreButton(elements.loadMoreAutomationRunsButton, 1, 1);
         updateLoadMoreButton(elements.loadMoreArtifactsButton, 1, 1);
+        updateLoadMoreButton(elements.loadMoreMemoriesButton, 1, 1);
+        updateLoadMoreButton(elements.loadMoreTasksButton, 1, 1);
         showToast("已清除本地 key");
     });
 
@@ -3173,6 +3575,65 @@ function bindForms() {
             showToast(error.message);
         }
     });
+
+    elements.memoryQuickForm.addEventListener("submit", handleMemoryQuickCreate);
+
+    elements.refreshMemoriesButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "正在刷新记忆");
+            await loadMemories({ reset: true });
+            const stats = await apiRequest("/memories/stats");
+            renderMemoryStats(stats);
+            setConnectionState("ready", "记忆已刷新");
+        } catch (error) {
+            setConnectionState("error", error.message);
+        }
+    });
+
+    elements.applyMemoryFilterButton.addEventListener("click", async () => {
+        try {
+            await loadMemories({ reset: true });
+        } catch (error) {
+            showToast(error.message);
+        }
+    });
+
+    elements.loadMoreMemoriesButton.addEventListener("click", async () => {
+        try {
+            await loadMemories();
+        } catch (error) {
+            showToast(error.message);
+        }
+    });
+
+    elements.taskQuickForm.addEventListener("submit", handleTaskQuickCreate);
+
+    elements.refreshTasksButton.addEventListener("click", async () => {
+        try {
+            setConnectionState("busy", "正在刷新任务");
+            await loadTasksToday();
+            await loadTasks({ reset: true });
+            setConnectionState("ready", "任务已刷新");
+        } catch (error) {
+            setConnectionState("error", error.message);
+        }
+    });
+
+    elements.applyTaskFilterButton.addEventListener("click", async () => {
+        try {
+            await loadTasks({ reset: true });
+        } catch (error) {
+            showToast(error.message);
+        }
+    });
+
+    elements.loadMoreTasksButton.addEventListener("click", async () => {
+        try {
+            await loadTasks();
+        } catch (error) {
+            showToast(error.message);
+        }
+    });
 }
 
 function bindViewer() {
@@ -3213,6 +3674,9 @@ function renderInitialEmptyStates() {
     renderEmptyState(elements.automationRuns, "还没有自动化运行记录。");
     renderEmptyState(elements.artifactSummaryCards, "保存 key 后即可读取自动化摘要。");
     renderEmptyState(elements.artifactList, "保存 key 后即可读取自动化产物。");
+    renderEmptyState(elements.memoryList, "保存 key 后即可读取记忆。");
+    renderEmptyState(elements.tasksTodayList, "保存 key 后即可读取今日任务。");
+    renderEmptyState(elements.taskList, "保存 key 后即可读取全部任务。");
     elements.overviewBacklogTotal.textContent = "待处理 0 条";
     elements.processingQueueTotal.textContent = "待处理 0 条";
     elements.processingQueueNextLabel.textContent = "保存 key 后即可查看下一条待处理记录。";
@@ -3220,6 +3684,8 @@ function renderInitialEmptyStates() {
     updateLoadMoreButton(elements.loadMoreSearchButton, 1, 1, "还没有结果");
     updateLoadMoreButton(elements.loadMoreAutomationRunsButton, 1, 1);
     updateLoadMoreButton(elements.loadMoreArtifactsButton, 1, 1);
+    updateLoadMoreButton(elements.loadMoreMemoriesButton, 1, 1);
+    updateLoadMoreButton(elements.loadMoreTasksButton, 1, 1);
 }
 
 function init() {

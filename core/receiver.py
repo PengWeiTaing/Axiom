@@ -72,6 +72,32 @@ ITEM_PROCESSING_OVERRIDE_LABELS = {
 }
 ITEM_TYPES = {ITEM_TYPE_TEXT, ITEM_TYPE_IMAGE, ITEM_TYPE_DOCUMENT, ITEM_TYPE_AUDIO}
 STORAGE_AREAS = {"inbox": INBOX_PATH, "archive": ARCHIVE_PATH}
+MEMORY_CATEGORIES = {"fact", "preference", "goal", "relationship", "event"}
+MEMORY_STATUSES = {"candidate", "confirmed", "archived"}
+MEMORY_CATEGORY_LABELS = {
+    "fact": "事实",
+    "preference": "偏好",
+    "goal": "目标",
+    "relationship": "人际关系",
+    "event": "事件",
+}
+MEMORY_STATUS_LABELS = {
+    "candidate": "待确认",
+    "confirmed": "已确认",
+    "archived": "已归档",
+}
+TASK_STATUSES = {"todo", "done", "cancelled"}
+TASK_PRIORITIES = {"high", "medium", "low"}
+TASK_STATUS_LABELS = {
+    "todo": "待办",
+    "done": "已完成",
+    "cancelled": "已取消",
+}
+TASK_PRIORITY_LABELS = {
+    "high": "高",
+    "medium": "中",
+    "low": "低",
+}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
 DOCUMENT_EXTENSIONS = {".pdf", ".doc", ".docx"}
 AUDIO_EXTENSIONS = {".aac", ".caf", ".flac", ".m4a", ".mp3", ".ogg", ".wav", ".webm"}
@@ -412,6 +438,55 @@ def init_db(db_path: Path = DB_PATH) -> None:
             CREATE INDEX IF NOT EXISTS idx_automation_runs_status
             ON automation_runs(status)
             """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS memories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL DEFAULT 'fact',
+                content TEXT NOT NULL,
+                detail TEXT,
+                status TEXT NOT NULL DEFAULT 'candidate',
+                source_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+                source_text TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                detail TEXT,
+                status TEXT NOT NULL DEFAULT 'todo',
+                priority TEXT NOT NULL DEFAULT 'medium',
+                memory_id INTEGER REFERENCES memories(id) ON DELETE SET NULL,
+                due_date TEXT,
+                completed_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date)"
         )
         conn.commit()
     finally:
@@ -1154,6 +1229,12 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def local_date_now() -> date:
+    offset_str = os.environ.get("AXIOM_LOCAL_UTC_OFFSET", "+08:00")
+    tz = timezone(timedelta(hours=int(offset_str[0:3]), minutes=int(offset_str[4:6])))
+    return datetime.now(tz).date()
+
+
 def isoformat_timestamp(timestamp: float) -> str:
     return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec="seconds")
 
@@ -1882,6 +1963,29 @@ def build_stats_payload() -> dict:
             WHERE file_path IS NOT NULL AND file_path != ''
             """
         ).fetchall()
+        memory_total = conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+        memory_candidate = conn.execute(
+            "SELECT COUNT(*) FROM memories WHERE status = 'candidate'"
+        ).fetchone()[0]
+        memory_confirmed = conn.execute(
+            "SELECT COUNT(*) FROM memories WHERE status = 'confirmed'"
+        ).fetchone()[0]
+        memory_category_rows = conn.execute(
+            """
+            SELECT category, COUNT(*) AS count
+            FROM memories
+            WHERE status = 'confirmed'
+            GROUP BY category
+            ORDER BY category
+            """
+        ).fetchall()
+        task_total = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+        task_todo = conn.execute(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'todo'"
+        ).fetchone()[0]
+        task_done = conn.execute(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'done'"
+        ).fetchone()[0]
     finally:
         conn.close()
 
@@ -1895,6 +1999,13 @@ def build_stats_payload() -> dict:
         "by_processing_state": rows_to_count_map(processing_rows, "processing_state"),
         "by_processing_override": rows_to_count_map(processing_override_rows, "processing_override"),
         "by_storage": count_storage_areas(storage_rows),
+        "memory_total": memory_total,
+        "memory_candidate": memory_candidate,
+        "memory_confirmed": memory_confirmed,
+        "memory_by_category": rows_to_count_map(memory_category_rows, "category"),
+        "task_total": task_total,
+        "task_todo": task_todo,
+        "task_done": task_done,
     }
 
 
@@ -2116,6 +2227,9 @@ def build_overview_text(payload: dict, preview_chars: int) -> str:
         f"- 待处理: {stats['by_processing_state'].get('pending', 0)}",
         f"- inbox: {stats['by_storage'].get('inbox', 0)}",
         f"- archive: {stats['by_storage'].get('archive', 0)}",
+        f"- 记忆: {stats.get('memory_confirmed', 0)} 已确认",
+        f"- 待确认记忆: {stats.get('memory_candidate', 0)}",
+        f"- 任务: {stats.get('task_todo', 0)} 待办 / {stats.get('task_done', 0)} 已完成",
         "",
         "最近记录",
     ]
@@ -3987,6 +4101,478 @@ def search_items():
             "items": [row_to_item(row, include_score=(sort == "relevance")) for row in rows],
         }
     )
+
+
+# ===== 任务路由 =====
+
+TASK_SELECT_FIELDS = """
+    id, title, detail, status, priority,
+    memory_id, due_date, completed_at, created_at, updated_at
+"""
+
+
+def row_to_task(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "detail": row["detail"],
+        "status": row["status"],
+        "status_label": TASK_STATUS_LABELS.get(row["status"], row["status"]),
+        "priority": row["priority"],
+        "priority_label": TASK_PRIORITY_LABELS.get(row["priority"], row["priority"]),
+        "memory_id": row["memory_id"],
+        "due_date": row["due_date"],
+        "completed_at": row["completed_at"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def read_task_filter_args() -> dict:
+    status = request.args.get("status", "").strip()
+    priority = request.args.get("priority", "").strip()
+    due_date = request.args.get("due_date", "").strip()
+    page = parse_positive_int(request.args.get("page"), "page", 1)
+    page_size = parse_positive_int(request.args.get("page_size"), "page_size", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+    return {"status": status, "priority": priority, "due_date": due_date, "page": page, "page_size": page_size}
+
+
+def build_task_filter_conditions(status: str, priority: str, due_date: str) -> tuple[list[str], list]:
+    conditions: list[str] = []
+    params: list = []
+    if status:
+        if status not in TASK_STATUSES:
+            raise ValueError(f"status 不支持: {status}")
+        conditions.append("status = ?")
+        params.append(status)
+    if priority:
+        if priority not in TASK_PRIORITIES:
+            raise ValueError(f"priority 不支持: {priority}")
+        conditions.append("priority = ?")
+        params.append(priority)
+    if due_date:
+        conditions.append("due_date = ?")
+        params.append(due_date)
+    return conditions, params
+
+
+@app.route("/tasks/today", methods=["GET"])
+def tasks_today():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    today_str = local_date_now().isoformat()
+    conn = get_db_connection()
+    try:
+        today_rows = conn.execute(
+            f"""
+            SELECT {TASK_SELECT_FIELDS} FROM tasks
+            WHERE (due_date = ? OR (status = 'todo' AND due_date IS NULL))
+            ORDER BY
+                CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 END,
+                created_at DESC
+            """,
+            (today_str,),
+        ).fetchall()
+
+        overdue_rows = conn.execute(
+            f"""
+            SELECT {TASK_SELECT_FIELDS} FROM tasks
+            WHERE status = 'todo' AND due_date IS NOT NULL AND due_date < ?
+            ORDER BY due_date ASC
+            LIMIT 20
+            """,
+            (today_str,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return ok_response({
+        "date": today_str,
+        "today": [row_to_task(r) for r in today_rows],
+        "overdue": [row_to_task(r) for r in overdue_rows],
+    })
+
+
+@app.route("/tasks", methods=["GET", "POST"])
+def tasks():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            title = str(body.get("title", "")).strip()
+            detail = str(body.get("detail", "")).strip() or None
+            priority = str(body.get("priority", "medium")).strip()
+            due_date = str(body.get("due_date", "")).strip() or None
+            memory_id = body.get("memory_id")
+
+            if not title:
+                return error_response(400, "missing_title", "title 不能为空")
+            if priority not in TASK_PRIORITIES:
+                return error_response(400, "invalid_priority", f"priority 不支持: {priority}")
+
+            now = utc_now().isoformat(timespec="seconds")
+            cursor = conn.execute(
+                "INSERT INTO tasks (title, detail, status, priority, memory_id, due_date, created_at, updated_at) VALUES (?, ?, 'todo', ?, ?, ?, ?, ?)",
+                (title, detail, priority, memory_id, due_date, now, now),
+            )
+            conn.commit()
+            task_id = cursor.lastrowid
+            row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            return ok_response({"task": row_to_task(row)}, 201)
+
+        filters = read_task_filter_args()
+        conditions, params = build_task_filter_conditions(filters["status"], filters["priority"], filters["due_date"])
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        count_row = conn.execute(f"SELECT COUNT(*) FROM tasks {where_clause}", params).fetchone()
+        total = count_row[0]
+        total_pages = max(1, (total + filters["page_size"] - 1) // filters["page_size"])
+        offset = (filters["page"] - 1) * filters["page_size"]
+        rows = conn.execute(
+            f"SELECT {TASK_SELECT_FIELDS} FROM tasks {where_clause} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params + [filters["page_size"], offset],
+        ).fetchall()
+
+        return ok_response({
+            "page": filters["page"],
+            "page_size": filters["page_size"],
+            "total": total,
+            "total_pages": total_pages,
+            "tasks": [row_to_task(r) for r in rows],
+        })
+    except ValueError as exc:
+        return error_response(400, "invalid_filter", str(exc))
+    finally:
+        conn.close()
+
+
+@app.route("/tasks/<int:task_id>", methods=["GET", "PUT", "DELETE"])
+def task_detail(task_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if row is None:
+            return error_response(404, "not_found", "任务不存在")
+
+        if request.method == "GET":
+            return ok_response({"task": row_to_task(row)})
+
+        if request.method == "DELETE":
+            conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+            conn.commit()
+            return ok_response({"deleted": task_id})
+
+        body = request.get_json(silent=True) or {}
+        title = str(body.get("title", row["title"])).strip()
+        detail = str(body.get("detail", row["detail"] or "")).strip() or None
+        priority = str(body.get("priority", row["priority"])).strip()
+        status = str(body.get("status", row["status"])).strip()
+
+        if not title:
+            return error_response(400, "missing_title", "title 不能为空")
+        if priority not in TASK_PRIORITIES:
+            return error_response(400, "invalid_priority", f"priority 不支持: {priority}")
+        if status not in TASK_STATUSES:
+            return error_response(400, "invalid_status", f"status 不支持: {status}")
+
+        completed_at = row["completed_at"]
+        if status == "done" and row["status"] != "done":
+            completed_at = utc_now().isoformat(timespec="seconds")
+        elif status != "done":
+            completed_at = None
+
+        now = utc_now().isoformat(timespec="seconds")
+        conn.execute(
+            "UPDATE tasks SET title = ?, detail = ?, status = ?, priority = ?, completed_at = ?, updated_at = ? WHERE id = ?",
+            (title, detail, status, priority, completed_at, now, task_id),
+        )
+        conn.commit()
+        row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return ok_response({"task": row_to_task(row)})
+    except ValueError as exc:
+        return error_response(400, "invalid_input", str(exc))
+    finally:
+        conn.close()
+
+
+def _set_task_status(task_id: int, status: str) -> tuple:
+    conn = get_db_connection()
+    try:
+        row = conn.execute("SELECT id, status FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if row is None:
+            return error_response(404, "not_found", "任务不存在"), None
+        now = utc_now().isoformat(timespec="seconds")
+        completed_at = now if status == "done" else None
+        conn.execute(
+            "UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?",
+            (status, completed_at, now, task_id),
+        )
+        conn.commit()
+        row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return None, row
+    finally:
+        conn.close()
+
+
+@app.route("/tasks/<int:task_id>/done", methods=["POST"])
+def task_done(task_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+    err, row = _set_task_status(task_id, "done")
+    if err:
+        return err
+    return ok_response({"task": row_to_task(row)})
+
+
+@app.route("/tasks/<int:task_id>/todo", methods=["POST"])
+def task_todo(task_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+    err, row = _set_task_status(task_id, "todo")
+    if err:
+        return err
+    return ok_response({"task": row_to_task(row)})
+
+
+@app.route("/tasks/<int:task_id>/cancel", methods=["POST"])
+def task_cancel(task_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+    err, row = _set_task_status(task_id, "cancelled")
+    if err:
+        return err
+    return ok_response({"task": row_to_task(row)})
+
+
+# ===== 记忆路由 =====
+
+
+def row_to_memory(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "category": row["category"],
+        "category_label": MEMORY_CATEGORY_LABELS.get(row["category"], row["category"]),
+        "content": row["content"],
+        "detail": row["detail"],
+        "status": row["status"],
+        "status_label": MEMORY_STATUS_LABELS.get(row["status"], row["status"]),
+        "source_item_id": row["source_item_id"],
+        "source_text": row["source_text"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def read_memory_filter_args() -> dict:
+    category = request.args.get("category", "").strip()
+    status = request.args.get("status", "").strip()
+    page = parse_positive_int(request.args.get("page"), "page", 1)
+    page_size = parse_positive_int(request.args.get("page_size"), "page_size", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+    return {"category": category, "status": status, "page": page, "page_size": page_size}
+
+
+def build_memory_filter_conditions(category: str, status: str) -> tuple[list[str], list]:
+    conditions: list[str] = []
+    params: list = []
+    if category:
+        if category not in MEMORY_CATEGORIES:
+            raise ValueError(f"category 不支持: {category}")
+        conditions.append("category = ?")
+        params.append(category)
+    if status:
+        if status not in MEMORY_STATUSES:
+            raise ValueError(f"status 不支持: {status}")
+        conditions.append("status = ?")
+        params.append(status)
+    return conditions, params
+
+
+@app.route("/memories/stats", methods=["GET"])
+def memory_stats():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        total = conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+        category_rows = conn.execute(
+            "SELECT category, status, COUNT(*) AS count FROM memories GROUP BY category, status ORDER BY category, status"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    by_category: dict[str, dict] = {}
+    for row in category_rows:
+        entry = by_category.setdefault(row["category"], {"total": 0, "confirmed": 0, "candidate": 0, "archived": 0})
+        entry[row["status"]] = row["count"]
+        entry["total"] += row["count"]
+
+    return ok_response({
+        "total": total,
+        "by_category": {
+            cat: {
+                "label": MEMORY_CATEGORY_LABELS.get(cat, cat),
+                **counts,
+            }
+            for cat, counts in by_category.items()
+        },
+    })
+
+
+@app.route("/memories", methods=["GET", "POST"])
+def memories():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            category = str(body.get("category", "fact")).strip()
+            content = str(body.get("content", "")).strip()
+            detail = str(body.get("detail", "")).strip() or None
+            source_item_id = body.get("source_item_id")
+            source_text = str(body.get("source_text", "")).strip() or None
+
+            if category not in MEMORY_CATEGORIES:
+                return error_response(400, "invalid_category", f"category 不支持: {category}")
+            if not content:
+                return error_response(400, "missing_content", "content 不能为空")
+
+            now = utc_now().isoformat(timespec="seconds")
+            cursor = conn.execute(
+                "INSERT INTO memories (category, content, detail, status, source_item_id, source_text, created_at, updated_at) VALUES (?, ?, ?, 'candidate', ?, ?, ?, ?)",
+                (category, content, detail, source_item_id, source_text, now, now),
+            )
+            conn.commit()
+            memory_id = cursor.lastrowid
+            row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
+            return ok_response({"memory": row_to_memory(row)}, 201)
+
+        filters = read_memory_filter_args()
+        conditions, params = build_memory_filter_conditions(filters["category"], filters["status"])
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        count_row = conn.execute(f"SELECT COUNT(*) FROM memories {where_clause}", params).fetchone()
+        total = count_row[0]
+        total_pages = max(1, (total + filters["page_size"] - 1) // filters["page_size"])
+        offset = (filters["page"] - 1) * filters["page_size"]
+        rows = conn.execute(
+            f"SELECT {MEMORY_SELECT_FIELDS} FROM memories {where_clause} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params + [filters["page_size"], offset],
+        ).fetchall()
+
+        return ok_response({
+            "page": filters["page"],
+            "page_size": filters["page_size"],
+            "total": total,
+            "total_pages": total_pages,
+            "memories": [row_to_memory(row) for row in rows],
+        })
+    except ValueError as exc:
+        return error_response(400, "invalid_filter", str(exc))
+    finally:
+        conn.close()
+
+
+@app.route("/memories/<int:memory_id>", methods=["GET", "PUT", "DELETE"])
+def memory_detail(memory_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        if row is None:
+            return error_response(404, "not_found", "记忆不存在")
+
+        if request.method == "GET":
+            return ok_response({"memory": row_to_memory(row)})
+
+        if request.method == "DELETE":
+            conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+            conn.commit()
+            return ok_response({"deleted": memory_id})
+
+        body = request.get_json(silent=True) or {}
+        category = str(body.get("category", row["category"])).strip()
+        content = str(body.get("content", row["content"])).strip()
+        detail = str(body.get("detail", row["detail"] or "")).strip() or None
+        status = str(body.get("status", row["status"])).strip()
+
+        if category not in MEMORY_CATEGORIES:
+            return error_response(400, "invalid_category", f"category 不支持: {category}")
+        if not content:
+            return error_response(400, "missing_content", "content 不能为空")
+        if status not in MEMORY_STATUSES:
+            return error_response(400, "invalid_status", f"status 不支持: {status}")
+
+        now = utc_now().isoformat(timespec="seconds")
+        conn.execute(
+            "UPDATE memories SET category = ?, content = ?, detail = ?, status = ?, updated_at = ? WHERE id = ?",
+            (category, content, detail, status, now, memory_id),
+        )
+        conn.commit()
+        row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        return ok_response({"memory": row_to_memory(row)})
+    except ValueError as exc:
+        return error_response(400, "invalid_input", str(exc))
+    finally:
+        conn.close()
+
+
+@app.route("/memories/<int:memory_id>/confirm", methods=["POST"])
+def confirm_memory(memory_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute("SELECT id FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        if row is None:
+            return error_response(404, "not_found", "记忆不存在")
+        now = utc_now().isoformat(timespec="seconds")
+        conn.execute("UPDATE memories SET status = 'confirmed', updated_at = ? WHERE id = ?", (now, memory_id))
+        conn.commit()
+        row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        return ok_response({"memory": row_to_memory(row)})
+    finally:
+        conn.close()
+
+
+@app.route("/memories/<int:memory_id>/archive", methods=["POST"])
+def archive_memory(memory_id: int):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute("SELECT id FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        if row is None:
+            return error_response(404, "not_found", "记忆不存在")
+        now = utc_now().isoformat(timespec="seconds")
+        conn.execute("UPDATE memories SET status = 'archived', updated_at = ? WHERE id = ?", (now, memory_id))
+        conn.commit()
+        row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        return ok_response({"memory": row_to_memory(row)})
+    finally:
+        conn.close()
 
 
 # ===== 错误处理 =====

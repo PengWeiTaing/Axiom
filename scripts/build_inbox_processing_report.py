@@ -76,6 +76,23 @@ def is_weak_image_description(content: str) -> bool:
     return any(pattern.fullmatch(text) for pattern in DATETIME_LIKE_PATTERNS)
 
 
+MEMORY_HINT_PATTERNS = [
+    (["我决定", "我计划", "我打算"], "可能包含决定或计划，可提取为记忆"),
+    (["我偏好", "我更喜欢", "我习惯", "我讨厌"], "可能包含偏好信息，可提取为记忆"),
+    (["我的目标是", "我想达成", "我希望"], "可能包含个人目标，可提取为记忆"),
+    (["我认识了", "我见过了", "我和.*聊"], "可能包含人际关系信息，可提取为记忆"),
+]
+
+
+def check_memory_hints(text: str) -> list[str]:
+    """检测内容中是否包含可提取为记忆的信号。"""
+    hints = []
+    for keywords, hint in MEMORY_HINT_PATTERNS:
+        if any(kw in text for kw in keywords):
+            hints.append(hint)
+    return hints
+
+
 def decide_action(
     item_type: str,
     content: str,
@@ -130,6 +147,9 @@ def build_processing_items(args: argparse.Namespace, rows: list) -> list[Process
             age_days,
             args.stale_days,
         )
+        memory_hints = check_memory_hints(effective_text)
+        if memory_hints:
+            reasons.extend(memory_hints)
 
         resolved_path = export_tools.resolve_file_path(
             args.root,

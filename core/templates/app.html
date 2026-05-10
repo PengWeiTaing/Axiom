@@ -35,6 +35,8 @@
         <nav class="quick-nav panel" aria-label="页面导航">
             <button type="button" data-scroll-target="capture-panel">记录</button>
             <button type="button" data-scroll-target="overview-panel">总览</button>
+            <button type="button" data-scroll-target="tasks-panel">任务</button>
+            <button type="button" data-scroll-target="memories-panel">记忆</button>
             <button type="button" data-scroll-target="processing-panel">处理</button>
             <button type="button" data-scroll-target="recent-panel">浏览</button>
             <button type="button" data-scroll-target="search-panel">搜索</button>
@@ -163,6 +165,132 @@
                         </div>
                         <div id="overview-artifact-highlights" class="stack-list"></div>
                     </div>
+                </div>
+            </section>
+
+            <section class="panel tasks-panel" id="tasks-panel">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">Tasks</p>
+                        <h2>任务</h2>
+                    </div>
+                    <button class="secondary-button" id="refresh-tasks-button" type="button">刷新</button>
+                </div>
+
+                <div id="tasks-today-container">
+                    <div class="section-head section-head-compact">
+                        <div><p class="eyebrow">今日任务</p></div>
+                    </div>
+                    <div id="tasks-today-list" class="item-grid"></div>
+                    <div id="tasks-overdue-list" class="item-grid"></div>
+                </div>
+
+                <form id="task-quick-form" class="stack-form">
+                    <label class="field">
+                        <span>新任务</span>
+                        <input id="task-quick-title" type="text" placeholder="要做什么？" autocomplete="off">
+                    </label>
+                    <div class="field-row">
+                        <label class="field">
+                            <span>优先级</span>
+                            <select id="task-quick-priority">
+                                <option value="high">高</option>
+                                <option value="medium" selected>中</option>
+                                <option value="low">低</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>截止日期（可选）</span>
+                            <input id="task-quick-due-date" type="date">
+                        </label>
+                        <button class="primary-button" type="submit">添加</button>
+                    </div>
+                    <label class="field">
+                        <span>详情（可选）</span>
+                        <input id="task-quick-detail" type="text" placeholder="补充说明…" autocomplete="off">
+                    </label>
+                </form>
+                <p class="feedback-text" id="task-quick-feedback"></p>
+
+                <div class="section-head section-head-compact">
+                    <div><p class="eyebrow">全部任务</p></div>
+                    <div class="filter-row">
+                        <select id="task-filter-status">
+                            <option value="">全部状态</option>
+                            <option value="todo">待办</option>
+                            <option value="done">已完成</option>
+                            <option value="cancelled">已取消</option>
+                        </select>
+                        <button class="secondary-button" id="apply-task-filter-button" type="button">筛选</button>
+                    </div>
+                </div>
+                <div id="task-list" class="item-grid"></div>
+                <div class="load-more-row">
+                    <button class="secondary-button" id="load-more-tasks-button" type="button">加载更多</button>
+                </div>
+            </section>
+
+            <section class="panel memories-panel" id="memories-panel">
+                <div class="section-head">
+                    <div>
+                        <p class="eyebrow">Memory</p>
+                        <h2>记忆</h2>
+                    </div>
+                    <button class="secondary-button" id="refresh-memories-button" type="button">刷新</button>
+                </div>
+
+                <div id="memory-stats" class="stats-mini-grid"></div>
+
+                <form id="memory-quick-form" class="stack-form">
+                    <div class="field-row">
+                        <label class="field">
+                            <span>分类</span>
+                            <select id="memory-quick-category">
+                                <option value="fact">事实</option>
+                                <option value="preference">偏好</option>
+                                <option value="goal">目标</option>
+                                <option value="relationship">人际关系</option>
+                                <option value="event">事件</option>
+                            </select>
+                        </label>
+                        <button class="primary-button" type="submit">添加记忆</button>
+                    </div>
+                    <label class="field">
+                        <span>内容</span>
+                        <input id="memory-quick-content" type="text" placeholder="写下一段关于你自己的信息…" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span>详细说明（可选）</span>
+                        <input id="memory-quick-detail" type="text" placeholder="补充上下文…" autocomplete="off">
+                    </label>
+                </form>
+                <p class="feedback-text" id="memory-quick-feedback"></p>
+
+                <div class="section-head section-head-compact">
+                    <div>
+                        <p class="eyebrow">浏览记忆</p>
+                    </div>
+                    <div class="filter-row">
+                        <select id="memory-filter-category">
+                            <option value="">全部分类</option>
+                            <option value="fact">事实</option>
+                            <option value="preference">偏好</option>
+                            <option value="goal">目标</option>
+                            <option value="relationship">人际关系</option>
+                            <option value="event">事件</option>
+                        </select>
+                        <select id="memory-filter-status">
+                            <option value="">全部状态</option>
+                            <option value="candidate">待确认</option>
+                            <option value="confirmed">已确认</option>
+                            <option value="archived">已归档</option>
+                        </select>
+                        <button class="secondary-button" id="apply-memory-filter-button" type="button">筛选</button>
+                    </div>
+                </div>
+                <div id="memory-list" class="item-grid"></div>
+                <div class="load-more-row">
+                    <button class="secondary-button" id="load-more-memories-button" type="button">加载更多</button>
                 </div>
             </section>
 
@@ -464,6 +592,8 @@
         <div class="bottom-bar">
             <button type="button" data-scroll-target="capture-panel">记录</button>
             <button type="button" data-scroll-target="overview-panel">总览</button>
+            <button type="button" data-scroll-target="tasks-panel">任务</button>
+            <button type="button" data-scroll-target="memories-panel">记忆</button>
             <button type="button" data-scroll-target="processing-panel">处理</button>
             <button type="button" data-scroll-target="recent-panel">浏览</button>
             <button type="button" data-scroll-target="search-panel">搜索</button>
