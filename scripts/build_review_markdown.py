@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 import sys
 from collections import Counter
@@ -438,6 +439,61 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+def generate_ai_analysis(
+    rows: list,
+    memory_rows: list | None,
+    task_summary: dict | None,
+    window_name: str,
+) -> str | None:
+    """调用 AI 生成回顾分析。"""
+    api_key = os.environ.get("AXIOM_DEEPSEEK_API_KEY", "") or os.environ.get("AXIOM_OPENAI_API_KEY", "")
+    if not api_key:
+        return None
+
+    model = os.environ.get("AXIOM_DEEPSEEK_MODEL", "deepseek-chat")
+    base_url = os.environ.get("AXIOM_DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+
+    type_counter = Counter(r["type"] or "unknown" for r in rows)
+    day_count = len(set((r["created_at"] or "")[:10] for r in rows))
+
+    lines = [
+        f"你是一个个人数据助手。以下是用户的{window_name}数据摘要，请用 3-5 句话做回顾分析：",
+        "",
+        f"总条目: {len(rows)}，覆盖 {day_count} 天",
+        f"类型分布: {dict(type_counter)}",
+    ]
+
+    if task_summary:
+        lines.append(f"本周完成任务: {task_summary.get('done', 0)}，当前待办: {task_summary.get('todo', 0)}")
+
+    if memory_rows:
+        confirmed = [r for r in memory_rows if r["status"] == "confirmed"]
+        if confirmed:
+            lines.append(f"新增记忆: {len(confirmed)} 条")
+
+    lines.extend([
+        "",
+        "分析要点：主要活动和主题、进度趋势、待关注的事。",
+        "用温暖简洁的中文，不需要标题和问候。",
+    ])
+
+    prompt = "\n".join(lines)
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key, base_url=base_url)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.7,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as exc:
+        print(f"AI analysis failed: {exc}", file=sys.stderr)
+        return None
+
+
 def main() -> int:
     try:
         args = parse_args()
@@ -447,6 +503,17 @@ def main() -> int:
         candidate_rows = fetch_candidate_memories(args.root)
         task_summary = fetch_task_summary(args.root, args.created_from, args.created_to)
         markdown = build_markdown(args, args.start_local, args.end_local, rows, memory_rows, candidate_rows, task_summary)
+        ai_analysis = generate_ai_analysis(rows, memory_rows, task_summary, WINDOW_NAMES[args.window])
+        if ai_analysis:
+            lines = markdown.split("\n")
+            # Insert AI analysis after the first "# Axiom ..." title line
+            idx = 1
+            for i, line in enumerate(lines):
+                if line.startswith("# Axiom "):
+                    idx = i + 2  # after title + blank line
+                    break
+            ai_block = ["## AI 分析", "", ai_analysis, ""]
+            markdown = "\n".join(lines[:idx] + ai_block + lines[idx:])
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
