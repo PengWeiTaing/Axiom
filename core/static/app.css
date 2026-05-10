@@ -95,8 +95,8 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 .desktop-sidebar {
     display: none;
     position: fixed;
-    left: max(20px, calc((100vw - var(--content-max)) / 2 - var(--sidebar-width) - 32px));
-    top: 32px;
+    left: 20px;
+    top: 24px;
     width: var(--sidebar-width);
     flex-direction: column;
     gap: 2px;
@@ -107,8 +107,52 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    max-height: calc(100vh - 64px);
+    max-height: calc(100vh - 48px);
     overflow-y: auto;
+}
+
+/* ===== Content Area ===== */
+.content-area {
+    padding: 28px 0 calc(var(--nav-height) + 24px);
+}
+
+/* ===== Responsive: Desktop ===== */
+@media (min-width: 768px) {
+    .desktop-sidebar { display: flex; }
+
+    .app-shell {
+        margin-left: calc(var(--sidebar-width) + 48px);
+        margin-right: 20px;
+    }
+
+    .bottom-bar { display: none; }
+
+    .quick-nav { display: none; }
+
+    .content-area { padding-top: 24px; padding-bottom: 32px; }
+
+    .layout > .panel { display: none; }
+    .layout > .panel.active { display: block; }
+
+    .panel { margin-bottom: 18px; }
+
+    .stats-mini-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+}
+
+/* ===== Responsive: Large Desktop ===== */
+@media (min-width: 1200px) {
+    .app-shell {
+        margin-left: calc(var(--sidebar-width) + 64px);
+        margin-right: auto;
+    }
+
+    .desktop-sidebar {
+        left: max(24px, calc((100vw - var(--content-max) - var(--sidebar-width) - 100px) / 2));
+    }
+
+    .content-area { padding-top: 40px; }
 }
 
 .desktop-sidebar button {
@@ -171,12 +215,6 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 .panel {
     padding: 24px;
     margin-bottom: 14px;
-}
-
-/* Desktop: hide all panels by default, show active */
-@media (min-width: 768px) {
-    .layout > .panel { display: none; }
-    .layout > .panel.active { display: block; }
 }
 
 .subpanel {
@@ -541,30 +579,3 @@ button { font-family: inherit; cursor: pointer; transition: all var(--ease); }
 
 /* ===== Hidden ===== */
 .hidden { display: none !important; }
-
-/* ===== Responsive: Desktop ===== */
-@media (min-width: 768px) {
-    .desktop-sidebar { display: flex; }
-
-    .app-shell {
-        margin-left: calc(var(--sidebar-width) + 32px);
-        margin-right: auto;
-    }
-
-    .bottom-bar { display: none; }
-
-    .quick-nav { display: none; }
-
-    .panel {
-        margin-bottom: 18px;
-    }
-
-    .stats-mini-grid {
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    }
-}
-
-/* ===== Responsive: Large Desktop ===== */
-@media (min-width: 1024px) {
-    .content-area { padding-top: 40px; }
-}
