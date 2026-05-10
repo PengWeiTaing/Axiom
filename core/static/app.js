@@ -432,7 +432,11 @@ function setFeedback(element, message, tone = "muted") {
 function setConnectionState(status, message) {
     elements.connectionIndicator.dataset.state = status;
     elements.connectionIndicator.className = "conn-dot " + status;
-    elements.connectionBar.style.display = state.key ? "flex" : "none";
+    if (state.key) {
+        elements.connectionBar.classList.add("visible");
+    } else {
+        elements.connectionBar.classList.remove("visible");
+    }
 
     if (message) {
         elements.lastSyncIndicator.textContent = message;
@@ -3626,7 +3630,7 @@ function bindForms() {
     elements.clearKeyButton.addEventListener("click", () => {
         saveKey("");
         elements.keyInput.value = "";
-        elements.connectionBar.style.display = "none";
+        elements.connectionBar.classList.remove("visible");
         state.recent = { page: 1, totalPages: 1, items: [], total: 0 };
         state.search = { page: 1, totalPages: 1, items: [], active: false, total: 0 };
         state.artifacts = { page: 1, totalPages: 1, items: [] };
@@ -4125,28 +4129,34 @@ function init() {
 
     if (state.key) {
         setFeedback(elements.keyFeedback, "已读取浏览器中的本地 key。", "ok");
-        elements.connectionBar.style.display = "flex";
+        elements.connectionBar.classList.add("visible");
         void syncDashboard();
         void initModules();
     } else {
         setConnectionState("idle", "尚未同步");
     }
 
-    // Desktop: show only overview panel initially, hide others
+    // Desktop: show only overview panel initially
     if (window.innerWidth >= 768) {
         document.querySelectorAll(".layout > .panel").forEach(p => {
-            if (p.id !== "setup-panel" && p.id !== "overview-panel") {
-                p.style.display = "none";
-            }
+            p.style.display = p.id === "overview-panel" ? "" : "none";
         });
     }
 
     window.addEventListener("beforeunload", releaseAllObjectUrls);
     window.addEventListener("resize", () => {
         const isDesktop = window.innerWidth >= 768;
-        document.querySelectorAll(".layout > .panel").forEach(p => {
-            p.style.display = isDesktop && p.id !== "overview-panel" && p.id !== "setup-panel" ? "none" : "";
-        });
+        if (isDesktop) {
+            const activeBtn = document.querySelector("#desktop-sidebar button.active");
+            const activePanel = activeBtn?.getAttribute("data-panel");
+            document.querySelectorAll(".layout > .panel").forEach(p => {
+                p.style.display = p.id === activePanel ? "" : "none";
+            });
+        } else {
+            document.querySelectorAll(".layout > .panel").forEach(p => {
+                p.style.display = "";
+            });
+        }
     });
 }
 

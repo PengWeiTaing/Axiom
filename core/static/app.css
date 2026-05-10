@@ -95,13 +95,20 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 .desktop-sidebar {
     display: none;
     position: fixed;
-    left: max(16px, calc((100vw - var(--content-max)) / 2 - var(--sidebar-width) - 24px));
-    top: 50%;
-    transform: translateY(-50%);
+    left: max(20px, calc((100vw - var(--content-max)) / 2 - var(--sidebar-width) - 32px));
+    top: 32px;
     width: var(--sidebar-width);
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     z-index: 10;
+    padding: 20px 12px;
+    border-radius: var(--radius-xl);
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
 }
 
 .desktop-sidebar button {
@@ -128,6 +135,7 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
     background: var(--glass-strong);
     color: var(--bloom-cyan);
     font-weight: 500;
+    box-shadow: inset 2px 0 0 var(--bloom-cyan);
 }
 
 .desktop-sidebar .sidebar-brand {
@@ -423,7 +431,11 @@ button { font-family: inherit; cursor: pointer; transition: all var(--ease); }
     border: 1px solid var(--glass-border);
     font-size: 0.75rem;
     color: var(--ink-soft);
+    opacity: 0;
+    transition: opacity var(--ease);
 }
+
+.connection-bar.visible { opacity: 1; }
 
 .conn-dot {
     width: 7px; height: 7px;
