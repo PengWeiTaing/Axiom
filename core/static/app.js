@@ -6,6 +6,14 @@ const SEARCH_PAGE_SIZE = 9;
 const ARTIFACT_PAGE_SIZE = 12;
 const AUTOMATION_RUN_PAGE_SIZE = 8;
 
+const registeredModules = new Map();
+
+window.axiom = {
+    registerModule(def) {
+        registeredModules.set(def.name, def);
+    },
+};
+
 const state = {
     key: "",
     recent: {
@@ -2732,6 +2740,12 @@ async function syncDashboard({ showMessage = false } = {}) {
         setConnectionState("error", error.message);
         showToast(error.message);
     }
+
+    for (const [, modDef] of registeredModules) {
+        if (modDef.onSync) {
+            try { await modDef.onSync(); } catch (e) { console.warn(modDef.name, e); }
+        }
+    }
 }
 
 async function handleTextCaptureSubmit(event) {
@@ -3688,6 +3702,67 @@ function renderInitialEmptyStates() {
     updateLoadMoreButton(elements.loadMoreTasksButton, 1, 1);
 }
 
+async function initModules() {
+    try {
+        const payload = await apiRequest("/modules");
+        const modules = payload.modules || [];
+        if (modules.length === 0) return;
+
+        const navContainer = document.querySelector(".quick-nav");
+        const bottomBar = document.querySelector(".bottom-bar");
+        const panelsContainer = document.getElementById("module-panels");
+
+        for (const mod of modules) {
+            const navId = `module-panel-${mod.name}`;
+            const label = mod.nav_item?.label || mod.label;
+
+            if (navContainer) {
+                navContainer.insertAdjacentHTML("beforeend",
+                    `<button type="button" data-scroll-target="${navId}">${escapeHtml(label)}</button>`);
+            }
+            if (bottomBar) {
+                bottomBar.insertAdjacentHTML("beforeend",
+                    `<button type="button" data-scroll-target="${navId}">${escapeHtml(label)}</button>`);
+            }
+
+            if (mod.scripts) {
+                for (const scriptUrl of mod.scripts) {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement("script");
+                        script.type = "module";
+                        script.src = scriptUrl;
+                        script.onload = resolve;
+                        script.onerror = () => { console.warn("Module script load failed:", scriptUrl); resolve(); };
+                        document.head.appendChild(script);
+                    });
+                }
+            }
+
+            const modDef = registeredModules.get(mod.name);
+            const panelHtml = modDef?.panelHtml || `<p>${escapeHtml(label)} 模块加载中…</p>`;
+            if (panelsContainer) {
+                panelsContainer.insertAdjacentHTML("beforeend", `
+                    <section class="panel module-panel" id="${navId}">
+                        <div class="section-head">
+                            <div>
+                                <p class="eyebrow">Module</p>
+                                <h2>${escapeHtml(label)}</h2>
+                            </div>
+                        </div>
+                        ${panelHtml}
+                    </section>
+                `);
+            }
+
+            if (modDef?.onInit) {
+                try { await modDef.onInit(); } catch (e) { console.warn(mod.name, e); }
+            }
+        }
+    } catch (error) {
+        console.warn("Module init failed:", error.message);
+    }
+}
+
 function init() {
     bindScrollButtons();
     bindForms();
@@ -3700,6 +3775,7 @@ function init() {
     if (state.key) {
         setFeedback(elements.keyFeedback, "已读取浏览器中的本地 key。", "ok");
         void syncDashboard();
+        void initModules();
     } else {
         setConnectionState("idle", "尚未同步");
     }

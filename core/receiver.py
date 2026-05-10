@@ -4590,6 +4590,60 @@ def handle_unexpected_exception(exc: Exception):
 
 init_app_storage()
 
+# ===== 模块加载 =====
+AXIOM_MODULES: list = []
+
+
+def init_modules(app):
+    global AXIOM_MODULES, AUTOMATION_JOBS
+    from modules.registry import discover_modules, get_module_dir
+    from modules.prompt_loader import PromptLoader
+
+    prompt_loader = PromptLoader()
+
+    for mod in discover_modules():
+        AXIOM_MODULES.append(mod)
+
+        for table_name, create_sql in mod.get_db_tables().items():
+            conn = get_db_connection()
+            try:
+                conn.execute(create_sql)
+                conn.commit()
+            finally:
+                conn.close()
+
+        bp = mod.get_blueprint()
+        if bp:
+            app.register_blueprint(bp)
+
+        jobs = mod.get_automation_jobs()
+        if jobs:
+            AUTOMATION_JOBS.update(jobs)
+
+        mod_dir = get_module_dir(mod.name)
+        if mod_dir:
+            prompt_loader.register_module(mod_dir)
+
+        logger.info("Module loaded: %s (%s)", mod.name, mod.label)
+
+    app.config["AXIOM_PROMPT_LOADER"] = prompt_loader
+
+
+@app.route("/modules", methods=["GET"])
+def list_modules():
+    return ok_response({
+        "modules": [
+            {
+                "name": m.name,
+                "label": m.label,
+                "description": m.description,
+                "nav_item": m.get_nav_item(),
+                **m.get_frontend_metadata(),
+            }
+            for m in AXIOM_MODULES
+        ]
+    })
+
 
 if __name__ == "__main__":
     host = os.environ.get("AXIOM_HOST", "0.0.0.0")
