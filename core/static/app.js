@@ -3691,6 +3691,13 @@ const PANEL_GROUPS = {
     "chat-panel": ["chat-panel"],
 };
 
+// Module panels are injected outside .layout, need separate handling
+function getModulePanelIds() {
+    const container = document.getElementById("module-panels");
+    if (!container) return [];
+    return Array.from(container.querySelectorAll(".panel")).map(p => p.id);
+}
+
 function bindSidebarTabs() {
     const sidebar = document.getElementById("desktop-sidebar");
     if (!sidebar) return;
@@ -3702,6 +3709,14 @@ function bindSidebarTabs() {
             document.querySelectorAll(".layout > .panel").forEach(p => {
                 p.classList.toggle("active", group.includes(p.id));
             });
+            // Module panels: show if the panelId matches a module
+            const moduleIds = getModulePanelIds();
+            const moduleContainer = document.getElementById("module-panels");
+            if (moduleContainer) {
+                moduleContainer.querySelectorAll(".panel").forEach(p => {
+                    p.classList.toggle("active", p.id === panelId || group.includes(p.id));
+                });
+            }
             // Mobile: scroll to the first panel in group
             if (window.innerWidth < 768) {
                 const target = document.getElementById(group[0]);

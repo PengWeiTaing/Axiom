@@ -147,6 +147,8 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 
     .layout > .panel { display: none; }
     .layout > .panel.active { display: block; }
+    #module-panels .panel { display: none; }
+    #module-panels .panel.active { display: block; }
 
     .panel { margin-bottom: 18px; }
 
