@@ -4544,6 +4544,8 @@ def row_to_memory(row: sqlite3.Row) -> dict:
         "source_text": row["source_text"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
+        "linked_tasks": [],
+        "task_progress": None,
     }
 
 
@@ -4648,12 +4650,33 @@ def memories():
             params + [filters["page_size"], offset],
         ).fetchall()
 
+        goal_ids = [r["id"] for r in rows if r["category"] == "goal"]
+        task_counts = {}
+        if goal_ids:
+            placeholders = ",".join("?" for _ in goal_ids)
+            task_rows = conn.execute(
+                f"SELECT memory_id, status, COUNT(*) as cnt FROM tasks WHERE memory_id IN ({placeholders}) GROUP BY memory_id, status",
+                goal_ids,
+            ).fetchall()
+            for tr in task_rows:
+                entry = task_counts.setdefault(tr["memory_id"], {"done": 0, "total": 0})
+                entry["total"] += tr["cnt"]
+                if tr["status"] == "done":
+                    entry["done"] = tr["cnt"]
+
+        memories_list = []
+        for row in rows:
+            m = row_to_memory(row)
+            if row["category"] == "goal" and row["id"] in task_counts:
+                m["task_progress"] = task_counts[row["id"]]
+            memories_list.append(m)
+
         return ok_response({
             "page": filters["page"],
             "page_size": filters["page_size"],
             "total": total,
             "total_pages": total_pages,
-            "memories": [row_to_memory(row) for row in rows],
+            "memories": memories_list,
         })
     except ValueError as exc:
         return error_response(400, "invalid_filter", str(exc))
@@ -4674,7 +4697,16 @@ def memory_detail(memory_id: int):
             return error_response(404, "not_found", "记忆不存在")
 
         if request.method == "GET":
-            return ok_response({"memory": row_to_memory(row)})
+            linked_tasks = conn.execute(
+                "SELECT id, title, status, priority FROM tasks WHERE memory_id = ? ORDER BY created_at DESC LIMIT 20",
+                (memory_id,),
+            ).fetchall()
+            memory = row_to_memory(row)
+            memory["linked_tasks"] = [dict(t) for t in linked_tasks]
+            if linked_tasks:
+                done = sum(1 for t in linked_tasks if t["status"] == "done")
+                memory["task_progress"] = {"done": done, "total": len(linked_tasks)}
+            return ok_response({"memory": memory})
 
         if request.method == "DELETE":
             conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))

@@ -2483,6 +2483,16 @@ function renderMemoryCards(data) {
             ? `<button type="button" class="text-button" data-action="view-item" data-item-id="${mem.source_item_id}">来源 #${mem.source_item_id}</button>`
             : "";
         const detailHtml = mem.detail ? `<p class="item-meta">${escapeHtml(mem.detail)}</p>` : "";
+
+        // Task progress for goal memories
+        let progressHtml = "";
+        if (mem.category === "goal" && mem.task_progress && mem.task_progress.total > 0) {
+            const pct = Math.round((mem.task_progress.done / mem.task_progress.total) * 100);
+            progressHtml = `<div style="margin:6px 0;background:var(--glass-border);border-radius:4px;height:4px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:var(--bloom-cyan);transition:width 300ms"></div>
+            </div>
+            <p class="item-meta">任务进度 ${mem.task_progress.done}/${mem.task_progress.total} · ${pct}%</p>`;
+        }
         const actions = [];
         if (mem.status === "candidate") {
             actions.push(`<button type="button" class="text-button" data-action="confirm-memory" data-memory-id="${mem.id}">确认</button>`);
@@ -2500,6 +2510,7 @@ function renderMemoryCards(data) {
                     </div>
                     <p class="item-card-text">${escapeHtml(mem.content)}</p>
                     ${detailHtml}
+                    ${progressHtml}
                     <p class="item-meta">${formatDateTime(mem.created_at)}${sourceLink ? " · " + sourceLink : ""}</p>
                 </div>
                 <div class="item-card-actions">${actions.join("")}</div>
