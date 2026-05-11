@@ -2915,6 +2915,25 @@ async function loadAiReview() {
     }
 }
 
+async function loadAlerts() {
+    try {
+        const payload = await apiRequest("/alerts");
+        const alerts = payload.alerts || [];
+        const container = document.getElementById("overview-alerts");
+        if (!container) return;
+        if (alerts.length === 0) {
+            container.innerHTML = "";
+            return;
+        }
+        const kindColors = { no_records: "var(--bloom-amber)", overdue_tasks: "var(--error)", stale_memories: "var(--warn)", pending_decisions: "var(--bloom-blue)", empty: "var(--bloom-cyan)" };
+        container.innerHTML = alerts.map(a => `
+            <div class="alert-item" style="border-left:3px solid ${kindColors[a.kind] || 'var(--ink-dim)'};padding:6px 10px;margin:4px 0;background:var(--glass);border-radius:0 var(--radius-sm) var(--radius-sm) 0">
+                <p class="item-meta" style="margin:0">${escapeHtml(a.message)}</p>
+            </div>
+        `).join("");
+    } catch (e) { /* noop */ }
+}
+
 async function loadSuggestions() {
     try {
         const payload = await apiRequest("/suggestions");
@@ -3057,6 +3076,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadTasksToday();
         await loadTasks({ reset: true });
         await loadDecisions({ reset: true });
+        await loadAlerts();
         await loadSuggestions();
         await loadAiReview();
         if (state.search.active) {

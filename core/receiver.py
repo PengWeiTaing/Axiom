@@ -5008,6 +5008,77 @@ def review_decision(decision_id: int):
         conn.close()
 
 
+# ===== 主动提醒 =====
+
+@app.route("/alerts", methods=["GET"])
+def alerts():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        today = local_date_now()
+        alerts_list = []
+
+        # 1. No records in 3+ days
+        latest_item = conn.execute("SELECT MAX(created_at) FROM items").fetchone()[0]
+        if latest_item:
+            latest_date = datetime.fromisoformat(latest_item).date()
+            gap = (today - latest_date).days
+            if gap >= 3:
+                alerts_list.append({
+                    "kind": "no_records",
+                    "message": f"已 {gap} 天没有新记录了，打开记录面板写点什么吧。",
+                    "days": gap,
+                })
+        else:
+            alerts_list.append({
+                "kind": "empty",
+                "message": "还没有任何记录，从记录面板开始吧。",
+            })
+
+        # 2. Tasks overdue more than 5 days
+        overdue_count = conn.execute(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'todo' AND due_date IS NOT NULL AND due_date < ?",
+            ((today - timedelta(days=5)).isoformat(),),
+        ).fetchone()[0]
+        if overdue_count > 0:
+            alerts_list.append({
+                "kind": "overdue_tasks",
+                "message": f"有 {overdue_count} 个任务过期超过 5 天了，去任务面板看看吧。",
+                "count": overdue_count,
+            })
+
+        # 3. Candidate memories older than 3 days
+        cutoff = (utc_now() - timedelta(days=3)).isoformat(timespec="seconds")
+        stale_memories = conn.execute(
+            "SELECT COUNT(*) FROM memories WHERE status = 'candidate' AND created_at < ?",
+            (cutoff,),
+        ).fetchone()[0]
+        if stale_memories > 0:
+            alerts_list.append({
+                "kind": "stale_memories",
+                "message": f"有 {stale_memories} 条候选记忆等待确认超过 3 天了。",
+                "count": stale_memories,
+            })
+
+        # 4. Pending decisions
+        pending_dec = conn.execute(
+            "SELECT COUNT(*) FROM decisions WHERE status = 'pending'"
+        ).fetchone()[0]
+        if pending_dec > 0:
+            alerts_list.append({
+                "kind": "pending_decisions",
+                "message": f"有 {pending_dec} 条决策等待回顾，花 5 分钟复盘一下吧。",
+                "count": pending_dec,
+            })
+    finally:
+        conn.close()
+
+    return ok_response({"alerts": alerts_list})
+
+
 # ===== AI 管家 =====
 
 @app.route("/chat", methods=["POST"])
