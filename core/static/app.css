@@ -83,9 +83,13 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 .feedback-muted { color: var(--ink-dim); }
 .empty-state { padding: 28px 20px; text-align: center; color: var(--ink-dim); font-size: 0.82rem; }
 
+/* ===== App Layout Wrapper ===== */
+.app-layout {
+    position: relative; z-index: 1;
+}
+
 /* ===== App Shell ===== */
 .app-shell {
-    position: relative; z-index: 1;
     max-width: var(--content-max);
     margin: 0 auto;
     padding: 0 16px;
@@ -94,21 +98,9 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 /* ===== Desktop Sidebar ===== */
 .desktop-sidebar {
     display: none;
-    position: fixed;
-    left: 20px;
-    top: 24px;
-    width: var(--sidebar-width);
     flex-direction: column;
     gap: 2px;
     z-index: 10;
-    padding: 20px 12px;
-    border-radius: var(--radius-xl);
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    max-height: calc(100vh - 48px);
-    overflow-y: auto;
 }
 
 /* ===== Content Area ===== */
@@ -118,18 +110,40 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 
 /* ===== Responsive: Desktop ===== */
 @media (min-width: 768px) {
-    .desktop-sidebar { display: flex; }
+    .app-layout {
+        display: flex;
+        gap: 32px;
+        max-width: calc(var(--content-max) + var(--sidebar-width) + 80px);
+        margin: 24px auto 0;
+        padding: 0 24px;
+    }
+
+    .desktop-sidebar {
+        display: flex;
+        position: sticky;
+        top: 24px;
+        width: var(--sidebar-width);
+        flex-shrink: 0;
+        align-self: flex-start;
+        padding: 20px 12px;
+        border-radius: var(--radius-xl);
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        max-height: calc(100vh - 48px);
+    }
 
     .app-shell {
-        margin-left: calc(var(--sidebar-width) + 48px);
-        margin-right: 20px;
+        flex: 1;
+        min-width: 0;
     }
 
     .bottom-bar { display: none; }
 
     .quick-nav { display: none; }
 
-    .content-area { padding-top: 24px; padding-bottom: 32px; }
+    .content-area { padding-top: 0; padding-bottom: 32px; }
 
     .layout > .panel { display: none; }
     .layout > .panel.active { display: block; }
@@ -143,16 +157,9 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 
 /* ===== Responsive: Large Desktop ===== */
 @media (min-width: 1200px) {
-    .app-shell {
-        margin-left: calc(var(--sidebar-width) + 64px);
-        margin-right: auto;
-    }
+    .app-layout { padding: 0; }
 
-    .desktop-sidebar {
-        left: max(24px, calc((100vw - var(--content-max) - var(--sidebar-width) - 100px) / 2));
-    }
-
-    .content-area { padding-top: 40px; }
+    .content-area { padding-top: 16px; }
 }
 
 .desktop-sidebar button {
