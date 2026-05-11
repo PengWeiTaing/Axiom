@@ -17,7 +17,7 @@ from urllib.parse import quote
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, Response, jsonify, render_template, request, send_file
 from werkzeug.exceptions import HTTPException
 
 try:
@@ -5077,6 +5077,93 @@ def ai_chat():
         return error_response(500, "ai_error", str(exc))
 
     return ok_response({"reply": reply})
+
+
+@app.route("/chat/stream", methods=["POST"])
+def ai_chat_stream():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    if not DEEPSEEK_API_KEY:
+        return error_response(503, "ai_unavailable", "未配置 AI API key")
+
+    body = request.get_json(silent=True) or {}
+    user_message = str(body.get("message", "")).strip()
+    if not user_message:
+        return error_response(400, "empty_message", "message 不能为空")
+
+    history = body.get("history", [])
+    if not isinstance(history, list):
+        history = []
+
+    conn = get_db_connection()
+    try:
+        now = utc_now()
+        week_ago = (now - timedelta(days=7)).isoformat(timespec="seconds")
+        item_total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        recent_items = conn.execute(
+            "SELECT type, content, original_name, created_at FROM items WHERE created_at >= ? ORDER BY created_at DESC LIMIT 15",
+            (week_ago,),
+        ).fetchall()
+        pending_tasks = conn.execute(
+            "SELECT title, priority, due_date FROM tasks WHERE status = 'todo' ORDER BY created_at DESC LIMIT 10"
+        ).fetchall()
+        confirmed_memories = conn.execute(
+            "SELECT category, content FROM memories WHERE status = 'confirmed' ORDER BY created_at DESC LIMIT 10"
+        ).fetchall()
+        pending_decisions = conn.execute(
+            "SELECT title, decision FROM decisions WHERE status = 'pending' LIMIT 5"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    context_lines = [
+        "你是 Axiom 个人外脑系统的 AI 管家。你叫 Axi。",
+        "回复简洁（3-5句），用温暖的中文。支持 Markdown 格式。",
+        "",
+        f"总条目: {item_total}，最近7天: {len(recent_items)}，待办: {len(pending_tasks)}，记忆: {len(confirmed_memories)}",
+    ]
+    if pending_tasks:
+        context_lines.append("待办: " + ", ".join(t["title"] for t in pending_tasks[:5]))
+    if recent_items:
+        context_lines.append("最近: " + ", ".join(((r["content"] or r["original_name"] or "")[:60]) for r in recent_items[:5]))
+
+    system_prompt = "\n".join(context_lines)
+
+    messages = [{"role": "system", "content": system_prompt}]
+    for h in history[-10:]:
+        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+    messages.append({"role": "user", "content": user_message})
+
+    def generate():
+        try:
+            import openai
+            client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+            response = client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=messages,
+                max_tokens=600,
+                temperature=0.7,
+                stream=True,
+            )
+            for chunk in response:
+                delta = chunk.choices[0].delta
+                if delta.content:
+                    yield f"data: {json.dumps({'content': delta.content})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as exc:
+            logger.exception("AI chat stream failed")
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ===== AI 建议 =====

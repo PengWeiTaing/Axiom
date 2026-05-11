@@ -619,6 +619,37 @@ button { font-family: inherit; cursor: pointer; transition: all var(--ease); }
     margin-top: 4px;
 }
 
+.streaming-cursor {
+    animation: blink 0.6s step-end infinite;
+    color: var(--bloom-cyan);
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.chat-msg code {
+    background: rgba(255,255,255,0.08);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.82em;
+}
+
+.chat-msg pre {
+    background: rgba(0,0,0,0.3);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.chat-msg pre code { background: none; padding: 0; }
+
+.chat-msg li { margin: 2px 0 2px 16px; }
+
+.chat-msg strong { color: var(--bloom-cyan); }
+
 .chat-input-row {
     display: flex;
     gap: 8px;

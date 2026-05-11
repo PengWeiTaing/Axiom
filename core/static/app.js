@@ -2929,14 +2929,30 @@ async function loadSuggestions() {
     }
 }
 
+function renderMarkdown(text) {
+    return escapeHtml(text)
+        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>');
+}
+
 function renderChatMessage(role, content) {
     const div = document.createElement("div");
     div.className = `chat-msg ${role}`;
     const now = new Date();
     const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-    div.innerHTML = `${escapeHtml(content)}<div class="msg-time">${time}</div>`;
+    div.innerHTML = `${role === "axi" ? renderMarkdown(content) : escapeHtml(content)}<div class="msg-time">${time}</div>`;
     elements.chatMessages.appendChild(div);
     elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+    return div;
 }
 
 async function handleChatSubmit(event) {
@@ -2949,16 +2965,56 @@ async function handleChatSubmit(event) {
     renderChatMessage("user", message);
     chatHistory.push({ role: "user", content: message });
 
-    setConnectionState("busy", "Axi 正在思考...");
+    setConnectionState("busy", "Axi 正在输入...");
 
     try {
-        const payload = await apiRequest("/chat", {
+        requireKey();
+        const response = await fetch(buildApiUrl("/chat/stream"), {
             method: "POST",
-            json: { message, history: chatHistory.slice(0, -1) },
+            headers: { "Content-Type": "application/json", "X-Axiom-Key": state.key },
+            body: JSON.stringify({ message, history: chatHistory.slice(0, -1) }),
         });
-        const reply = payload.reply || "让我想想...";
-        renderChatMessage("axi", reply);
-        chatHistory.push({ role: "assistant", content: reply });
+
+        if (!response.ok) throw new Error(await parseErrorMessage(response));
+
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "chat-msg axi";
+        const now = new Date();
+        const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+        msgDiv.innerHTML = `<span class="streaming-cursor">▊</span><div class="msg-time">${time}</div>`;
+        elements.chatMessages.appendChild(msgDiv);
+        elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+
+        let fullText = "";
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                    const data = line.slice(6);
+                    if (data === "[DONE]") continue;
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.error) { fullText = `错误: ${parsed.error}`; break; }
+                        if (parsed.content) {
+                            fullText += parsed.content;
+                            msgDiv.innerHTML = `${renderMarkdown(fullText)}<div class="msg-time">${time}</div>`;
+                            elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+                        }
+                    } catch (e) { /* skip malformed */ }
+                }
+            }
+        }
+
+        if (!fullText) fullText = "让我想想...";
+        chatHistory.push({ role: "assistant", content: fullText });
         setConnectionState("ready", "Axi 已回复");
     } catch (error) {
         setFeedback(elements.chatFeedback, error.message, "error");
