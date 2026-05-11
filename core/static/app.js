@@ -3562,20 +3562,29 @@ function bindDelegatedActions() {
     });
 }
 
+const PANEL_GROUPS = {
+    "capture-panel": ["setup-panel", "capture-panel"],
+    "overview-panel": ["overview-panel"],
+    "tasks-panel": ["tasks-panel"],
+    "memories-panel": ["memories-panel"],
+    "archive-panel": ["search-panel", "recent-panel", "decisions-panel", "artifacts-panel", "processing-panel"],
+};
+
 function bindSidebarTabs() {
     const sidebar = document.getElementById("desktop-sidebar");
     if (!sidebar) return;
     sidebar.querySelectorAll("button[data-panel]").forEach(btn => {
         btn.addEventListener("click", () => {
             const panelId = btn.getAttribute("data-panel");
-            // Desktop: toggle active class on panels
+            const group = PANEL_GROUPS[panelId] || [panelId];
+            // Desktop: show only panels in the group
             document.querySelectorAll(".layout > .panel").forEach(p => {
-                p.classList.toggle("active", p.id === panelId);
+                p.classList.toggle("active", group.includes(p.id));
             });
-            // Mobile: scroll to the panel
-            const target = document.getElementById(panelId);
-            if (target && window.innerWidth < 768) {
-                target.scrollIntoView({ behavior: "smooth", block: "start" });
+            // Mobile: scroll to the first panel in group
+            if (window.innerWidth < 768) {
+                const target = document.getElementById(group[0]);
+                if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
             }
             // Update sidebar active state
             sidebar.querySelectorAll("button[data-panel]").forEach(b => b.classList.remove("active"));
