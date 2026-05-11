@@ -8,7 +8,7 @@ from flask import Blueprint, request
 bp = Blueprint("jianzhi", __name__, url_prefix="/m/jianzhi",
                static_folder="static", static_url_path="/static")
 
-from core.receiver import (  # noqa: E402
+from core._common import (  # noqa: E402
     require_key, get_db_connection, ok_response, error_response,
     parse_positive_int, local_date_now,
 )
