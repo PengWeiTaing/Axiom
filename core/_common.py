@@ -3249,6 +3249,9 @@ def _fetch_bilibili(url: str) -> dict:
             metadata["duration"] = f"{vdata.get('duration', 0) // 60}:{vdata.get('duration', 0) % 60:02d}"
             metadata["tags"] = vdata.get("tname", "")
 
+            if not metadata.get("title"):
+                return {"error": "Bilibili API 无法获取视频信息（可能地区限制）", "title": url, "content": url}
+
             parts.append(f"# {metadata['title']}")
             parts.append(f"作者: {metadata['author']} | 时长: {metadata['duration']} | 分区: {metadata['tags']}")
             if metadata["description"]:
