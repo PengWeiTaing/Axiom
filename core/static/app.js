@@ -6,6 +6,8 @@ const SEARCH_PAGE_SIZE = 9;
 const ARTIFACT_PAGE_SIZE = 12;
 const AUTOMATION_RUN_PAGE_SIZE = 8;
 
+const chatHistory = [];
+
 const registeredModules = new Map();
 
 window.axiom = {
@@ -136,6 +138,11 @@ const elements = {
     viewerContent: document.getElementById("viewer-content"),
     closeViewerButton: document.getElementById("close-viewer-button"),
     toast: document.getElementById("toast"),
+    chatMessages: document.getElementById("chat-messages"),
+    chatForm: document.getElementById("chat-form"),
+    chatInput: document.getElementById("chat-input"),
+    chatFeedback: document.getElementById("chat-feedback"),
+    clearChatButton: document.getElementById("clear-chat-button"),
     memoryStats: document.getElementById("memory-stats"),
     memoryQuickForm: document.getElementById("memory-quick-form"),
     memoryQuickCategory: document.getElementById("memory-quick-category"),
@@ -2922,6 +2929,52 @@ async function loadSuggestions() {
     }
 }
 
+function renderChatMessage(role, content) {
+    const div = document.createElement("div");
+    div.className = `chat-msg ${role}`;
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+    div.innerHTML = `${escapeHtml(content)}<div class="msg-time">${time}</div>`;
+    elements.chatMessages.appendChild(div);
+    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+}
+
+async function handleChatSubmit(event) {
+    event.preventDefault();
+    const message = elements.chatInput.value.trim();
+    if (!message) return;
+
+    elements.chatInput.value = "";
+    elements.chatInput.disabled = true;
+    renderChatMessage("user", message);
+    chatHistory.push({ role: "user", content: message });
+
+    setConnectionState("busy", "Axi 正在思考...");
+
+    try {
+        const payload = await apiRequest("/chat", {
+            method: "POST",
+            json: { message, history: chatHistory.slice(0, -1) },
+        });
+        const reply = payload.reply || "让我想想...";
+        renderChatMessage("axi", reply);
+        chatHistory.push({ role: "assistant", content: reply });
+        setConnectionState("ready", "Axi 已回复");
+    } catch (error) {
+        setFeedback(elements.chatFeedback, error.message, "error");
+        setConnectionState("error", error.message);
+    } finally {
+        elements.chatInput.disabled = false;
+        elements.chatInput.focus();
+    }
+}
+
+// Initial greeting
+function showChatGreeting() {
+    if (chatHistory.length > 0) return;
+    renderChatMessage("axi", "你好，我是 Axi。我了解你的 Axiom 数据，可以帮你回顾、分析、给建议。试试问我：\"今天该做什么？\" 或 \"最近状态怎么样？\"");
+}
+
 async function syncDashboard({ showMessage = false } = {}) {
     try {
         requireKey();
@@ -3568,6 +3621,7 @@ const PANEL_GROUPS = {
     "tasks-panel": ["tasks-panel"],
     "memories-panel": ["memories-panel"],
     "archive-panel": ["search-panel", "recent-panel", "decisions-panel", "artifacts-panel", "processing-panel"],
+    "chat-panel": ["chat-panel"],
 };
 
 function bindSidebarTabs() {
@@ -3589,6 +3643,7 @@ function bindSidebarTabs() {
             // Update sidebar active state
             sidebar.querySelectorAll("button[data-panel]").forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
+            if (panelId === "chat-panel") showChatGreeting();
         });
     });
 }
@@ -3993,6 +4048,13 @@ function bindForms() {
     });
 
     elements.decisionQuickForm.addEventListener("submit", handleDecisionQuickCreate);
+
+    elements.chatForm.addEventListener("submit", handleChatSubmit);
+    elements.clearChatButton.addEventListener("click", () => {
+        chatHistory.length = 0;
+        elements.chatMessages.innerHTML = "";
+        showChatGreeting();
+    });
 
     elements.refreshDecisionsButton.addEventListener("click", async () => {
         try {

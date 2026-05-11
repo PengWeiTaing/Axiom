@@ -4976,6 +4976,109 @@ def review_decision(decision_id: int):
         conn.close()
 
 
+# ===== AI 管家 =====
+
+@app.route("/chat", methods=["POST"])
+def ai_chat():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    if not DEEPSEEK_API_KEY:
+        return error_response(503, "ai_unavailable", "未配置 AI API key")
+
+    body = request.get_json(silent=True) or {}
+    user_message = str(body.get("message", "")).strip()
+    if not user_message:
+        return error_response(400, "empty_message", "message 不能为空")
+
+    history = body.get("history", [])
+    if not isinstance(history, list):
+        history = []
+
+    conn = get_db_connection()
+    try:
+        now = utc_now()
+        week_ago = (now - timedelta(days=7)).isoformat(timespec="seconds")
+
+        item_total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+
+        recent_items = conn.execute(
+            "SELECT type, content, original_name, created_at FROM items WHERE created_at >= ? ORDER BY created_at DESC LIMIT 15",
+            (week_ago,),
+        ).fetchall()
+
+        pending_tasks = conn.execute(
+            "SELECT title, priority, due_date FROM tasks WHERE status = 'todo' ORDER BY created_at DESC LIMIT 10"
+        ).fetchall()
+
+        confirmed_memories = conn.execute(
+            "SELECT category, content FROM memories WHERE status = 'confirmed' ORDER BY created_at DESC LIMIT 10"
+        ).fetchall()
+
+        pending_decisions = conn.execute(
+            "SELECT title, decision FROM decisions WHERE status = 'pending' LIMIT 5"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    context_lines = [
+        "你是 Axiom 个人外脑系统的 AI 管家。你叫 Axi。",
+        "你了解用户的所有数据，能回答问题、给建议、帮分析。",
+        "回复简洁（3-5 句），用温暖的中文。",
+        "",
+        "## 当前状态",
+        f"总条目: {item_total}",
+        f"最近 7 天新增: {len(recent_items)} 条",
+        f"待办任务: {len(pending_tasks)} 条",
+        f"已确认记忆: {len(confirmed_memories)} 条",
+        f"待回顾决策: {len(pending_decisions)} 条",
+        "",
+    ]
+
+    if pending_tasks:
+        context_lines.append("## 待办任务")
+        for t in pending_tasks[:5]:
+            context_lines.append(f"- [{t['priority']}] {t['title']}")
+        context_lines.append("")
+
+    if confirmed_memories:
+        context_lines.append("## 近期记忆")
+        for m in confirmed_memories[:5]:
+            context_lines.append(f"- [{m['category']}] {m['content']}")
+        context_lines.append("")
+
+    if recent_items:
+        context_lines.append("## 最近记录")
+        for item in recent_items[:8]:
+            text = (item["content"] or item["original_name"] or "")[:100]
+            context_lines.append(f"- [{item['type']}] {text}")
+        context_lines.append("")
+
+    system_prompt = "\n".join(context_lines)
+
+    messages = [{"role": "system", "content": system_prompt}]
+    for h in history[-10:]:
+        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+    messages.append({"role": "user", "content": user_message})
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        response = client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=messages,
+            max_tokens=600,
+            temperature=0.7,
+        )
+        reply = response.choices[0].message.content.strip()
+    except Exception as exc:
+        logger.exception("AI chat failed")
+        return error_response(500, "ai_error", str(exc))
+
+    return ok_response({"reply": reply})
+
+
 # ===== AI 建议 =====
 
 @app.route("/suggestions", methods=["GET"])
