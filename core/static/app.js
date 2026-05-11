@@ -82,6 +82,9 @@ const elements = {
     lastSyncIndicator: document.getElementById("last-sync-indicator"),
     textCaptureForm: document.getElementById("text-capture-form"),
     textInput: document.getElementById("text-input"),
+    urlFetchForm: document.getElementById("url-fetch-form"),
+    urlFetchInput: document.getElementById("url-fetch-input"),
+    urlFetchFeedback: document.getElementById("url-fetch-feedback"),
     fileCaptureForm: document.getElementById("file-capture-form"),
     fileInput: document.getElementById("file-input"),
     captureFeedback: document.getElementById("capture-feedback"),
@@ -3101,6 +3104,29 @@ async function syncDashboard({ showMessage = false } = {}) {
     }
 }
 
+async function handleUrlFetchSubmit(event) {
+    event.preventDefault();
+    const url = elements.urlFetchInput.value.trim();
+    if (!url) {
+        setFeedback(elements.urlFetchFeedback, "请输入链接。", "error");
+        return;
+    }
+    try {
+        setConnectionState("busy", "正在抓取链接内容...");
+        setFeedback(elements.urlFetchFeedback, "抓取中，请稍候...", "muted");
+        const payload = await apiRequest("/fetch", { method: "POST", json: { url } });
+        elements.urlFetchInput.value = "";
+        const title = payload.item?.original_name || url;
+        const summary = payload.summary ? `\nAI 摘要：${payload.summary}` : "";
+        setFeedback(elements.urlFetchFeedback, `已保存：${title}${summary}`, "ok");
+        setConnectionState("ready", "链接已抓取");
+        void syncDashboard({ showMessage: false });
+    } catch (error) {
+        setFeedback(elements.urlFetchFeedback, error.message, "error");
+        setConnectionState("error", error.message);
+    }
+}
+
 async function handleTextCaptureSubmit(event) {
     event.preventDefault();
     const text = elements.textInput.value.trim();
@@ -3848,6 +3874,7 @@ function bindForms() {
 
     elements.textCaptureForm.addEventListener("submit", handleTextCaptureSubmit);
     elements.fileCaptureForm.addEventListener("submit", handleFileCaptureSubmit);
+    elements.urlFetchForm.addEventListener("submit", handleUrlFetchSubmit);
     elements.automationRunForm.addEventListener("submit", (event) => {
         event.preventDefault();
     });
