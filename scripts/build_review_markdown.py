@@ -456,26 +456,42 @@ def generate_ai_analysis(
     type_counter = Counter(r["type"] or "unknown" for r in rows)
     day_count = len(set((r["created_at"] or "")[:10] for r in rows))
 
+    is_weekly = "week" in window_name.lower()
+
     lines = [
-        f"你是一个个人数据助手。以下是用户的{window_name}数据摘要，请用 3-5 句话做回顾分析：",
+        f"你是个人数据助手。以下是用户的{window_name}数据摘要。",
         "",
         f"总条目: {len(rows)}，覆盖 {day_count} 天",
         f"类型分布: {dict(type_counter)}",
     ]
 
     if task_summary:
-        lines.append(f"本周完成任务: {task_summary.get('done', 0)}，当前待办: {task_summary.get('todo', 0)}")
+        lines.append(f"完成任务: {task_summary.get('done', 0)}，当前待办: {task_summary.get('todo', 0)}")
+        if task_summary.get("done_rows"):
+            lines.append("已完成: " + ", ".join(r["title"] for r in task_summary["done_rows"][:10]))
 
     if memory_rows:
         confirmed = [r for r in memory_rows if r["status"] == "confirmed"]
         if confirmed:
             lines.append(f"新增记忆: {len(confirmed)} 条")
 
-    lines.extend([
-        "",
-        "分析要点：主要活动和主题、进度趋势、待关注的事。",
-        "用温暖简洁的中文，不需要标题和问候。",
-    ])
+    if is_weekly:
+        lines.extend([
+            "",
+            "请做一个深入周回顾（5-8 句），包括：",
+            "1. 本周主题和主要活动",
+            "2. 相比上周的变化趋势（如果有数据的话）",
+            "3. 任务完成情况分析（完成率、哪些拖了很久）",
+            "4. 需要关注的信号（过多未完成、长时间无记录等）",
+            "5. 下周的 1-2 条建议",
+            "用温暖的中文。",
+        ])
+    else:
+        lines.extend([
+            "",
+            "请用 3-5 句做简洁日回顾：主要活动、待关注的事。",
+            "用温暖的中文，不需要标题和问候。",
+        ])
 
     prompt = "\n".join(lines)
 
@@ -485,7 +501,7 @@ def generate_ai_analysis(
         response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
+            max_tokens=500 if is_weekly else 300,
             temperature=0.7,
         )
         return response.choices[0].message.content.strip()
