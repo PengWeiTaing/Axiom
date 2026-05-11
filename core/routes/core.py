@@ -207,6 +207,78 @@ def register_routes(app):
         )
 
 
+    @app.route("/fetch", methods=["POST"])
+    def fetch_url():
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        body = get_request_body_data()
+        url = str(body.get("url", "")).strip()
+        if not url:
+            return error_response(400, "missing_url", "url 不能为空")
+        if not (url.startswith("http://") or url.startswith("https://")):
+            return error_response(400, "invalid_url", "url 必须以 http:// 或 https:// 开头")
+
+        result = fetch_url_content(url)
+        if "error" in result:
+            return error_response(400, "fetch_failed", result["error"])
+
+        text = result["content"]
+        source = f"url_fetch_{result.get('site', 'web')}"
+        now_iso = utc_now().isoformat(timespec="seconds")
+        file_path = build_text_file_path(datetime.now(timezone.utc))
+        write_text_file_atomic(file_path, text)
+
+        try:
+            item_id = insert_item(
+                ITEM_TYPE_TEXT,
+                text,
+                str(file_path),
+                source,
+                now_iso,
+                original_name=result.get("title") or url[:80],
+            )
+            fts_sync_item(item_id, text, result.get("title"), None, None)
+        except sqlite3.Error:
+            cleanup_file(file_path)
+            logger.exception("failed to insert fetched item")
+            return error_response(500, "database_write_failed", "数据库写入失败")
+
+        write_audit_log("item_create", "item", item_id)
+        logger.info("saved fetched item id=%s url=%s", item_id, url[:80])
+
+        if DEEPSEEK_API_KEY and len(text) > 200:
+            try:
+                import openai
+                client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+                resp = client.chat.completions.create(
+                    model=DEEPSEEK_MODEL,
+                    messages=[{"role": "user", "content": f"请用 3-5 句中文总结以下内容：\n\n{text[:3000]}"}],
+                    max_tokens=300,
+                    temperature=0.5,
+                )
+                summary = resp.choices[0].message.content.strip()
+            except Exception:
+                summary = None
+        else:
+            summary = None
+
+        return ok_response({
+            "message": f"saved: {result.get('title', url[:60])}",
+            "item": build_item_payload(
+                item_id,
+                ITEM_TYPE_TEXT,
+                text,
+                str(file_path),
+                source,
+                now_iso,
+                original_name=result.get("title"),
+            ),
+            "summary": summary,
+        }, 201)
+
+
     @app.route("/add", methods=["GET", "POST"])
     def add_note():
         auth_error = require_key()
