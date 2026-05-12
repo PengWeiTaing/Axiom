@@ -6,7 +6,22 @@ const SEARCH_PAGE_SIZE = 9;
 const ARTIFACT_PAGE_SIZE = 12;
 const AUTOMATION_RUN_PAGE_SIZE = 8;
 
-const chatHistory = [];
+const CHAT_STORAGE_KEY = "axiom.chat.history";
+
+function loadChatHistory() {
+    try {
+        const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+}
+
+function saveChatHistory(history) {
+    try {
+        localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(history.slice(-30)));
+    } catch { /* quota exceeded */ }
+}
+
+const chatHistory = loadChatHistory();
 
 const registeredModules = new Map();
 
@@ -145,6 +160,12 @@ const elements = {
     chatForm: document.getElementById("chat-form"),
     chatInput: document.getElementById("chat-input"),
     chatFeedback: document.getElementById("chat-feedback"),
+    floatChatBtn: document.getElementById("float-chat-btn"),
+    floatChatPopup: document.getElementById("float-chat-popup"),
+    floatChatBody: document.getElementById("float-chat-body"),
+    floatChatForm: document.getElementById("float-chat-form"),
+    floatChatInput: document.getElementById("float-chat-input"),
+    floatChatClose: document.getElementById("float-chat-close"),
     clearChatButton: document.getElementById("clear-chat-button"),
     memoryStats: document.getElementById("memory-stats"),
     memoryQuickForm: document.getElementById("memory-quick-form"),
@@ -4317,6 +4338,102 @@ async function initModules() {
     }
 }
 
+function toggleFloatChat() {
+    const popup = elements.floatChatPopup;
+    const isHidden = popup.classList.contains("hidden");
+    if (isHidden) {
+        popup.classList.remove("hidden");
+        elements.floatChatInput.focus();
+    } else {
+        popup.classList.add("hidden");
+    }
+}
+
+function showFloatMsg(role, content) {
+    const div = document.createElement("div");
+    div.className = `chat-msg ${role}`;
+    div.innerHTML = `${role === "axi" ? renderMarkdown(content) : escapeHtml(content)}`;
+    elements.floatChatBody.appendChild(div);
+    elements.floatChatBody.scrollTop = elements.floatChatBody.scrollHeight;
+    return div;
+}
+
+function loadFloatChatHistory() {
+    elements.floatChatBody.innerHTML = "";
+    if (chatHistory.length === 0) {
+        showFloatMsg("axi", "你好，我是 Axi。按 `Ctrl+K` 随时呼出我。试试问我：**今天该做什么？**");
+        return;
+    }
+    for (const msg of chatHistory.slice(-20)) {
+        showFloatMsg(msg.role, msg.content);
+    }
+}
+
+async function handleFloatChatSubmit(event) {
+    event.preventDefault();
+    const message = elements.floatChatInput.value.trim();
+    if (!message) return;
+
+    elements.floatChatInput.value = "";
+    elements.floatChatInput.disabled = true;
+    showFloatMsg("user", message);
+    chatHistory.push({ role: "user", content: message });
+    saveChatHistory(chatHistory);
+
+    try {
+        requireKey();
+        const response = await fetch(buildApiUrl("/chat/stream"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Axiom-Key": state.key },
+            body: JSON.stringify({ message, history: chatHistory.slice(-21, -1) }),
+        });
+        if (!response.ok) throw new Error(await parseErrorMessage(response));
+
+        const msgDiv = showFloatMsg("axi", "");
+        let fullText = "";
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                    const data = line.slice(6);
+                    if (data === "[DONE]") continue;
+                    try {
+                        const p = JSON.parse(data);
+                        if (p.content) {
+                            fullText += p.content;
+                            msgDiv.innerHTML = renderMarkdown(fullText);
+                            elements.floatChatBody.scrollTop = elements.floatChatBody.scrollHeight;
+                        }
+                    } catch (e) { /* */ }
+                }
+            }
+        }
+
+        if (fullText) {
+            chatHistory.push({ role: "assistant", content: fullText });
+            saveChatHistory(chatHistory);
+        }
+    } catch (error) {
+        showFloatMsg("axi", `出错了: ${error.message}`);
+    } finally {
+        elements.floatChatInput.disabled = false;
+        elements.floatChatInput.focus();
+    }
+}
+
+function bindFloatChat() {
+    elements.floatChatBtn.addEventListener("click", toggleFloatChat);
+    elements.floatChatClose.addEventListener("click", () => elements.floatChatPopup.classList.add("hidden"));
+    elements.floatChatForm.addEventListener("submit", handleFloatChatSubmit);
+}
+
 function init() {
     bindScrollButtons();
     bindSidebarTabs();
@@ -4336,7 +4453,17 @@ function init() {
         setConnectionState("idle", "尚未同步");
     }
 
+    // Floating chat
+    bindFloatChat();
+    loadFloatChatHistory();
+
     window.addEventListener("beforeunload", releaseAllObjectUrls);
+    document.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+            e.preventDefault();
+            toggleFloatChat();
+        }
+    });
 }
 
 init();

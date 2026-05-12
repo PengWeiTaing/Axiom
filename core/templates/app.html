@@ -697,6 +697,22 @@
 
     <div class="toast hidden" id="toast"></div>
 
+    <button class="float-chat-btn" id="float-chat-btn" type="button" title="AI 管家 (Ctrl+K)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
+    </button>
+
+    <div class="float-chat-popup hidden" id="float-chat-popup">
+        <div class="float-chat-head">
+            <span>Axi · AI 管家</span>
+            <button class="text-button" id="float-chat-close" type="button">✕</button>
+        </div>
+        <div class="float-chat-body" id="float-chat-body"></div>
+        <form class="float-chat-form" id="float-chat-form">
+            <input id="float-chat-input" type="text" placeholder="问 Axi..." autocomplete="off">
+            <button class="primary-button" type="submit">发送</button>
+        </form>
+    </div>
+
     <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
