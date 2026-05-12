@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from collections import Counter
@@ -76,21 +77,50 @@ def is_weak_image_description(content: str) -> bool:
     return any(pattern.fullmatch(text) for pattern in DATETIME_LIKE_PATTERNS)
 
 
-MEMORY_HINT_PATTERNS = [
-    (["我决定", "我计划", "我打算"], "可能包含决定或计划，可提取为记忆"),
-    (["我偏好", "我更喜欢", "我习惯", "我讨厌"], "可能包含偏好信息，可提取为记忆"),
-    (["我的目标是", "我想达成", "我希望"], "可能包含个人目标，可提取为记忆"),
-    (["我认识了", "我见过了", "我和.*聊"], "可能包含人际关系信息，可提取为记忆"),
-]
+def ai_classify_items(items: list[dict]) -> dict[int, tuple[str, list[str]]]:
+    """用 AI 对 inbox 条目分类，比关键词规则更智能。"""
+    api_key = os.environ.get("AXIOM_DEEPSEEK_API_KEY", "") or os.environ.get("AXIOM_OPENAI_API_KEY", "")
+    if not api_key:
+        return {}
 
+    lines = [
+        "你是 Axiom 个人外脑的 inbox 处理助手。",
+        "对每个条目给出处理建议：归档 / 继续保留 / 补描述 / 可提取记忆 / 可创建任务。",
+        "回复格式：每行 'id: 动作, 理由'。",
+        "",
+    ]
+    for item in items:
+        text = item.get("content", "")[:200]
+        lines.append(f"id={item['id']} type={item['type']} text={text}")
 
-def check_memory_hints(text: str) -> list[str]:
-    """检测内容中是否包含可提取为记忆的信号。"""
-    hints = []
-    for keywords, hint in MEMORY_HINT_PATTERNS:
-        if any(kw in text for kw in keywords):
-            hints.append(hint)
-    return hints
+    prompt = "\n".join(lines)
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.3,
+        )
+        text = response.choices[0].message.content.strip()
+    except Exception:
+        return {}
+
+    results = {}
+    for line in text.split("\n"):
+        line = line.strip().lstrip("- ").strip()
+        if ":" in line or "," in line or "，" in line:
+            parts = line.replace("：", ":").replace("，", ",").split(":", 1) if ":" in line else line.split(",", 1)
+            if len(parts) >= 2:
+                try:
+                    item_id = int(parts[0].strip().replace("id=", ""))
+                    action_reason = parts[1].strip()
+                    results[item_id] = (action_reason[:20], [action_reason[:80]])
+                except ValueError:
+                    pass
+    return results
 
 
 def decide_action(
@@ -98,23 +128,27 @@ def decide_action(
     content: str,
     age_days: int,
     stale_days: int,
+    ai_result: tuple[str, list[str]] | None = None,
 ) -> tuple[str, list[str]]:
+    if ai_result:
+        action, reasons = ai_result
+        if "归档" in action:
+            return "归档候选", reasons + [f"已在 inbox 停留 {age_days} 天"]
+        return action, reasons
+
+    # Fallback: keyword rules
     has_content = bool(content.strip())
     is_stale = age_days >= stale_days
     weak_image_description = item_type == "image" and is_weak_image_description(content)
 
     if weak_image_description and is_stale:
         return "补描述后归档", ["图片描述偏弱", f"已在 inbox 停留 {age_days} 天"]
-
     if weak_image_description:
         return "补描述", ["图片描述偏弱"]
-
     if not has_content:
         return "检查空内容", ["内容为空"]
-
     if is_stale:
         return "归档候选", [f"已在 inbox 停留 {age_days} 天"]
-
     return "继续保留", [f"仍在最近 {stale_days} 天窗口内"]
 
 
@@ -137,19 +171,29 @@ def build_processing_items(args: argparse.Namespace, rows: list) -> list[Process
     report_date = date.fromisoformat(args.date)
     items: list[ProcessingItem] = []
 
+    # AI classification batch
+    item_dicts = []
+    for row in rows:
+        effective_text = export_tools.pick_primary_text(row)
+        item_dicts.append({
+            "id": row["id"],
+            "type": row["type"] or "unknown",
+            "content": effective_text,
+        })
+    ai_results = ai_classify_items(item_dicts) if item_dicts else {}
+
     for row in rows:
         local_created = review_tools.to_local_datetime(row["created_at"], local_tz)
         age_days = (report_date - local_created.date()).days
         effective_text = export_tools.pick_primary_text(row)
+        ai_result = ai_results.get(row["id"])
         action, reasons = decide_action(
             row["type"] or "unknown",
             effective_text,
             age_days,
             args.stale_days,
+            ai_result,
         )
-        memory_hints = check_memory_hints(effective_text)
-        if memory_hints:
-            reasons.extend(memory_hints)
 
         resolved_path = export_tools.resolve_file_path(
             args.root,
