@@ -204,6 +204,9 @@ const elements = {
     applyTaskFilterButton: document.getElementById("apply-task-filter-button"),
     taskList: document.getElementById("task-list"),
     loadMoreTasksButton: document.getElementById("load-more-tasks-button"),
+    modulesManageList: document.getElementById("modules-manage-list"),
+    modulesManageFeedback: document.getElementById("modules-manage-feedback"),
+    refreshModulesButton: document.getElementById("refresh-modules-button"),
     refreshTasksButton: document.getElementById("refresh-tasks-button"),
 };
 
@@ -2715,7 +2718,8 @@ function renderTaskCard(task) {
 
     let actions = "";
     if (task.status === "todo") {
-        actions = `<button type="button" class="text-button" data-action="task-done" data-task-id="${task.id}">完成</button>
+        actions = `<button type="button" class="text-button" data-action="task-breakdown" data-task-id="${task.id}">拆解</button>
+                   <button type="button" class="text-button" data-action="task-done" data-task-id="${task.id}">完成</button>
                    <button type="button" class="text-button" data-action="task-cancel" data-task-id="${task.id}">取消</button>`;
     } else if (task.status === "done" || task.status === "cancelled") {
         actions = `<button type="button" class="text-button" data-action="task-todo" data-task-id="${task.id}">恢复</button>`;
@@ -2983,6 +2987,47 @@ async function loadBrief() {
     }
 }
 
+async function loadModulesManage() {
+    try {
+        const payload = await apiRequest("/admin/modules");
+        const modules = payload.modules || [];
+        if (modules.length === 0) {
+            elements.modulesManageList.innerHTML = '<p class="empty-state">没有已安装的模块。</p>';
+            return;
+        }
+        elements.modulesManageList.innerHTML = modules.map(m => {
+            const statusTag = m.enabled
+                ? '<span class="tag tag-ok">已启用</span>'
+                : '<span class="tag tag-dim">已禁用</span>';
+            const toggleAction = m.enabled ? "disable-module" : "enable-module";
+            const toggleLabel = m.enabled ? "禁用" : "启用";
+            return `
+                <div class="item-card">
+                    <div class="item-card-body">
+                        <div class="item-card-tags">${statusTag}</div>
+                        <p class="item-card-text">${escapeHtml(m.label)}</p>
+                        <p class="item-meta">${escapeHtml(m.description || m.name)}</p>
+                    </div>
+                    <div class="item-card-actions">
+                        <button type="button" class="text-button" data-action="${toggleAction}" data-module-name="${escapeHtml(m.name)}">${toggleLabel}</button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    } catch (e) {
+        elements.modulesManageList.innerHTML = `<p class="empty-state">${e.message}</p>`;
+    }
+}
+
+async function handleToggleModule(moduleName, enable) {
+    try {
+        setConnectionState("busy", `正在${enable ? '启用' : '禁用'}模块`);
+        await apiRequest(`/admin/modules/${moduleName}/${enable ? 'enable' : 'disable'}`, { method: "POST" });
+        showToast(`模块"${moduleName}"已${enable ? '启用' : '禁用'}，重启后生效。`);
+        await loadModulesManage();
+    } catch (e) { showToast(e.message); }
+}
+
 async function loadAlerts() {
     try {
         const payload = await apiRequest("/alerts");
@@ -3148,6 +3193,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadBrief();
         await loadSuggestions();
         await loadAiReview();
+        await loadModulesManage();
         updateSidebarBadges();
         if (state.search.active) {
             await loadSearchPage({ reset: true });
@@ -3754,6 +3800,10 @@ function bindDelegatedActions() {
                 target.textContent = "已添加";
                 setConnectionState("ready", "任务已创建");
             } catch (e) { showToast(e.message); }
+        } else if (action === "enable-module") {
+            await handleToggleModule(target.getAttribute("data-module-name"), true);
+        } else if (action === "disable-module") {
+            await handleToggleModule(target.getAttribute("data-module-name"), false);
         } else if (action === "task-done") {
             await handleTaskDone(target.getAttribute("data-task-id"));
         } else if (action === "task-todo") {
@@ -3800,7 +3850,7 @@ const PANEL_GROUPS = {
     "overview-panel": ["overview-panel"],
     "tasks-panel": ["tasks-panel"],
     "memories-panel": ["memories-panel"],
-    "archive-panel": ["search-panel", "recent-panel", "decisions-panel", "artifacts-panel", "processing-panel"],
+    "archive-panel": ["search-panel", "recent-panel", "decisions-panel", "artifacts-panel", "processing-panel", "modules-manage-panel"],
     "chat-panel": ["chat-panel"],
 };
 
@@ -4301,6 +4351,10 @@ function bindForms() {
 
     elements.loadMoreDecisionsButton.addEventListener("click", async () => {
         try { await loadDecisions(); } catch (e) { showToast(e.message); }
+    });
+
+    elements.refreshModulesButton.addEventListener("click", async () => {
+        try { await loadModulesManage(); } catch (e) { showToast(e.message); }
     });
 }
 

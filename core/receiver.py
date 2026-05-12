@@ -80,18 +80,53 @@ def init_modules(app):
 
 @app.route("/modules", methods=["GET"])
 def list_modules():
+    from modules.registry import get_all_modules_status
+    all_modules = get_all_modules_status()
     return ok_response({
         "modules": [
             {
                 "name": m.name,
                 "label": m.label,
                 "description": m.description,
+                "enabled": any(am.name == m.name for am in AXIOM_MODULES),
                 "nav_item": m.get_nav_item(),
                 **m.get_frontend_metadata(),
             }
             for m in AXIOM_MODULES
-        ]
+        ],
+        "all": all_modules,
     })
+
+
+@app.route("/admin/modules", methods=["GET"])
+def admin_modules():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+    from modules.registry import get_all_modules_status
+    return ok_response({"modules": get_all_modules_status()})
+
+
+@app.route("/admin/modules/<module_name>/enable", methods=["POST"])
+def admin_enable_module(module_name: str):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+    from modules.registry import set_module_enabled
+    if set_module_enabled(module_name, True):
+        return ok_response({"message": f"模块 {module_name} 已启用，重启后生效。"})
+    return error_response(404, "not_found", "模块不存在")
+
+
+@app.route("/admin/modules/<module_name>/disable", methods=["POST"])
+def admin_disable_module(module_name: str):
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+    from modules.registry import set_module_enabled
+    if set_module_enabled(module_name, False):
+        return ok_response({"message": f"模块 {module_name} 已禁用，重启后生效。"})
+    return error_response(404, "not_found", "模块不存在")
 
 
 init_app_storage()

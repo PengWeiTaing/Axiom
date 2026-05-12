@@ -524,6 +524,15 @@ def init_db(db_path: Path = DB_PATH) -> None:
         ensure_tasks_table_columns(conn)
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS module_state (
+                name TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                installed_at TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS audit_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 action TEXT NOT NULL,
