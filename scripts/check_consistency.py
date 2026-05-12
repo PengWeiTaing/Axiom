@@ -128,8 +128,22 @@ def build_report(root: Path, deploy_root: str = DEFAULT_DEPLOY_ROOT) -> dict:
         str(path) for path in storage_files if path not in db_files
     )
 
+    # FTS5 index check
+    fts_ok = True
+    fts_count = 0
+    items_count = 0
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        items_count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        fts_count = conn.execute("SELECT COUNT(*) FROM items_fts").fetchone()[0]
+        conn.close()
+        fts_ok = items_count == fts_count
+    except sqlite3.OperationalError:
+        pass
+
     return {
-        "ok": not missing_files and not orphan_files and not missing_path_rows,
+        "ok": not missing_files and not orphan_files and not missing_path_rows and fts_ok,
         "root": str(root),
         "db_path": str(db_path),
         "inbox_path": str(inbox_path),
@@ -142,6 +156,9 @@ def build_report(root: Path, deploy_root: str = DEFAULT_DEPLOY_ROOT) -> dict:
         "missing_files": missing_files,
         "orphan_files": orphan_files,
         "missing_path_rows": missing_path_rows,
+        "fts_ok": fts_ok,
+        "fts_count": fts_count,
+        "items_count": items_count,
     }
 
 
@@ -151,6 +168,9 @@ def print_text_report(report: dict) -> None:
     print(f"DB files: {report['db_file_count']}")
     print(f"Inbox files: {report['inbox_file_count']}")
     print(f"Archive files: {report['archive_file_count']}")
+
+    fts_status = "OK" if report.get("fts_ok") else f"MISMATCH (items:{report.get('items_count',0)} fts:{report.get('fts_count',0)})"
+    print(f"FTS5 index: {fts_status}")
 
     if report["ok"]:
         print("Consistency check passed.")
