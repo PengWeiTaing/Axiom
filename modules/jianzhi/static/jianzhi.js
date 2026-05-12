@@ -100,7 +100,48 @@ axiom.registerModule({
 
     async onSync() {
         await this.loadStats();
+        await this.renderWeightTrend();
         await this.loadEntries({ reset: true });
+    },
+
+    async renderWeightTrend() {
+        try {
+            const payload = await apiRequest("/m/jianzhi/weight-trend", { query: { days: 30 } });
+            const points = payload.points || [];
+            if (points.length < 2) return;
+
+            const weights = points.map(p => p.weight_kg).filter(w => w != null);
+            if (weights.length < 2) return;
+
+            const min = Math.min(...weights);
+            const max = Math.max(...weights);
+            const range = max - min || 1;
+            const latest = weights[weights.length - 1];
+            const first = weights[0];
+            const change = latest - first;
+            const arrow = change < 0 ? "↓" : change > 0 ? "↑" : "→";
+            const color = change < 0 ? "var(--ok)" : change > 0 ? "var(--warn)" : "var(--ink-soft)";
+
+            const chartHeight = 60;
+            const bars = points.map((p, i) => {
+                const w = p.weight_kg || (points[i-1]?.weight_kg || min);
+                const h = Math.max(3, ((w - min) / range) * chartHeight);
+                const isLast = i === points.length - 1;
+                return `<span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:${chartHeight}px" title="${p.recorded_at}: ${w}kg">
+                    <span style="width:80%;height:${h}px;background:${isLast ? 'var(--bloom-cyan)' : 'var(--glass-strong)'};border-radius:2px 2px 0 0;opacity:${isLast ? 1 : 0.5}"></span>
+                </span>`;
+            }).join("");
+
+            document.getElementById("jianzhi-stats").insertAdjacentHTML("beforebegin", `
+                <div class="subpanel" style="margin-bottom:12px">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
+                        <p class="subtle-text">30 天体重趋势</p>
+                        <p style="font-size:0.88rem;color:${color};font-weight:550">${latest} kg ${arrow} ${Math.abs(change).toFixed(1)}</p>
+                    </div>
+                    <div style="display:flex;align-items:flex-end;gap:2px;padding:0 2px">${bars}</div>
+                </div>
+            `);
+        } catch (e) { /* noop */ }
     },
 
     async loadStats() {
