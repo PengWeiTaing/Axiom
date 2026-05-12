@@ -2463,6 +2463,7 @@ async function loadMemories({ reset = false } = {}) {
         state.memories.total = payload.total;
         renderMemoryCards(state.memories);
         updateLoadMoreButton(elements.loadMoreMemoriesButton, state.memories.page, state.memories.totalPages);
+        updateSidebarBadges();
     } catch (error) {
         renderEmptyState(elements.memoryList, error.message);
     }
@@ -2628,6 +2629,7 @@ async function loadTasksToday() {
         state.tasks.todayItems = payload.today;
         state.tasks.overdueItems = payload.overdue;
         renderTasksToday(payload);
+    updateSidebarBadges();
     } catch (error) {
         renderEmptyState(elements.tasksTodayList, error.message);
     }
@@ -2782,6 +2784,7 @@ async function handleTaskDone(taskId) {
         await apiRequest(`/tasks/${taskId}/done`, { method: "POST" });
         await loadTasksToday();
         await loadTasks({ reset: true });
+        updateSidebarBadges();
         setConnectionState("ready", "任务已完成");
     } catch (error) {
         showToast(error.message);
@@ -3122,6 +3125,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadBrief();
         await loadSuggestions();
         await loadAiReview();
+        updateSidebarBadges();
         if (state.search.active) {
             await loadSearchPage({ reset: true });
         } else {
@@ -3778,6 +3782,39 @@ const PANEL_GROUPS = {
 };
 
 // Module panels are injected outside .layout, need separate handling
+function updateSidebarBadges() {
+    try {
+        // Task count
+        const taskTodo = state.tasks?.todayItems?.length || 0;
+        const taskBtn = document.querySelector("[data-panel='tasks-panel']");
+        if (taskBtn) {
+            const existing = taskBtn.querySelector(".nav-badge");
+            if (existing) existing.remove();
+            if (taskTodo > 0) {
+                taskBtn.insertAdjacentHTML("beforeend", `<span class="nav-badge">${taskTodo}</span>`);
+            }
+        }
+
+        // Memory candidate count
+        const memTotal = state.memories?.total || 0;
+        const memBtn = document.querySelector("[data-panel='memories-panel']");
+        if (memBtn) {
+            const existing = memBtn.querySelector(".nav-badge");
+            if (existing) existing.remove();
+            if (memTotal > 0) {
+                memBtn.insertAdjacentHTML("beforeend", `<span class="nav-badge">${memTotal}</span>`);
+            }
+        }
+
+        // Page title
+        const parts = [];
+        if (taskTodo > 0) parts.push(`${taskTodo} 任务`);
+        const todayCount = state.tasks?.todayItems?.length || 0;
+        if (todayCount > 0) parts.push(`${todayCount} 今日`);
+        document.title = parts.length > 0 ? `${parts.join(" · ")} · Axiom` : "Axiom 外脑";
+    } catch (e) { /* noop */ }
+}
+
 function getModulePanelIds() {
     const container = document.getElementById("module-panels");
     if (!container) return [];

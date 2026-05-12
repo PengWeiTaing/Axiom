@@ -191,6 +191,19 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
     box-shadow: inset 2px 0 0 var(--bloom-cyan);
 }
 
+.nav-badge {
+    float: right;
+    background: var(--bloom-cyan);
+    color: #060b14;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+    line-height: 1.4;
+}
+
 .desktop-sidebar .sidebar-brand {
     padding: 10px 16px 16px;
     color: var(--ink-soft);
