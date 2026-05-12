@@ -4476,11 +4476,48 @@ function init() {
     bindFloatChat();
     loadFloatChatHistory();
 
+    // Clipboard paste support for images
+    document.addEventListener("paste", async (e) => {
+        const items = e.clipboardData?.items;
+        if (!items || !state.key) return;
+        for (const item of items) {
+            if (item.type.startsWith("image/")) {
+                e.preventDefault();
+                const file = item.getAsFile();
+                if (!file) continue;
+                try {
+                    setConnectionState("busy", "正在上传粘贴的图片...");
+                    const formData = new FormData();
+                    formData.append("file", file, `pasted-${Date.now()}.png`);
+                    formData.append("source", "clipboard");
+                    const resp = await fetch(buildApiUrl("/upload"), {
+                        method: "POST", headers: { "X-Axiom-Key": state.key }, body: formData,
+                    });
+                    if (resp.ok) showToast("图片已保存");
+                    void syncDashboard({ showMessage: false });
+                } catch (err) { showToast("图片上传失败: " + err.message); }
+                break;
+            }
+        }
+    });
+
     window.addEventListener("beforeunload", releaseAllObjectUrls);
     document.addEventListener("keydown", (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+            e.preventDefault(); toggleFloatChat();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === "n") {
             e.preventDefault();
-            toggleFloatChat();
+            // Navigate to tasks panel and focus quick form
+            document.querySelector("[data-panel='tasks-panel']")?.click();
+            setTimeout(() => elements.taskQuickTitle?.focus(), 200);
+        } else if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+            e.preventDefault();
+            // Navigate to archive and focus search
+            document.querySelector("[data-panel='archive-panel']")?.click();
+            setTimeout(() => document.querySelector("#search-panel input")?.focus(), 200);
+        } else if (e.key === "Escape") {
+            elements.floatChatPopup.classList.add("hidden");
+            closeViewer();
         }
     });
 }
