@@ -125,7 +125,7 @@ def register_routes(app):
             "回复简洁（3-5 句），用温暖的中文。",
             "",
             "## 当前状态",
-            f"总条目: {item_total}",
+            f"总条目: {item_total}，连续: {compute_streak()}天",
             f"最近 7 天新增: {len(recent_items)} 条",
             f"待办任务: {len(pending_tasks)} 条",
             f"已确认记忆: {len(confirmed_memories)} 条",
@@ -219,7 +219,7 @@ def register_routes(app):
             "你是 Axiom 个人外脑系统的 AI 管家。你叫 Axi。",
             "回复简洁（3-5句），用温暖的中文。支持 Markdown 格式。",
             "",
-            f"总条目: {item_total}，最近7天: {len(recent_items)}，待办: {len(pending_tasks)}，记忆: {len(confirmed_memories)}",
+            f"总条目: {item_total}，连续: {compute_streak()}天，待办: {len(pending_tasks)}，记忆: {len(confirmed_memories)}",
         ]
         if pending_tasks:
             context_lines.append("待办: " + ", ".join(t["title"] for t in pending_tasks[:5]))
