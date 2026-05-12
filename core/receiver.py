@@ -5,9 +5,10 @@ from __future__ import annotations
 from core._common import *  # noqa: F401, F403, E402
 
 import logging
+from datetime import datetime, timezone
 
 from core._common import (  # noqa: E402
-    app, logger,
+    app, logger, AXIOM_ROOT, INBOX_PATH, ARCHIVE_PATH, DB_PATH,
     init_app_storage, get_db_connection,
     ok_response, error_response,
     AUTOMATION_JOBS,
@@ -127,6 +128,44 @@ def admin_disable_module(module_name: str):
     if set_module_enabled(module_name, False):
         return ok_response({"message": f"模块 {module_name} 已禁用，重启后生效。"})
     return error_response(404, "not_found", "模块不存在")
+
+
+@app.route("/system", methods=["GET"])
+def system_info():
+    import os as _os
+    import time as _time
+    db_size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
+    inbox_count = sum(1 for _ in INBOX_PATH.rglob("*")) if INBOX_PATH.exists() else 0
+    archive_count = sum(1 for _ in ARCHIVE_PATH.rglob("*")) if ARCHIVE_PATH.exists() else 0
+
+    backup_dir = AXIOM_ROOT / "backup"
+    last_backup = None
+    if backup_dir.exists():
+        backups = sorted(backup_dir.rglob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if backups:
+            last_backup = datetime.fromtimestamp(backups[0].stat().st_mtime, tz=timezone.utc).isoformat()
+
+    conn = get_db_connection()
+    try:
+        tables = {}
+        for table in ["items", "memories", "tasks", "decisions", "audit_log", "automation_runs"]:
+            try:
+                tables[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            except sqlite3.Error:
+                tables[table] = 0
+        fts_size = conn.execute("SELECT COUNT(*) FROM items_fts").fetchone()[0]
+    finally:
+        conn.close()
+
+    return ok_response({
+        "db_size_bytes": db_size,
+        "db_size_mb": round(db_size / (1024 * 1024), 2),
+        "inbox_files": inbox_count,
+        "archive_files": archive_count,
+        "fts_index_entries": fts_size,
+        "last_backup": last_backup,
+        "tables": tables,
+    })
 
 
 init_app_storage()

@@ -477,16 +477,29 @@ function setConnectionState(status, message) {
     }
 }
 
-function showToast(message) {
-    if (!message) {
-        return;
-    }
-    elements.toast.textContent = message;
+let undoAction = null;
+
+function showToast(message, options = {}) {
+    if (!message) return;
+    const { action, actionLabel, onUndo } = options;
+    elements.toast.innerHTML = action && onUndo
+        ? `${escapeHtml(message)} <button class="text-button" id="toast-undo-btn" style="color:var(--bloom-cyan)">${actionLabel || '撤销'}</button>`
+        : escapeHtml(message);
     elements.toast.classList.remove("hidden");
     window.clearTimeout(showToast.timer);
+
+    if (action && onUndo) {
+        undoAction = onUndo;
+        document.getElementById("toast-undo-btn")?.addEventListener("click", () => {
+            if (undoAction) { undoAction(); undoAction = null; }
+            elements.toast.classList.add("hidden");
+        });
+    }
+
     showToast.timer = window.setTimeout(() => {
         elements.toast.classList.add("hidden");
-    }, 2400);
+        undoAction = null;
+    }, action ? 5000 : 2400);
 }
 
 function saveKey(value) {
@@ -3820,14 +3833,18 @@ function bindDelegatedActions() {
             await handleTaskCancel(target.getAttribute("data-task-id"));
         } else if (action === "delete-item") {
             const itemId = target.getAttribute("data-item-id");
-            if (!confirm(`确定要删除条目 #${itemId} 吗？删除后无法恢复。`)) return;
+            if (!confirm(`确定要删除条目 #${itemId} 吗？`)) return;
             try {
+                // Save item data for potential undo (we can't restore, but show it was deleted)
                 setConnectionState("busy", "正在删除条目");
                 await apiRequest(`/item/${itemId}`, { method: "DELETE" });
                 closeViewer();
-                await syncDashboard({ showMessage: false });
                 setConnectionState("ready", "条目已删除");
-                showToast(`条目 #${itemId} 已删除`);
+                showToast(`条目 #${itemId} 已删除`, {
+                    action: true, actionLabel: "知道了",
+                    onUndo: () => showToast("删除操作无法撤销，请谨慎操作。"),
+                });
+                void syncDashboard({ showMessage: false });
             } catch (error) {
                 showToast(error.message);
                 setConnectionState("error", error.message);
