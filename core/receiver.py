@@ -145,10 +145,17 @@ def system_info():
         if backups:
             last_backup = datetime.fromtimestamp(backups[0].stat().st_mtime, tz=timezone.utc).isoformat()
 
+    backup_age_hours = None
+    backup_ok = False
+    if last_backup:
+        age = (datetime.now(timezone.utc) - datetime.fromisoformat(last_backup)).total_seconds() / 3600
+        backup_age_hours = round(age, 1)
+        backup_ok = age < 48
+
     conn = get_db_connection()
     try:
         tables = {}
-        for table in ["items", "memories", "tasks", "decisions", "audit_log", "automation_runs"]:
+        for table in ["items", "memories", "tasks", "decisions", "audit_log", "automation_runs", "module_state"]:
             try:
                 tables[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             except sqlite3.Error:
@@ -164,6 +171,8 @@ def system_info():
         "archive_files": archive_count,
         "fts_index_entries": fts_size,
         "last_backup": last_backup,
+        "backup_age_hours": backup_age_hours,
+        "backup_ok": backup_ok,
         "tables": tables,
     })
 
