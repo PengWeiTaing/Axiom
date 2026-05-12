@@ -108,6 +108,27 @@ def register_routes(app):
             mem_total = conn.execute("SELECT COUNT(*) FROM memories WHERE status='confirmed'").fetchone()[0]
             dec_pending = conn.execute("SELECT COUNT(*) FROM decisions WHERE status='pending'").fetchone()[0]
 
+            # Jianzhi module data
+            jianzhi_info = ""
+            try:
+                jz_total = conn.execute("SELECT COUNT(*) FROM module_jianzhi_entries").fetchone()[0]
+                if jz_total > 0:
+                    latest_w = conn.execute(
+                        "SELECT entry_data FROM module_jianzhi_entries WHERE entry_type='weight' ORDER BY recorded_at DESC LIMIT 1"
+                    ).fetchone()
+                    week_ago_date = (local_date_now() - timedelta(days=7)).isoformat()
+                    jz_week = conn.execute(
+                        "SELECT COUNT(*) FROM module_jianzhi_entries WHERE recorded_at >= ?", (week_ago_date,)
+                    ).fetchone()[0]
+                    jianzhi_info = f"减脂: 共{jz_total}条记录，本周{jz_week}条"
+                    if latest_w:
+                        import json as _json_mod
+                        wd = _json_mod.loads(latest_w["entry_data"])
+                        if wd.get("weight_kg"):
+                            jianzhi_info += f"，最新体重{wd['weight_kg']}kg"
+            except Exception:
+                pass  # table might not exist yet
+
             # Get latest daily review AI analysis
             artifacts = list_review_artifacts()
             review_text = ""
@@ -126,6 +147,8 @@ def register_routes(app):
             f"待办 {todo_count} 个，本周完成 {done_week} 个任务",
             f"已确认 {mem_total} 条记忆，{dec_pending} 条决策待回顾",
         ]
+        if jianzhi_info:
+            lines.append(jianzhi_info)
         if today_tasks:
             lines.append("今日任务: " + ", ".join(f"[{t['priority']}]{t['title']}" for t in today_tasks))
         if review_text and len(review_text) > 20:
