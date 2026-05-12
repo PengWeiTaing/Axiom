@@ -2943,6 +2943,20 @@ async function loadAiReview() {
     }
 }
 
+async function loadBrief() {
+    try {
+        const payload = await apiRequest("/brief");
+        const brief = payload.brief || "";
+        const container = document.getElementById("overview-brief");
+        if (!container || !brief) return;
+        container.innerHTML = `<div class="brief-card"><p class="item-card-text">${renderMarkdown(brief)}</p></div>`;
+        container.style.display = "";
+    } catch (e) {
+        const container = document.getElementById("overview-brief");
+        if (container) container.style.display = "none";
+    }
+}
+
 async function loadAlerts() {
     try {
         const payload = await apiRequest("/alerts");
@@ -3105,6 +3119,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadTasks({ reset: true });
         await loadDecisions({ reset: true });
         await loadAlerts();
+        await loadBrief();
         await loadSuggestions();
         await loadAiReview();
         if (state.search.active) {

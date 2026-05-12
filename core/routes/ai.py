@@ -75,6 +75,79 @@ def register_routes(app):
 
     # ===== AI 管家 =====
 
+    @app.route("/brief", methods=["GET"])
+    def daily_brief():
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+        if not DEEPSEEK_API_KEY:
+            return error_response(503, "ai_unavailable", "未配置 AI API key")
+
+        conn = get_db_connection()
+        try:
+            now = utc_now()
+            today = local_date_now().isoformat()
+            week_ago = (now - timedelta(days=7)).isoformat(timespec="seconds")
+            streak = compute_streak()
+
+            item_total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+            today_items = conn.execute(
+                "SELECT COUNT(*) FROM items WHERE date(created_at) = ?", (today,)
+            ).fetchone()[0]
+
+            todo_count = conn.execute("SELECT COUNT(*) FROM tasks WHERE status='todo'").fetchone()[0]
+            today_tasks = conn.execute(
+                "SELECT title, priority FROM tasks WHERE status='todo' AND (due_date=? OR due_date IS NULL) ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END LIMIT 5",
+                (today,),
+            ).fetchall()
+
+            done_week = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE status='done' AND completed_at >= ?", (week_ago,)
+            ).fetchone()[0]
+
+            mem_total = conn.execute("SELECT COUNT(*) FROM memories WHERE status='confirmed'").fetchone()[0]
+            dec_pending = conn.execute("SELECT COUNT(*) FROM decisions WHERE status='pending'").fetchone()[0]
+
+            # Get latest daily review AI analysis
+            artifacts = list_review_artifacts()
+            review_text = ""
+            for a in artifacts:
+                if a.get("group") == "review" and a.get("window") == "daily":
+                    preview = a.get("preview", "")
+                    if "AI" in preview:
+                        review_text = preview
+                        break
+        finally:
+            conn.close()
+
+        lines = [
+            "你是 Axiom 个人外脑的每日简报助手。请生成一段温暖的早安简报（4-6句），包含：",
+            f"连续记录 {streak} 天，总共 {item_total} 条记录，今天已记 {today_items} 条",
+            f"待办 {todo_count} 个，本周完成 {done_week} 个任务",
+            f"已确认 {mem_total} 条记忆，{dec_pending} 条决策待回顾",
+        ]
+        if today_tasks:
+            lines.append("今日任务: " + ", ".join(f"[{t['priority']}]{t['title']}" for t in today_tasks))
+        if review_text and len(review_text) > 20:
+            lines.append(f"昨日回顾: {review_text[:200]}")
+        lines.append("用中文，语气像朋友，不需要标题。如果今天是周一可以说'新的一周'。")
+
+        prompt = "\n".join(lines)
+        try:
+            import openai
+            client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+            resp = client.chat.completions.create(
+                model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
+                max_tokens=300, temperature=0.7,
+            )
+            brief = resp.choices[0].message.content.strip()
+        except Exception as exc:
+            logger.exception("brief failed")
+            return error_response(500, "ai_error", str(exc))
+
+        return ok_response({"brief": brief, "generated_at": utc_now().isoformat(timespec="seconds")})
+
+
     @app.route("/chat", methods=["POST"])
     def ai_chat():
         auth_error = require_key()

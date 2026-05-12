@@ -581,6 +581,15 @@ button { font-family: inherit; cursor: pointer; transition: all var(--ease); }
 .setup-panel .section-head { margin-bottom: 12px; }
 
 /* ===== Suggestions ===== */
+.brief-card {
+    padding: 18px 22px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(0,212,170,0.08), rgba(59,130,246,0.06));
+    border: 1px solid rgba(0,212,170,0.12);
+    line-height: 1.65;
+}
+
 .suggestion-row:hover { background: rgba(255,255,255,0.03); border-radius: 6px; }
 
 /* ===== Chat ===== */
