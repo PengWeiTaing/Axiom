@@ -2162,6 +2162,15 @@ def build_stats_payload() -> dict:
         task_done = conn.execute(
             "SELECT COUNT(*) FROM tasks WHERE status = 'done'"
         ).fetchone()[0]
+
+        today = local_date_now()
+        daily_counts = [
+            conn.execute(
+                "SELECT COUNT(*) FROM items WHERE date(created_at) = ?",
+                ((today - timedelta(days=i)).isoformat(),),
+            ).fetchone()[0]
+            for i in range(6, -1, -1)
+        ]
     finally:
         conn.close()
 
@@ -2183,6 +2192,7 @@ def build_stats_payload() -> dict:
         "task_total": task_total,
         "task_todo": task_todo,
         "task_done": task_done,
+        "daily_counts": daily_counts,
     }
 
 

@@ -603,7 +603,30 @@ function updateLoadMoreButton(button, page, totalPages, emptyText = "没有更�
     button.textContent = hasMore ? "加载更多" : emptyText;
 }
 
+function renderSparkline(counts) {
+    if (!counts || counts.length === 0) return "";
+    const max = Math.max(...counts, 1);
+    const bars = counts.map((c, i) => {
+        const h = Math.max(2, Math.round((c / max) * 48));
+        const today = i === counts.length - 1;
+        return `<span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <span style="width:100%;height:${h}px;background:${today ? 'var(--bloom-cyan)' : 'var(--glass-strong)'};border-radius:3px 3px 0 0;transition:height 300ms"></span>
+            <span style="font-size:0.55rem;color:${today ? 'var(--bloom-cyan)' : 'var(--ink-dim)'}">${c}</span>
+        </span>`;
+    }).join("");
+    return `<div style="display:flex;align-items:flex-end;gap:3px;height:56px;padding:0 4px">${bars}</div>`;
+}
+
 function renderOverviewStats(stats) {
+    const sparkline = renderSparkline(stats.daily_counts);
+    if (sparkline) {
+        elements.overviewStats.insertAdjacentHTML("beforebegin",
+            `<div class="subpanel" style="margin-bottom:12px">
+                <p class="subtle-text" style="margin-bottom:8px">过去 7 天活跃度</p>
+                ${sparkline}
+            </div>`);
+    }
+
     const cards = [
         ["连续记录", `${stats.streak || 0} 天`],
         ["总条目", stats.total],
