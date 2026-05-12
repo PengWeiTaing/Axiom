@@ -605,6 +605,7 @@ function updateLoadMoreButton(button, page, totalPages, emptyText = "没有更�
 
 function renderOverviewStats(stats) {
     const cards = [
+        ["连续记录", `${stats.streak || 0} 天`],
         ["总条目", stats.total],
         ["文本", stats.by_type?.text || 0],
         ["图片", stats.by_type?.image || 0],
@@ -618,6 +619,7 @@ function renderOverviewStats(stats) {
     ];
 
     const filterMap = [
+        null,  // streak card has no filter
         { kind: "all", value: "" },
         { kind: "type", value: "text" },
         { kind: "type", value: "image" },
@@ -636,9 +638,11 @@ function renderOverviewStats(stats) {
                 <button
                     class="stat-card"
                     type="button"
+                    ${filterMap[index] ? `
                     data-action="apply-overview-filter"
                     data-filter-kind="${escapeHtml(filterMap[index].kind)}"
                     data-filter-value="${escapeHtml(filterMap[index].value)}"
+                    ` : ""}
                 >
                     <span class="subtle-text">${escapeHtml(label)}</span>
                     <strong>${escapeHtml(value)}</strong>

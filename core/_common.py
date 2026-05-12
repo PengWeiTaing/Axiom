@@ -2179,10 +2179,34 @@ def build_stats_payload() -> dict:
         "memory_candidate": memory_candidate,
         "memory_confirmed": memory_confirmed,
         "memory_by_category": rows_to_count_map(memory_category_rows, "category"),
+        "streak": compute_streak(),
         "task_total": task_total,
         "task_todo": task_todo,
         "task_done": task_done,
     }
+
+
+def compute_streak() -> int:
+    """计算连续记录天数。"""
+    conn = get_db_connection()
+    try:
+        today = local_date_now()
+        streak = 0
+        for i in range(365):
+            check_date = (today - timedelta(days=i)).isoformat()
+            count = conn.execute(
+                "SELECT COUNT(*) FROM items WHERE date(created_at) = ?",
+                (check_date,),
+            ).fetchone()[0]
+            if count > 0:
+                streak += 1
+            elif i == 0:
+                continue  # today can be 0, streak continues from yesterday
+            else:
+                break
+    finally:
+        conn.close()
+    return streak
 
 
 def fetch_recent_item_rows(limit: int) -> list[sqlite3.Row]:
