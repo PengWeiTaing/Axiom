@@ -1059,6 +1059,9 @@ def register_routes(app):
         filter_clause = join_conditions(filter_conditions, "AND")
         extra_where = f" {filter_clause}" if filter_clause else ""
 
+        mode = request.args.get("mode", "").strip()
+        use_semantic = mode == "semantic"
+
         conn = get_db_connection()
         try:
             total = conn.execute(
@@ -1070,22 +1073,78 @@ def register_routes(app):
                 """,
                 (fts_query, *filter_params),
             ).fetchone()["total"]
-
-            rows = conn.execute(
-                f"""
-                SELECT
-                    {ITEM_JOIN_SELECT_FIELDS},
-                    -rank AS score
-                FROM items_fts
-                JOIN items ON items_fts.rowid = items.id
-                WHERE items_fts MATCH ?{extra_where}
-                ORDER BY {order_clause}
-                LIMIT ? OFFSET ?
-                """,
-                (fts_query, *filter_params, page_size, offset),
-            ).fetchall()
+            rows = []
         finally:
             conn.close()
+
+        # Semantic search: FTS5 found nothing or user explicitly requested
+        if (total == 0 or use_semantic) and DEEPSEEK_API_KEY:
+            conn = get_db_connection()
+            try:
+                candidate_rows = conn.execute(
+                    f"SELECT id, type, content, original_name FROM items WHERE 1=1{extra_where} ORDER BY id DESC LIMIT 50",
+                    filter_params,
+                ).fetchall()
+            finally:
+                conn.close()
+
+            if candidate_rows:
+                lines = [f"查询: {query}", "从以下条目中找出最相关的内容（最多10条），每行一个 id:", ""]
+                for r in candidate_rows:
+                    text = (r["content"] or r["original_name"] or "")[:150]
+                    lines.append(f"id={r['id']}: {text}")
+
+                try:
+                    import openai
+                    client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+                    resp = client.chat.completions.create(
+                        model=DEEPSEEK_MODEL,
+                        messages=[{"role": "user", "content": "\n".join(lines)}],
+                        max_tokens=200,
+                        temperature=0.3,
+                    )
+                    ai_text = resp.choices[0].message.content.strip()
+                    matched_ids = set()
+                    for line in ai_text.split("\n"):
+                        for part in line.strip().lstrip("- ").replace(",", " ").split():
+                            part = part.strip().replace("id=", "").replace("ID=", "")
+                            try:
+                                matched_ids.add(int(part))
+                            except ValueError:
+                                pass
+
+                    if matched_ids:
+                        conn = get_db_connection()
+                        try:
+                            placeholders = ",".join("?" for _ in matched_ids)
+                            rows = conn.execute(
+                                f"SELECT {ITEM_JOIN_SELECT_FIELDS}, 0 AS score FROM items WHERE id IN ({placeholders}) ORDER BY id DESC LIMIT ?",
+                                list(matched_ids) + [page_size],
+                            ).fetchall()
+                            total = len(rows)
+                        finally:
+                            conn.close()
+                except Exception:
+                    pass  # AI failed, return empty
+
+        if not rows and total > 0:
+            conn = get_db_connection()
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT
+                        {ITEM_JOIN_SELECT_FIELDS},
+                        -rank AS score
+                    FROM items_fts
+                    JOIN items ON items_fts.rowid = items.id
+                    WHERE items_fts MATCH ?{extra_where}
+                    ORDER BY {order_clause}
+                    LIMIT ? OFFSET ?
+                    """,
+                    (fts_query, *filter_params, page_size, offset),
+                ).fetchall()
+            finally:
+                conn.close()
 
         total_pages = (total + page_size - 1) // page_size
         return ok_response(
