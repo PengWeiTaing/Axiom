@@ -49,6 +49,22 @@ def log_request_start():
 
 
 @app.after_request
+def compress_response(response):
+    import gzip
+    accept = request.headers.get("Accept-Encoding", "")
+    if "gzip" not in accept:
+        return response
+    if response.content_length and response.content_length < 500:
+        return response
+    if "text/event-stream" in response.content_type:
+        return response
+    response.data = gzip.compress(response.data)
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers["Content-Length"] = str(len(response.data))
+    return response
+
+
+@app.after_request
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
