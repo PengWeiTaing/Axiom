@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone
 
 from core._common import (  # noqa: E402
-    app, logger, AXIOM_ROOT, INBOX_PATH, ARCHIVE_PATH, DB_PATH,
+    app, logger, AXIOM_ROOT, INBOX_PATH, ARCHIVE_PATH, DB_PATH, LOG_PATH,
     init_app_storage, get_db_connection,
     ok_response, error_response,
     AUTOMATION_JOBS,
@@ -33,9 +33,27 @@ register_governance(app)
 # ===== 请求日志中间件 =====
 
 @app.before_request
+def handle_cors_preflight():
+    if request.method == "OPTIONS":
+        resp = app.make_default_options_response()
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Axiom-Key"
+        return resp
+
+
+@app.before_request
 def log_request_start():
     import time as _time
     request._start_time = _time.time()
+
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Axiom-Key"
+    return response
 
 
 @app.after_request
@@ -211,6 +229,8 @@ def system_info():
         "backup_age_hours": backup_age_hours,
         "backup_ok": backup_ok,
         "tables": tables,
+        "log_size_bytes": Path(LOG_PATH).stat().st_size if LOG_PATH and Path(LOG_PATH).exists() else 0,
+        "log_size_mb": round((Path(LOG_PATH).stat().st_size if LOG_PATH and Path(LOG_PATH).exists() else 0) / (1024 * 1024), 2),
         "integrity": {
             "ok": integrity_ok,
             "orphan_memories": orphan_memories,
