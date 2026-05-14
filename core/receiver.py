@@ -178,6 +178,31 @@ def admin_enable_module(module_name: str):
     return error_response(404, "not_found", "模块不存在")
 
 
+@app.route("/admin/vacuum", methods=["POST"])
+def admin_vacuum():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+    import time as _time
+    before = DB_PATH.stat().st_size if DB_PATH.exists() else 0
+    conn = get_db_connection()
+    try:
+        conn.execute("PRAGMA optimize")
+        conn.execute("VACUUM")
+        conn.commit()
+    finally:
+        conn.close()
+    after = DB_PATH.stat().st_size
+    saved = before - after
+    write_audit_log("db_vacuum", "system")
+    return ok_response({
+        "before_bytes": before,
+        "after_bytes": after,
+        "saved_bytes": saved,
+        "saved_mb": round(saved / (1024 * 1024), 2),
+    })
+
+
 @app.route("/admin/modules/<module_name>/disable", methods=["POST"])
 def admin_disable_module(module_name: str):
     auth_error = require_key()
