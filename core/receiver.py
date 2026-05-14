@@ -180,6 +180,18 @@ def system_info():
             except sqlite3.Error:
                 tables[table] = 0
         fts_size = conn.execute("SELECT COUNT(*) FROM items_fts").fetchone()[0]
+
+        # Data integrity checks
+        orphan_memories = conn.execute(
+            "SELECT COUNT(*) FROM memories WHERE source_item_id IS NOT NULL AND source_item_id NOT IN (SELECT id FROM items)"
+        ).fetchone()[0]
+        orphan_tasks = conn.execute(
+            "SELECT COUNT(*) FROM tasks WHERE memory_id IS NOT NULL AND memory_id NOT IN (SELECT id FROM memories)"
+        ).fetchone()[0]
+        empty_content = conn.execute(
+            "SELECT COUNT(*) FROM items WHERE (content IS NULL OR TRIM(content)='') AND (derived_text IS NULL OR TRIM(derived_text)='') AND (transcript_text IS NULL OR TRIM(transcript_text)='')"
+        ).fetchone()[0]
+        integrity_ok = orphan_memories == 0 and orphan_tasks == 0
     finally:
         conn.close()
 
@@ -193,6 +205,12 @@ def system_info():
         "backup_age_hours": backup_age_hours,
         "backup_ok": backup_ok,
         "tables": tables,
+        "integrity": {
+            "ok": integrity_ok,
+            "orphan_memories": orphan_memories,
+            "orphan_tasks": orphan_tasks,
+            "empty_content_items": empty_content,
+        },
     })
 
 
