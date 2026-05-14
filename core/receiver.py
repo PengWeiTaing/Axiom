@@ -30,6 +30,22 @@ register_ai(app)
 register_governance(app)
 
 
+# ===== 请求日志中间件 =====
+
+@app.before_request
+def log_request_start():
+    import time as _time
+    request._start_time = _time.time()
+
+
+@app.after_request
+def log_request_end(response):
+    import time as _time
+    duration_ms = int((_time.time() - getattr(request, "_start_time", _time.time())) * 1000)
+    logger.info("%s %s -> %s (%dms)", request.method, request.path, response.status_code, duration_ms)
+    return response
+
+
 # ===== 错误处理 =====
 
 @app.errorhandler(Exception)
