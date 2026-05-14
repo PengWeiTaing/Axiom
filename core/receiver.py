@@ -42,6 +42,12 @@ def log_request_start():
 def log_request_end(response):
     import time as _time
     duration_ms = int((_time.time() - getattr(request, "_start_time", _time.time())) * 1000)
+    with _metrics_lock:
+        _metrics["requests"] += 1
+        if response.status_code >= 400:
+            _metrics["errors"] += 1
+        if duration_ms > 500:
+            _metrics["slow"] += 1
     if duration_ms > 500:
         logger.warning("SLOW %s %s -> %s (%dms)", request.method, request.path, response.status_code, duration_ms)
     else:
@@ -214,8 +220,86 @@ def system_info():
     })
 
 
+def startup_self_check():
+    """启动自检：验证 DB、FTS5、目录、模块。"""
+    checks = []
+    warnings = []
+
+    # 1. DB
+    if DB_PATH.exists():
+        checks.append(("db", "ok", f"{DB_PATH.stat().st_size} bytes"))
+    else:
+        checks.append(("db", "fail", "axiom.db not found"))
+
+    # 2. FTS5
+    conn = get_db_connection()
+    try:
+        fts_count = conn.execute("SELECT COUNT(*) FROM items_fts").fetchone()[0]
+        item_count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        if fts_count == item_count:
+            checks.append(("fts5", "ok", f"{fts_count} entries"))
+        else:
+            warnings.append(f"fts5 mismatch: items={item_count} fts={fts_count}")
+            checks.append(("fts5", "warn", f"items={item_count} fts={fts_count}"))
+    except sqlite3.Error:
+        checks.append(("fts5", "fail", "table missing"))
+    finally:
+        conn.close()
+
+    # 3. Directories
+    for name, path in [("inbox", INBOX_PATH), ("archive", ARCHIVE_PATH)]:
+        if path.exists():
+            checks.append((name, "ok", str(path)))
+        else:
+            warnings.append(f"{name} directory missing: {path}")
+
+    # 4. Modules
+    checks.append(("modules", "ok", f"{len(AXIOM_MODULES)} loaded"))
+
+    # 5. AI
+    if DEEPSEEK_API_KEY:
+        checks.append(("ai", "ok", "DeepSeek configured"))
+    else:
+        checks.append(("ai", "warn", "no API key"))
+        warnings.append("DEEPSEEK_API_KEY not set, AI features unavailable")
+
+    for name, status, detail in checks:
+        level = logging.WARNING if status == "warn" else logging.ERROR if status == "fail" else logging.INFO
+        logger.log(level, "startup check %s: %s (%s)", name, status, detail)
+
+    for w in warnings:
+        logger.warning("startup warning: %s", w)
+
+    return checks, warnings
+
+
+# ===== 运行时指标 =====
+import threading as _threading
+_start_time = datetime.now(timezone.utc)
+_metrics_lock = _threading.Lock()
+_metrics = {"requests": 0, "errors": 0, "slow": 0}
+
+
+@app.route("/metrics", methods=["GET"])
+def metrics():
+    uptime = (datetime.now(timezone.utc) - _start_time).total_seconds()
+    hours = int(uptime // 3600)
+    minutes = int((uptime % 3600) // 60)
+    with _metrics_lock:
+        m = dict(_metrics)
+    total = max(m["requests"], 1)
+    return ok_response({
+        "uptime": f"{hours}h {minutes}m",
+        "requests": m["requests"],
+        "errors": m["errors"],
+        "error_rate": round(m["errors"] / total * 100, 2),
+        "slow_requests": m["slow"],
+    })
+
+
 init_app_storage()
 init_modules(app)
+startup_self_check()
 
 if __name__ == "__main__":
     import os
