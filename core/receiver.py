@@ -42,7 +42,10 @@ def log_request_start():
 def log_request_end(response):
     import time as _time
     duration_ms = int((_time.time() - getattr(request, "_start_time", _time.time())) * 1000)
-    logger.info("%s %s -> %s (%dms)", request.method, request.path, response.status_code, duration_ms)
+    if duration_ms > 500:
+        logger.warning("SLOW %s %s -> %s (%dms)", request.method, request.path, response.status_code, duration_ms)
+    else:
+        logger.info("%s %s -> %s (%dms)", request.method, request.path, response.status_code, duration_ms)
     return response
 
 
