@@ -45,7 +45,9 @@ def handle_cors_preflight():
 @app.before_request
 def log_request_start():
     import time as _time
+    import uuid as _uuid
     request._start_time = _time.time()
+    request._req_id = str(_uuid.uuid4())[:8]
 
 
 @app.after_request
@@ -61,6 +63,18 @@ def compress_response(response):
     response.data = gzip.compress(response.data)
     response.headers["Content-Encoding"] = "gzip"
     response.headers["Content-Length"] = str(len(response.data))
+    return response
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Cache static assets
+    if request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "public, max-age=86400, immutable"
     return response
 
 
@@ -82,10 +96,11 @@ def log_request_end(response):
             _metrics["errors"] += 1
         if duration_ms > 500:
             _metrics["slow"] += 1
+    req_id = getattr(request, "_req_id", "--------")
     if duration_ms > 500:
-        logger.warning("SLOW %s %s -> %s (%dms)", request.method, request.path, response.status_code, duration_ms)
+        logger.warning("[%s] SLOW %s %s -> %s (%dms)", req_id, request.method, request.path, response.status_code, duration_ms)
     else:
-        logger.info("%s %s -> %s (%dms)", request.method, request.path, response.status_code, duration_ms)
+        logger.info("[%s] %s %s -> %s (%dms)", req_id, request.method, request.path, response.status_code, duration_ms)
     return response
 
 
