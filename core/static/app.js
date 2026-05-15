@@ -4306,6 +4306,28 @@ function bindForms() {
         }
     });
 
+    document.getElementById("quick-filters")?.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-quick-filter]");
+        if (!btn) return;
+        const filter = btn.getAttribute("data-quick-filter");
+        document.querySelectorAll("#quick-filters .tag-ok").forEach(t => t.classList.replace("tag-ok", "tag-dim"));
+        btn.classList.replace("tag-dim", "tag-ok");
+        if (filter === "all") {
+            elements.recentFilterForm.reset();
+            void loadRecentPage({ reset: true });
+        } else if (filter.startsWith("created_from=7d")) {
+            const d = new Date(); d.setDate(d.getDate() - 7);
+            document.querySelector("#recent-filter-form [name='created_from']")?.setAttribute("value", d.toISOString().slice(0, 10));
+            void loadRecentPage({ reset: true });
+        } else if (filter.startsWith("type=")) {
+            document.querySelector("#recent-filter-form [name='type']")?.setAttribute("value", filter.split("=")[1]);
+            void loadRecentPage({ reset: true });
+        } else if (filter.startsWith("processing_state=")) {
+            document.querySelector("#recent-filter-form [name='processing_state']")?.setAttribute("value", filter.split("=")[1]);
+            void loadRecentPage({ reset: true });
+        }
+    });
+
     elements.searchForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         try {

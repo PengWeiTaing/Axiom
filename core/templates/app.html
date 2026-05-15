@@ -464,7 +464,15 @@
                 </div>
             </section>
 
-            <section class="panel search-panel" id="search-panel">
+            <div id="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    <button class="tag tag-dim" data-quick-filter="type=image">图片</button>
+    <button class="tag tag-dim" data-quick-filter="type=document">文档</button>
+    <button class="tag tag-dim" data-quick-filter="type=audio">音频</button>
+    <button class="tag tag-dim" data-quick-filter="processing_state=pending">待处理</button>
+    <button class="tag tag-dim" data-quick-filter="created_from=7d">本周</button>
+    <button class="tag tag-dim" data-quick-filter="all">全部</button>
+</div>
+<section class="panel search-panel" id="search-panel">
                 <div class="section-head">
                     <div>
                         <p class="eyebrow">Search</p>
