@@ -32,6 +32,31 @@ register_governance(app)
 
 # ===== 请求日志中间件 =====
 
+# Simple in-memory rate limiter (60 req/min per IP)
+_rate_limits: dict[str, list[float]] = {}
+_rate_limit = 120
+_rate_window = 60  # seconds
+
+
+@app.before_request
+def check_rate_limit():
+    import time as _time
+    ip = request.remote_addr or "unknown"
+    if ip in ("127.0.0.1", "localhost", "::1"):
+        return None
+    now = _time.time()
+    window_start = now - _rate_window
+
+    if ip not in _rate_limits:
+        _rate_limits[ip] = []
+
+    _rate_limits[ip] = [t for t in _rate_limits[ip] if t > window_start]
+    if len(_rate_limits[ip]) >= _rate_limit:
+        logger.warning("rate limit exceeded for %s", ip)
+        return error_response(429, "rate_limited", "请求过于频繁，请稍后再试。")
+    _rate_limits[ip].append(now)
+
+
 @app.before_request
 def handle_cors_preflight():
     if request.method == "OPTIONS":
@@ -402,6 +427,7 @@ def metrics():
         "errors": m["errors"],
         "error_rate": round(m["errors"] / total * 100, 2),
         "slow_requests": m["slow"],
+        "rate_limited_ips": len(_rate_limits),
     })
 
 
