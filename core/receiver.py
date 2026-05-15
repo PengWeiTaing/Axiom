@@ -246,6 +246,78 @@ def admin_rebuild_fts():
     return ok_response({"message": "FTS5 index rebuilt"})
 
 
+@app.route("/admin/dedup", methods=["GET"])
+def admin_dedup():
+    """检测重复条目（内容完全相同的 items）。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    conn = get_db_connection()
+    try:
+        rows = conn.execute(
+            """SELECT content, COUNT(*) as cnt, GROUP_CONCAT(id) as ids
+               FROM items WHERE content IS NOT NULL AND TRIM(content) != ''
+               GROUP BY content HAVING cnt > 1 ORDER BY cnt DESC LIMIT 30"""
+        ).fetchall()
+    finally:
+        conn.close()
+
+    duplicates = []
+    for r in rows:
+        ids = [int(x) for x in r["ids"].split(",")]
+        duplicates.append({
+            "content": (r["content"] or "")[:100],
+            "count": r["cnt"],
+            "ids": ids,
+            "keep": ids[0],  # suggestion: keep the oldest
+        })
+
+    return ok_response({"total": len(duplicates), "duplicates": duplicates})
+
+
+@app.route("/admin/cleanup", methods=["POST"])
+def admin_cleanup():
+    """清理旧数据：旧自动化运行、旧审计日志、回收空间。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    days_automation = parse_positive_int(request.args.get("automation_days"), "automation_days", 90)
+    days_audit = parse_positive_int(request.args.get("audit_days"), "audit_days", 180)
+
+    conn = get_db_connection()
+    cleaned = {}
+    try:
+        # 1. Old automation runs
+        cutoff_auto = (utc_now() - timedelta(days=days_automation)).isoformat(timespec="seconds")
+        result = conn.execute("DELETE FROM automation_runs WHERE started_at < ?", (cutoff_auto,))
+        cleaned["automation_runs"] = result.rowcount
+
+        # 2. Old audit log entries
+        cutoff_audit = (utc_now() - timedelta(days=days_audit)).isoformat(timespec="seconds")
+        result = conn.execute("DELETE FROM audit_log WHERE created_at < ?", (cutoff_audit,))
+        cleaned["audit_log"] = result.rowcount
+
+        # 3. Vacuum
+        conn.execute("PRAGMA optimize")
+        conn.commit()
+
+        before = DB_PATH.stat().st_size
+        conn.execute("VACUUM")
+        after = DB_PATH.stat().st_size
+        cleaned["db_before_bytes"] = before
+        cleaned["db_after_bytes"] = after
+        cleaned["db_saved_bytes"] = before - after
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    write_audit_log("cleanup", "system")
+    return ok_response({"cleaned": cleaned})
+
+
 @app.route("/admin/vacuum", methods=["POST"])
 def admin_vacuum():
     auth_error = require_key()
