@@ -463,6 +463,114 @@ init_app_storage()
 init_modules(app)
 startup_self_check()
 
+@app.route("/search/all", methods=["GET"])
+def search_all():
+    """跨 items、memories、tasks 的统一搜索。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    q = request.args.get("q", "").strip()
+    if not q:
+        return error_response(400, "empty_query", "q 不能为空")
+
+    limit = parse_positive_int(request.args.get("limit"), "limit", 20)
+    results = {"items": [], "memories": [], "tasks": [], "decisions": []}
+
+    conn = get_db_connection()
+    try:
+        # 1. Items via FTS5
+        fts_q = escape_fts_query(q)
+        if fts_q != '""':
+            item_rows = conn.execute(
+                "SELECT items.id, items.type, items.content, items.created_at, -rank AS score FROM items_fts JOIN items ON items_fts.rowid = items.id WHERE items_fts MATCH ? ORDER BY rank LIMIT ?",
+                (fts_q, limit),
+            ).fetchall()
+            results["items"] = [{"id": r["id"], "type": r["type"], "content": (r["content"] or "")[:200], "created_at": r["created_at"], "score": r["score"]} for r in item_rows]
+
+        # 2. Memories
+        like = f"%{escape_like(q)}%"
+        mem_rows = conn.execute(
+            "SELECT id, category, content, status, created_at FROM memories WHERE content LIKE ? ESCAPE '\\' OR detail LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",
+            (like, like, limit),
+        ).fetchall()
+        results["memories"] = [{"id": r["id"], "category": r["category"], "content": r["content"], "status": r["status"], "created_at": r["created_at"]} for r in mem_rows]
+
+        # 3. Tasks
+        task_rows = conn.execute(
+            "SELECT id, title, status, priority, created_at FROM tasks WHERE title LIKE ? ESCAPE '\\' OR detail LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",
+            (like, like, limit),
+        ).fetchall()
+        results["tasks"] = [{"id": r["id"], "title": r["title"], "status": r["status"], "priority": r["priority"], "created_at": r["created_at"]} for r in task_rows]
+
+        # 4. Decisions
+        dec_rows = conn.execute(
+            "SELECT id, title, decision, status, created_at FROM decisions WHERE title LIKE ? ESCAPE '\\' OR decision LIKE ? ESCAPE '\\' OR reasoning LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",
+            (like, like, like, limit),
+        ).fetchall()
+        results["decisions"] = [{"id": r["id"], "title": r["title"], "decision": r["decision"], "status": r["status"], "created_at": r["created_at"]} for r in dec_rows]
+    finally:
+        conn.close()
+
+    total = sum(len(v) for v in results.values())
+    return ok_response({"query": q, "total": total, "results": results})
+
+
+@app.route("/items/batch", methods=["POST"])
+def batch_items():
+    """批量操作：归档或删除多条 items。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    body = request.get_json(silent=True) or {}
+    ids = body.get("ids", [])
+    action = body.get("action", "").strip()
+
+    if not isinstance(ids, list) or len(ids) == 0:
+        return error_response(400, "missing_ids", "ids 必须是非空数组")
+    if action not in ("archive", "delete"):
+        return error_response(400, "invalid_action", "action 必须是 archive 或 delete")
+
+    success = []
+    failed = []
+    conn = get_db_connection()
+    try:
+        for item_id in ids:
+            try:
+                row = conn.execute("SELECT id, type, file_path FROM items WHERE id = ?", (item_id,)).fetchone()
+                if row is None:
+                    failed.append({"id": item_id, "reason": "not found"})
+                    continue
+
+                if action == "delete":
+                    conn.execute("UPDATE memories SET source_item_id = NULL WHERE source_item_id = ?", (item_id,))
+                    conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+                    if row["file_path"]:
+                        fp = resolve_stored_file_path(row["file_path"])
+                        if fp and fp.exists():
+                            fp.unlink(missing_ok=True)
+                    fts_delete_item(item_id)
+                    write_audit_log("item_delete", "item", item_id)
+                    success.append(item_id)
+                else:  # archive
+                    old_path = resolve_stored_file_path(row["file_path"])
+                    if old_path and old_path.exists():
+                        archive_path = build_archive_file_path(datetime.now(timezone.utc), old_path)
+                        archive_path.parent.mkdir(parents=True, exist_ok=True)
+                        old_path.rename(archive_path)
+                        conn.execute("UPDATE items SET file_path = ? WHERE id = ?", (str(archive_path), item_id))
+                    write_audit_log("item_archive", "item", item_id)
+                    success.append(item_id)
+            except Exception as exc:
+                failed.append({"id": item_id, "reason": str(exc)})
+        conn.commit()
+    finally:
+        conn.close()
+
+    return ok_response({"action": action, "success": len(success), "failed": failed})
+
+
 @app.route("/import", methods=["POST"])
 def import_data():
     auth_error = require_key()
