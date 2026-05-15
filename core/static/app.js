@@ -673,6 +673,32 @@ function renderOverviewMemories() {
     `).join("");
 }
 
+function renderTodayFocus() {
+    const container = document.getElementById("overview-focus");
+    if (!container) return;
+
+    const tasks = state.tasks?.todayItems || [];
+    const overdue = state.tasks?.overdueItems || [];
+    const mems = state.memories?.items || [];
+    const pendingMems = mems.filter(m => m.status === "candidate");
+    const alerts = Array.from(container.parentElement?.querySelectorAll?.(".alert-item") || []);
+
+    const lines = [];
+    if (overdue.length > 0) {
+        lines.push(`<span style="color:var(--warn)">${overdue.length} 个任务已过期</span>`);
+    }
+    if (tasks.length > 0) {
+        lines.push(`<span>${tasks.length} 个今日任务</span>`);
+    }
+    if (pendingMems.length > 0) {
+        lines.push(`<span style="color:var(--bloom-cyan)">${pendingMems.length} 条待确认记忆</span>`);
+    }
+    if (lines.length === 0) {
+        lines.push("<span>今天还没有记录，开始写点什么吧</span>");
+    }
+    container.innerHTML = lines.join(" &nbsp;·&nbsp; ");
+}
+
 function renderOverviewStats(stats) {
     const sparkline = renderSparkline(stats.daily_counts);
     if (sparkline) {
@@ -682,6 +708,7 @@ function renderOverviewStats(stats) {
                 ${sparkline}
             </div>`);
     }
+    renderTodayFocus();
 
     const cards = [
         ["连续记录", `${stats.streak || 0} 天`],
@@ -3268,6 +3295,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         renderOverviewTasks({ today: state.tasks.todayItems, overdue: state.tasks.overdueItems });
         await loadMemories({ reset: true });
         renderOverviewMemories();
+        renderTodayFocus();
         await loadAlerts();
         await loadBrief();
         await loadSuggestions();
