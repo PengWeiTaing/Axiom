@@ -448,6 +448,27 @@ if __name__ == "__main__":
     _signal.signal(_signal.SIGTERM, _graceful_shutdown)
     _signal.signal(_signal.SIGINT, _graceful_shutdown)
 
+    # Systemd watchdog: periodically ping via NOTIFY_SOCKET if available
+    _notify_socket = os.environ.get("NOTIFY_SOCKET")
+    _watchdog_usec = os.environ.get("WATCHDOG_USEC")
+    if _notify_socket and _watchdog_usec:
+        import socket as _socket
+        import time as _time2
+        _watchdog_sec = max(int(_watchdog_usec) / 1_000_000 / 3, 1)
+        _sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_DGRAM)
+        _sock.connect(_notify_socket)
+
+        def _watchdog_ping():
+            while True:
+                _time2.sleep(_watchdog_sec)
+                try:
+                    _sock.send(b"WATCHDOG=1")
+                except Exception:
+                    break
+        import threading as _threading
+        _threading.Thread(target=_watchdog_ping, daemon=True).start()
+        logger.info("systemd watchdog: interval=%ss", _watchdog_sec)
+
     import os as _os
     host = _os.environ.get("AXIOM_HOST", "0.0.0.0")
     port = int(_os.environ.get("AXIOM_PORT", "5000"))
