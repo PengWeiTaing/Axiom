@@ -416,6 +416,31 @@ _metrics_lock = _threading.Lock()
 _metrics = {"requests": 0, "errors": 0, "slow": 0}
 
 
+@app.route("/api", methods=["GET"])
+def api_docs():
+    """返回所有 API 端点的文档。"""
+    routes = []
+    for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
+        if rule.rule.startswith("/static") or rule.rule == "/sw.js":
+            continue
+        methods = sorted(m for m in rule.methods if m not in ("HEAD", "OPTIONS"))
+        func = app.view_functions.get(rule.endpoint)
+        doc = (func.__doc__ or "").strip().split("\n")[0] if func else ""
+        routes.append({
+            "path": rule.rule,
+            "methods": methods,
+            "auth": "none" if rule.rule in ("/health", "/app", "/sw.js") else "X-Axiom-Key",
+            "description": doc,
+        })
+
+    return ok_response({
+        "total": len(routes),
+        "routes": routes,
+        "auth_header": "X-Axiom-Key",
+        "base_url": f"{request.scheme}://{request.host}",
+    })
+
+
 @app.route("/metrics", methods=["GET"])
 def metrics():
     uptime = (datetime.now(timezone.utc) - _start_time).total_seconds()
@@ -437,6 +462,140 @@ def metrics():
 init_app_storage()
 init_modules(app)
 startup_self_check()
+
+@app.route("/import", methods=["POST"])
+def import_data():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    if "file" not in request.files:
+        return error_response(400, "missing_file", "需要上传 ZIP 文件（field name: file）")
+
+    uploaded = request.files["file"]
+    if not uploaded.filename or not uploaded.filename.endswith(".zip"):
+        return error_response(400, "invalid_format", "只支持 .zip 格式的 Axiom 导出文件")
+
+    import tempfile, zipfile
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+    try:
+        uploaded.save(tmp.name)
+        imported = {"items": 0, "memories": 0, "tasks": 0, "decisions": 0, "files": 0}
+
+        with zipfile.ZipFile(tmp.name, "r") as zf:
+            for name in zf.namelist():
+                if name.endswith("items.json"):
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for item in data:
+                            try:
+                                conn.execute(
+                                    "INSERT OR IGNORE INTO items (id, type, content, file_path, source, created_at, original_name, mime_type, size_bytes, derived_text, transcript_text, processing_override) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                                    (item.get("id"), item.get("type", "text"), item.get("content"), item.get("file_path"), item.get("source"), item.get("created_at"), item.get("original_name"), item.get("mime_type"), item.get("size_bytes"), item.get("derived_text"), item.get("transcript_text"), item.get("processing_override")),
+                                )
+                                imported["items"] += 1
+                            except sqlite3.IntegrityError:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
+
+                if name.endswith("memories.json"):
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for mem in data:
+                            try:
+                                conn.execute(
+                                    "INSERT OR IGNORE INTO memories (id, category, content, detail, status, source_item_id, source_text, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                                    (mem.get("id"), mem.get("category","fact"), mem.get("content"), mem.get("detail"), mem.get("status","confirmed"), mem.get("source_item_id"), mem.get("source_text"), mem.get("created_at"), mem.get("updated_at", mem.get("created_at"))),
+                                )
+                                imported["memories"] += 1
+                            except sqlite3.IntegrityError:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
+
+                if name.endswith("tasks.json"):
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for task in data:
+                            try:
+                                conn.execute(
+                                    "INSERT OR IGNORE INTO tasks (id, title, detail, status, priority, memory_id, due_date, estimated_minutes, completed_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                                    (task.get("id"), task.get("title"), task.get("detail"), task.get("status","todo"), task.get("priority","medium"), task.get("memory_id"), task.get("due_date"), task.get("estimated_minutes"), task.get("completed_at"), task.get("created_at"), task.get("updated_at", task.get("created_at"))),
+                                )
+                                imported["tasks"] += 1
+                            except sqlite3.IntegrityError:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
+
+                if "/files/" in name and not name.endswith("/"):
+                    dest = AXIOM_ROOT / "data" / name.split("files/", 1)[1]
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    if not dest.exists():
+                        dest.write_bytes(zf.read(name))
+                        imported["files"] += 1
+
+        fts_backfill(get_db_connection())
+        write_audit_log("data_import", "system")
+        return ok_response({"imported": imported})
+    except Exception as exc:
+        return error_response(500, "import_failed", str(exc))
+    finally:
+        try:
+            Path(tmp.name).unlink()
+        except OSError:
+            pass
+
+
+# ===== Webhook 系统 =====
+import threading as _threading
+_webhooks: list[dict] = []
+
+
+def fire_webhook(event: str, data: dict) -> None:
+    """异步触发 webhook。"""
+    for wh in _webhooks:
+        if wh.get("event") == event or wh.get("event") == "*":
+            def _send(url=wh["url"], payload={"event": event, "data": data}):
+                try:
+                    import urllib.request as _ur
+                    req = _ur.Request(url, data=_json.dumps(payload).encode("utf-8"),
+                                       headers={"Content-Type": "application/json"})
+                    _ur.urlopen(req, timeout=10)
+                except Exception:
+                    pass
+            _threading.Thread(target=_send, daemon=True).start()
+
+
+@app.route("/admin/webhooks", methods=["GET", "POST", "DELETE"])
+def manage_webhooks():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    if request.method == "GET":
+        return ok_response({"webhooks": _webhooks})
+
+    if request.method == "DELETE":
+        _webhooks.clear()
+        return ok_response({"message": "所有 webhook 已清除"})
+
+    body = request.get_json(silent=True) or {}
+    url = str(body.get("url", "")).strip()
+    event = str(body.get("event", "*")).strip()
+    if not url:
+        return error_response(400, "missing_url", "url 不能为空")
+    _webhooks.append({"url": url, "event": event})
+    write_audit_log("webhook_add", "system")
+    return ok_response({"webhooks": _webhooks})
+
 
 if __name__ == "__main__":
     import signal as _signal
