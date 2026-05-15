@@ -575,6 +575,41 @@ def batch_items():
     return ok_response({"action": action, "success": len(success), "failed": failed})
 
 
+@app.route("/export/csv", methods=["GET"])
+def export_csv():
+    """导出 items 为 CSV 格式。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    table = request.args.get("table", "items").strip()
+    if table not in ("items", "memories", "tasks", "decisions"):
+        return error_response(400, "invalid_table", "table 必须是 items, memories, tasks 或 decisions")
+
+    conn = get_db_connection()
+    try:
+        rows = conn.execute(f"SELECT * FROM {table} ORDER BY id DESC LIMIT 10000").fetchall()
+    finally:
+        conn.close()
+
+    if not rows:
+        return error_response(404, "empty", "没有数据")
+
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(rows[0].keys())
+    for row in rows:
+        writer.writerow([str(v) if v is not None else "" for v in row])
+
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=axiom_{table}_{local_date_now().isoformat()}.csv"},
+    )
+
+
 @app.route("/import", methods=["POST"])
 def import_data():
     auth_error = require_key()
