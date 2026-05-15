@@ -3286,8 +3286,11 @@ function showChatGreeting() {
 async function syncDashboard({ showMessage = false } = {}) {
     try {
         requireKey();
-        setConnectionState("busy", "正在同步总览、最近记录和自动化产物");
+        setConnectionState("busy", "正在同步...");
+        const skeleton = document.getElementById("overview-skeleton");
+        if (skeleton) skeleton.style.display = "";
         await loadOverview();
+        if (skeleton) skeleton.style.display = "none";
         await loadProcessingQueue();
         await loadRecentPage({ reset: true });
         await loadAutomationJobs();
