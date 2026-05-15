@@ -633,6 +633,46 @@ function renderSparkline(counts) {
     return `<div style="display:flex;align-items:flex-end;gap:3px;height:56px;padding:0 4px">${bars}</div>`;
 }
 
+function renderOverviewTasks(todayData) {
+    const container = document.getElementById("overview-today-tasks");
+    if (!container) return;
+    const today = todayData?.today || [];
+    const overdue = todayData?.overdue || [];
+    const all = [...overdue, ...today].slice(0, 5);
+    if (all.length === 0) {
+        container.innerHTML = '<p class="item-meta">今天没有待办任务</p>';
+        return;
+    }
+    container.innerHTML = all.map(t => {
+        const isOverdue = t.overdue_days > 0;
+        const badge = isOverdue ? `<span class="tag tag-warn">过期${t.overdue_days}天</span>` : "";
+        return `
+            <div class="task-inline-row">
+                <button class="text-button task-done-btn" data-action="task-done" data-task-id="${t.id}" title="完成">○</button>
+                <span style="flex:1;font-size:0.85rem;${isOverdue ? 'color:var(--warn)' : ''}">${escapeHtml(t.title)}</span>
+                ${badge}
+            </div>
+        `;
+    }).join("");
+}
+
+function renderOverviewMemories() {
+    const container = document.getElementById("overview-pending-memories");
+    if (!container) return;
+    const mems = state.memories?.items || [];
+    const pending = mems.filter(m => m.status === "candidate").slice(0, 3);
+    if (pending.length === 0) {
+        container.innerHTML = '<p class="item-meta">没有待确认的记忆</p>';
+        return;
+    }
+    container.innerHTML = pending.map(m => `
+        <div class="task-inline-row">
+            <span style="flex:1;font-size:0.85rem">[${escapeHtml(m.category_label)}] ${escapeHtml(m.content)}</span>
+            <button class="text-button" data-action="confirm-memory" data-memory-id="${m.id}">确认</button>
+        </div>
+    `).join("");
+}
+
 function renderOverviewStats(stats) {
     const sparkline = renderSparkline(stats.daily_counts);
     if (sparkline) {
@@ -2825,6 +2865,7 @@ async function handleTaskDone(taskId) {
         await loadTasksToday();
         await loadTasks({ reset: true });
         updateSidebarBadges();
+        renderOverviewTasks({ today: state.tasks.todayItems, overdue: state.tasks.overdueItems });
         setConnectionState("ready", "任务已完成");
     } catch (error) {
         showToast(error.message);
@@ -3224,6 +3265,9 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadTasksToday();
         await loadTasks({ reset: true });
         await loadDecisions({ reset: true });
+        renderOverviewTasks({ today: state.tasks.todayItems, overdue: state.tasks.overdueItems });
+        await loadMemories({ reset: true });
+        renderOverviewMemories();
         await loadAlerts();
         await loadBrief();
         await loadSuggestions();
