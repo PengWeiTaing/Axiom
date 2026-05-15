@@ -870,6 +870,59 @@ def manage_webhooks():
     return ok_response({"webhooks": _webhooks})
 
 
+@app.route("/ping", methods=["GET"])
+def ai_ping():
+    """检查 AI 服务连通性。"""
+    if not DEEPSEEK_API_KEY:
+        return ok_response({"ai": "unconfigured", "latency_ms": 0})
+
+    import time as _time
+    start = _time.time()
+    try:
+        import openai
+        client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+        client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+            temperature=0,
+        )
+        latency = int((_time.time() - start) * 1000)
+        return ok_response({"ai": "ok", "model": DEEPSEEK_MODEL, "latency_ms": latency})
+    except Exception as exc:
+        latency = int((_time.time() - start) * 1000)
+        return ok_response({"ai": "error", "error": str(exc)[:200], "latency_ms": latency})
+
+
+@app.route("/admin/stats/daily", methods=["GET"])
+def admin_daily_stats():
+    """返回过去 30 天每天的新增条目数。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    days = parse_positive_int(request.args.get("days"), "days", 30)
+    conn = get_db_connection()
+    try:
+        daily = []
+        for i in range(days - 1, -1, -1):
+            d = (local_date_now() - timedelta(days=i)).isoformat()
+            count = conn.execute(
+                "SELECT COUNT(*) FROM items WHERE date(created_at) = ?", (d,)
+            ).fetchone()[0]
+            tasks_count = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE date(created_at) = ?", (d,)
+            ).fetchone()[0]
+            done_count = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE status='done' AND date(completed_at) = ?", (d,)
+            ).fetchone()[0]
+            daily.append({"date": d, "items": count, "tasks_created": tasks_count, "tasks_done": done_count})
+    finally:
+        conn.close()
+
+    return ok_response({"days": days, "daily": daily})
+
+
 if __name__ == "__main__":
     import signal as _signal
 
