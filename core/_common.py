@@ -544,6 +544,15 @@ def init_db(db_path: Path = DB_PATH) -> None:
         ensure_tasks_table_columns(conn)
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS module_state (
                 name TEXT PRIMARY KEY,
                 enabled INTEGER NOT NULL DEFAULT 1,
@@ -2225,6 +2234,24 @@ def build_stats_payload() -> dict:
         "task_done": task_done,
         "daily_counts": daily_counts,
     }
+
+
+def ensure_migration(version: int, name: str) -> None:
+    """确保 schema 迁移已应用。"""
+    conn = get_db_connection()
+    try:
+        existing = conn.execute(
+            "SELECT version FROM schema_migrations WHERE version = ?", (version,)
+        ).fetchone()
+        if not existing:
+            conn.execute(
+                "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                (version, name, utc_now().isoformat(timespec="seconds")),
+            )
+            conn.commit()
+            logger.info("applied migration %s: %s", version, name)
+    finally:
+        conn.close()
 
 
 def compute_streak() -> int:

@@ -304,7 +304,7 @@ def system_info():
     conn = get_db_connection()
     try:
         tables = {}
-        for table in ["items", "memories", "tasks", "decisions", "audit_log", "automation_runs", "module_state"]:
+        for table in ["items", "memories", "tasks", "decisions", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
             try:
                 tables[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             except sqlite3.Error:
@@ -335,6 +335,10 @@ def system_info():
         "backup_age_hours": backup_age_hours,
         "backup_ok": backup_ok,
         "tables": tables,
+        "migrations": [
+            {"version": m["version"], "name": m["name"], "applied_at": m["applied_at"]}
+            for m in conn.execute("SELECT version, name, applied_at FROM schema_migrations ORDER BY version").fetchall()
+        ],
         "log_size_bytes": Path(LOG_PATH).stat().st_size if LOG_PATH and Path(LOG_PATH).exists() else 0,
         "log_size_mb": round((Path(LOG_PATH).stat().st_size if LOG_PATH and Path(LOG_PATH).exists() else 0) / (1024 * 1024), 2),
         "integrity": {
