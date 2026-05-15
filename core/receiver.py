@@ -178,6 +178,28 @@ def admin_enable_module(module_name: str):
     return error_response(404, "not_found", "模块不存在")
 
 
+@app.route("/admin/rebuild-fts", methods=["POST"])
+def admin_rebuild_fts():
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+    conn = get_db_connection()
+    try:
+        conn.execute("DELETE FROM items_fts")
+        rows = conn.execute("SELECT id, content, original_name, derived_text, transcript_text FROM items").fetchall()
+        for r in rows:
+            conn.execute(
+                "INSERT INTO items_fts(rowid, content, original_name, derived_text, transcript_text) VALUES (?, ?, ?, ?, ?)",
+                (r["id"], cjk_tokenize(r["content"]), cjk_tokenize(r["original_name"]),
+                 cjk_tokenize(r["derived_text"]), cjk_tokenize(r["transcript_text"])),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    write_audit_log("fts_rebuild", "system")
+    return ok_response({"message": "FTS5 index rebuilt"})
+
+
 @app.route("/admin/vacuum", methods=["POST"])
 def admin_vacuum():
     auth_error = require_key()
@@ -283,6 +305,7 @@ def system_info():
 
 def startup_self_check():
     """启动自检：验证 DB、FTS5、目录、模块。"""
+    import os as _os
     checks = []
     warnings = []
 
@@ -322,7 +345,16 @@ def startup_self_check():
         checks.append(("ai", "ok", "DeepSeek configured"))
     else:
         checks.append(("ai", "warn", "no API key"))
-        warnings.append("DEEPSEEK_API_KEY not set, AI features unavailable")
+        warnings.append("AXIOM_DEEPSEEK_API_KEY not set, AI features unavailable")
+
+    # 6. Environment
+    for var, label in [("AXIOM_SECRET_KEY", "secret key"), ("AXIOM_ROOT", "root path")]:
+        if _os.environ.get(var):
+            checks.append((f"env:{var}", "ok", "set"))
+        else:
+            checks.append((f"env:{var}", "warn", f"using default, set {var} in .env"))
+    if not _os.environ.get("AXIOM_HOST"):
+        checks.append(("env:AXIOM_HOST", "ok", "using 0.0.0.0 (default)"))
 
     for name, status, detail in checks:
         level = logging.WARNING if status == "warn" else logging.ERROR if status == "fail" else logging.INFO
