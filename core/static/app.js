@@ -694,9 +694,15 @@ function renderTodayFocus() {
         lines.push(`<span style="color:var(--bloom-cyan)">${pendingMems.length} 条待确认记忆</span>`);
     }
     if (lines.length === 0) {
-        lines.push("<span>今天还没有记录，开始写点什么吧</span>");
+        const totalTasks = (state.tasks?.items || []).length;
+        if (totalTasks > 0) {
+            lines.push("<span style=\"color:var(--ok)\">今天任务全部完成！</span>");
+        } else {
+            lines.push("<span>今天还没有记录，开始写点什么吧</span>");
+        }
     }
     container.innerHTML = lines.join(" &nbsp;·&nbsp; ");
+    container.style.display = "block";
 }
 
 function renderOverviewStats(stats) {
