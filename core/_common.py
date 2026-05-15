@@ -400,6 +400,13 @@ def ensure_storage_dirs() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
+def ensure_items_table_columns_v2(conn: sqlite3.Connection) -> None:
+    """V2  columns added after initial schema."""
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(items)").fetchall()}
+    if "file_sha256" not in existing:
+        conn.execute("ALTER TABLE items ADD COLUMN file_sha256 TEXT")
+
+
 def ensure_tasks_table_columns(conn: sqlite3.Connection) -> None:
     existing = {row[1] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()}
     if "estimated_minutes" not in existing:
@@ -450,6 +457,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
             """
         )
         ensure_items_table_columns(conn)
+        ensure_items_table_columns_v2(conn)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at)"
         )
@@ -1725,6 +1733,19 @@ def write_text_file_atomic(file_path: Path, text: str) -> None:
     except Exception:
         tmp_path.unlink(missing_ok=True)
         raise
+
+
+def compute_file_sha256(file_path: Path) -> str | None:
+    """计算文件的 SHA256 哈希。"""
+    import hashlib
+    try:
+        sha = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha.update(chunk)
+        return sha.hexdigest()
+    except Exception:
+        return None
 
 
 def write_binary_file_atomic(file_path: Path, uploaded_file) -> None:
