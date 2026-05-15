@@ -290,6 +290,55 @@ def register_routes(app):
             conn.close()
 
 
+    @app.route("/tasks/<int:task_id>/breakdown", methods=["POST"])
+    def task_breakdown(task_id: int):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+        if not DEEPSEEK_API_KEY:
+            return error_response(503, "ai_unavailable", "未配置 AI API key")
+
+        conn = get_db_connection()
+        try:
+            row = conn.execute("SELECT id, title, detail FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            if row is None:
+                return error_response(404, "not_found", "任务不存在")
+        finally:
+            conn.close()
+
+        prompt = f"把这个任务拆解成3-5个可执行的小步骤（每个5-15分钟能完成）：\n任务：{row['title']}\n"
+        if row["detail"]:
+            prompt += f"详情：{row['detail']}\n"
+        prompt += "每行一个步骤，以 '- ' 开头，简洁。用中文。"
+
+        try:
+            import openai
+            client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+            resp = client.chat.completions.create(
+                model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
+                max_tokens=300, temperature=0.5,
+            )
+            steps_text = resp.choices[0].message.content.strip()
+        except Exception as exc:
+            return error_response(500, "ai_error", str(exc))
+
+        # Create subtasks
+        created = []
+        for line in steps_text.split("\n"):
+            line = line.strip().lstrip("- ").strip()
+            if line and len(line) > 2:
+                now = utc_now().isoformat(timespec="seconds")
+                cursor = conn.execute(
+                    "INSERT INTO tasks (title, status, priority, memory_id, created_at, updated_at) VALUES (?, 'todo', 'medium', ?, ?, ?)",
+                    (line, row["memory_id"] if "memory_id" in row.keys() else None, now, now),
+                )
+                conn.commit()
+                created.append({"id": cursor.lastrowid, "title": line})
+
+        write_audit_log("task_breakdown", "task", task_id)
+        return ok_response({"original_id": task_id, "subtasks": created})
+
+
     @app.route("/tasks/<int:task_id>/cancel", methods=["POST"])
     def task_cancel(task_id: int):
         auth_error = require_key()

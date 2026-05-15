@@ -656,6 +656,23 @@ function renderOverviewTasks(todayData) {
     }).join("");
 }
 
+function showRandomMemory() {
+    const container = document.getElementById("overview-random-memory");
+    if (!container) return;
+    const confirmed = (state.memories?.items || []).filter(m => m.status === "confirmed");
+    if (confirmed.length === 0) {
+        container.innerHTML = "";
+        return;
+    }
+    const mem = confirmed[Math.floor(Math.random() * confirmed.length)];
+    container.innerHTML = `
+        <div class="subpanel" style="border-color:rgba(244,114,182,0.15);background:linear-gradient(135deg,rgba(244,114,182,0.06),rgba(59,130,246,0.04))">
+            <p class="subtle-text" style="margin-bottom:4px">回忆一下</p>
+            <p style="font-size:0.9rem">[${escapeHtml(mem.category_label)}] ${escapeHtml(mem.content)}</p>
+        </div>
+    `;
+}
+
 function renderOverviewMemories() {
     const container = document.getElementById("overview-pending-memories");
     if (!container) return;
@@ -3304,6 +3321,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         renderOverviewTasks({ today: state.tasks.todayItems, overdue: state.tasks.overdueItems });
         await loadMemories({ reset: true });
         renderOverviewMemories();
+        showRandomMemory();
         renderTodayFocus();
         await loadAlerts();
         await loadBrief();
