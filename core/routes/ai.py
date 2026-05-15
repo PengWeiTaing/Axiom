@@ -75,6 +75,72 @@ def register_routes(app):
 
     # ===== AI 管家 =====
 
+    @app.route("/report/weekly", methods=["GET"])
+    def weekly_report():
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+        if not DEEPSEEK_API_KEY:
+            return error_response(503, "ai_unavailable", "未配置 AI API key")
+
+        conn = get_db_connection()
+        try:
+            week_ago = (utc_now() - timedelta(days=7)).isoformat(timespec="seconds")
+            two_weeks_ago = (utc_now() - timedelta(days=14)).isoformat(timespec="seconds")
+
+            this_week = conn.execute("SELECT COUNT(*) FROM items WHERE created_at >= ?", (week_ago,)).fetchone()[0]
+            last_week = conn.execute("SELECT COUNT(*) FROM items WHERE created_at >= ? AND created_at < ?", (two_weeks_ago, week_ago)).fetchone()[0]
+
+            tasks_done = conn.execute("SELECT COUNT(*) FROM tasks WHERE status='done' AND completed_at >= ?", (week_ago,)).fetchone()[0]
+            tasks_total = conn.execute("SELECT COUNT(*) FROM tasks WHERE created_at >= ?", (week_ago,)).fetchone()[0]
+
+            new_memories = conn.execute("SELECT COUNT(*) FROM memories WHERE created_at >= ?", (week_ago,)).fetchone()[0]
+
+            type_rows = conn.execute(
+                "SELECT type, COUNT(*) as cnt FROM items WHERE created_at >= ? GROUP BY type ORDER BY cnt DESC",
+                (week_ago,),
+            ).fetchall()
+
+            streak = compute_streak()
+        finally:
+            conn.close()
+
+        type_str = ", ".join(f"{r['type']} {r['cnt']}" for r in type_rows)
+        trend = "↑" if this_week > last_week else "↓" if this_week < last_week else "→"
+
+        prompt = (
+            f"请生成一份温暖的 Axiom 周报（5-8句），用中文。\n"
+            f"本周记录 {this_week} 条（上周 {last_week}）{trend}\n"
+            f"分布: {type_str}\n"
+            f"完成任务 {tasks_done}/{tasks_total}，新增记忆 {new_memories}，连续记录 {streak} 天\n"
+            f"请包括：主要活动和变化、值得肯定的进步、下周 1-2 条建议。语气像关心你的朋友。"
+        )
+        try:
+            import openai
+            client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+            resp = client.chat.completions.create(
+                model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
+                max_tokens=500, temperature=0.7,
+            )
+            report = resp.choices[0].message.content.strip()
+        except Exception as exc:
+            return error_response(500, "ai_error", str(exc))
+
+        return ok_response({
+            "report": report,
+            "stats": {
+                "this_week_items": this_week,
+                "last_week_items": last_week,
+                "trend": trend,
+                "tasks_done": tasks_done,
+                "tasks_total": tasks_total,
+                "new_memories": new_memories,
+                "streak": streak,
+            },
+            "generated_at": utc_now().isoformat(timespec="seconds"),
+        })
+
+
     @app.route("/brief", methods=["GET"])
     def daily_brief():
         auth_error = require_key()

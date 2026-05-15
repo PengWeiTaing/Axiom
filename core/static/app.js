@@ -2986,6 +2986,28 @@ async function loadAiReview() {
     }
 }
 
+async function loadWeeklyReport() {
+    try {
+        const payload = await apiRequest("/report/weekly");
+        const report = payload.report || "";
+        if (!report) return;
+        const container = document.getElementById("overview-weekly");
+        if (!container) return;
+        const stats = payload.stats || {};
+        const trendIcon = stats.trend === "↑" ? "↗" : stats.trend === "↓" ? "↘" : "→";
+        container.innerHTML = `
+            <div class="brief-card" style="border-color:rgba(240,192,96,0.15);background:linear-gradient(135deg,rgba(240,192,96,0.06),rgba(0,212,170,0.04))">
+                <p class="subtle-text" style="margin-bottom:4px">本周报告 ${trendIcon} ${stats.this_week_items || 0} 条记录 · 完成 ${stats.tasks_done || 0} 个任务 · 连续 ${stats.streak || 0} 天</p>
+                <p class="item-card-text">${renderMarkdown(report)}</p>
+            </div>
+        `;
+        container.style.display = "";
+    } catch (e) {
+        const c = document.getElementById("overview-weekly");
+        if (c) c.style.display = "none";
+    }
+}
+
 async function loadBrief() {
     try {
         const payload = await apiRequest("/brief");
@@ -3206,6 +3228,7 @@ async function syncDashboard({ showMessage = false } = {}) {
         await loadBrief();
         await loadSuggestions();
         await loadAiReview();
+        await loadWeeklyReport();
         await loadModulesManage();
         updateSidebarBadges();
         if (state.search.active) {
