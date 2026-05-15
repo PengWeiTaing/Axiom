@@ -120,6 +120,9 @@ def log_request_end(response):
     duration_ms = int((_time.time() - getattr(request, "_start_time", _time.time())) * 1000)
     with _metrics_lock:
         _metrics["requests"] += 1
+        ep = _metrics["endpoints"]
+        key = f"{request.method} {request.path}"
+        ep[key] = ep.get(key, 0) + 1
         if response.status_code >= 400:
             _metrics["errors"] += 1
         if duration_ms > 500:
@@ -417,7 +420,7 @@ def startup_self_check():
 import threading as _threading
 _start_time = datetime.now(timezone.utc)
 _metrics_lock = _threading.Lock()
-_metrics = {"requests": 0, "errors": 0, "slow": 0}
+_metrics = {"requests": 0, "errors": 0, "slow": 0, "endpoints": {}}
 
 
 @app.route("/api", methods=["GET"])
@@ -502,6 +505,7 @@ def metrics():
     with _metrics_lock:
         m = dict(_metrics)
     total = max(m["requests"], 1)
+    endpoints_sorted = sorted(m.get("endpoints", {}).items(), key=lambda x: -x[1])[:20]
     return ok_response({
         "uptime": f"{hours}h {minutes}m",
         "requests": m["requests"],
@@ -509,6 +513,7 @@ def metrics():
         "error_rate": round(m["errors"] / total * 100, 2),
         "slow_requests": m["slow"],
         "rate_limited_ips": len(_rate_limits),
+        "top_endpoints": [{"path": k, "count": v} for k, v in endpoints_sorted],
     })
 
 
