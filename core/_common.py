@@ -342,9 +342,22 @@ AUTOMATION_JOBS = {
 }
 
 
+LOG_FORMAT = os.environ.get("AXIOM_LOG_FORMAT", "text")
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        import json as _json
+        return _json.dumps({
+            "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }, ensure_ascii=False)
+
+
 def configure_logging() -> None:
     log_level = os.environ.get("AXIOM_LOG_LEVEL", "INFO").upper()
-    log_format = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
     handlers: list[logging.Handler] = [logging.StreamHandler()]
 
     if LOG_PATH:
@@ -352,7 +365,14 @@ def configure_logging() -> None:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
 
-    logging.basicConfig(level=log_level, format=log_format, handlers=handlers)
+    if LOG_FORMAT == "json":
+        formatter = JsonFormatter()
+        for h in handlers:
+            h.setFormatter(formatter)
+        logging.basicConfig(level=log_level, handlers=handlers)
+    else:
+        log_format = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+        logging.basicConfig(level=log_level, format=log_format, handlers=handlers)
 
 
 configure_logging()

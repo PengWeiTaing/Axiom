@@ -5,6 +5,7 @@ from __future__ import annotations
 from core._common import *  # noqa: F401, F403, E402
 
 import logging
+import sys
 from datetime import datetime, timezone
 
 from core._common import (  # noqa: E402
@@ -97,9 +98,11 @@ def add_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    # Cache static assets
+    # Cache static assets (24h), disable caching for API responses
     if request.path.startswith("/static/"):
         response.headers["Cache-Control"] = "public, max-age=86400, immutable"
+    elif request.path != "/health":
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
@@ -436,7 +439,17 @@ init_modules(app)
 startup_self_check()
 
 if __name__ == "__main__":
-    import os
-    host = os.environ.get("AXIOM_HOST", "0.0.0.0")
-    port = int(os.environ.get("AXIOM_PORT", "5000"))
+    import signal as _signal
+
+    def _graceful_shutdown(signum, frame):
+        logger.info("received signal %s, shutting down gracefully", signum)
+        sys.exit(0)
+
+    _signal.signal(_signal.SIGTERM, _graceful_shutdown)
+    _signal.signal(_signal.SIGINT, _graceful_shutdown)
+
+    import os as _os
+    host = _os.environ.get("AXIOM_HOST", "0.0.0.0")
+    port = int(_os.environ.get("AXIOM_PORT", "5000"))
+    logger.info("starting Axiom receiver on %s:%s", host, port)
     app.run(host=host, port=port)
