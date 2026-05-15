@@ -459,6 +459,15 @@ def init_db(db_path: Path = DB_PATH) -> None:
         ensure_items_table_columns(conn)
         ensure_items_table_columns_v2(conn)
         conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_preferences (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at)"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(type)")
@@ -2271,6 +2280,72 @@ def ensure_migration(version: int, name: str) -> None:
             )
             conn.commit()
             logger.info("applied migration %s: %s", version, name)
+    finally:
+        conn.close()
+
+
+def get_preference(key: str, default: str = "") -> str:
+    """读取用户偏好。"""
+    conn = get_db_connection()
+    try:
+        row = conn.execute("SELECT value FROM user_preferences WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+    finally:
+        conn.close()
+
+
+def set_preference(key: str, value: str) -> None:
+    """写入用户偏好。"""
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO user_preferences (key, value, updated_at) VALUES (?, ?, ?)",
+            (key, value, utc_now().isoformat(timespec="seconds")),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def learn_user_patterns() -> dict:
+    """从数据中学习用户行为模式。"""
+    conn = get_db_connection()
+    try:
+        # Preferred capture time (hour of day)
+        hours = conn.execute(
+            "SELECT CAST(strftime('%H', created_at) AS INTEGER) as h, COUNT(*) as cnt FROM items GROUP BY h ORDER BY cnt DESC LIMIT 3"
+        ).fetchall()
+        peak_hours = [r["h"] for r in hours] if hours else []
+
+        # Preferred content type
+        types = conn.execute(
+            "SELECT type, COUNT(*) as cnt FROM items GROUP BY type ORDER BY cnt DESC"
+        ).fetchall()
+        top_type = types[0]["type"] if types else "text"
+
+        # Task completion rate
+        total_tasks = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+        done_tasks = conn.execute("SELECT COUNT(*) FROM tasks WHERE status='done'").fetchone()[0]
+        completion_rate = round(done_tasks / max(total_tasks, 1) * 100)
+
+        # Memory category preference
+        mem_cats = conn.execute(
+            "SELECT category, COUNT(*) as cnt FROM memories WHERE status='confirmed' GROUP BY category ORDER BY cnt DESC LIMIT 3"
+        ).fetchall()
+        top_categories = [r["category"] for r in mem_cats] if mem_cats else []
+
+        # Avg items per week (last 4 weeks)
+        weekly = conn.execute(
+            "SELECT COUNT(*) / 4.0 FROM items WHERE created_at >= date('now', '-28 days')"
+        ).fetchone()[0]
+
+        return {
+            "peak_hours": peak_hours,
+            "top_type": top_type,
+            "task_completion_rate": completion_rate,
+            "top_memory_categories": top_categories,
+            "avg_weekly_items": round(weekly, 1),
+        }
     finally:
         conn.close()
 

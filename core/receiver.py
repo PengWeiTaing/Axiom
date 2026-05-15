@@ -870,6 +870,70 @@ def manage_webhooks():
     return ok_response({"webhooks": _webhooks})
 
 
+@app.route("/admin/insights", methods=["GET"])
+def admin_insights():
+    """系统自知：使用模式、用户行为、增长趋势。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    patterns = learn_user_patterns()
+
+    # Growth trend: items per week for past 8 weeks
+    conn = get_db_connection()
+    try:
+        weekly_trend = []
+        for i in range(7, -1, -1):
+            start = (local_date_now() - timedelta(weeks=i+1)).isoformat()
+            end = (local_date_now() - timedelta(weeks=i)).isoformat()
+            count = conn.execute(
+                "SELECT COUNT(*) FROM items WHERE created_at >= ? AND created_at < ?",
+                (start, end),
+            ).fetchone()[0]
+            weekly_trend.append({"week": i, "start": start[:10], "count": count})
+
+        # Feature usage: which days are most active
+        day_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        day_counts = conn.execute(
+            "SELECT CAST(strftime('%w', created_at) AS INTEGER) as dow, COUNT(*) as cnt FROM items GROUP BY dow ORDER BY dow"
+        ).fetchall()
+        by_day = {}
+        for r in day_counts:
+            dow = (int(r["dow"]) + 6) % 7  # SQLite Sunday=0, adjust to Monday=0
+            by_day[day_names[dow]] = r["cnt"]
+
+        # Content type trend (recent 30 days vs previous 30 days)
+        recent_start = (local_date_now() - timedelta(days=30)).isoformat()
+        prev_start = (local_date_now() - timedelta(days=60)).isoformat()
+        recent_types = conn.execute(
+            "SELECT type, COUNT(*) as cnt FROM items WHERE created_at >= ? GROUP BY type",
+            (recent_start,),
+        ).fetchall()
+        prev_types = conn.execute(
+            "SELECT type, COUNT(*) as cnt FROM items WHERE created_at >= ? AND created_at < ?",
+            (prev_start, recent_start),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    # Recommendations based on patterns
+    recommendations = []
+    if patterns["task_completion_rate"] < 30:
+        recommendations.append("任务完成率偏低(<30%)，建议减少任务数量或拆分大任务")
+    if patterns["avg_weekly_items"] < 2:
+        recommendations.append("每周记录较少(<2条)，尝试每天记录一件小事")
+    if patterns["peak_hours"]:
+        recommendations.append(f"你最活跃的时间是 {patterns['peak_hours'][0]} 点，可以在这个时段处理任务")
+
+    return ok_response({
+        "patterns": patterns,
+        "weekly_trend": weekly_trend,
+        "by_day": by_day,
+        "recommendations": recommendations,
+        "generated_at": utc_now().isoformat(timespec="seconds"),
+    })
+
+
 @app.route("/ping", methods=["GET"])
 def ai_ping():
     """检查 AI 服务连通性。"""
