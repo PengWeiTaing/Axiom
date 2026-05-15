@@ -3279,35 +3279,42 @@ async function handleUrlFetchSubmit(event) {
 async function handleTextCaptureSubmit(event) {
     event.preventDefault();
     const text = elements.textInput.value.trim();
-    const sourceInput = document.getElementById("text-source-input");
-    const source = sourceInput.value.trim() || "web_app";
+    if (!text) { setFeedback(elements.captureFeedback, "内容不能为空。", "error"); return; }
+    elements.textInput.value = "";
 
-    if (!text) {
-        setFeedback(elements.captureFeedback, "文本内容不能为空。", "error");
-        return;
-    }
+    // Smart capture: AI determines type, creates the right thing
+    let parsed = null;
+    try { parsed = await apiRequest("/parse", { method: "POST", json: { text } }); } catch (e) { /* fallback */ }
 
+    const type = parsed?.type || "note";
     try {
-        setConnectionState("busy", "正在写入文本");
-        const payload = await apiRequest("/add", {
-            method: "POST",
-            json: {
-                text,
-                source,
-            },
-        });
-        elements.textInput.value = "";
-        setFeedback(
-            elements.captureFeedback,
-            `文本已写入 inbox，item #${payload.item.id}`,
-            "ok",
-        );
-        showToast("文本已写入 Axiom");
-        await syncDashboard();
+        setConnectionState("busy", "AI 正在理解...");
+        let resultMsg = "";
+        if (type === "task") {
+            await apiRequest("/tasks", { method: "POST", json: { title: parsed.title || text, priority: parsed.priority || "medium", due_date: parsed.due_date || undefined } });
+            await loadTasksToday(); await loadTasks({ reset: true }); updateSidebarBadges();
+            resultMsg = `已创建任务: ${parsed.title || text}`;
+        } else if (type === "memory") {
+            await apiRequest("/memories", { method: "POST", json: { category: parsed.category || "fact", content: parsed.content || text } });
+            await loadMemories({ reset: true });
+            resultMsg = `已创建记忆: ${parsed.content || text}`;
+        } else if (type === "decision") {
+            await apiRequest("/decisions", { method: "POST", json: { title: parsed.title || text.slice(0, 60), decision: parsed.decision || text } });
+            await loadDecisions({ reset: true });
+            resultMsg = `已记录决策`;
+        } else if (type === "url" || text.startsWith("http")) {
+            const r = await apiRequest("/fetch", { method: "POST", json: { url: text } });
+            resultMsg = `已抓取: ${r.item?.original_name || text}`;
+        } else {
+            await apiRequest("/add", { method: "POST", json: { text, source: "web_app" } });
+            resultMsg = `已保存 (${type})`;
+        }
+        setFeedback(elements.captureFeedback, resultMsg, "ok");
+        setConnectionState("ready", resultMsg);
+        void syncDashboard({ showMessage: false });
     } catch (error) {
-        setConnectionState("error", error.message);
         setFeedback(elements.captureFeedback, error.message, "error");
-        showToast(error.message);
+        setConnectionState("error", error.message);
     }
 }
 

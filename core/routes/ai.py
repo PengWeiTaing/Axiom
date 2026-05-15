@@ -141,6 +141,57 @@ def register_routes(app):
         })
 
 
+    @app.route("/parse", methods=["POST"])
+    def parse_input():
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        body = request.get_json(silent=True) or {}
+        text = str(body.get("text", "")).strip()
+        if not text:
+            return error_response(400, "empty_text", "text 不能为空")
+
+        if not DEEPSEEK_API_KEY:
+            # Fallback: basic keyword classification
+            if any(kw in text for kw in ["明天", "后天", "下周", "记得", "要做", "完成", "交", "提交"]):
+                return ok_response({"type": "task", "title": text, "priority": "medium"})
+            if any(kw in text for kw in ["我决定", "我选择", "我打算选", "我确定"]):
+                return ok_response({"type": "decision", "title": text[:60], "decision": text})
+            if len(text) > 30 and ("我" in text):
+                return ok_response({"type": "memory", "category": "fact", "content": text})
+            return ok_response({"type": "note", "content": text})
+
+        prompt = (
+            f"分类这条输入：\n'{text}'\n\n"
+            "返回一行 JSON，包含 type 字段：\n"
+            "- note: 普通笔记、想法、记录\n"
+            "- task: 待办事项、提醒、要做的事。如果有时间信息，提取 title 和 due_date\n"
+            "- memory: 关于'我'的事实、偏好、目标。提取 category(fact/preference/goal/relationship/event)和 content\n"
+            "- decision: 做出的决定、选择。提取 title 和 decision\n"
+            "- health: 健康相关（体重、运动、饮食）\n"
+            "- url: 如果输入是一个链接\n"
+            "只返回 JSON，不要其他文字。示例：{\"type\":\"task\",\"title\":\"交报告\",\"priority\":\"high\",\"due_date\":\"2026-05-13\"}"
+        )
+        try:
+            import openai
+            client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
+            resp = client.chat.completions.create(
+                model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
+                max_tokens=200, temperature=0.2,
+            )
+            result_text = resp.choices[0].message.content.strip()
+            # Extract JSON from response
+            import re as _re
+            match = _re.search(r'\{[^{}]*\}', result_text)
+            if match:
+                parsed = json.loads(match.group())
+                return ok_response(parsed)
+            return ok_response({"type": "note", "content": text})
+        except Exception:
+            return ok_response({"type": "note", "content": text})
+
+
     @app.route("/brief", methods=["GET"])
     def daily_brief():
         auth_error = require_key()
