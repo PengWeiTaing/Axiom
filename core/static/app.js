@@ -4308,6 +4308,22 @@ function bindForms() {
         try {
             setConnectionState("busy", "正在搜索");
             await loadSearchPage({ reset: true });
+
+    // Search-as-you-type
+    const searchInputEl = elements.searchForm.querySelector("input[type='search'], input[name='q']");
+    if (searchInputEl) {
+        let debounce;
+        searchInputEl.addEventListener("input", () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(() => {
+                const q = searchInputEl.value.trim();
+                if (q.length >= 2) {
+                    setConnectionState("busy", "正在搜索");
+                    loadSearchPage({ reset: true });
+                }
+            }, 300);
+        });
+    }
             setConnectionState("ready", elements.lastSyncIndicator.textContent);
         } catch (error) {
             setConnectionState("error", error.message);
