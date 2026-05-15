@@ -552,16 +552,24 @@ def register_routes(app):
             lines.append("用户最近一周没有新增记录。")
             lines.append("")
 
+        # Add trend context
+        today = local_date_now()
+        daily_counts = []
+        for i in range(6, -1, -1):
+            d = (today - timedelta(days=i)).isoformat()
+            daily_counts.append(f"{d[-5:]}:{len([r for r in recent_items if (r['created_at'] or '')[:10] == d])}")
+        lines.append(f"每日活跃: {', '.join(daily_counts)}")
+        lines.append("")
+
         lines.extend([
             "请根据以上信息，给出 3 到 5 条具体、可执行的下一步建议。",
             "每条建议一行，以 '- ' 开头，20 字以内。",
             "",
-            "建议应该覆盖以下方面（有则提，没有则跳过）：",
-            "1. 最该优先做的事（从待办任务中选，考虑优先级和截止日期）",
-            "2. 长时间未完成的任务（提醒拆分或降低优先级）",
-            "3. 待确认的记忆（提醒用户处理）",
-            "4. 待回顾的决策（提醒复盘，特别是超过 3 天的）",
-            "5. 如果没有足够数据，建议用户今天记录一些内容",
+            "注意观察规律（有则提，没有则跳过）：",
+            "1. 活跃度下降趋势 → 鼓励恢复节奏",
+            "2. 某类记录增多 → 肯定并建议继续",
+            "3. 某类记录缺失（如运动） → 温和提醒",
+            "4. 过多未完成 → 建议优先排序或放弃",
             "",
             "用温暖、鼓励的语气，中文输出。不需要问好或结尾。",
         ])
