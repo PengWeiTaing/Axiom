@@ -3817,6 +3817,22 @@ function bindDelegatedActions() {
             await handleToggleModule(target.getAttribute("data-module-name"), true);
         } else if (action === "disable-module") {
             await handleToggleModule(target.getAttribute("data-module-name"), false);
+        } else if (action === "chat-to-task") {
+            const title = target.getAttribute("data-title");
+            try {
+                await apiRequest("/tasks", { method: "POST", json: { title, priority: "medium" } });
+                await loadTasksToday();
+                await loadTasks({ reset: true });
+                updateSidebarBadges();
+                showToast(`已创建任务: ${title}`);
+            } catch (e) { showToast(e.message); }
+        } else if (action === "chat-to-memory") {
+            const content = target.getAttribute("data-content");
+            try {
+                await apiRequest("/memories", { method: "POST", json: { category: "fact", content } });
+                await loadMemories({ reset: true });
+                showToast(`已创建记忆: ${content}`);
+            } catch (e) { showToast(e.message); }
         } else if (action === "task-done") {
             await handleTaskDone(target.getAttribute("data-task-id"));
         } else if (action === "task-todo") {
@@ -4503,6 +4519,16 @@ function showFloatMsg(role, content) {
     const div = document.createElement("div");
     div.className = `chat-msg ${role}`;
     div.innerHTML = `${role === "axi" ? renderMarkdown(content) : escapeHtml(content)}`;
+    if (role === "axi" && content.length > 10) {
+        const firstLine = content.split(/[。\n]/)[0].replace(/^[-\s*#]+/, "").trim().slice(0, 60);
+        const actions = document.createElement("div");
+        actions.className = "chat-actions";
+        actions.innerHTML = `
+            <button class="text-button" data-action="chat-to-task" data-title="${escapeHtml(firstLine)}">＋任务</button>
+            <button class="text-button" data-action="chat-to-memory" data-content="${escapeHtml(firstLine)}">🧠 记忆</button>
+        `;
+        div.appendChild(actions);
+    }
     elements.floatChatBody.appendChild(div);
     elements.floatChatBody.scrollTop = elements.floatChatBody.scrollHeight;
     return div;
