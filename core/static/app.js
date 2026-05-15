@@ -4717,41 +4717,15 @@ function bindQuickCapture() {
 
 function bindFloatAdd() {
     const btn = document.getElementById("float-add-btn");
-    const menu = document.getElementById("float-add-menu");
-    if (!btn || !menu) return;
+    if (!btn) return;
 
     btn.addEventListener("click", () => {
-        menu.classList.toggle("hidden");
+        showQuickCapture();
     });
 
-    menu.querySelectorAll("[data-quick-action]").forEach(b => {
-        b.addEventListener("click", async () => {
-            menu.classList.add("hidden");
-            const action = b.getAttribute("data-quick-action");
-            const sidebar = document.getElementById("desktop-sidebar");
-
-            if (action === "add-note") {
-                sidebar?.querySelector("[data-panel='capture-panel']")?.click();
-                setTimeout(() => elements.textInput?.focus(), 200);
-            } else if (action === "add-task") {
-                sidebar?.querySelector("[data-panel='tasks-panel']")?.click();
-                setTimeout(() => elements.taskQuickTitle?.focus(), 200);
-            } else if (action === "add-memory") {
-                sidebar?.querySelector("[data-panel='memories-panel']")?.click();
-                setTimeout(() => elements.memoryQuickContent?.focus(), 200);
-            } else if (action === "add-url") {
-                sidebar?.querySelector("[data-panel='capture-panel']")?.click();
-                setTimeout(() => elements.urlFetchInput?.focus(), 200);
-            }
-        });
-    });
-
-    // Close menu on outside click
-    document.addEventListener("click", (e) => {
-        if (!btn.contains(e.target) && !menu.contains(e.target)) {
-            menu.classList.add("hidden");
-        }
-    });
+    // Hide the old menu if it exists
+    const menu = document.getElementById("float-add-menu");
+    if (menu) menu.remove();
 }
 
 function bindFloatChat() {

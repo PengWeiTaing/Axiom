@@ -727,6 +727,12 @@ button { font-family: inherit; cursor: pointer; transition: all var(--ease); }
     position: fixed;
     bottom: 88px;
     right: 24px;
+}
+@media (max-width: 767px) {
+    .float-add-btn { bottom: 144px; right: 16px; }
+}
+
+.float-add-btn {
     width: 42px;
     height: 42px;
     border-radius: 50%;
@@ -744,39 +750,6 @@ button { font-family: inherit; cursor: pointer; transition: all var(--ease); }
     transition: all var(--ease);
 }
 .float-add-btn:hover { border-color: var(--bloom-amber); transform: scale(1.05); }
-
-.float-add-menu {
-    position: fixed;
-    bottom: 144px;
-    right: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 6px;
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--glass-border);
-    background: rgba(6,11,20,0.95);
-    backdrop-filter: blur(20px);
-    z-index: 39;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-    animation: popupIn 150ms ease;
-}
-.float-add-menu button {
-    padding: 8px 16px;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--ink-soft);
-    font-size: 0.82rem;
-    text-align: left;
-    white-space: nowrap;
-}
-.float-add-menu button:hover { background: var(--glass-hover); color: var(--ink); }
-
-@media (max-width: 767px) {
-    .float-add-btn { bottom: 144px; right: 16px; }
-    .float-add-menu { bottom: 200px; right: 16px; }
-}
 
 .float-chat-btn {
     position: fixed;
