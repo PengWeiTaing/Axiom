@@ -445,6 +445,55 @@ def api_docs():
     })
 
 
+@app.route("/admin/logs", methods=["GET"])
+def admin_logs():
+    """查看最近的应用日志。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    lines_param = parse_positive_int(request.args.get("lines"), "lines", 50)
+    level = request.args.get("level", "").strip().lower() or None
+
+    log_path = Path(LOG_PATH).expanduser().resolve() if LOG_PATH else None
+    if not log_path or not log_path.exists():
+        return error_response(404, "no_log_file", "日志文件不存在或未配置 AXIOM_LOG_PATH")
+
+    try:
+        raw = log_path.read_text(encoding="utf-8", errors="replace")
+        all_lines = raw.strip().split("\n")
+        if level:
+            all_lines = [l for l in all_lines if level.upper() in l]
+        recent = all_lines[-lines_param:]
+        return ok_response({"lines": len(recent), "log": recent})
+    except Exception as exc:
+        return error_response(500, "log_read_failed", str(exc))
+
+
+@app.route("/admin/backup", methods=["POST"])
+def admin_backup():
+    """手动触发数据备份。"""
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
+
+    import subprocess as _sp
+    script = Path(__file__).resolve().parents[1] / "scripts" / "backup_axiom.py"
+    if not script.exists():
+        return error_response(500, "script_missing", "backup_axiom.py 不存在")
+
+    result = _sp.run(
+        [sys.executable, str(script), "--root", str(AXIOM_ROOT)],
+        capture_output=True, text=True, timeout=120,
+    )
+    write_audit_log("manual_backup", "system")
+    return ok_response({
+        "success": result.returncode == 0,
+        "stdout": result.stdout[-500:],
+        "stderr": result.stderr[-200:] if result.stderr else "",
+    })
+
+
 @app.route("/metrics", methods=["GET"])
 def metrics():
     uptime = (datetime.now(timezone.utc) - _start_time).total_seconds()
