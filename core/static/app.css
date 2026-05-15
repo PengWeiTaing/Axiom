@@ -685,6 +685,35 @@ button { font-family: inherit; cursor: pointer; transition: all var(--ease); }
 .chat-actions .text-button { font-size: 0.72rem; }
 
 /* ===== Floating Chat ===== */
+.quick-capture-overlay {
+    position: fixed; inset: 0;
+    background: rgba(3,7,17,0.8);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50;
+}
+.quick-capture-dialog {
+    width: 560px; max-width: 90vw;
+    padding: 20px;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--glass-border);
+    background: rgba(6,11,20,0.95);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 16px 64px rgba(0,0,0,0.6);
+    animation: popupIn 200ms ease;
+}
+.quick-capture-dialog textarea {
+    width: 100%; border: none; background: transparent;
+    color: var(--ink); font-size: 1rem; resize: none; outline: none;
+    font-family: inherit; line-height: 1.6;
+}
+.quick-capture-dialog textarea::placeholder { color: var(--ink-dim); }
+.quick-capture-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid var(--glass-border);
+}
+
 .float-add-btn {
     position: fixed;
     bottom: 88px;

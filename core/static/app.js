@@ -4634,6 +4634,43 @@ async function handleFloatChatSubmit(event) {
     }
 }
 
+function showQuickCapture() {
+    const overlay = document.getElementById("quick-capture-overlay");
+    const input = document.getElementById("quick-capture-input");
+    overlay.classList.remove("hidden");
+    input.value = "";
+    input.focus();
+}
+
+function hideQuickCapture() {
+    document.getElementById("quick-capture-overlay").classList.add("hidden");
+}
+
+async function handleQuickCapture() {
+    const input = document.getElementById("quick-capture-input");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    hideQuickCapture();
+    await handleSmartCapture(text);
+}
+
+function bindQuickCapture() {
+    const overlay = document.getElementById("quick-capture-overlay");
+    document.getElementById("quick-capture-submit").addEventListener("click", handleQuickCapture);
+    document.getElementById("quick-capture-input").addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleQuickCapture();
+        } else if (e.key === "Escape") {
+            hideQuickCapture();
+        }
+    });
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) hideQuickCapture();
+    });
+}
+
 function bindFloatAdd() {
     const btn = document.getElementById("float-add-btn");
     const menu = document.getElementById("float-add-menu");
@@ -4705,6 +4742,9 @@ function init() {
     // Floating add button
     bindFloatAdd();
 
+    // Quick capture overlay
+    bindQuickCapture();
+
     // Clipboard paste support for images
     document.addEventListener("paste", async (e) => {
         const items = e.clipboardData?.items;
@@ -4744,9 +4784,13 @@ function init() {
             // Navigate to archive and focus search
             document.querySelector("[data-panel='archive-panel']")?.click();
             setTimeout(() => document.querySelector("#search-panel input")?.focus(), 200);
+        } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "N") {
+            e.preventDefault();
+            showQuickCapture();
         } else if (e.key === "Escape") {
             elements.floatChatPopup.classList.add("hidden");
             closeViewer();
+            hideQuickCapture();
         }
     });
 }

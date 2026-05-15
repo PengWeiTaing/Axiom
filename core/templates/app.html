@@ -715,6 +715,16 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
     </button>
 
+    <div class="quick-capture-overlay hidden" id="quick-capture-overlay">
+        <div class="quick-capture-dialog">
+            <textarea id="quick-capture-input" rows="3" placeholder="随便写...AI 自动判断类型" autofocus></textarea>
+            <div class="quick-capture-bar">
+                <span class="subtle-text" id="quick-capture-hint">Enter 发送 · Esc 取消</span>
+                <button class="primary-button" id="quick-capture-submit" type="button">记录</button>
+            </div>
+        </div>
+    </div>
+
     <button class="float-add-btn" id="float-add-btn" type="button" title="快速添加">+</button>
     <div class="float-add-menu hidden" id="float-add-menu">
         <button data-quick-action="add-note">写笔记</button>
