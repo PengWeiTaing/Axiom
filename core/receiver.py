@@ -577,7 +577,20 @@ def admin_insights():
     if patterns["task_completion_rate"] < 30: recs.append("任务完成率偏低，建议减少任务数量或拆分大任务")
     if patterns["avg_weekly_items"] < 2: recs.append("每周记录较少，尝试每天记录一件小事")
     if patterns["peak_hours"]: recs.append(f"最活跃时段是 {patterns['peak_hours'][0]} 点，可在此处理任务")
-    return ok_response({"patterns":patterns,"weekly_trend":weekly_trend,"by_day":by_day,"recommendations":recs,"generated_at":utc_now().isoformat(timespec="seconds")})
+
+    # Parse accuracy
+    from core._common import get_preference
+    corrections = sum(int(get_preference(f"parse_misc:{t}", "0")) for t in ["task","memory","decision","note","health","url"])
+    total_parse = sum(int(get_preference(f"parse_correction:{a}:{u}", "0"))
+                      for a in ["task","memory","decision","note","health","url"]
+                      for u in ["task","memory","decision","note","health","url"])
+    parse_accuracy = round((1 - corrections / max(total_parse, 1)) * 100) if total_parse > 0 else None
+
+    return ok_response({
+        "patterns":patterns,"weekly_trend":weekly_trend,"by_day":by_day,"recommendations":recs,
+        "parse_accuracy": parse_accuracy,
+        "generated_at":utc_now().isoformat(timespec="seconds"),
+    })
 
 
 @app.route("/admin/stats/daily", methods=["GET"])

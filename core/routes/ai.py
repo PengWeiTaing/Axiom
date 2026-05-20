@@ -165,6 +165,35 @@ def register_routes(app):
         })
 
 
+    @app.route("/parse/feedback", methods=["POST"])
+    def parse_feedback():
+        """记录 AI 解析的用户反馈，用于自进化。"""
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+        body = request.get_json(silent=True) or {}
+        original_text = str(body.get("text", "")).strip()
+        ai_type = str(body.get("ai_type", "")).strip()
+        user_type = str(body.get("user_type", "")).strip()
+
+        if not all([original_text, ai_type, user_type]):
+            return error_response(400, "missing_fields", "需要 text, ai_type, user_type")
+
+        # Record the correction for learning
+        key = f"parse_correction:{ai_type}:{user_type}"
+        current = int(get_preference(key, "0"))
+        set_preference(key, str(current + 1))
+
+        # If user corrected, note the pattern
+        if ai_type != user_type:
+            key2 = f"parse_misc:{ai_type}"
+            misc = int(get_preference(key2, "0"))
+            set_preference(key2, str(misc + 1))
+
+        write_audit_log("parse_feedback", "ai", detail=f"{ai_type}->{user_type}: {original_text[:80]}")
+        return ok_response({"message": "反馈已记录", "corrected": ai_type != user_type})
+
+
     @app.route("/parse", methods=["POST"])
     def parse_input():
         auth_error = require_key()
