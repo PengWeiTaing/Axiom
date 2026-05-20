@@ -20,7 +20,7 @@ _rate_window = 60
 # Request metrics
 _start_time = datetime.now(timezone.utc)
 _metrics_lock = _threading.Lock()
-_metrics = {"requests": 0, "errors": 0, "slow": 0, "endpoints": {}}
+_metrics = {"requests": 0, "errors": 0, "slow": 0, "endpoints": {}, "response_times": []}
 
 
 def get_metrics() -> dict:
@@ -112,6 +112,9 @@ def register_middleware(app):
                 _metrics["errors"] += 1
             if duration_ms > 500:
                 _metrics["slow"] += 1
+            _metrics["response_times"].append(duration_ms)
+            if len(_metrics["response_times"]) > 10000:
+                _metrics["response_times"] = _metrics["response_times"][-5000:]
         req_id = getattr(request, "_req_id", "--------")
         if duration_ms > 500:
             logger.warning("[%s] SLOW %s %s -> %s (%dms)", req_id, request.method, request.path,

@@ -157,12 +157,21 @@ def metrics():
     m = get_metrics()
     total = max(m["requests"], 1)
     endpoints_sorted = sorted(m.get("endpoints", {}).items(), key=lambda x: -x[1])[:20]
+
+    times = sorted(m.get("response_times", []))
+    latency = {"p50": 0, "p95": 0, "p99": 0}
+    if times:
+        latency["p50"] = times[len(times) // 2]
+        latency["p95"] = times[int(len(times) * 0.95)]
+        latency["p99"] = times[int(len(times) * 0.99)]
+
     return ok_response({
         "uptime": get_uptime(),
         "requests": m["requests"], "errors": m["errors"],
         "error_rate": round(m["errors"] / total * 100, 2),
         "slow_requests": m["slow"],
         "rate_limited_ips": len(_rate_limits),
+        "latency_ms": latency,
         "top_endpoints": [{"path": k, "count": v} for k, v in endpoints_sorted],
     })
 
