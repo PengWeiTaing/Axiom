@@ -1,5 +1,17 @@
-"""Axiom shared constants, utilities, and helpers."""
+"""Axiom shared constants, utilities, and helpers.
 
+架构说明:
+  1. 基础配置 (line ~34):    Flask app, 常量, 环境变量
+  2. 响应工具 (line ~382):    ok_response, error_response
+  3. 存储与数据库 (line ~394): DB连接, 建表, FTS5, 迁移
+  4. 请求工具 (line ~650):    认证, 分页, 过滤器
+  5. Item 处理 (line ~1050):  Item CRUD, 文件读写, 类型检测
+  6. 文本与文件 (line ~1300):  文本处理, PDF/DOCX抽取, 音频转写
+  7. 统计与概览 (line ~2000):  stats, overview, item building
+  8. 自动化与工件 (line ~2500): automation jobs, artifacts
+  9. 审计与清理 (line ~3100):  审计日志, 文件清理
+  10. URL抓取 (line ~3380):    Bilibili/网页内容抓取
+"""
 from __future__ import annotations
 
 import hmac
