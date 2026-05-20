@@ -149,6 +149,12 @@ def system_info():
         "integrity": {"ok": orphan_mem == 0 and orphan_tasks == 0,
                       "orphan_memories": orphan_mem, "orphan_tasks": orphan_tasks,
                       "empty_content_items": empty_content},
+        "health_score": sum([
+            25 if db_size > 0 else 0,         # DB exists
+            25 if fts_size == tables.get("items", -1) else 0,  # FTS5 in sync
+            25 if backup_ok else 0,            # Recent backup
+            25 if orphan_mem == 0 and orphan_tasks == 0 else 0,  # Data integrity
+        ]),
     })
 
 
