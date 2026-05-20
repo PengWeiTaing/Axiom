@@ -274,3 +274,55 @@ AI 协作代理接手：
 3. `core/receiver.py`
 4. `scripts/check_consistency.py`
 5. `scripts/backup_axiom.py`
+
+## 当前架构 (v0.2, 2026-05-20)
+
+```
+core/
+  _common.py      3529行  共享工具库 (常量/DB/文件/Item/AI/自动化)
+  receiver.py      613行  主入口 (组装路由+管理端点+导入导出+Webhook)
+  middleware.py     122行  中间件 (限流/CORS/安全/Gzip/日志/指标)
+  client.py         245行  Python SDK (供程序化调用, 90+ 方法)
+  config.py            -  待拆分 (风险>收益)
+  
+  routes/                 按八层模型组织:
+    items.py        487行  采集层: /add /upload /item /archive /fetch
+    browse.py       321行  检索层: /recent /search /stats /overview  
+    memories.py     332行  记忆层: /memories/*
+    tasks.py        352行  计划层: /tasks/*
+    decisions.py    161行  决策层: /decisions/*
+    ai.py           626行  干预层: /suggestions /chat /parse /brief
+    automation.py   335行  动作层: /automation /artifacts /processing
+    governance.py   152行  治理层: /export /audit-log
+    core.py          55行  基础: /app /health /sw.js
+
+modules/
+  base.py                  AxiomModule 基类
+  registry.py             自动发现+启用/禁用管理
+  jianzhi/                减脂模块 (体重/饮食/运动/围度/备注)
+    routes.py  models.py  prompts/  static/
+
+scripts/                  22个脚本 (备份/一致性/回顾/inbox/部署/导出/转写)
+```
+
+### Python SDK 示例
+
+```python
+from core.client import AxiomClient
+c = AxiomClient("https://pengweitai.me", "axiomnb")
+
+# 数据操作
+c.add_note("今天跑步5公里")
+c.create_task("交周报", priority="high", due_date="2026-05-21")
+c.create_memory("goal", "年底前减到65kg")
+
+# AI
+c.ai_parse("明天下午3点开会")  # → {"type": "task", ...}
+c.ai_chat("今天该做什么？")     # 流式聊天
+c.ai_suggestions()            # AI 建议
+
+# 管理
+c.health()      # 健康检查
+c.system()      # 系统状态
+c.export_csv()  # 导出 CSV
+```
