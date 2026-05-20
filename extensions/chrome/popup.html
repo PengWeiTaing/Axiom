@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Axiom</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:340px;padding:16px;font-family:system-ui,sans-serif;background:#080c12;color:#ddd}
+h2{font-size:1rem;color:#00d4aa;margin-bottom:12px}
+textarea{width:100%;height:80px;padding:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;border-radius:8px;resize:none;font-size:.85rem;outline:none;font-family:inherit}
+textarea:focus{border-color:#00d4aa}
+.row{display:flex;gap:8px;margin-top:8px}
+button{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:.82rem;font-weight:500}
+.btn-primary{background:#00d4aa;color:#080c12;flex:1}
+.btn-secondary{background:rgba(255,255,255,.08);color:#ccc}
+.btn-row{display:flex;gap:4px;margin-top:8px}
+.btn-row button{flex:1;font-size:.75rem;padding:6px 8px}
+.feedback{font-size:.75rem;margin-top:8px;min-height:1.2em}
+.feedback-ok{color:#34d399}.feedback-error{color:#f87171}
+.setup{font-size:.8rem;color:#888}
+input[type=password]{padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;border-radius:6px;width:100%;margin:4px 0;font-size:.8rem}
+</style>
+</head>
+<body>
+
+<div id="setup-view">
+  <h2>Axiom 外脑</h2>
+  <p class="setup">输入你的 Axiom key 开始使用</p>
+  <input type="password" id="key-input" placeholder="axiomnb">
+  <div class="row">
+    <button class="btn-primary" id="save-key-btn">保存</button>
+  </div>
+</div>
+
+<div id="main-view" style="display:none">
+  <h2>Axiom</h2>
+  <textarea id="quick-input" placeholder="随便写...AI 自动判断类型" autofocus></textarea>
+  <div class="row">
+    <button class="btn-primary" id="send-btn">记录</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn-secondary" id="save-page-btn">📄 当前页</button>
+    <button class="btn-secondary" id="save-url-btn">🔗 抓取链接</button>
+  </div>
+  <p class="feedback" id="feedback"></p>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
