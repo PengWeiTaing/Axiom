@@ -204,7 +204,37 @@ def api_docs():
                         "auth_header": "X-Axiom-Key", "base_url": f"{request.scheme}://{request.host}"})
 
 
-@app.route("/ping", methods=["GET"])
+@app.route("/health/badge", methods=["GET"])
+def health_badge():
+    """返回 SVG 健康徽章，可嵌入 README 或监控面板。"""
+    conn = get_db_connection()
+    try:
+        items_c = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        fts_c = conn.execute("SELECT COUNT(*) FROM items_fts").fetchone()[0]
+    except Exception:
+        items_c = -1; fts_c = -1
+    finally:
+        conn.close()
+
+    db_ok = items_c >= 0
+    fts_ok = items_c == fts_c
+    backup_ok_val = False
+    bd = AXIOM_ROOT / "backup"
+    if bd.exists():
+        bu = sorted(bd.rglob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if bu:
+            age = (datetime.now(timezone.utc) - datetime.fromtimestamp(bu[0].stat().st_mtime, tz=timezone.utc)).total_seconds() / 3600
+            backup_ok_val = age < 48
+    score = (25 if db_ok else 0) + (25 if fts_ok else 0) + (25 if backup_ok_val else 0) + 25
+
+    color = "#34d399" if score >= 75 else "#f59e0b" if score >= 50 else "#f87171"
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="140" height="20">
+        <rect width="140" height="20" rx="4" fill="#1a1a2e"/>
+        <rect width="70" height="20" rx="4" fill="#333"/>
+        <text x="35" y="14" fill="#ccc" font-size="11" text-anchor="middle" font-family="sans-serif">Axiom</text>
+        <text x="105" y="14" fill="{color}" font-size="11" text-anchor="middle" font-family="sans-serif">{score}/100</text>
+    </svg>'''
+    return Response(svg, mimetype="image/svg+xml")
 def ai_ping():
     if not DEEPSEEK_API_KEY:
         return ok_response({"ai": "unconfigured", "latency_ms": 0})
