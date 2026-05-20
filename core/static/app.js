@@ -4792,6 +4792,71 @@ async function handleQuickCapture() {
     await handleSmartCapture(text);
 }
 
+function bindVoiceInput() {
+    const btn = document.getElementById("voice-btn");
+    if (!btn) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        btn.style.display = "none";
+        return;
+    }
+
+    let listening = false;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-CN";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    btn.addEventListener("click", () => {
+        if (listening) {
+            recognition.stop();
+            btn.textContent = "🎤 语音";
+            btn.style.color = "";
+            listening = false;
+            return;
+        }
+        try {
+            recognition.start();
+            btn.textContent = "🔴 聆听中...";
+            btn.style.color = "var(--error)";
+            listening = true;
+            setConnectionState("busy", "正在聆听...");
+        } catch (e) {
+            showToast("语音启动失败: " + e.message);
+        }
+    });
+
+    recognition.addEventListener("result", async (e) => {
+        const transcript = e.results[0][0].transcript;
+        btn.textContent = "🎤 语音";
+        btn.style.color = "";
+        listening = false;
+
+        elements.textInput.value = transcript;
+        setFeedback(elements.captureFeedback, `语音识别: "${transcript}"`, "muted");
+        // Auto-submit via smart capture
+        await handleSmartCapture(transcript);
+    });
+
+    recognition.addEventListener("error", (e) => {
+        btn.textContent = "🎤 语音";
+        btn.style.color = "";
+        listening = false;
+        if (e.error !== "aborted") {
+            setConnectionState("error", "语音识别失败: " + e.error);
+        }
+    });
+
+    recognition.addEventListener("end", () => {
+        if (listening) {
+            btn.textContent = "🎤 语音";
+            btn.style.color = "";
+            listening = false;
+        }
+    });
+}
+
 function bindQuickCapture() {
     const overlay = document.getElementById("quick-capture-overlay");
     document.getElementById("quick-capture-submit").addEventListener("click", handleQuickCapture);
@@ -4855,6 +4920,9 @@ function init() {
 
     // Quick capture overlay
     bindQuickCapture();
+
+    // Voice input
+    bindVoiceInput();
 
     // Clipboard paste support for images
     document.addEventListener("paste", async (e) => {
