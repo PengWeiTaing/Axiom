@@ -1,5 +1,6 @@
 """App shell routes: /app, /sw.js, /health."""
 from core._common import *
+from flask import render_template_string
 
 def register_routes(app):
         @app.route("/app", methods=["GET"], strict_slashes=False)
