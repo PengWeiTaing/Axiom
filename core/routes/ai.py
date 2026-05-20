@@ -1,6 +1,30 @@
 """AI routes: alerts, chat, suggestions."""
 from core._common import *
 
+AI_CONTEXT_KEY = "ai_context"
+
+
+def _fetch_ai_context(conn) -> dict:
+    """统一构建 AI 所需的用户上下文，供所有 AI 端点复用。"""
+    week_ago = (utc_now() - timedelta(days=7)).isoformat(timespec="seconds")
+    return {
+        "recent_items": conn.execute(
+            "SELECT type, content, original_name, created_at FROM items WHERE created_at >= ? ORDER BY created_at DESC LIMIT 20",
+            (week_ago,),
+        ).fetchall(),
+        "pending_tasks": conn.execute(
+            "SELECT id, title, priority, due_date FROM tasks WHERE status = 'todo' ORDER BY created_at DESC LIMIT 10"
+        ).fetchall(),
+        "confirmed_memories": conn.execute(
+            "SELECT category, content FROM memories WHERE status = 'confirmed' ORDER BY created_at DESC LIMIT 10"
+        ).fetchall(),
+        "pending_decisions": conn.execute(
+            "SELECT title, decision FROM decisions WHERE status = 'pending' LIMIT 5"
+        ).fetchall(),
+        "item_total": conn.execute("SELECT COUNT(*) FROM items").fetchone()[0],
+    }
+
+
 def register_routes(app):
     # ===== 主动提醒 =====
 
