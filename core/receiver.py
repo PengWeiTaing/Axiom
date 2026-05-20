@@ -31,6 +31,9 @@ register_middleware(app)
 
 # 路由注册
 from core.routes.core import register_routes as register_core  # noqa: E402
+from core.routes.items import register_routes as register_items  # noqa: E402
+from core.routes.browse import register_routes as register_browse  # noqa: E402
+from core.routes.automation import register_routes as register_automation  # noqa: E402
 from core.routes.tasks import register_routes as register_tasks  # noqa: E402
 from core.routes.memories import register_routes as register_memories  # noqa: E402
 from core.routes.decisions import register_routes as register_decisions  # noqa: E402
@@ -38,6 +41,9 @@ from core.routes.ai import register_routes as register_ai  # noqa: E402
 from core.routes.governance import register_routes as register_governance  # noqa: E402
 
 register_core(app)
+register_items(app)
+register_browse(app)
+register_automation(app)
 register_tasks(app)
 register_memories(app)
 register_decisions(app)
