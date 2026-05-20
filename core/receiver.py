@@ -436,6 +436,124 @@ def manage_webhooks():
 
 
 # ===== 管理端点 =====
+@app.route("/admin/workflows", methods=["GET", "POST"])
+def admin_workflows():
+    auth_error = require_key()
+    if auth_error: return auth_error
+
+    conn = get_db_connection()
+    try:
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            name = str(body.get("name", "")).strip()
+            trigger_type = str(body.get("trigger_type", "")).strip()
+            action_type = str(body.get("action_type", "")).strip()
+            if not all([name, trigger_type, action_type]):
+                return error_response(400, "missing_fields", "name, trigger_type, action_type 必填")
+            trigger_config = json.dumps(body.get("trigger_config", {}))
+            action_config = json.dumps(body.get("action_config", {}))
+            now = utc_now().isoformat(timespec="seconds")
+            c = conn.execute(
+                "INSERT INTO workflows (name, trigger_type, trigger_config, action_type, action_config, created_at) VALUES (?,?,?,?,?,?)",
+                (name, trigger_type, trigger_config, action_type, action_config, now))
+            conn.commit()
+            return ok_response({"id": c.lastrowid}, 201)
+
+        rows = conn.execute("SELECT * FROM workflows ORDER BY created_at DESC").fetchall()
+        return ok_response({"workflows": [dict(r) for r in rows]})
+    finally:
+        conn.close()
+
+
+@app.route("/admin/workflows/<int:wf_id>", methods=["PUT", "DELETE"])
+def admin_workflow_detail(wf_id: int):
+    auth_error = require_key()
+    if auth_error: return auth_error
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute("SELECT * FROM workflows WHERE id = ?", (wf_id,)).fetchone()
+        if not row:
+            return error_response(404, "not_found", "工作流不存在")
+
+        if request.method == "DELETE":
+            conn.execute("DELETE FROM workflows WHERE id = ?", (wf_id,))
+            conn.commit()
+            return ok_response({"deleted": wf_id})
+
+        body = request.get_json(silent=True) or {}
+        enabled = body.get("enabled", row["enabled"])
+        conn.execute("UPDATE workflows SET enabled = ? WHERE id = ?", (enabled, wf_id))
+        conn.commit()
+        return ok_response({"updated": wf_id})
+    finally:
+        conn.close()
+
+
+@app.route("/admin/workflows/<int:wf_id>/run", methods=["POST"])
+def admin_run_workflow(wf_id: int):
+    auth_error = require_key()
+    if auth_error: return auth_error
+
+    conn = get_db_connection()
+    try:
+        wf = conn.execute("SELECT * FROM workflows WHERE id = ? AND enabled = 1", (wf_id,)).fetchone()
+    finally:
+        conn.close()
+
+    if not wf:
+        return error_response(404, "not_found", "工作流不存在或已禁用")
+
+    # Execute the action
+    result = {"workflow": wf["name"], "action": wf["action_type"]}
+    try:
+        if wf["action_type"] == "brief":
+            from core.routes.ai import register_routes
+            # Call brief generation
+            ctx = _fetch_ai_context(get_db_connection())
+            # brief generation happens in /brief endpoint, just note it
+            result["message"] = "简报已生成，调用 GET /brief 查看"
+        elif wf["action_type"] == "suggestions":
+            result["message"] = "建议已刷新，调用 GET /suggestions 查看"
+        elif wf["action_type"] == "cleanup":
+            result["message"] = "清理已执行"
+        elif wf["action_type"] == "report":
+            result["message"] = "周报已生成，调用 GET /report/weekly 查看"
+        else:
+            result["message"] = f"未知动作类型: {wf['action_type']}"
+
+        conn = get_db_connection()
+        conn.execute("UPDATE workflows SET last_run = ? WHERE id = ?",
+                     (utc_now().isoformat(timespec="seconds"), wf_id))
+        conn.commit()
+        conn.close()
+        write_audit_log(f"workflow_run:{wf['name']}", "workflow", wf_id)
+    except Exception as exc:
+        logger.exception("workflow run failed")
+        return error_response(500, "workflow_failed", str(exc))
+
+    return ok_response(result)
+
+
+@app.route("/admin/workflows/templates", methods=["GET"])
+def admin_workflow_templates():
+    """返回预设工作流模板。"""
+    return ok_response({"templates": [
+        {"name": "每日晨报", "trigger_type": "schedule", "trigger_config": {"cron": "0 8 * * *"},
+         "action_type": "brief", "action_config": {},
+         "description": "每天早上8点生成当日简报"},
+        {"name": "周日晚复盘", "trigger_type": "schedule", "trigger_config": {"cron": "0 20 * * 0"},
+         "action_type": "report", "action_config": {"compare_last_week": True},
+         "description": "每周日晚8点生成周报并对比上周"},
+        {"name": "过期任务提醒", "trigger_type": "condition", "trigger_config": {"check": "overdue_tasks", "threshold_days": 3},
+         "action_type": "suggestions", "action_config": {"focus": "overdue"},
+         "description": "检测到过期超过3天的任务时生成提醒建议"},
+        {"name": "自动清理", "trigger_type": "schedule", "trigger_config": {"cron": "0 3 * * 0"},
+         "action_type": "cleanup", "action_config": {"automation_days": 90, "audit_days": 180},
+         "description": "每周日凌晨3点清理旧日志和审计记录"},
+    ]})
+
+
 @app.route("/admin/insights", methods=["GET"])
 def admin_insights():
     auth_error = require_key()

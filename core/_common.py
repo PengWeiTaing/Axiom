@@ -573,6 +573,21 @@ def init_db(db_path: Path = DB_PATH) -> None:
         ensure_tasks_table_columns(conn)
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS workflows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                trigger_type TEXT NOT NULL,
+                trigger_config TEXT,
+                action_type TEXT NOT NULL,
+                action_config TEXT,
+                enabled INTEGER DEFAULT 1,
+                last_run TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 version INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
