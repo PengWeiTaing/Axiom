@@ -150,11 +150,15 @@ def system_info():
                       "orphan_memories": orphan_mem, "orphan_tasks": orphan_tasks,
                       "empty_content_items": empty_content},
         "health_score": sum([
-            25 if db_size > 0 else 0,         # DB exists
-            25 if fts_size == tables.get("items", -1) else 0,  # FTS5 in sync
-            25 if backup_ok else 0,            # Recent backup
-            25 if orphan_mem == 0 and orphan_tasks == 0 else 0,  # Data integrity
+            25 if db_size > 0 else 0,
+            25 if fts_size == tables.get("items", -1) else 0,
+            25 if backup_ok else 0,
+            25 if orphan_mem == 0 and orphan_tasks == 0 else 0,
         ]),
+        "growth": {
+            "items_per_day": round(tables["items"] / 30, 1) if tables["items"] > 0 else 0,
+            "db_mb_per_100_items": round(db_size / max(tables["items"], 1) * 100 / (1024 * 1024), 2),
+        },
     })
 
 
