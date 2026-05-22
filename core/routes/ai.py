@@ -226,7 +226,6 @@ def register_routes(app):
             resp = client.chat.completions.create(
                 model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
                 max_tokens=2000, temperature=0.1,
-                extra_body={"enable_thinking": False},
             )
             result_text = (resp.choices[0].message.content or "").strip().lower()
             if not result_text and hasattr(resp.choices[0].message, "reasoning"):
