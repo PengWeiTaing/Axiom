@@ -225,7 +225,7 @@ def register_routes(app):
             client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
             resp = client.chat.completions.create(
                 model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
-                max_tokens=500, temperature=0.1,
+                max_tokens=2000, temperature=0.1,
                 extra_body={"enable_thinking": False},
             )
             result_text = (resp.choices[0].message.content or "").strip().lower()
