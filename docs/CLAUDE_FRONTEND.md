@@ -107,12 +107,13 @@ c.insights()                 # 使用模式分析 + AI准确率
 | POST | `/archive/<id>` | 归档 item 文件 (inbox → archive) |
 | POST | `/restore/<id>` | 恢复 item 文件 (archive → inbox) |
 
-### 检索层 — 5 个端点
+### 检索层 — 7 个端点
 
 | 方法 | 路径 | 参数 | 说明 |
 |------|------|------|------|
 | GET | `/search` | `q`, `mode=semantic`, `page`, `type`, `storage`, `source`, `sort`, `created_from`, `created_to`, `processing_state` | FTS5搜索 + AI语义搜索 |
-| GET | `/search/all` | `q`, `limit` | 跨表搜索 |
+| GET | `/search/vector` | `q`, `limit` | **向量语义搜索**（Qwen3-Embedding-4B，2048维，cosine similarity） |
+| GET | `/search/all` | `q`, `limit` | 跨表搜索（items+memories+tasks+decisions） |
 | GET | `/recent` | `page`, `type`, `storage`, `source`, `created_from`, `created_to`, `processing_state` | 最近记录 |
 | GET | `/stats` | — | 总量/类型/来源/存储/记忆/任务计数 + streak |
 | GET | `/overview` | `recent_limit`, `preview_chars` | 聚合返回 stats + recent + backlog + artifacts |
@@ -323,25 +324,149 @@ Ctrl+/       → 全局搜索
 Esc          → 关闭弹窗/聊天
 ```
 
-## 八、前端重做建议
+## 八、前端交互模型（核心参考）
 
-### 保持的东西
-- **API 调用模式** — `apiRequest()` 和状态管理已验证
-- **认证流程** — key → localStorage → syncDashboard
-- **Ctrl+Shift+N 快速捕获** — 交互概念好
-- **悬浮 AI 聊天** — 流式 SSE 接收逻辑
+### 智能捕获流程 — 最重要的交互
+
+```
+用户在记录面板输入文字
+  → handleTextCaptureSubmit()
+  → POST /parse (body: {"text": "..."})
+  → AI 返回 {"type":"task","title":"...","priority":"medium","due_date":"..."}
+  → 前端根据 type 自动创建对应类型的记录:
+    type=task     → POST /tasks
+    type=memory   → POST /memories
+    type=decision → POST /decisions
+    type=url      → POST /fetch
+    type=note     → POST /add
+  → 显示反馈
+
+AI 未配置时回退: 关键字匹配规则 → 默认创建 note
+```
+
+### 全局快速捕获 Ctrl+Shift+N
+
+```
+任意面板按 Ctrl+Shift+N
+  → 弹出半透明 overlay (quick-capture-overlay)
+  → 打字 → Enter
+  → 调用 handleSmartCapture(text)
+  → AI 解析 + 自动创建
+  → overlay 关闭
+```
+
+### 悬浮 AI 聊天
+
+```
+右下角悬浮按钮 (float-chat-btn) → 点击或 Ctrl+K
+  → 弹出聊天窗口 (float-chat-popup)
+  → 输入消息 → Enter
+  → POST /chat/stream (SSE)
+  → fetch + ReadableStream + TextDecoder 逐字渲染
+  → 支持 Markdown (bold/italic/code/lists)
+  → 历史持久化到 localStorage
+  → 每条 AI 回复下方有 "+任务" "🧠 记忆" 操作按钮
+```
+
+### 语音输入
+
+```
+记录面板点 "🎤 语音" 按钮
+  → Web Speech API (SpeechRecognition, lang=zh-CN)
+  → 实时语音转文字 → 自动填入文本框
+  → 自动触发 handleSmartCapture
+```
+
+### 总览面板数据流
+
+```
+syncDashboard()
+  → /alerts       → 渲染提醒卡片
+  → /brief        → AI 每日简报
+  → /tasks/today  → 今日任务(可操作: 点○完成)
+  → /memories     → 待确认记忆(可操作: 点确认)
+  → /report/weekly → 周报卡片
+  → /stats        → 统计卡片 + 7天活跃度柱状图
+  → /suggestions  → AI建议(带"＋任务"按钮)
+  → showRandomMemory() → 随机回忆卡片
+  → updateSidebarBadges() → 侧边栏数字徽章
+```
+
+### 常用交互模式
+
+```javascript
+// 任务操作 (委托事件)
+data-action="task-done"     → POST /tasks/<id>/done
+data-action="task-cancel"   → POST /tasks/<id>/cancel
+data-action="task-reschedule" → POST /tasks/<id>/reschedule
+data-action="task-breakdown"  → POST /tasks/<id>/breakdown
+data-action="suggestion-to-task" → 从AI建议创建任务
+data-action="chat-to-task"      → 从聊天消息创建任务
+
+// 记忆操作
+data-action="confirm-memory" → POST /memories/<id>/confirm
+data-action="archive-memory" → POST /memories/<id>/archive
+data-action="delete-memory"  → DELETE /memories/<id>
+```
+
+### 桌面 vs 移动布局
+
+```
+桌面 (≥768px):
+  flex容器 (.app-layout) → sidebar(固定宽度200px) + content(flex:1)
+  面板通过 .active class 切换显示
+  底部导航栏隐藏
+
+移动 (<768px):
+  面板全部垂直排列，滚动浏览
+  底部固定导航栏 (bottom-bar) 做锚点跳转
+```
+
+## 九、前端重做建议
+
+### 必须保留的核心逻辑
+- **apiRequest()** — 统一 API 调用（含 key 注入、错误处理）
+- **handleSmartCapture(text)** — AI 路由的智能输入
+- **showQuickCapture() / hideQuickCapture()** — 全局捕获 overlay
+- **bindFloatChat()** — 流式 SSE 聊天 + localStorage 持久化
 - **面板切换** — CSS `.active` 模式，响应式双布局
+- **认证流程** — key → localStorage → syncDashboard
 
 ### 可以完全重做的
-- **HTML 结构** — 当前是单体文件，可以组件化
-- **CSS** — 当前暗色玻璃主题可保留方向，但实现可以更现代
+- **HTML 结构** — 当前是单体文件，可以组件化（React/Vue/Svelte 任意框架）
+- **CSS** — 当前暗色玻璃主题可保留方向，但实现可以更现代（Tailwind/shared-ui）
 - **渲染逻辑** — 当前用 innerHTML 拼接，可改用框架
-- **状态管理** — 当前是全局 state 对象
-- **移动端体验** — 当前只是折叠+滚动
+- **状态管理** — 当前是全局 state 对象，可改用 Zustand/Pinia/Context
+- **移动端体验** — 当前只是折叠+滚动，可改用 TabView/BottomSheet
+
+### 面板建议
+
+保留 5+1 面板结构，但可以重新组织内容:
+```
+记录  — 智能输入框（核心）+ 文件上传 + 链接抓取 + 语音
+总览  — 简报 + 周报 + 提醒 + 今日任务(可操作) + 建议 + 统计
+任务  — 今日/过期/全部 tab + 快速创建 + 批量操作
+记忆  — AI提取 + 列表(分类/状态筛选) + 进度条
+档案  — 搜索 + 快速筛选 + 最近/决策/自动化/模块管理 tab
+管家  — 流式聊天 + AI建议 + 操作按钮
+```
 
 ### API 调用注意事项
 - 所有写操作成功返回 `{"ok": true, ...}`，失败返回 `{"ok": false, "error": {"code":"...", "message":"..."}}`
 - 分页统一: `page`, `page_size`, `total`, `total_pages`
-- `/chat/stream` 是 SSE 流，需要 `fetch` + `ReadableStream` + `TextDecoder`
+- `/chat/stream` 是 SSE 流，需要 `fetch` + `ReadableStream` + `TextDecoder`，格式 `data: {"content":"字"}\n\n`
 - AI 端点有 5 分钟缓存 (`SUGGESTIONS_CACHE`)，传 `?_t=timestamp` 可绕过
 - 文件上传用 `multipart/form-data`，`file` + `content` + `source` 字段
+- `/parse` 端点返回 `{"type":"task|memory|decision|note|health|url", ...}`，前端据此路由到不同创建端点
+- 向量搜索 `/search/vector` 返回 items 数组含 `relevance` 字段(0-1 cosine similarity)
+- 语音输入用浏览器 Web Speech API，不需要后端支持
+
+### 快捷键设计建议
+```
+Ctrl+K       → 呼出AI管家
+Ctrl+N       → 新建任务
+Ctrl+Shift+N → 全局快速捕获 (核心功能)
+Ctrl+/       → 聚焦搜索
+Ctrl+V       → 粘贴图片自动上传
+Esc          → 关闭所有弹窗
+```
