@@ -216,17 +216,9 @@ def register_routes(app):
             return ok_response({"type": "note", "content": text})
 
         prompt = (
-            f"# 任务：分类以下用户输入\n"
             f"输入: {text}\n\n"
-            "# 类型定义：\n"
-            "- task: 包含时间、截止日期、或明确待办语义 (如\"明天交\"、\"下午要做\")\n"
-            "- memory: 关于\"我\"的陈述 (如\"我喜欢\"、\"我在\"、\"我的目标是\")\n"
-            "- decision: 做出选择 (如\"我决定\"、\"我选择\")\n"
-            "- note: 不属于以上类型的普通记录\n\n"
-            "# 返回格式 (仅JSON，无其他文字):\n"
-            "{\"type\": \"task\", \"title\": \"任务标题\", \"priority\": \"medium\", \"due_date\": \"YYYY-MM-DD\"}\n"
-            "或 {\"type\": \"memory\", \"category\": \"fact\", \"content\": \"记忆内容\"}\n"
-            "或 {\"type\": \"note\", \"content\": \"原文\"}"
+            "分类为task/memory/decision/note/health/url，只输出type值:\n"
+            "task(有日期/待办) memory(关于我的陈述) decision(选择) note(其他)"
         )
         try:
             import openai
@@ -236,16 +228,15 @@ def register_routes(app):
                 max_tokens=500, temperature=0.1,
                 extra_body={"enable_thinking": False},
             )
-            result_text = (resp.choices[0].message.content or "").strip()
-            # Fallback: if model returns reasoning instead of content, use that
+            result_text = (resp.choices[0].message.content or "").strip().lower()
             if not result_text and hasattr(resp.choices[0].message, "reasoning"):
-                result_text = (resp.choices[0].message.reasoning or "").strip()
-            # Extract JSON from response
+                result_text = (resp.choices[0].message.reasoning or "").strip().lower()
+
+            # Parse response: try JSON first, then plain text
             import re as _re
-            match = _re.search(r'\{[^{}]*\}', result_text)
-            if match:
-                parsed = json.loads(match.group())
-                return ok_response(parsed)
+            for token in ["task", "memory", "decision", "note", "health", "url"]:
+                if token in result_text:
+                    return ok_response({"type": token, "title": text[:60], "content": text})
             return ok_response({"type": "note", "content": text})
         except Exception:
             return ok_response({"type": "note", "content": text})
