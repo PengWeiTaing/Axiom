@@ -382,6 +382,48 @@ def batch_items():
     return ok_response({"action": action, "success": len(success), "failed": failed})
 
 
+@app.route("/search/vector", methods=["GET"])
+def search_vector():
+    """向量语义搜索。需要 embedding 服务。"""
+    auth_error = require_key()
+    if auth_error: return auth_error
+    q = request.args.get("q", "").strip()
+    if not q: return error_response(400, "empty_query", "q 不能为空")
+    limit = parse_positive_int(request.args.get("limit"), "limit", 10)
+
+    results = vector_search(q, limit)
+    if not results:
+        return ok_response({"query": q, "total": 0, "items": []})
+
+    conn = get_db_connection()
+    try:
+        placeholders = ",".join("?" for _ in results)
+        rows = conn.execute(
+            f"SELECT {ITEM_JOIN_SELECT_FIELDS.replace('items.','')}, 0 AS score FROM items WHERE id IN ({placeholders}) ORDER BY id DESC",
+            [r["id"] for r in results]).fetchall()
+    finally:
+        conn.close()
+
+    id_to_score = {r["id"]: r["score"] for r in results}
+    items = []
+    for row in rows:
+        item = row_to_item(row)
+        item["relevance"] = id_to_score.get(row["id"], 0)
+        items.append(item)
+
+    return ok_response({"query": q, "total": len(items), "items": items})
+
+
+@app.route("/admin/rebuild-vectors", methods=["POST"])
+def admin_rebuild_vectors():
+    """重建所有 items 的向量索引。"""
+    auth_error = require_key()
+    if auth_error: return auth_error
+    result = rebuild_all_vectors()
+    write_audit_log("vectors_rebuild", "system")
+    return ok_response(result)
+
+
 @app.route("/search/all", methods=["GET"])
 def search_all():
     auth_error = require_key()
