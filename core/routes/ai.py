@@ -216,24 +216,30 @@ def register_routes(app):
             return ok_response({"type": "note", "content": text})
 
         prompt = (
-            f"分类这条输入：\n'{text}'\n\n"
-            "返回一行 JSON，包含 type 字段：\n"
-            "- note: 普通笔记、想法、记录\n"
-            "- task: 待办事项、提醒、要做的事。如果有时间信息，提取 title 和 due_date\n"
-            "- memory: 关于'我'的事实、偏好、目标。提取 category(fact/preference/goal/relationship/event)和 content\n"
-            "- decision: 做出的决定、选择。提取 title 和 decision\n"
-            "- health: 健康相关（体重、运动、饮食）\n"
-            "- url: 如果输入是一个链接\n"
-            "只返回 JSON，不要其他文字。示例：{\"type\":\"task\",\"title\":\"交报告\",\"priority\":\"high\",\"due_date\":\"2026-05-13\"}"
+            f"# 任务：分类以下用户输入\n"
+            f"输入: {text}\n\n"
+            "# 类型定义：\n"
+            "- task: 包含时间、截止日期、或明确待办语义 (如\"明天交\"、\"下午要做\")\n"
+            "- memory: 关于\"我\"的陈述 (如\"我喜欢\"、\"我在\"、\"我的目标是\")\n"
+            "- decision: 做出选择 (如\"我决定\"、\"我选择\")\n"
+            "- note: 不属于以上类型的普通记录\n\n"
+            "# 返回格式 (仅JSON，无其他文字):\n"
+            "{\"type\": \"task\", \"title\": \"任务标题\", \"priority\": \"medium\", \"due_date\": \"YYYY-MM-DD\"}\n"
+            "或 {\"type\": \"memory\", \"category\": \"fact\", \"content\": \"记忆内容\"}\n"
+            "或 {\"type\": \"note\", \"content\": \"原文\"}"
         )
         try:
             import openai
             client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
             resp = client.chat.completions.create(
                 model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
-                max_tokens=200, temperature=0.2,
+                max_tokens=500, temperature=0.1,
+                extra_body={"enable_thinking": False},
             )
-            result_text = resp.choices[0].message.content.strip()
+            result_text = (resp.choices[0].message.content or "").strip()
+            # Fallback: if model returns reasoning instead of content, use that
+            if not result_text and hasattr(resp.choices[0].message, "reasoning"):
+                result_text = (resp.choices[0].message.reasoning or "").strip()
             # Extract JSON from response
             import re as _re
             match = _re.search(r'\{[^{}]*\}', result_text)
