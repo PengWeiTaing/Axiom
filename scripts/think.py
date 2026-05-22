@@ -24,16 +24,22 @@ from core.client import AxiomClient
 
 
 class ThinkEngine:
-    """Axiom 的深度思考引擎。"""
+    """Axiom 的深度思考引擎。
 
-    def __init__(self, base_url: str = "http://127.0.0.1:5001", key: str = "axiomnb"):
-        self.c = AxiomClient(base_url, key)
+    双轨设计:
+    - data_client: 从 VPS 读取数据（快速，用 DeepSeek API）
+    - think_client: 在学校服务器上分析（深度，用本地 Qwen 模型）
+    """
+
+    def __init__(self, data_url: str = "https://pengweitai.me", think_url: str = "http://127.0.0.1:5001", key: str = "axiomnb"):
+        self.data = AxiomClient(data_url, key)      # VPS - 读数据
+        self.think = AxiomClient(think_url, key)     # 本地 - 深度分析
         self.insights_dir = REPO_ROOT / "data" / "insights"
         self.insights_dir.mkdir(parents=True, exist_ok=True)
 
     def analyze_trends(self, days: int = 30) -> dict:
         """深度趋势分析。"""
-        stats = self.c.daily_stats(days=days)
+        stats = self.data.daily_stats(days=days)
         if not stats.get("ok"):
             return {"error": "failed to get stats"}
 
@@ -84,7 +90,7 @@ class ThinkEngine:
         # 2. AI accuracy check
         print("\n[2/4] AI 准确率分析...")
         try:
-            insights = self.c.insights()
+            insights = self.data.insights()
             acc = insights.get("parse_accuracy")
             if acc is not None:
                 print(f"  解析准确率: {acc}%")
@@ -109,7 +115,7 @@ class ThinkEngine:
     def _generate_deep_review(self, trends: dict) -> str | None:
         """使用本地 LLM 生成深度回顾。"""
         try:
-            response = self.c._req("POST", "/chat", data={
+            response = self.think._req("POST", "/chat", data={
                 "message": (
                     f"基于以下30天数据做深度分析(3-5句):\n"
                     f"总记录{trends['total_items']}条, 活跃{trends['active_days']}天({trends['active_pct']}%), "
@@ -164,11 +170,12 @@ def main():
     parser = argparse.ArgumentParser(description="Axiom Think Engine")
     parser.add_argument("--once", action="store_true", help="Run once and exit")
     parser.add_argument("--interval", type=int, default=3600, help="Interval in seconds (default: 3600)")
-    parser.add_argument("--base-url", default="http://127.0.0.1:5001", help="Axiom base URL")
+    parser.add_argument("--data-url", default="https://pengweitai.me", help="VPS URL for reading data")
+    parser.add_argument("--think-url", default="http://127.0.0.1:5001", help="Local server for deep AI analysis")
     parser.add_argument("--key", default="axiomnb", help="API key")
     args = parser.parse_args()
 
-    engine = ThinkEngine(args.base_url, args.key)
+    engine = ThinkEngine(args.data_url, args.think_url, args.key)
 
     if args.once:
         engine.deep_analyze()
