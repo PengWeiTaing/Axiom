@@ -14,10 +14,7 @@ import SmartInput from '@/components/SmartInput.vue';
 import Timeline from '@/components/Timeline.vue';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import { useTimelineStore } from '@/stores/timeline';
-import { useModeStore } from '@/stores/mode';
-
 const showSearch = ref(false);
-const mode = useModeStore();
 const timeline = useTimelineStore();
 const selectedId = ref<number | null>(null);
 
@@ -67,19 +64,6 @@ defineExpose({ openSearch: () => (showSearch.value = true) });
           </svg>
           <span>搜索</span>
           <kbd class="mono">⌘F</kbd>
-        </button>
-        <button
-          class="action-btn atlas-btn"
-          type="button"
-          title="进入 Atlas — 宏观视野"
-          @click="mode.set('atlas')"
-        >
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4" />
-            <circle cx="8" cy="8" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4" />
-            <path d="M8 2v2M8 12v2M2 8h2M12 8h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-          </svg>
-          <span>Atlas</span>
         </button>
       </div>
     </div>

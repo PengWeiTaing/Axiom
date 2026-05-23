@@ -18,11 +18,9 @@
 
 import { onMounted, computed } from 'vue';
 import { useAtlasStore } from '@/stores/atlas';
-import { useModeStore } from '@/stores/mode';
 import type { GoalWithProgress, DailyPoint } from '@/stores/atlas';
 
-const atlas = useAtlasStore();
-const mode = useModeStore();
+const atlas = useAtlasStore()
 
 onMounted(() => atlas.load());
 
@@ -98,15 +96,9 @@ const trendArrow = computed(() => {
   <div class="atlas">
     <header class="atlas-head">
       <div>
-        <span class="eyebrow">Atlas</span>
-        <h1 class="title">你正在往哪里走</h1>
+        <span class="eyebrow">近况</span>
+        <h1 class="title">本周与最近的轮廓</h1>
       </div>
-      <button class="back" type="button" @click="mode.set('capture')">
-        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
-          <path d="M14 8H2M7 3L2 8l5 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-        <span>返回 Capture</span>
-      </button>
     </header>
 
     <div v-if="atlas.loading && atlas.goals.length === 0" class="loading">

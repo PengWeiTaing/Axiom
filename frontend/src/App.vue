@@ -4,11 +4,13 @@ import { useAuthStore } from '@/stores/auth';
 import { useModeStore } from '@/stores/mode';
 import KeyGate from '@/components/KeyGate.vue';
 import CaptureView from '@/views/CaptureView.vue';
+import ModeSwitcher from '@/components/ModeSwitcher.vue';
 import QuickCapture from '@/components/QuickCapture.vue';
 import FloatChat from '@/components/FloatChat.vue';
 
-// Atlas 视图懒加载，避免拖慢 Capture 启动
+// 懒加载，避免拖慢 Capture 启动
 const AtlasView = defineAsyncComponent(() => import('@/views/AtlasView.vue'));
+const RecentView = defineAsyncComponent(() => import('@/views/RecentView.vue'));
 
 const auth = useAuthStore();
 const mode = useModeStore();
@@ -23,9 +25,11 @@ onMounted(async () => {
 <template>
   <KeyGate v-if="!auth.ready" />
   <template v-else>
+    <ModeSwitcher v-if="auth.ready" />
     <Transition name="mode" mode="out-in">
       <CaptureView v-if="mode.mode === 'capture'" key="capture" />
-      <AtlasView v-else key="atlas" />
+      <AtlasView v-else-if="mode.mode === 'atlas'" key="atlas" />
+      <RecentView v-else key="recent" />
     </Transition>
     <QuickCapture />
     <FloatChat />
