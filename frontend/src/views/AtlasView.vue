@@ -238,8 +238,16 @@ const trendArrow = computed(() => {
       </section>
     </div>
 
-    <footer v-if="atlas.errors.length" class="errors">
-      <p v-for="(e, i) in atlas.errors" :key="i" class="error">{{ e }}</p>
+    <footer v-if="atlas.notices.length" class="notice-bar">
+      <span
+        v-for="(n, i) in atlas.notices"
+        :key="n.source"
+        class="notice-item"
+      >
+        <span class="notice-dot" :class="{ warn: n.level === 'warn' }" />
+        <span>{{ n.message }}</span>
+        <span v-if="i < atlas.notices.length - 1" class="notice-sep"> · </span>
+      </span>
     </footer>
   </div>
 </template>
@@ -608,15 +616,37 @@ const trendArrow = computed(() => {
   }
 }
 
-.errors {
+.notice-bar {
   margin-top: var(--s-5);
-  padding: var(--s-3);
+  padding: var(--s-2) var(--s-4);
   border-top: 1px solid var(--line-1);
+  font-size: var(--fs-2);
+  color: var(--text-4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.error {
-  font-size: var(--fs-2);
-  color: var(--error);
-  margin-bottom: 4px;
+.notice-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.notice-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-5);
+  flex-shrink: 0;
+}
+
+.notice-dot.warn {
+  background: var(--warn);
+}
+
+.notice-sep {
+  color: var(--text-5);
+  margin: 0 2px;
 }
 </style>

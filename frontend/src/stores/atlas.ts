@@ -18,6 +18,13 @@ import {
 import type { Memory, Task, Decision } from '@/api/types';
 import { ApiError } from '@/api/client';
 
+export type AtlasNoticeLevel = 'info' | 'warn'
+export interface AtlasNotice {
+  level: AtlasNoticeLevel
+  message: string
+  source: 'goals' | 'decisions' | 'memory_stats' | 'weekly' | 'daily'
+}
+
 export interface GoalWithProgress {
   memory: Memory;
   linked_tasks: Task[];
@@ -52,7 +59,7 @@ export const useAtlasStore = defineStore('atlas', () => {
   const daily = ref<DailyPoint[]>([]);
 
   const loading = ref(false);
-  const errors = ref<string[]>([]);
+  const notices = ref<AtlasNotice[]>([]);
   const lastLoaded = ref<number>(0);
 
   const isStale = computed(() => Date.now() - lastLoaded.value > CACHE_TTL);
@@ -62,7 +69,9 @@ export const useAtlasStore = defineStore('atlas', () => {
     if (!force && !isStale.value && lastLoaded.value > 0) return;
 
     loading.value = true;
-    errors.value = [];
+    notices.value = [];
+
+    const sources = ['goals', 'decisions', 'memory_stats', 'weekly', 'daily'] as const;
 
     // 并行拉，失败一个不影响其他
     const settled = await Promise.allSettled([
@@ -73,12 +82,36 @@ export const useAtlasStore = defineStore('atlas', () => {
       loadDaily(),
     ]);
 
-    settled.forEach((r) => {
+    const seen = new Map<string, AtlasNotice>();
+    settled.forEach((r, idx) => {
       if (r.status === 'rejected') {
-        const msg = r.reason instanceof ApiError ? r.reason.message : '加载失败';
-        errors.value.push(msg);
+        const raw = r.reason instanceof ApiError ? r.reason.message : '加载失败';
+        const source = sources[idx];
+        const lower = raw.toLowerCase();
+        let level: AtlasNoticeLevel = 'warn';
+        let message = raw;
+        if (lower.includes('ai') || lower.includes('key') || lower.includes('unconfigured')) {
+          level = 'info';
+          message = 'AI 未配置，本周提炼暂不可用';
+        } else if (lower.includes('404') || lower.includes('not_found')) {
+          level = 'info';
+          const names: Record<string, string> = {
+            goals: '主线', decisions: '决策', memory_stats: '记忆统计',
+            weekly: '本周提炼', daily: '节奏数据',
+          };
+          message = `${names[source]} 端点暂时不可用`;
+        } else {
+          const names: Record<string, string> = {
+            goals: '主线', decisions: '决策', memory_stats: '记忆统计',
+            weekly: '本周提炼', daily: '节奏数据',
+          };
+          message = `${names[source]} 加载失败：${raw}`;
+        }
+        // 同 source 去重，只保留最后一次
+        seen.set(source, { level, message, source });
       }
     });
+    notices.value = Array.from(seen.values());
 
     lastLoaded.value = Date.now();
     loading.value = false;
@@ -132,7 +165,7 @@ export const useAtlasStore = defineStore('atlas', () => {
     weekly,
     daily,
     loading,
-    errors,
+    notices,
     isStale,
     load,
   };

@@ -317,5 +317,153 @@ def register_routes(app):
                     "items": [row_to_item(row, include_score=(sort == "relevance")) for row in rows],
                 }
             )
-    
+
+
+        @app.route("/timeline", methods=["GET"])
+        def timeline():
+            """统一时间流：items/tasks/memories/decisions 的创建+状态变更事件合流。"""
+            auth_error = require_key()
+            if auth_error:
+                return auth_error
+
+            try:
+                page, page_size = read_pagination(default_page_size=30)
+            except ValueError as exc:
+                return error_response(400, "invalid_pagination", str(exc))
+
+            kinds_raw = request.args.get("kinds", "").strip()
+            allowed = {"item", "task", "memory", "decision"}
+            kinds = [k for k in kinds_raw.split(",") if k.strip()] if kinds_raw else list(allowed)
+            for k in kinds:
+                if k not in allowed:
+                    return error_response(400, "invalid_kinds", f"kinds 含非法值: {k}")
+
+            conn = get_db_connection()
+            try:
+                unions = []
+                count_unions = []
+                params = []
+                count_params = []
+
+                # --- 创建事件 ---
+                if "item" in kinds:
+                    unions.append(
+                        "SELECT 'item' AS kind, id, 'created' AS event, created_at AS occurred_at, "
+                        "SUBSTR(COALESCE(content,''),1,80) AS title, "
+                        "SUBSTR(COALESCE(content,''),1,80) AS summary, "
+                        "json_object('type',type,'source',source,'storage',"
+                        "CASE WHEN file_path LIKE '%/archive/%' THEN 'archive' ELSE 'inbox' END) AS meta "
+                        "FROM items")
+                    count_unions.append("SELECT COUNT(*) FROM items")
+
+                if "task" in kinds:
+                    unions.append(
+                        "SELECT 'task' AS kind, id, 'created' AS event, created_at AS occurred_at, "
+                        "title, title AS summary, "
+                        "json_object('status',status,'priority',priority,'due_date',COALESCE(due_date,''),"
+                        "'completed_at',COALESCE(completed_at,'')) AS meta "
+                        "FROM tasks")
+                    count_unions.append("SELECT COUNT(*) FROM tasks")
+
+                if "memory" in kinds:
+                    unions.append(
+                        "SELECT 'memory' AS kind, id, 'created' AS event, created_at AS occurred_at, "
+                        "SUBSTR(COALESCE(content,''),1,80) AS title, "
+                        "SUBSTR(COALESCE(content,''),1,80) AS summary, "
+                        "json_object('category',category,'status',status) AS meta "
+                        "FROM memories")
+                    count_unions.append("SELECT COUNT(*) FROM memories")
+
+                if "decision" in kinds:
+                    unions.append(
+                        "SELECT 'decision' AS kind, id, 'created' AS event, created_at AS occurred_at, "
+                        "title, title AS summary, "
+                        "json_object('status',status) AS meta "
+                        "FROM decisions")
+                    count_unions.append("SELECT COUNT(*) FROM decisions")
+
+                # --- 状态变更事件（从 audit_log） ---
+                audit_map = {
+                    "item":     ("item", ("item_archive", "item_restore", "item_delete"),
+                                {"item_archive": "archived", "item_restore": "restored", "item_delete": "deleted"}),
+                    "task":     ("task", ("task_done", "task_cancelled", "task_todo"),
+                                {"task_done": "completed", "task_cancelled": "cancelled", "task_todo": "restored"}),
+                    "memory":   ("memory", ("memory_confirm", "memory_archive"),
+                                {"memory_confirm": "confirmed", "memory_archive": "archived"}),
+                    "decision": ("decision", ("decision_review",),
+                                {"decision_review": "reviewed"}),
+                }
+
+                for k in kinds:
+                    if k not in audit_map:
+                        continue
+                    table, actions, mapping = audit_map[k]
+                    title_col = {
+                        "item": "COALESCE(t.content,'')",
+                        "task": "COALESCE(t.title,'')",
+                        "memory": "COALESCE(t.content,'')",
+                        "decision": "COALESCE(t.title,'')",
+                    }[k]
+                    table_name = f"{table}s" if table != "memory" else "memories"
+                    action_placeholders = ",".join("?" for _ in actions)
+
+                    unions.append(
+                        f"SELECT '{k}' AS kind, a.target_id AS id, "
+                        f"CASE a.action " + " ".join(f"WHEN '{a}' THEN '{e}'" for a, e in mapping.items()) +
+                        " END AS event, a.created_at AS occurred_at, "
+                        f"CASE WHEN t.id IS NULL THEN '(已删除 #' || a.target_id || ')' ELSE SUBSTR({title_col},1,80) END AS title, "
+                        f"CASE WHEN t.id IS NULL THEN '(已删除 #' || a.target_id || ')' ELSE SUBSTR({title_col},1,80) END AS summary, "
+                        f"'{{}}' AS meta "
+                        f"FROM audit_log a LEFT JOIN {table_name} t ON t.id = a.target_id "
+                        f"WHERE a.action IN ({action_placeholders})")
+                    params.extend(actions)
+
+                    count_unions.append(
+                        f"SELECT COUNT(*) FROM audit_log a LEFT JOIN {table_name} t ON t.id = a.target_id "
+                        f"WHERE a.action IN ({action_placeholders})")
+                    count_params.extend(actions)
+
+                if not unions:
+                    return ok_response({"page": page, "page_size": page_size,
+                                        "total": 0, "total_pages": 0, "entries": []})
+
+                # Total count (each subquery returns COUNT(*), sum them)
+                count_sql = "SELECT SUM(cnt) FROM (" + " UNION ALL ".join(
+                    q.replace("SELECT COUNT(*)", "SELECT COUNT(*) AS cnt") for q in count_unions
+                ) + ")"
+                total = conn.execute(count_sql, count_params).fetchone()[0] or 0
+
+                # Data query
+                union_sql = " UNION ALL ".join(unions)
+                offset = (page - 1) * page_size
+                sql = (f"SELECT * FROM ({union_sql}) AS timeline_union "
+                       f"ORDER BY occurred_at DESC LIMIT ? OFFSET ?")
+                rows = conn.execute(sql, params + [page_size, offset]).fetchall()
+            except sqlite3.Error:
+                logger.exception("timeline query failed")
+                return error_response(500, "database_read_failed", "数据库查询失败")
+            finally:
+                conn.close()
+
+            total_pages = max(1, (total + page_size - 1) // page_size)
+            entries = []
+            for row in rows:
+                meta_raw = row["meta"]
+                if isinstance(meta_raw, str):
+                    meta_raw = json.loads(meta_raw)
+                entries.append({
+                    "kind": row["kind"],
+                    "id": row["id"],
+                    "event": row["event"],
+                    "occurred_at": row["occurred_at"],
+                    "title": row["title"],
+                    "summary": row["summary"],
+                    "meta": {k: v for k, v in (meta_raw or {}).items()
+                             if v is not None and v != ""} if meta_raw else {},
+                })
+
+            return ok_response({
+                "page": page, "page_size": page_size,
+                "total": total, "total_pages": total_pages, "entries": entries,
+            })
     
