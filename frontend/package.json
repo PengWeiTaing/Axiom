@@ -11,7 +11,9 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@types/three": "^0.184.1",
     "pinia": "^2.2.6",
+    "three": "^0.184.0",
     "vue": "^3.5.13"
   },
   "devDependencies": {

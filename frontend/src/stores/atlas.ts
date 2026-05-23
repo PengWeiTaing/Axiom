@@ -105,7 +105,7 @@ export const useAtlasStore = defineStore('atlas', () => {
             goals: '主线', decisions: '决策', memory_stats: '记忆统计',
             weekly: '本周提炼', daily: '节奏数据',
           };
-          message = `${names[source]} 加载失败：${raw}`;
+          message = raw === '加载失败' ? `${names[source]} 加载失败` : `${names[source]} 加载失败：${raw}`;
         }
         // 同 source 去重，只保留最后一次
         seen.set(source, { level, message, source });
@@ -121,7 +121,7 @@ export const useAtlasStore = defineStore('atlas', () => {
     const data = await listMemories({ category: 'goal', status: 'confirmed', page_size: 20 });
     // 给每个 goal 拉 linked_tasks + progress（顺序拉，避免后端压力）
     const result: GoalWithProgress[] = [];
-    for (const m of data.items) {
+    for (const m of data.memories) {
       try {
         const detail = await getMemory(m.id);
         result.push({
@@ -142,7 +142,7 @@ export const useAtlasStore = defineStore('atlas', () => {
 
   async function loadDecisions() {
     const data = await listDecisions({ page: 1 });
-    decisions.value = data.items.slice(0, 8);
+    decisions.value = data.decisions.slice(0, 8);
   }
 
   async function loadMemoryStats() {

@@ -352,7 +352,7 @@ def register_routes(app):
                         "SUBSTR(COALESCE(content,''),1,80) AS title, "
                         "SUBSTR(COALESCE(content,''),1,80) AS summary, "
                         "json_object('type',type,'source',source,'storage',"
-                        "CASE WHEN file_path LIKE '%/archive/%' THEN 'archive' ELSE 'inbox' END) AS meta "
+                        "CASE WHEN INSTR(file_path,'/archive/')>0 OR INSTR(file_path,'\\archive\\')>0 THEN 'archive' WHEN file_path IS NULL THEN 'inbox' ELSE 'inbox' END) AS meta "
                         "FROM items")
                     count_unions.append("SELECT COUNT(*) FROM items")
 

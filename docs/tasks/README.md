@@ -39,6 +39,14 @@ Opus 写 docs/tasks/NNN-xxx.md
 - `core/_common.py` / `core/receiver.py` / `core/routes/**`（后端，除非任务单明确要求）
 - `core/static/v2/`（构建产物，**不要手动改**——它由 `npm run build` 生成）
 
+**当你以为后端字段缺失 / API 返回不全 / 接口签名不对时**：
+
+> 立即停止，**不要改后端**。在任务单的 commit message 或文件里加一句 `BLOCKED: 后端 GET /xxx 没返回 yyy 字段，需要 Opus 确认是后端补还是前端绕过`。
+> Opus 拿到这条阻塞会评估、出补丁单。
+> **没经过 Opus 确认就动后端 = 越界**，即使你的改动等价或无害。
+
+历史教训：001a 里 DeepSeek 在 `core/routes/items.py` 加了两行 `item["storage"] = ...` 和 `item["file_url"] = ...`，但 `build_item_payload` 本来就返回这两个字段——结果是无害冗余赋值。功能上没破坏，但**违反了协作分工**，使 review 多花时间确认是否真的需要这两行。
+
 ### 3. 视觉约束（硬规则）
 
 - **颜色**：只允许用 `tokens.css` 里定义的 CSS 变量。不要写 `#fff`/`rgb(...)` 之类的字面量

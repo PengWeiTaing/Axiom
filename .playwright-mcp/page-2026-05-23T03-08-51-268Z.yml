@@ -1,0 +1,56 @@
+- generic [ref=e2]:
+  - generic [ref=e70]:
+    - banner [ref=e71]:
+      - generic [ref=e72]:
+        - text: Atlas
+        - heading "你正在往哪里走" [level=1] [ref=e73]
+      - button "返回 Capture" [ref=e74] [cursor=pointer]:
+        - img [ref=e75]
+        - generic [ref=e77]: 返回 Capture
+    - generic [ref=e78]:
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - generic [ref=e81]: 主线
+          - generic [ref=e82]: 0 条目标
+        - generic [ref=e83]: 还没有目标。在 Capture 模式记一条"目标"，它会出现在这里。
+      - generic [ref=e84]:
+        - generic [ref=e86]: 本周
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - generic [ref=e89]: —
+            - generic [ref=e90]: 完成
+          - generic [ref=e91]:
+            - generic [ref=e92]: —
+            - generic [ref=e93]: 上周
+          - generic [ref=e94]:
+            - generic [ref=e95]: —
+            - generic [ref=e96]: 完成率
+          - generic [ref=e97]:
+            - generic [ref=e98]: —
+            - generic [ref=e99]: 趋势
+      - generic [ref=e100]:
+        - generic [ref=e101]:
+          - generic [ref=e102]: 节奏
+          - generic [ref=e103]: 近 30 天
+        - generic [ref=e104]: 没有节奏数据
+      - generic [ref=e105]:
+        - generic [ref=e106]:
+          - generic [ref=e107]: 领域
+          - generic [ref=e108]: 记忆 0
+        - generic [ref=e109]: 没有数据
+      - generic [ref=e110]:
+        - generic [ref=e111]:
+          - generic [ref=e112]: 决策
+          - generic [ref=e113]: 最近 0 条
+        - generic [ref=e114]: 没有决策
+      - generic [ref=e115]:
+        - generic [ref=e116]:
+          - generic [ref=e117]: 提炼
+          - generic [ref=e118]: AI 周报
+        - generic [ref=e119]: 本周还没有提炼
+    - contentinfo [ref=e120]:
+      - paragraph [ref=e121]: 加载失败
+      - paragraph [ref=e122]: 加载失败
+      - paragraph [ref=e123]: 未配置 AI API key
+  - button "AI 管家" [ref=e65] [cursor=pointer]:
+    - img [ref=e66]

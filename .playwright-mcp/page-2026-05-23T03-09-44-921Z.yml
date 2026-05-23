@@ -1,0 +1,63 @@
+- generic [ref=e2]:
+  - generic [ref=e124]:
+    - generic [ref=e125]:
+      - generic [ref=e128]: Axiom
+      - generic [ref=e129]:
+        - button "搜索 ⌘F" [ref=e130] [cursor=pointer]:
+          - img [ref=e131]
+          - generic [ref=e134]: 搜索
+          - generic [ref=e135]: ⌘F
+        - button "Atlas" [ref=e136] [cursor=pointer]:
+          - img [ref=e137]
+          - generic [ref=e141]: Atlas
+    - generic [ref=e142]:
+      - textbox "粘个链接，AI 帮你抓内容…" [ref=e176]
+      - generic [ref=e144]:
+        - generic [ref=e145]: 少思考、多记录。AI 会判断这是笔记、任务还是记忆。
+        - button "提交" [disabled] [ref=e146]:
+          - img [ref=e147]
+    - generic [ref=e149]:
+      - generic [ref=e150]:
+        - generic [ref=e151]: 最近
+        - generic [ref=e152]: 4 条
+      - list [ref=e153]:
+        - listitem [ref=e154] [cursor=pointer]:
+          - generic [ref=e155]: 昨天 14:13
+          - generic "明天下午三点开会" [ref=e157]
+          - generic [ref=e158]: text
+        - listitem [ref=e159] [cursor=pointer]:
+          - generic [ref=e160]: 04/09
+          - generic "数学" [ref=e162]
+          - generic [ref=e163]: text
+        - listitem [ref=e164] [cursor=pointer]:
+          - generic [ref=e165]: 03/30
+          - generic "4577" [ref=e167]
+          - generic [ref=e168]: text
+        - listitem [ref=e169] [cursor=pointer]:
+          - generic [ref=e170]: 03/30
+          - generic "db_test" [ref=e172]
+          - generic [ref=e173]: text
+      - generic [ref=e175]: — 没有更多了 —
+    - complementary [ref=e177]:
+      - generic [ref=e178]:
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - generic [ref=e181]: TEXT
+            - generic [ref=e182]: 昨天 14:13
+          - button "关闭" [ref=e183] [cursor=pointer]: ×
+        - paragraph [ref=e185]: 明天下午三点开会
+        - generic [ref=e186]:
+          - generic [ref=e187]:
+            - generic [ref=e188]: ID
+            - generic [ref=e189]: "#4"
+          - generic [ref=e190]:
+            - generic [ref=e191]: 来源
+            - generic [ref=e192]: ios_shortcut
+          - generic [ref=e193]:
+            - generic [ref=e194]: 路径
+            - generic "E:\\Axiom\\data\\inbox\\20260522_061312_970166_35cfac37.txt" [ref=e195]
+        - generic [ref=e196]:
+          - button "归档" [ref=e197] [cursor=pointer]
+          - button "删除" [ref=e198] [cursor=pointer]
+  - button "AI 管家" [ref=e65] [cursor=pointer]:
+    - img [ref=e66]

@@ -1,0 +1,42 @@
+{
+  "schema_version": "0.1",
+  "root": { "id": "ROOT", "name": "我" },
+  "lifelines": [
+    { "id": "L1", "name": "健康", "parent_id": "ROOT", "order_index": 1 },
+    { "id": "L1.1", "name": "减脂", "parent_id": "L1", "order_index": 1 },
+    { "id": "L1.2", "name": "睡眠", "parent_id": "L1", "order_index": 2 },
+    { "id": "L2", "name": "学习", "parent_id": "ROOT", "order_index": 2 },
+    { "id": "L2.1", "name": "Rust", "parent_id": "L2", "order_index": 1 },
+    { "id": "L2.2", "name": "系统设计", "parent_id": "L2", "order_index": 2 },
+    { "id": "L3", "name": "关系", "parent_id": "ROOT", "order_index": 3 },
+    { "id": "L3.1", "name": "家人", "parent_id": "L3", "order_index": 1 },
+    { "id": "L4", "name": "事业", "parent_id": "ROOT", "order_index": 4 },
+    { "id": "L4.1", "name": "Axiom", "parent_id": "L4", "order_index": 1 },
+    { "id": "L5", "name": "兴趣", "parent_id": "ROOT", "order_index": 5 }
+  ],
+  "entities": [
+    { "id": "T1", "kind": "task", "title": "晨跑 5km", "lifeline_id": "L1.1", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "T2", "kind": "task", "title": "晚饭少碳水", "lifeline_id": "L1.1", "meta": { "priority": "medium", "status": "done" } },
+    { "id": "T3", "kind": "task", "title": "23 点前关灯", "lifeline_id": "L1.2", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "T4", "kind": "task", "title": "读 Rustonomicon Ch5", "lifeline_id": "L2.1", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "T5", "kind": "task", "title": "重构 timeline 端点", "lifeline_id": "L4.1", "meta": { "priority": "high", "status": "done" } },
+    { "id": "M1", "kind": "memory", "title": "夜间容易饿", "lifeline_id": "L1.1" },
+    { "id": "M2", "kind": "memory", "title": "睡前刷手机会让我焦虑", "lifeline_id": "L1.2" },
+    { "id": "M3", "kind": "memory", "title": "学习时容易分心", "lifeline_id": "L2" },
+    { "id": "M4", "kind": "memory", "title": "我重视手感大于理论", "lifeline_id": "L2.1" },
+    { "id": "M5", "kind": "memory", "title": "妈妈最近常打电话", "lifeline_id": "L3.1" },
+    { "id": "D1", "kind": "decision", "title": "买跑步机还是去健身房", "lifeline_id": "L1" },
+    { "id": "D2", "kind": "decision", "title": "Axiom 是否做 Tauri 壳", "lifeline_id": "L4.1" },
+    { "id": "I1", "kind": "item", "title": "MIT 6.S081 课程笔记", "lifeline_id": "L2.2" },
+    { "id": "I2", "kind": "item", "title": "豆瓣读书清单截图", "lifeline_id": "L5" }
+  ],
+  "associations": [
+    { "id": "A1", "from": "T1", "to": "M1", "relation_type": "co_occurrence", "confidence": 0.82, "status": "accepted", "evidence": [{ "type": "shared_keyword", "excerpt": "夜间 / 早晨节律", "weight": 0.6 }] },
+    { "id": "A2", "from": "T1", "to": "D1", "relation_type": "causal", "confidence": 0.74, "status": "pending", "evidence": [{ "type": "temporal", "excerpt": "T1 创建 2 天后 D1 出现", "weight": 0.5 }] },
+    { "id": "A3", "from": "M2", "to": "T3", "relation_type": "causal", "confidence": 0.88, "status": "accepted", "evidence": [{ "type": "shared_keyword", "excerpt": "夜间 / 睡眠 / 焦虑", "weight": 0.8 }] },
+    { "id": "A4", "from": "M3", "to": "T4", "relation_type": "tension", "confidence": 0.71, "status": "pending", "evidence": [{ "type": "explicit_link", "excerpt": "学习专注度与任务难度可能矛盾", "weight": 0.5 }] },
+    { "id": "A5", "from": "T5", "to": "D2", "relation_type": "derived_from", "confidence": 0.79, "status": "accepted", "evidence": [{ "type": "temporal", "excerpt": "完成 T5 后讨论 D2", "weight": 0.6 }] },
+    { "id": "A6", "from": "M4", "to": "T4", "relation_type": "co_occurrence", "confidence": 0.68, "status": "accepted", "evidence": [{ "type": "shared_keyword", "excerpt": "实践 / 手感", "weight": 0.5 }] },
+    { "id": "A7", "from": "M1", "to": "T3", "relation_type": "co_occurrence", "confidence": 0.65, "status": "pending", "evidence": [{ "type": "temporal", "excerpt": "饿 → 不睡 → 第二天累", "weight": 0.4 }] }
+  ]
+}

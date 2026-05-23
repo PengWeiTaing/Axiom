@@ -87,6 +87,11 @@ export interface Paginated<T> {
   items: T[];
 }
 
+// 列表端点用实体名复数作字段名（非统一的 "items"）
+export interface MemoryList { page: number; page_size: number; total: number; total_pages: number; memories: Memory[] }
+export interface DecisionList { page: number; page_size: number; total: number; total_pages: number; decisions: Decision[] }
+export interface TaskList { page: number; page_size: number; total: number; total_pages: number; tasks: Task[] }
+
 export interface ApiErrorPayload {
   code: string;
   message: string;

@@ -11,6 +11,8 @@ import type {
   Decision,
   ParseResult,
   Paginated,
+  MemoryList,
+  DecisionList,
 } from './types';
 
 // ---------- 采集 ----------
@@ -99,7 +101,7 @@ export const listMemories = (params: {
   status?: 'candidate' | 'confirmed' | 'archived';
   page?: number;
   page_size?: number;
-} = {}) => apiRequest<Paginated<Memory>>('/memories', { query: params });
+} = {}) => apiRequest<MemoryList>('/memories', { query: params });
 
 export const getMemory = (id: number) =>
   apiRequest<{ memory: Memory; linked_tasks: Task[]; task_progress: { total: number; done: number; todo: number } }>(
@@ -113,7 +115,7 @@ export const memoriesStats = () =>
 
 // ---------- 决策扩展 ----------
 export const listDecisions = (params: { status?: 'pending' | 'reviewed'; page?: number } = {}) =>
-  apiRequest<Paginated<Decision>>('/decisions', { query: params });
+  apiRequest<DecisionList>('/decisions', { query: params });
 
 // ---------- 报告 ----------
 export const weeklyReport = () =>

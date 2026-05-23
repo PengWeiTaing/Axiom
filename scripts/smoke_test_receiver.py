@@ -2127,6 +2127,53 @@ def main() -> None:
             if consistency["archive_file_count"] != 0:
                 raise AssertionError(f"expected 0 archive files in report: {consistency}")
 
+            # === GET /timeline 用例 ===
+            # 1. 空库返回 entries=[]
+            body = assert_status(
+                client.get("/timeline", query_string={"key": "test-key", "kinds": "task"}),
+                200, "timeline empty")
+            assert body["entries"] == []
+            assert body["total"] == 0
+
+            # 2. 创建 task → 出现 kind=task event=created
+            resp = client.post("/tasks", json={"title": "smoke task", "priority": "high"}, headers={"X-Axiom-Key": "test-key"})
+            task_body = resp.get_json()
+            assert task_body["ok"]
+            task_id = task_body["task"]["id"]
+            body = assert_status(
+                client.get("/timeline", query_string={"key": "test-key", "kinds": "task"}),
+                200, "timeline task created")
+            matches = [e for e in body["entries"] if e["kind"] == "task" and e["event"] == "created"]
+            assert len(matches) == 1, f"expected 1 task created event, got {len(matches)}"
+            assert matches[0]["title"] == "smoke task"
+
+            # 3. 完成该 task → 同时出现 kind=task event=completed（两条都在）
+            client.post(f"/tasks/{task_id}/done", headers={"X-Axiom-Key": "test-key"})
+            body = assert_status(
+                client.get("/timeline", query_string={"key": "test-key", "kinds": "task"}),
+                200, "timeline task completed")
+            events = sorted([e["event"] for e in body["entries"] if e["id"] == task_id])
+            assert events == ["completed", "created"], f"expected [completed, created], got {events}"
+
+            # 4. kinds 过滤
+            body = assert_status(
+                client.get("/timeline", query_string={"key": "test-key", "kinds": "memory"}),
+                200, "timeline kinds memory")
+            assert all(e["kind"] == "memory" for e in body["entries"])
+            invalid_resp = client.get("/timeline", query_string={"key": "test-key", "kinds": "invalid"})
+            assert invalid_resp.status_code == 400
+
+            # 5. 分页
+            for i in range(5):
+                client.post("/add", json={"text": f"page test {i}"}, headers={"X-Axiom-Key": "test-key"})
+            body = assert_status(
+                client.get("/timeline", query_string={"key": "test-key", "page": 1, "page_size": 2}),
+                200, "timeline paginate")
+            assert body["page_size"] == 2
+            assert len(body["entries"]) == 2
+            assert body["total"] >= 5
+            assert body["total_pages"] == (body["total"] + 1) // 2
+
             log_path = root / "logs" / "receiver.log"
             if not log_path.exists():
                 raise AssertionError(f"expected log file to exist: {log_path}")
