@@ -16,7 +16,7 @@ interface SceneObjects {
   renderer: THREE.WebGLRenderer
   nodes: THREE.Mesh[]
   pickables: THREE.Mesh[]
-  lines: THREE.LineSegments[]
+  lines: THREE.Line[]
   orbit: THREE.Mesh | null
   layoutNodes: LayoutNode[]
   dispose: () => void
@@ -40,7 +40,7 @@ export async function initScene(
   const nodes = computeLayout(data)
   const meshes: THREE.Mesh[] = []
   const pickables: THREE.Mesh[] = []
-  const allLines: THREE.LineSegments[] = []
+  const allLines: THREE.Line[] = []
 
   // Create meshes by layer
   for (const n of nodes) {
@@ -89,7 +89,8 @@ export async function initScene(
     }
     const lineGeom = new THREE.BufferGeometry().setFromPoints(points)
     const lineMat = new THREE.LineBasicMaterial({ color: cssVar('--line-2'), transparent: true, opacity: 0.4 })
-    const line = new THREE.LineSegments(lineGeom, lineMat)
+    const line = new THREE.Line(lineGeom, lineMat)
+    line.userData = { fromLayer: parent.layer, toLayer: n.layer }
     scene.add(line)
     allLines.push(line)
   }
@@ -114,7 +115,7 @@ export async function initScene(
 }
 
 interface AssociationLine {
-  line: THREE.LineSegments
+  line: THREE.Line
   data: CosmosAssociation
   fromNode: LayoutNode
   toNode: LayoutNode
@@ -149,7 +150,7 @@ export function createAssociationLines(
       ? new THREE.LineDashedMaterial({ color: cssVar(colorMap[assoc.relation_type] || '--text-3'), transparent: true, opacity: alpha * 0.8, dashSize: 0.06, gapSize: 0.04 })
       : new THREE.LineBasicMaterial({ color: cssVar(colorMap[assoc.relation_type] || '--text-3'), transparent: true, opacity: alpha })
     mat.depthTest = false
-    const line = new THREE.LineSegments(lineGeom, mat)
+    const line = new THREE.Line(lineGeom, mat)
     line.userData = { associationId: assoc.id, ...assoc }
     scene.add(line)
     results.push({ line, data: assoc, fromNode: from, toNode: to })

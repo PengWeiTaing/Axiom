@@ -17,7 +17,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let sceneObjs: Awaited<ReturnType<typeof initScene>> | null = null
 let controls: any = null
 let animFrame = 0
-let assocLines: { line: THREE.LineSegments; data: any; fromNode: LayoutNode; toNode: LayoutNode }[] = []
+let assocLines: { line: THREE.Line; data: any; fromNode: LayoutNode; toNode: LayoutNode }[] = []
 let tooltipText = ''
 
 async function start() {
@@ -114,15 +114,18 @@ function animate() {
   controls?.update()
   updateTween(0.016, sceneObjs.camera, controls)
 
-  // LOD: layer visibility based on camera distance
+  // LOD: layer visibility by camera distance
   const dist = sceneObjs.camera.position.length()
+  const maxLayer = dist > 3.5 ? 1 : dist >= 2.0 ? 2 : 3
+  const inFocusState = store.state.kind === 'node_focus' || store.state.kind === 'relation_reveal'
   sceneObjs.nodes.forEach(m => {
     const layer = m.userData.layer as number
-    const shouldShow = layer <= 0 || dist < 3.5
-      || (layer <= 1 && dist >= 3.5)
-      || (layer <= 2 && dist < 3.5 && dist >= 2.0)
-      || (layer <= 3 && dist < 2.0)
-    m.visible = shouldShow || store.state.kind === 'node_focus' || store.state.kind === 'relation_reveal'
+    m.visible = inFocusState || layer <= maxLayer
+  })
+  sceneObjs.lines.forEach((l: any) => {
+    const fromLayer = (l.userData?.fromLayer ?? 3) as number
+    const toLayer = (l.userData?.toLayer ?? 3) as number
+    l.visible = inFocusState || Math.max(fromLayer, toLayer) <= maxLayer
   })
 
   sceneObjs.renderer.render(sceneObjs.scene, sceneObjs.camera)
