@@ -6,8 +6,29 @@ def register_routes(app):
         @app.route("/app", methods=["GET"], strict_slashes=False)
         def app_shell():
             return render_template("app.html")
-    
-    
+
+
+        @app.route("/app/v2", methods=["GET"], strict_slashes=False)
+        def app_shell_v2():
+            # 新一代前端入口（Vite + Vue 3）。
+            # 构建产物输出到 core/static/v2/，由 Flask 静态目录直接 serve。
+            # 没有构建产物时回退到提示页。
+            static_root = Path(app.static_folder or "").resolve()
+            v2_index = static_root / "v2" / "index.html"
+            if v2_index.exists():
+                return send_file(v2_index, mimetype="text/html")
+            return render_template_string('''<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>Axiom v2 (未构建)</title><style>body{font-family:system-ui;max-width:560px;margin:80px auto;padding:24px;background:#07090d;color:#b4bcc9;line-height:1.6}
+h1{color:#6ee7d0;font-weight:500;margin-bottom:12px}code{background:#141921;padding:2px 8px;border-radius:4px;color:#e8ecf2;font-family:ui-monospace,monospace}
+.hint{color:#7d8694;margin-top:24px;font-size:14px}</style></head><body>
+<h1>Axiom v2 尚未构建</h1>
+<p>新一代前端在 <code>frontend/</code> 目录。先构建一次再访问。</p>
+<p>本地：<br><code>cd frontend && npm install && npm run build</code></p>
+<p class="hint">构建产物会输出到 <code>core/static/v2/</code>，刷新本页即可看到新前端。<br>
+旧版前端在 <a href="/app" style="color:#6ee7d0">/app</a> 仍可访问。</p>
+</body></html>'''), 404
+
+
         @app.route("/sw.js", methods=["GET"])
         def service_worker():
             static_root = Path(app.static_folder or "").resolve()

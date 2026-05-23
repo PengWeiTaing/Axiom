@@ -1,0 +1,97 @@
+/*
+ * Axiom Design Tokens
+ *
+ * 方向：单一冷光源 + 灰阶层次 + 紧凑几何
+ * 反方向：多色 bloom、彩色高光、大圆角、过厚玻璃
+ *
+ * 日常模式（Capture）只允许两种"非中性"色：
+ *   --accent  用于交互聚焦与 AI 路由提示
+ *   --warm    用于成功/确认的瞬时反馈（褪色后回到中性）
+ * 其他一切都是冷灰阶。
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ---------- 表面层次（从底到顶 4 层） ---------- */
+  --surface-0: #07090d;    /* 页面背景，几乎黑 */
+  --surface-1: #0d1116;    /* 内容区 */
+  --surface-2: #141921;    /* 卡片/输入框 */
+  --surface-3: #1c2330;    /* hover / 提升态 */
+  --surface-4: #262e3d;    /* active / 选中 */
+
+  /* ---------- 文字层次 ---------- */
+  --text-1: #e8ecf2;       /* 高亮文字（标题、当前焦点） */
+  --text-2: #b4bcc9;       /* 主文字 */
+  --text-3: #7d8694;       /* 次文字（meta、说明） */
+  --text-4: #4a5260;       /* 弱文字（占位符、禁用） */
+  --text-5: #2d3340;       /* 极弱（分隔线上的字） */
+
+  /* ---------- 边线 ---------- */
+  --line-1: rgba(255, 255, 255, 0.04);   /* 主分隔 */
+  --line-2: rgba(255, 255, 255, 0.08);   /* hover 后的边 */
+  --line-3: rgba(255, 255, 255, 0.14);   /* 聚焦边 */
+
+  /* ---------- 单一冷光源 ---------- */
+  --accent: #6ee7d0;              /* 比旧版的 #00d4aa 更冷、更克制 */
+  --accent-bright: #a5f3e0;       /* 聚焦点的小亮点 */
+  --accent-dim: rgba(110, 231, 208, 0.18);
+  --accent-glow: rgba(110, 231, 208, 0.10);
+
+  /* ---------- 状态色（克制使用） ---------- */
+  --warm: #f4c060;                /* 成功瞬时反馈，会褪到 text-3 */
+  --warn: #e8a87c;
+  --error: #e87878;
+
+  /* ---------- 圆角（紧凑，不软糖） ---------- */
+  --r-1: 4px;
+  --r-2: 8px;
+  --r-3: 12px;
+  --r-pill: 999px;
+
+  /* ---------- 间距（8 倍数） ---------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* ---------- 字体 ---------- */
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable",
+    "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono:
+    "JetBrains Mono", "SF Mono", "Cascadia Code", ui-monospace, monospace;
+
+  --fs-1: 11px;     /* eyebrow / 标签 */
+  --fs-2: 12px;     /* meta */
+  --fs-3: 13px;     /* 次正文 */
+  --fs-4: 14px;     /* 正文 */
+  --fs-5: 16px;     /* 输入框主字号 */
+  --fs-6: 20px;     /* 小标题 */
+  --fs-7: 28px;     /* 主标题（克制使用） */
+
+  --lh-tight: 1.3;
+  --lh-base: 1.55;
+
+  /* ---------- 动效（极快，单一曲线） ---------- */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-fast: 120ms;
+  --t-base: 180ms;
+  --t-slow: 280ms;
+
+  /* ---------- 玻璃（极薄，靠 backdrop-filter） ---------- */
+  --glass-blur: blur(20px) saturate(140%);
+  --glass-bg: rgba(13, 17, 22, 0.72);
+
+  /* ---------- 阴影（用于浮层，几乎不可见） ---------- */
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 48px rgba(0, 0, 0, 0.6);
+
+  /* ---------- 布局 ---------- */
+  --content-max: 720px;          /* Capture 模式刻意窄一点，逼近"一栏阅读" */
+  --content-wide: 1100px;        /* Atlas 模式才用宽栏 */
+}

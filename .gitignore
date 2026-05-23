@@ -13,3 +13,10 @@ playwright-report/
 test-results/
 .claude/settings.local.json
 *.pdf
+
+# frontend (Vite + Vue v2 工程)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+# 构建产物 core/static/v2/ 暂入库，避免 VPS 安装 Node.js

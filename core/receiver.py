@@ -235,7 +235,14 @@ def health_badge():
         <text x="105" y="14" fill="{color}" font-size="11" text-anchor="middle" font-family="sans-serif">{score}/100</text>
     </svg>'''
     return Response(svg, mimetype="image/svg+xml")
+
+
+@app.route("/ping", methods=["GET"])
 def ai_ping():
+    # 探活：既能验证后端可达，也能确认 AI 渠道连通。
+    auth_error = require_key()
+    if auth_error:
+        return auth_error
     if not DEEPSEEK_API_KEY:
         return ok_response({"ai": "unconfigured", "latency_ms": 0})
     import time as _t
