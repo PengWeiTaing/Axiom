@@ -1,7 +1,0 @@
-- generic [ref=e4]:
-  - generic [ref=e7]: Axiom
-  - paragraph [ref=e8]: 个人外脑 · 输入访问密钥
-  - generic [ref=e9]:
-    - textbox "X-Axiom-Key" [ref=e10]: axiom123
-    - button "进入" [ref=e11] [cursor=pointer]
-  - paragraph [ref=e12]: 密钥仅保存在本机浏览器，用于所有 API 请求的 X-Axiom-Key 头。

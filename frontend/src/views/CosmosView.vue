@@ -2,7 +2,6 @@
 /** CosmosView — Atlas 球形树宿主组件 */
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
-import { useModeStore } from '@/stores/mode'
 import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
 import type { CosmosState } from '@/cosmos/types'
@@ -11,7 +10,6 @@ import * as THREE from 'three'
 import Breadcrumb from '@/components/cosmos/Breadcrumb.vue'
 
 const store = useCosmosStore()
-const mode = useModeStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 let sceneObjs: Awaited<ReturnType<typeof initScene>> | null = null
@@ -168,7 +166,6 @@ onBeforeUnmount(() => {
   <div class="cosmos-view">
     <div class="cosmos-hud">
       <Breadcrumb :state="store.state" @nav="(s: CosmosState) => store.transition(s)" />
-      <button class="close-btn" type="button" @click="mode.set('capture')">&times; 退出 Atlas</button>
     </div>
     <canvas ref="canvasRef" class="cosmos-canvas" />
     <div v-if="tooltipText && store.state.kind === 'relation_reveal'" class="tooltip">{{ tooltipText }}</div>
@@ -186,28 +183,14 @@ onBeforeUnmount(() => {
 .cosmos-hud {
   position: absolute;
   top: var(--s-4);
-  right: var(--s-4);
+  left: var(--s-4);
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--s-2);
   z-index: 20;
 }
 
-.close-btn {
-  background: none;
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
-  color: var(--text-3);
-  font-size: var(--fs-2);
-  padding: 2px var(--s-2);
-  cursor: pointer;
-}
-
-.close-btn:hover {
-  color: var(--text-1);
-  border-color: var(--line-2);
-}
 
 .cosmos-canvas {
   width: 100%;

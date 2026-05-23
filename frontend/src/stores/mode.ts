@@ -8,18 +8,14 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
-export type AppMode = 'capture' | 'atlas';
+export type AppMode = 'capture' | 'atlas' | 'recent';
 
 export const useModeStore = defineStore('mode', () => {
   const mode = ref<AppMode>('capture');
-
-  function toggle() {
-    mode.value = mode.value === 'capture' ? 'atlas' : 'capture';
-  }
 
   function set(m: AppMode) {
     mode.value = m;
   }
 
-  return { mode, toggle, set };
+  return { mode, set };
 });
