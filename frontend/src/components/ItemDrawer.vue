@@ -10,11 +10,15 @@ import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { getItem, archiveItem, restoreItem, deleteItem } from '@/api/endpoints'
 import { typeAccent } from '@/composables/useTypeAccent'
 import { humanSize } from '@/composables/useHumanSize'
+import { formatRelative } from '@/composables/useRelativeTime'
 import { ApiError } from '@/api/client'
 import type { Item } from '@/api/types'
 
 const props = defineProps<{ itemId: number | null }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
+
+const now = ref(Date.now())
+const nowDate = computed(() => new Date(now.value))
 
 const loading = ref(false)
 const acting = ref(false)
@@ -43,11 +47,7 @@ watch(() => props.itemId, async (id) => {
   }
 })
 
-const isInbox = computed(() => {
-  const fp = detail.value?.file_path
-  if (!fp) return true
-  return !fp.includes('/archive/')
-})
+const isInbox = computed(() => detail.value?.storage !== 'archive')
 
 const typeLabel = computed(() => {
   const map: Record<string, string> = { text: 'TEXT', image: 'IMAGE', document: 'DOC', audio: 'AUDIO' }
@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
             <span class="type-chip mono" :style="{ '--chip-accent': detail ? typeAccent(detail.type) : 'var(--text-5)' }">
               {{ typeLabel }}
             </span>
-            <span v-if="detail" class="head-time mono">{{ detail.created_at?.slice(0, 16).replace('T', ' ') }}</span>
+            <span v-if="detail" class="head-time mono">{{ formatRelative(detail.created_at, nowDate) }}</span>
           </div>
           <button
             class="close-btn"
@@ -446,11 +446,11 @@ onBeforeUnmount(() => {
 /* Transition */
 .drawer-enter-active,
 .drawer-leave-active {
-  transition: opacity var(--t-slow) var(--ease);
+  transition: opacity var(--t-drawer) var(--ease);
 }
 .drawer-enter-active .drawer-panel,
 .drawer-leave-active .drawer-panel {
-  transition: transform var(--t-slow) var(--ease);
+  transition: transform var(--t-drawer) var(--ease);
 }
 
 .drawer-enter-from,

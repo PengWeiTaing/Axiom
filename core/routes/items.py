@@ -229,8 +229,11 @@ def register_routes(app):
             row = get_item_by_id(item_id)
             if row is None:
                 return error_response(404, "item_not_found", "item 不存在")
-    
-            return ok_response({"item": row_to_item(row)})
+
+            item = row_to_item(row)
+            item["storage"] = get_storage_area(row["file_path"])
+            item["file_url"] = build_file_url(item_id)
+            return ok_response({"item": item})
     
     
         @app.route("/item/<int:item_id>/update", methods=["POST"])

@@ -82,6 +82,7 @@
   --t-fast: 120ms;
   --t-base: 180ms;
   --t-slow: 280ms;
+  --t-drawer: 240ms;  /* 抽屉滑入 */
 
   /* ---------- 玻璃（极薄，靠 backdrop-filter） ---------- */
   --glass-blur: blur(20px) saturate(140%);
