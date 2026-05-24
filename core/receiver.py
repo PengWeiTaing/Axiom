@@ -39,6 +39,7 @@ from core.routes.memories import register_routes as register_memories  # noqa: E
 from core.routes.decisions import register_routes as register_decisions  # noqa: E402
 from core.routes.ai import register_routes as register_ai  # noqa: E402
 from core.routes.governance import register_routes as register_governance  # noqa: E402
+from core.routes.cosmos import register_routes as register_cosmos  # noqa: E402
 
 register_core(app)
 register_items(app)
@@ -49,6 +50,7 @@ register_memories(app)
 register_decisions(app)
 register_ai(app)
 register_governance(app)
+register_cosmos(app)
 
 # ===== 错误处理 =====
 @app.errorhandler(Exception)

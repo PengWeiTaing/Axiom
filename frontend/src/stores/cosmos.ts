@@ -24,10 +24,16 @@ export const useCosmosStore = defineStore('cosmos', () => {
     if (data.value) return
     loading.value = true
     try {
-      const resp = await fetch('/mock/cosmos.json')
-      data.value = await resp.json()
-    } catch {
-      error.value = 'Cosmos mock 加载失败'
+      const { apiRequest } = await import('@/api/client')
+      data.value = await apiRequest<CosmosData>('/cosmos')
+    } catch (e: unknown) {
+      // 线上失败时退回 mock 作为 fallback
+      try {
+        const resp = await fetch('/mock/cosmos.json')
+        data.value = await resp.json()
+      } catch {
+        error.value = 'Cosmos 数据加载失败'
+      }
     } finally {
       loading.value = false
     }

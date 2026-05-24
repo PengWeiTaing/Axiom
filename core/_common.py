@@ -425,6 +425,54 @@ def ensure_tasks_table_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER")
 
 
+def ensure_items_lifeline_id(conn: sqlite3.Connection) -> None:
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='items'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+    if "lifeline_id" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN lifeline_id TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_lifeline_id ON items(lifeline_id)")
+
+
+def ensure_tasks_lifeline_id(conn: sqlite3.Connection) -> None:
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
+    if "lifeline_id" not in cols:
+        conn.execute("ALTER TABLE tasks ADD COLUMN lifeline_id TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_lifeline_id ON tasks(lifeline_id)")
+
+
+def ensure_memories_lifeline_id(conn: sqlite3.Connection) -> None:
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='memories'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(memories)")}
+    if "lifeline_id" not in cols:
+        conn.execute("ALTER TABLE memories ADD COLUMN lifeline_id TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_lifeline_id ON memories(lifeline_id)")
+
+
+def ensure_decisions_lifeline_id(conn: sqlite3.Connection) -> None:
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='decisions'"
+    ).fetchone()
+    if not exists:
+        return
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(decisions)")}
+    if "lifeline_id" not in cols:
+        conn.execute("ALTER TABLE decisions ADD COLUMN lifeline_id TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_decisions_lifeline_id ON decisions(lifeline_id)")
+
+
 def ensure_items_table_columns(conn: sqlite3.Connection) -> None:
     existing_columns = {
         row[1]
@@ -665,6 +713,44 @@ def init_db(db_path: Path = DB_PATH) -> None:
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_decisions_status ON decisions(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_decisions_created_at ON decisions(created_at)")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS lifelines (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                parent_id TEXT,
+                order_index INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_lifelines_parent ON lifelines(parent_id)")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS associations (
+                id TEXT PRIMARY KEY,
+                from_kind TEXT NOT NULL,
+                from_id TEXT NOT NULL,
+                to_kind TEXT NOT NULL,
+                to_id TEXT NOT NULL,
+                relation_type TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 0.5,
+                status TEXT NOT NULL DEFAULT 'pending',
+                evidence TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_assoc_from ON associations(from_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_assoc_to ON associations(to_id)")
+
+        ensure_items_lifeline_id(conn)
+        ensure_tasks_lifeline_id(conn)
+        ensure_memories_lifeline_id(conn)
+        ensure_decisions_lifeline_id(conn)
 
         conn.commit()
     finally:

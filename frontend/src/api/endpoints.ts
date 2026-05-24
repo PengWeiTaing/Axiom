@@ -14,6 +14,7 @@ import type {
   MemoryList,
   DecisionList,
 } from './types';
+import type { CosmosData } from '@/cosmos/types';
 
 // ---------- 采集 ----------
 export const addNote = (text: string, source = 'web_app') =>
@@ -153,6 +154,9 @@ export const restoreItem = (id: number) =>
 
 export const deleteItem = (id: number) =>
   apiRequest<{ message: string }>(`/item/${id}`, { method: 'DELETE' });
+
+// ---------- Cosmos ----------
+export const getCosmos = () => apiRequest<CosmosData>('/cosmos');
 
 // ---------- 系统 ----------
 export const health = () => apiRequest<{ service: string; db: string }>('/health', { skipAuth: true });
