@@ -1,7 +1,0 @@
-<<<<<<<< HEAD:core/static/v2/assets/AtlasView-CuMqv6Nj.js
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/CosmosView-tF2yRAYY.js","assets/index-BNgUBcWI.js","assets/vue-BJVCRO9R.js","assets/index-B_Z5ir8V.css","assets/CosmosView-DAu2tmg6.css"])))=>i.map(i=>d[i]);
-import{_ as o,a as n}from"./index-BNgUBcWI.js";import{k as r,r as _,d as i,y as s,i as c,v as l,b as d,S as p,j as f}from"./vue-BJVCRO9R.js";const m=r({__name:"AtlasView",setup(u){const t=f(()=>o(()=>import("./CosmosView-tF2yRAYY.js").then(e=>e.a),__vite__mapDeps([0,1,2,3,4])));return(e,a)=>(_(),i(p,null,{fallback:s(()=>[...a[0]||(a[0]=[d("div",{class:"loading"},"加载 Atlas…",-1)])]),default:s(()=>[c(l(t))]),_:1}))}}),A=n(m,[["__scopeId","data-v-b646ac3a"]]);export{A as default};
-========
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/CosmosView-BgQ-jhcm.js","assets/index-lgg6ZrFi.js","assets/vue-BJVCRO9R.js","assets/index-ue9rgxab.css","assets/CosmosView-XPm2SOXT.css"])))=>i.map(i=>d[i]);
-import{_ as o,a as n}from"./index-lgg6ZrFi.js";import{k as r,r as _,d as i,y as s,i as c,v as l,b as d,S as p,j as f}from"./vue-BJVCRO9R.js";const m=r({__name:"AtlasView",setup(u){const t=f(()=>o(()=>import("./CosmosView-BgQ-jhcm.js").then(e=>e.a),__vite__mapDeps([0,1,2,3,4])));return(e,a)=>(_(),i(p,null,{fallback:s(()=>[...a[0]||(a[0]=[d("div",{class:"loading"},"加载 Atlas…",-1)])]),default:s(()=>[c(l(t))]),_:1}))}}),A=n(m,[["__scopeId","data-v-b646ac3a"]]);export{A as default};
->>>>>>>> 4da9ae98f0e9372f216a20d068f54ab5c2d83121:core/static/v2/assets/AtlasView-Cpm56alm.js
