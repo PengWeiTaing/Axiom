@@ -29,7 +29,7 @@ onMounted(async () => {
     <Transition name="mode" mode="out-in">
       <CaptureView v-if="mode.mode === 'capture'" key="capture" />
       <AtlasView v-else-if="mode.mode === 'atlas'" key="atlas" />
-      <RecentView v-else-if="mode.mode === 'recent'" key="recent" />
+      <RecentView v-else key="recent" />
     </Transition>
     <QuickCapture />
     <FloatChat />
