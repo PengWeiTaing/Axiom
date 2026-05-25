@@ -60,7 +60,7 @@ def register_routes(app):
                     "id": entity_id("item", r["id"]),
                     "kind": "item",
                     "title": _truncate(r["content"] or r["original_name"] or ""),
-                    "lifeline_id": r["lifeline_id"],
+                    "lifeline_id": entity_id("lifeline", r["lifeline_id"]),
                 })
 
             for r in conn.execute(
@@ -70,7 +70,7 @@ def register_routes(app):
                     "id": entity_id("task", r["id"]),
                     "kind": "task",
                     "title": _truncate(r["title"] or ""),
-                    "lifeline_id": r["lifeline_id"],
+                    "lifeline_id": entity_id("lifeline", r["lifeline_id"]),
                     "meta": {"priority": r["priority"], "status": r["status"]},
                 })
 
@@ -81,7 +81,7 @@ def register_routes(app):
                     "id": entity_id("memory", r["id"]),
                     "kind": "memory",
                     "title": _truncate(r["content"] or ""),
-                    "lifeline_id": r["lifeline_id"],
+                    "lifeline_id": entity_id("lifeline", r["lifeline_id"]),
                 })
 
             for r in conn.execute(
@@ -91,7 +91,7 @@ def register_routes(app):
                     "id": entity_id("decision", r["id"]),
                     "kind": "decision",
                     "title": _truncate(r["title"] or ""),
-                    "lifeline_id": r["lifeline_id"],
+                    "lifeline_id": entity_id("lifeline", r["lifeline_id"]),
                 })
 
             # associations

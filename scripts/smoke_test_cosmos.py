@@ -47,6 +47,18 @@ resp = req_no_key("/cosmos")
 check("403 without key", resp.status_code == 403, f"got {resp.status_code}")
 
 # ---- 2. 空库 → 200 ----
+# 先清理可能残留的种子数据（前次运行可能中断在 seed 阶段）
+cleanup_conn = get_db_connection()
+try:
+    cleanup_conn.execute("DELETE FROM associations")
+    cleanup_conn.execute("DELETE FROM tasks")
+    cleanup_conn.execute("DELETE FROM memories")
+    cleanup_conn.execute("DELETE FROM items")
+    cleanup_conn.execute("DELETE FROM lifelines")
+    cleanup_conn.commit()
+finally:
+    cleanup_conn.close()
+
 resp = req("/cosmos")
 check("200 with empty db", resp.status_code == 200, f"got {resp.status_code}")
 data = resp.get_json()
@@ -63,20 +75,20 @@ check("entities empty", data.get("entities") == [])
 check("associations empty", data.get("associations") == [])
 
 # ---- 3. 种子数据 ----
+# lifeline_id 列存 raw 值（外键引用 lifelines.id），endpoint 输出时加前缀
 conn = get_db_connection()
 try:
     conn.execute(
         "INSERT INTO lifelines (id, name, parent_id, order_index) VALUES (?, ?, ?, ?)",
         ("L1", "课业", None, 1),
     )
-    # 在 items 表上有 lifeline_id 列
     conn.execute(
         "INSERT INTO items (type, content, source, created_at, lifeline_id) VALUES (?, ?, ?, datetime('now'), ?)",
-        ("text", "一道不会的题", "web_app", "lifeline:L1"),
+        ("text", "一道不会的题", "web_app", "L1"),
     )
     conn.execute(
         "INSERT INTO tasks (title, priority, status, created_at, updated_at, lifeline_id) VALUES (?, ?, ?, datetime('now'), datetime('now'), ?)",
-        ("写完作业", "high", "todo", "lifeline:L1"),
+        ("写完作业", "high", "todo", "L1"),
     )
     conn.execute(
         "INSERT INTO associations (id, from_kind, from_id, to_kind, to_id, relation_type, confidence, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -110,6 +122,9 @@ check("seed: entities=2", len(entities) == 2, f"got {len(entities)}")
 entity_ids = [e["id"] for e in entities]
 check("seed: item present", any(e.startswith("item:") for e in entity_ids))
 check("seed: task present", any(e.startswith("task:") for e in entity_ids))
+check("seed: entity lifeline_id prefixed", all(
+    e.get("lifeline_id", "").startswith("lifeline:") for e in entities
+), f"raw values: {[e.get('lifeline_id') for e in entities]}")
 check("seed: no unmarked item", not any(
     e.get("title") == "一条普通笔记" for e in entities
 ), "unmarked item leaked into entities")
