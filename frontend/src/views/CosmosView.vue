@@ -2,10 +2,11 @@
 /** CosmosView — Atlas 球形树宿主组件 */
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
-import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities } from '@/cosmos/scene'
+import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
 import type { CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
+import { RADII } from '@/cosmos/layout'
 import * as THREE from 'three'
 import Breadcrumb from '@/components/cosmos/Breadcrumb.vue'
 import LifelinePanel from '@/components/LifelinePanel.vue'
@@ -37,7 +38,7 @@ async function start() {
   controls.enableDamping = true; controls.dampingFactor = 0.08
   controls.enableZoom = true; controls.zoomSpeed = 0.6
   controls.enablePan = false
-  controls.minDistance = 0.5; controls.maxDistance = 6.0
+  controls.minDistance = 0.5; controls.maxDistance = 9.0
 
   // CSS2D label renderer
   labelRenderer = new CSS2DRenderer()
@@ -74,6 +75,8 @@ async function start() {
         } else {
           store.transition({ kind: 'global_overview' })
         }
+      } else if (store.state.kind === 'region_zoom') {
+        store.transition({ kind: 'global_overview' })
       }
       return
     }
@@ -109,6 +112,10 @@ async function start() {
 
   window.addEventListener('keydown', onKey)
   animate()
+}
+
+function onPanelFocusLifeline(lifelineId: string) {
+  store.transition({ kind: 'region_zoom', lifeline_id: lifelineId } as any)
 }
 
 function onResize() {
@@ -200,7 +207,50 @@ async function onStateChange() {
   const s = store.state
   const nodes = sceneObjs.layoutNodes
 
-  if (s.kind === 'node_focus' || s.kind === 'relation_reveal') {
+  if (s.kind === 'global_overview') {
+    // 恢复所有节点位置 + opacity
+    for (const m of sceneObjs.nodes) {
+      m.userData.targetPosition = m.userData.homePosition.clone()
+    }
+    resetNodeAlpha(sceneObjs.nodes)
+    tweenCamera(sceneObjs.camera, controls, new THREE.Vector3(0, 2.5, 5.5), new THREE.Vector3(0, 0, 0), 60, 800)
+  } else if (s.kind === 'region_zoom') {
+    // 恢复节点位置
+    for (const m of sceneObjs.nodes) {
+      m.userData.targetPosition = m.userData.homePosition.clone()
+    }
+    const targetId = (s as any).lifeline_id as string
+    const targetR1 = nodes.find(ln => ln.id === targetId && ln.layer === 1)
+    // 如果点的是 R2/R3，向上找其 R1 祖先
+    let r1Node = targetR1
+    if (!r1Node) {
+      const anyNode = nodes.find(ln => ln.id === targetId)
+      if (anyNode) {
+        let pid = anyNode.parentId
+        while (pid) {
+          const p = nodes.find(ln => ln.id === pid)
+          if (p && p.layer === 1) { r1Node = p; break }
+          pid = p?.parentId
+        }
+      }
+    }
+    if (r1Node) {
+      const dir = r1Node.position.clone().normalize()
+      const dist = RADII.R1 + 1.8
+      tweenCamera(sceneObjs.camera, controls, dir.clone().multiplyScalar(dist), r1Node.position, 50, 800)
+
+      // Ghost 非目标 lifeline 的节点
+      const targetR1Id = r1Node.id
+      const visibleIds = new Set<string>()
+      const queue = [targetR1Id]
+      while (queue.length > 0) {
+        const cur = queue.shift()!
+        visibleIds.add(cur)
+        nodes.filter(n => n.parentId === cur).forEach(n => queue.push(n.id))
+      }
+      ghostExcept(sceneObjs.nodes, visibleIds)
+    }
+  } else if (s.kind === 'node_focus' || s.kind === 'relation_reveal') {
     const targetId = (s as any).entity_id as string
     const n = nodes.find(ln => ln.id === targetId)
     if (!n) return
@@ -209,7 +259,7 @@ async function onStateChange() {
     const dir = n.position.clone().normalize()
     const dist = n.position.length() + 0.6
     const camPos = dir.clone().multiplyScalar(dist)
-    tweenCamera(sceneObjs.camera, controls, camPos, n.position, s.kind === 'node_focus' ? 38 : 55, 800)
+    tweenCamera(sceneObjs.camera, controls, camPos, n.position, s.kind === 'node_focus' ? 35 : 55, 800)
 
     // 星座布局
     const { computeFocusLayout } = await import('@/cosmos/layout')
@@ -225,25 +275,6 @@ async function onStateChange() {
       m.userData.targetPosition = tgt ? tgt.clone() : m.userData.homePosition.clone()
     }
     applyConstellationOpacities(sceneObjs.nodes, constellationIds)
-  } else if (s.kind === 'global_overview' || s.kind === 'region_zoom') {
-    // 退出聚焦：恢复位置 + opacity
-    for (const m of sceneObjs.nodes) {
-      m.userData.targetPosition = m.userData.homePosition.clone()
-    }
-    resetNodeAlpha(sceneObjs.nodes)
-
-    // 相机 tween
-    if (s.kind === 'region_zoom') {
-      const targetId = (s as any).lifeline_id as string
-      const n = nodes.find(ln => ln.id === targetId)
-      if (n) {
-        const dir2 = n.position.clone().normalize()
-        const dist2 = n.position.length() + 1.8
-        tweenCamera(sceneObjs.camera, controls, dir2.clone().multiplyScalar(dist2), n.position, 55, 800)
-      }
-    } else {
-      tweenCamera(sceneObjs.camera, controls, new THREE.Vector3(0, 2, 4), new THREE.Vector3(0, 0, 0), 60, 800)
-    }
   }
 }
 
@@ -269,7 +300,7 @@ onBeforeUnmount(() => {
   <div class="cosmos-view">
     <div class="cosmos-hud">
       <Breadcrumb :state="store.state" @nav="(s: CosmosState) => store.transition(s)" />
-      <LifelinePanel />
+      <LifelinePanel @focus-lifeline="onPanelFocusLifeline" />
     </div>
     <canvas ref="canvasRef" class="cosmos-canvas" />
     <NodeDetailCard />

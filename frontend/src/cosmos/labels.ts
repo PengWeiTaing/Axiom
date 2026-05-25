@@ -40,9 +40,13 @@ export function createLabelGroup(): LabelGroup {
         div.style.display = 'none'
       }
 
+      const labelOffset = n.layer <= 2
+        ? n.position.clone().normalize().multiplyScalar(0.08)
+        : new THREE.Vector3(0, 0.03, 0)
+
       const obj = new CSS2DObject(div)
-      obj.position.copy(n.position)
-      obj.userData = { nodeId: n.id, layer: n.layer, parentId: n.parentId }
+      obj.position.copy(n.position.clone().add(labelOffset))
+      obj.userData = { nodeId: n.id, layer: n.layer, parentId: n.parentId, labelOffset }
       scene.add(obj)
       entries.push({ object: obj, nodeId: n.id, layer: n.layer, parentId: n.parentId })
     }
@@ -162,7 +166,12 @@ export function createLabelGroup(): LabelGroup {
     }
     for (const e of entries) {
       const pos = meshMap.get(e.nodeId)
-      if (pos) e.object.position.copy(pos)
+      const offset = e.object.userData.labelOffset as THREE.Vector3 | undefined
+      if (pos && offset) {
+        e.object.position.copy(pos.clone().add(offset))
+      } else if (pos) {
+        e.object.position.copy(pos)
+      }
     }
   }
 

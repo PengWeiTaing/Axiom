@@ -12,7 +12,7 @@ export interface LayoutNode {
 }
 
 // Shell radii
-export const RADII = { R0: 0.2, R1: 1.0, R2: 1.8, R3: 2.5 }
+export const RADII = { R0: 0.35, R1: 1.6, R2: 2.2, R3: 3.0 }
 
 export function computeLayout(data: CosmosData): LayoutNode[] {
   const nodes: LayoutNode[] = []

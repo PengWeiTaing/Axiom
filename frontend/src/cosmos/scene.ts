@@ -42,7 +42,7 @@ export async function initScene(
   const resolution = new THREE.Vector2(w, h)
 
   const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 20)
-  camera.position.set(0, 2, 4)
+  camera.position.set(0, 2.5, 5.5)
   camera.lookAt(0, 0, 0)
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -62,19 +62,20 @@ export async function initScene(
     const alpha = n.layer === 0 ? 1 : n.layer === 1 ? 1 : n.layer === 2 ? 0.9 : 0.85
 
     if (n.layer === 0) {
-      geom = new THREE.SphereGeometry(0.04, 16, 16)
+      geom = new THREE.SphereGeometry(0.06, 16, 16)
       mat = new THREE.MeshBasicMaterial({ color: cssVar('--accent') })
     } else if (n.layer === 1) {
-      geom = new THREE.SphereGeometry(0.025, 12, 12)
+      geom = new THREE.SphereGeometry(0.05, 12, 12)
       mat = new THREE.MeshBasicMaterial({ color: cssVar('--accent'), transparent: true, opacity: alpha })
     } else if (n.layer === 2) {
-      geom = new THREE.SphereGeometry(0.018, 8, 8)
+      geom = new THREE.SphereGeometry(0.03, 8, 8)
       mat = new THREE.MeshBasicMaterial({ color: cssVar('--text-2'), transparent: true, opacity: alpha })
     } else {
-      if (n.kind === 'task') geom = new THREE.BoxGeometry(0.014, 0.014, 0.014)
-      else if (n.kind === 'decision') geom = new THREE.OctahedronGeometry(0.014)
-      else if (n.kind === 'item') geom = new THREE.TetrahedronGeometry(0.014)
-      else geom = new THREE.SphereGeometry(0.012, 8, 8)
+      if (n.kind === 'task') geom = new THREE.BoxGeometry(0.022, 0.022, 0.022)
+      else if (n.kind === 'decision') geom = new THREE.OctahedronGeometry(0.022)
+      else if (n.kind === 'memory') geom = new THREE.SphereGeometry(0.02, 8, 8)
+      else if (n.kind === 'item') geom = new THREE.TetrahedronGeometry(0.02)
+      else geom = new THREE.SphereGeometry(0.015, 8, 8)
       mat = new THREE.MeshBasicMaterial({ color: cssVar('--text-3'), transparent: true, opacity: alpha })
     }
 
@@ -126,10 +127,16 @@ export async function initScene(
   }
 
   // R1 orbit ring
-  const ringGeom = new THREE.TorusGeometry(RADII.R1, 0.003, 8, 64)
-  const ring = new THREE.Mesh(ringGeom, new THREE.MeshBasicMaterial({ color: cssVar('--line-2'), transparent: true, opacity: 0.04 }))
-  ring.rotation.x = THREE.MathUtils.degToRad(15)
-  scene.add(ring)
+  const ring1Geom = new THREE.TorusGeometry(RADII.R1, 0.006, 8, 80)
+  const ring1 = new THREE.Mesh(ring1Geom, new THREE.MeshBasicMaterial({ color: cssVar('--line-2'), transparent: true, opacity: 0.12 }))
+  ring1.rotation.x = THREE.MathUtils.degToRad(15)
+  scene.add(ring1)
+
+  // R2 orbit ring
+  const ring2Geom = new THREE.TorusGeometry(RADII.R2, 0.004, 8, 80)
+  const ring2 = new THREE.Mesh(ring2Geom, new THREE.MeshBasicMaterial({ color: cssVar('--line-2'), transparent: true, opacity: 0.08 }))
+  ring2.rotation.x = THREE.MathUtils.degToRad(15)
+  scene.add(ring2)
 
   function setResolution(w2: number, h2: number) {
     resolution.set(w2, h2)
@@ -153,7 +160,7 @@ export async function initScene(
     renderer.dispose()
   }
 
-  return { scene, camera, renderer, nodes: meshes, pickables, lines: allLines, orbit: ring, layoutNodes: nodes, dispose, setResolution }
+  return { scene, camera, renderer, nodes: meshes, pickables, lines: allLines, orbit: ring1, layoutNodes: nodes, dispose, setResolution }
 }
 
 interface AssociationLine {
@@ -257,11 +264,21 @@ export function applyConstellationOpacities(
   constellationIds: Set<string>,
   ghostAlpha: number = 0.06
 ): void {
+  ghostExcept(meshes, constellationIds, ghostAlpha)
+}
+
+/** ghost 全部节点，然后恢复 visibleIds 中的节点到正常 opacity */
+export function ghostExcept(meshes: THREE.Mesh[], visibleIds: Set<string>, ghostAlpha: number = 0.06): void {
   for (const m of meshes) {
     const id = m.userData.id as string
-    if (constellationIds.has(id)) continue
+    const layer = m.userData.layer as number
     const mat = m.material as THREE.MeshBasicMaterial
-    mat.opacity = ghostAlpha
+    if (visibleIds.has(id)) {
+      const alpha = layer === 0 ? 1 : layer === 1 ? 1 : layer === 2 ? 0.9 : 0.85
+      mat.opacity = alpha
+    } else {
+      mat.opacity = ghostAlpha
+    }
     mat.transparent = true
     mat.needsUpdate = true
   }

@@ -3,7 +3,20 @@ import { ref, computed } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
 import type { CosmosLifeline, CosmosEntity } from '@/cosmos/types'
 
+const emit = defineEmits<{
+  (e: 'focus-lifeline', lifelineId: string): void
+}>()
+
 const store = useCosmosStore()
+
+const activeLifelineId = computed<string | null>(() => {
+  const s = store.state
+  if (s.kind === 'region_zoom') return (s as any).lifeline_id ?? null
+  if (s.kind === 'node_focus' || s.kind === 'relation_reveal') {
+    return store.data?.entities.find(e => e.id === (s as any).entity_id)?.lifeline_id ?? null
+  }
+  return null
+})
 
 const expandedIds = ref<Set<string>>(new Set())
 const creating = ref(false)
@@ -71,12 +84,11 @@ function isExpanded(id: string): boolean {
 }
 
 function isCurrentLifeline(id: string): boolean {
-  const s = store.state
-  return (s.kind === 'region_zoom' || s.kind === 'node_focus') && (s as any).lifeline_id === id
+  return activeLifelineId.value === id
 }
 
 function clickLifeline(id: string) {
-  store.transition({ kind: 'region_zoom', lifeline_id: id } as any)
+  emit('focus-lifeline', id)
 }
 
 async function doCreate() {
