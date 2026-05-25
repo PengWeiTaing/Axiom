@@ -220,6 +220,7 @@ function onKey(e: KeyboardEvent) {
   // 搜索快捷键
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault()
+    e.stopPropagation()
     showSearch.value = !showSearch.value
     return
   }
