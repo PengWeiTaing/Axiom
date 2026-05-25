@@ -32,7 +32,7 @@ const dragging = ref(false);
 const placeholder = ref(PLACEHOLDERS[0]);
 const ghost = ref<CaptureSuccess | null>(null);
 
-const { capture, submitting, lastError } = useSmartCapture();
+const { capture, submitting, lastError, acceptLifeline } = useSmartCapture();
 
 const canSubmit = computed(() => (text.value.trim().length > 0 || files.value.length > 0) && !submitting.value);
 
@@ -90,6 +90,12 @@ function showGhost(result: CaptureSuccess) {
   ghostTimer = window.setTimeout(() => {
     ghost.value = null;
   }, 1800);
+}
+
+async function onAcceptLifeline() {
+  if (!ghost.value) return
+  await acceptLifeline(ghost.value)
+  ghost.value = { ...ghost.value, suggestedLifelineId: undefined, suggestedLifelineName: undefined }
 }
 
 function onDrop(e: DragEvent) {
@@ -158,6 +164,11 @@ function removeFile(idx: number) {
           <span v-if="ghost" class="ghost" :data-kind="ghost.kind">
             <span class="ghost-dot" />
             AI 判定为 <strong>{{ ghost.label }}</strong>
+            <template v-if="ghost.suggestedLifelineName">
+              · 归类到
+              <strong class="lifeline-suggest">{{ ghost.suggestedLifelineName }}</strong>
+              <button class="ghost-accept" @click="onAcceptLifeline">✓</button>
+            </template>
           </span>
           <span v-else-if="lastError" class="error">{{ lastError }}</span>
           <span v-else-if="submitting" class="hint">写入中…</span>
@@ -338,6 +349,27 @@ textarea::placeholder {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
+}
+
+.ghost .lifeline-suggest {
+  color: var(--accent);
+}
+
+.ghost-accept {
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-1);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 4px;
+  margin-left: 2px;
+  line-height: 1.4;
+}
+
+.ghost-accept:hover {
+  background: var(--accent);
+  color: var(--surface-0);
 }
 
 .submit {

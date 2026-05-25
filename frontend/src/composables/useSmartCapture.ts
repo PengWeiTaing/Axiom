@@ -23,6 +23,7 @@ import {
   createTask,
   createMemory,
   createDecision,
+  mountEntity,
 } from '@/api/endpoints';
 import type { Item, ParseResult, ParseType } from '@/api/types';
 import { ApiError } from '@/api/client';
@@ -34,6 +35,8 @@ export interface CaptureSuccess {
   item?: Item;          // 如果对应 item 表的记录，回填 timeline
   parsed?: ParseResult; // AI 解析结果（用于撤销/纠错）
   raw: unknown;         // 后端返回原文，给详情面板用
+  suggestedLifelineId?: string;
+  suggestedLifelineName?: string;
 }
 
 const URL_RE = /^https?:\/\/\S+$/i;
@@ -126,7 +129,17 @@ export function useSmartCapture() {
     }
   }
 
-  return { capture, submitting, lastResult, lastError };
+  async function acceptLifeline(result: CaptureSuccess) {
+    if (!result.suggestedLifelineId || !result.item) return
+    const kind = result.kind === 'file' || result.kind === 'url' ? 'item' : result.kind
+    try {
+      await mountEntity(kind, result.item.id, result.suggestedLifelineId)
+    } catch {
+      // 静默失败，不影响主流程
+    }
+  }
+
+  return { capture, submitting, lastResult, lastError, acceptLifeline };
 }
 
 async function route(parsed: ParseResult, originalText: string): Promise<CaptureSuccess> {
@@ -138,30 +151,35 @@ async function route(parsed: ParseResult, originalText: string): Promise<Capture
         due_date: parsed.due_date,
         estimated_minutes: parsed.estimated_minutes,
       });
-      return { kind: 'task', label: KIND_LABEL.task, parsed, raw: data };
+      return { kind: 'task', label: KIND_LABEL.task, parsed, raw: data,
+        suggestedLifelineId: parsed.suggested_lifeline_id, suggestedLifelineName: parsed.suggested_lifeline_name };
     }
     case 'memory': {
       const data = await createMemory({
         category: parsed.category || 'fact',
         content: parsed.content || originalText,
       });
-      return { kind: 'memory', label: KIND_LABEL.memory, parsed, raw: data };
+      return { kind: 'memory', label: KIND_LABEL.memory, parsed, raw: data,
+        suggestedLifelineId: parsed.suggested_lifeline_id, suggestedLifelineName: parsed.suggested_lifeline_name };
     }
     case 'decision': {
       const data = await createDecision({
         title: parsed.title || originalText.slice(0, 40),
         decision: parsed.content || originalText,
       });
-      return { kind: 'decision', label: KIND_LABEL.decision, parsed, raw: data };
+      return { kind: 'decision', label: KIND_LABEL.decision, parsed, raw: data,
+        suggestedLifelineId: parsed.suggested_lifeline_id, suggestedLifelineName: parsed.suggested_lifeline_name };
     }
     case 'url': {
       if (parsed.url) {
         const data = await fetchUrl(parsed.url);
-        return { kind: 'url', label: KIND_LABEL.url, item: data.item, parsed, raw: data };
+        return { kind: 'url', label: KIND_LABEL.url, item: data.item, parsed, raw: data,
+          suggestedLifelineId: parsed.suggested_lifeline_id, suggestedLifelineName: parsed.suggested_lifeline_name };
       }
       // 没解析出 url 字段就当 note
       const data = await addNote(originalText);
-      return { kind: 'note', label: KIND_LABEL.note, item: data.item, parsed, raw: data };
+      return { kind: 'note', label: KIND_LABEL.note, item: data.item, parsed, raw: data,
+        suggestedLifelineId: parsed.suggested_lifeline_id, suggestedLifelineName: parsed.suggested_lifeline_name };
     }
     case 'note':
     case 'health':
@@ -173,6 +191,8 @@ async function route(parsed: ParseResult, originalText: string): Promise<Capture
         item: data.item,
         parsed,
         raw: data,
+        suggestedLifelineId: parsed.suggested_lifeline_id,
+        suggestedLifelineName: parsed.suggested_lifeline_name,
       };
     }
   }

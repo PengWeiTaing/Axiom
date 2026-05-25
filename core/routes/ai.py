@@ -215,10 +215,28 @@ def register_routes(app):
                 return ok_response({"type": "memory", "category": "fact", "content": text})
             return ok_response({"type": "note", "content": text})
 
+        # 读取 lifeline 列表供 LLM 匹配
+        lifeline_conn = get_db_connection()
+        try:
+            ll_rows = lifeline_conn.execute("SELECT id, name FROM lifelines ORDER BY id").fetchall()
+            lifeline_map = {r["id"]: r["name"] for r in ll_rows}
+        finally:
+            lifeline_conn.close()
+
+        # 构建 prompt
+        ll_hint = ""
+        if lifeline_map:
+            ll_list = "\n".join(f"  {lid}: {lname}" for lid, lname in lifeline_map.items())
+            ll_hint = f"\n已有的 lifeline（选择合适的，没有合适的填 null）：\n{ll_list}\n"
+
         prompt = (
             f"输入: {text}\n\n"
-            "分类为task/memory/decision/note/health/url，只输出type值:\n"
-            "task(有日期/待办) memory(关于我的陈述) decision(选择) note(其他)"
+            "分析这段话并只返回一行 JSON（不要 markdown、不要解释）：\n"
+            '{{"type":"task|memory|decision|note","title":"...","content":"..."'
+            + (',"suggested_lifeline":"<id>"' if lifeline_map else '')
+            + '}\n\n'
+            "分类规则：task=有日期/待办, memory=关于我的陈述/偏好, decision=选择/决定, note=其他\n"
+            f"{ll_hint}"
         )
         try:
             import openai
@@ -227,16 +245,44 @@ def register_routes(app):
                 model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
                 max_tokens=2000, temperature=0.1,
             )
-            result_text = (resp.choices[0].message.content or "").strip().lower()
+            result_text = (resp.choices[0].message.content or "").strip()
             if not result_text and hasattr(resp.choices[0].message, "reasoning"):
-                result_text = (resp.choices[0].message.reasoning or "").strip().lower()
+                result_text = (resp.choices[0].message.reasoning or "").strip()
 
-            # Parse response: try JSON first, then plain text
+            # 尝试 JSON 解析
             import re as _re
-            for token in ["task", "memory", "decision", "note", "health", "url"]:
-                if token in result_text:
-                    return ok_response({"type": token, "title": text[:60], "content": text})
-            return ok_response({"type": "note", "content": text})
+            raw = result_text
+            m = _re.search(r'\{[^{}]*\}', raw)
+            if m:
+                raw = m.group(0)
+
+            try:
+                parsed = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                # 降级：保持原有 keyword 匹配行为
+                result_lower = result_text.lower()
+                for token in ["task", "memory", "decision", "note", "health", "url"]:
+                    if token in result_lower:
+                        return ok_response({"type": token, "title": text[:60], "content": text})
+                return ok_response({"type": "note", "content": text})
+
+            resp_type = str(parsed.get("type", "note")).strip().lower()
+            if resp_type not in ("task", "memory", "decision", "note", "health", "url"):
+                resp_type = "note"
+
+            result = {
+                "type": resp_type,
+                "title": str(parsed.get("title", text[:60])),
+                "content": str(parsed.get("content", text)),
+            }
+
+            # lifeline suggestion
+            suggested_id = str(parsed.get("suggested_lifeline", "")).strip() if parsed.get("suggested_lifeline") else ""
+            if suggested_id and suggested_id in lifeline_map:
+                result["suggested_lifeline_id"] = suggested_id
+                result["suggested_lifeline_name"] = lifeline_map[suggested_id]
+
+            return ok_response(result)
         except Exception:
             return ok_response({"type": "note", "content": text})
 

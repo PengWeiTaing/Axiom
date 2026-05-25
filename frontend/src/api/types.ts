@@ -77,6 +77,8 @@ export interface ParseResult {
   category?: MemoryCategory;
   url?: string;
   reasoning?: string;
+  suggested_lifeline_id?: string;
+  suggested_lifeline_name?: string;
 }
 
 export interface Paginated<T> {

@@ -41,7 +41,19 @@ async function start() {
     mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
     raycaster.setFromCamera(mouse, sceneObjs.camera)
     const hits = raycaster.intersectObjects(sceneObjs.pickables)
-    if (hits.length === 0) return
+    if (hits.length === 0) {
+      if (store.state.kind === 'node_focus' || store.state.kind === 'relation_reveal') {
+        const eid = (store.state as any).entity_id as string
+        const ent = store.data?.entities.find(e => e.id === eid)
+        const lid = ent?.lifeline_id
+        if (lid) {
+          store.transition({ kind: 'region_zoom', lifeline_id: lid } as any)
+        } else {
+          store.transition({ kind: 'global_overview' })
+        }
+      }
+      return
+    }
     const obj = hits[0].object
     const layer = obj.userData.layer as number
     const id = obj.userData.id as string

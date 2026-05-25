@@ -253,7 +253,7 @@ async function rejectAssoc(assocId: string) {
 }
 
 .status-badge.accepted {
-  color: #34d399;
+  color: var(--accent);
 }
 
 .status-badge.pending {
@@ -279,7 +279,7 @@ async function rejectAssoc(assocId: string) {
 }
 
 .btn-accept {
-  color: #34d399;
+  color: var(--accent);
 }
 
 .btn-reject {
