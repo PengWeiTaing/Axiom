@@ -8,6 +8,11 @@ export const useCosmosStore = defineStore('cosmos', () => {
   const state = ref<CosmosState>({ kind: 'global_overview' })
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const selectedAssocId = ref<string | null>(null)
+
+  function selectAssociation(id: string | null) {
+    selectedAssocId.value = id
+  }
 
   const listeners: Record<string, Array<(payload: unknown) => void>> = {}
 
@@ -42,6 +47,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
   function transition(next: CosmosState) {
     emit(`leave_${state.value.kind}`, state.value)
     state.value = next
+    selectedAssocId.value = null
     emit(`enter_${next.kind}`, next)
   }
 
@@ -99,5 +105,6 @@ export const useCosmosStore = defineStore('cosmos', () => {
   }
 
   return { data, state, loading, error, load, reload, transition, on,
-    createLifeline, updateLifeline, deleteLifeline, mountEntity, reviewAssociation }
+    createLifeline, updateLifeline, deleteLifeline, mountEntity, reviewAssociation,
+    selectedAssocId, selectAssociation }
 })

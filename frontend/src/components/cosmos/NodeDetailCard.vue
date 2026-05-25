@@ -111,21 +111,42 @@ async function rejectAssoc(assocId: string) {
       <div
         v-for="a in entityAssociations"
         :key="a.id"
-        class="assoc-row"
-        :class="{ pending: a.status === 'pending' }"
+        class="assoc-wrapper"
       >
-        <span class="rel-badge" :style="{ color: relColor(a.relation_type) }">
-          [{{ relLabel(a.relation_type) }}]
-        </span>
-        <span class="assoc-target" @click="switchFocus(a)">
-          {{ oppositeEntity(a).title.slice(0, 30) }}
-        </span>
-        <span class="confidence">{{ Math.round(a.confidence * 100) }}%</span>
-        <span class="status-badge" :class="a.status">{{ a.status === 'accepted' ? '已确认' : '待定' }}</span>
-        <span v-if="a.status === 'pending'" class="assoc-actions">
-          <button class="btn-accept" @click="acceptAssoc(a.id)">✓</button>
-          <button class="btn-reject" @click="rejectAssoc(a.id)">✗</button>
-        </span>
+        <div
+          class="assoc-row"
+          :class="{ pending: a.status === 'pending', expanded: store.selectedAssocId === a.id }"
+        >
+          <span class="rel-badge" :style="{ color: relColor(a.relation_type) }">
+            [{{ relLabel(a.relation_type) }}]
+          </span>
+          <span class="assoc-target" @click.stop="switchFocus(a)">
+            {{ oppositeEntity(a).title.slice(0, 30) }}
+          </span>
+          <span class="confidence">{{ Math.round(a.confidence * 100) }}%</span>
+          <span class="status-badge" :class="a.status">{{ a.status === 'accepted' ? '已确认' : '待定' }}</span>
+          <span v-if="a.status === 'pending'" class="assoc-actions">
+            <button class="btn-accept" @click="acceptAssoc(a.id)">✓</button>
+            <button class="btn-reject" @click="rejectAssoc(a.id)">✗</button>
+          </span>
+          <button
+            class="btn-expand"
+            @click.stop="store.selectedAssocId === a.id ? store.selectAssociation(null) : store.selectAssociation(a.id)"
+          >{{ store.selectedAssocId === a.id ? '▾' : '▸' }}</button>
+        </div>
+
+        <!-- 证据展开区域 -->
+        <div v-if="store.selectedAssocId === a.id" class="evidence-block">
+          <div class="evidence-title">证据 ({{ a.evidence?.length || 0 }} 条)</div>
+          <div v-if="!a.evidence || a.evidence.length === 0" class="no-evidence">暂无证据详情</div>
+          <div v-for="(ev, i) in a.evidence" :key="i" class="evidence-item">
+            <div class="evidence-excerpt">"{{ ev.excerpt.slice(0, 120) }}{{ ev.excerpt.length > 120 ? '…' : '' }}"</div>
+            <div class="evidence-meta">
+              <span class="evidence-type">{{ ev.type }}</span>
+              <span class="evidence-weight">权重: {{ Math.round(ev.weight * 100) }}%</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -284,5 +305,75 @@ async function rejectAssoc(assocId: string) {
 
 .btn-reject {
   color: var(--text-5);
+}
+
+.assoc-row.expanded {
+  border-left: 2px solid var(--accent) !important;
+  background: var(--surface-2);
+}
+
+.btn-expand {
+  background: none;
+  border: none;
+  color: var(--text-4);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.assoc-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.evidence-block {
+  padding: var(--s-1) var(--s-2);
+  margin-top: 2px;
+  background: var(--surface-0);
+  border-radius: var(--r-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.evidence-title {
+  font-size: var(--fs-1);
+  color: var(--text-4);
+}
+
+.no-evidence {
+  font-size: var(--fs-1);
+  color: var(--text-4);
+  font-style: italic;
+}
+
+.evidence-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evidence-excerpt {
+  font-size: var(--fs-1);
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+.evidence-meta {
+  display: flex;
+  gap: var(--s-2);
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+.evidence-type {
+  border: 1px solid var(--text-4);
+  border-radius: var(--r-1);
+  padding: 0 3px;
+}
+
+.evidence-weight {
+  color: var(--text-4);
 }
 </style>

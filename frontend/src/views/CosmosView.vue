@@ -64,8 +64,28 @@ async function start() {
     mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
     mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
     raycaster.setFromCamera(mouse, sceneObjs.camera)
+
+    // 1. 先检测关联线（仅在 relation_reveal 模式下）
+    if (store.state.kind === 'relation_reveal' && assocLines.length > 0) {
+      const lineHits = raycaster.intersectObjects(assocLines.map(l => l.line))
+      if (lineHits.length > 0) {
+        const hitLine = lineHits[0].object
+        const al = assocLines.find(a => a.line === hitLine)
+        if (al) {
+          if (store.selectedAssocId === al.data.id) {
+            store.selectAssociation(null)
+          } else {
+            store.selectAssociation(al.data.id)
+          }
+          return
+        }
+      }
+    }
+
+    // 2. 再检测节点
     const hits = raycaster.intersectObjects(sceneObjs.pickables)
     if (hits.length === 0) {
+      store.selectAssociation(null)
       if (store.state.kind === 'node_focus' || store.state.kind === 'relation_reveal') {
         const eid = (store.state as any).entity_id as string
         const ent = store.data?.entities.find(e => e.id === eid)
@@ -80,6 +100,7 @@ async function start() {
       }
       return
     }
+    store.selectAssociation(null)
     const obj = hits[0].object
     const layer = obj.userData.layer as number
     const id = obj.userData.id as string

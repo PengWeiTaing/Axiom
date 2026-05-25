@@ -95,15 +95,47 @@
     { "id": "memory:14", "kind": "memory", "title": "写作让我整理思路，不是炫耀", "lifeline_id": "lifeline:creative-blog" }
   ],
   "associations": [
-    { "id": "assoc:1", "from": "task:1", "to": "memory:1", "relation_type": "causal", "confidence": 0.75, "status": "pending", "evidence": [] },
-    { "id": "assoc:2", "from": "task:4", "to": "memory:3", "relation_type": "causal", "confidence": 0.70, "status": "accepted", "evidence": [] },
-    { "id": "assoc:3", "from": "task:5", "to": "memory:4", "relation_type": "derived_from", "confidence": 0.82, "status": "pending", "evidence": [] },
-    { "id": "assoc:4", "from": "task:7", "to": "memory:5", "relation_type": "co_occurrence", "confidence": 0.65, "status": "pending", "evidence": [] },
-    { "id": "assoc:5", "from": "task:9", "to": "task:11", "relation_type": "tension", "confidence": 0.55, "status": "pending", "evidence": [] },
-    { "id": "assoc:6", "from": "task:13", "to": "memory:10", "relation_type": "derived_from", "confidence": 0.88, "status": "accepted", "evidence": [] },
-    { "id": "assoc:7", "from": "task:17", "to": "memory:13", "relation_type": "causal", "confidence": 0.72, "status": "pending", "evidence": [] },
-    { "id": "assoc:8", "from": "decision:3", "to": "memory:8", "relation_type": "tension", "confidence": 0.48, "status": "pending", "evidence": [] },
-    { "id": "assoc:9", "from": "task:5", "to": "task:6", "relation_type": "co_occurrence", "confidence": 0.68, "status": "pending", "evidence": [] },
-    { "id": "assoc:10","from": "memory:11", "to": "task:14", "relation_type": "causal", "confidence": 0.60, "status": "accepted", "evidence": [] }
+    { "id": "assoc:1", "from": "task:1", "to": "memory:1", "relation_type": "causal", "confidence": 0.75, "status": "pending", "evidence": [
+      { "type": "co_occurrence", "excerpt": "用户在 7 天内同时记录了 4 次跑步任务和 6 条血压数据，共现频率高于随机基线", "weight": 0.85 },
+      { "type": "semantic", "excerpt": "「跑步」与「有氧减脂」语义向量余弦相似度 0.72，同属健康管理主题域", "weight": 0.70 },
+      { "type": "causal_hint", "excerpt": "连续数据暗示规律运动可能对血压控制有直接改善效果", "weight": 0.65 }
+    ]},
+    { "id": "assoc:2", "from": "task:4", "to": "memory:3", "relation_type": "causal", "confidence": 0.70, "status": "accepted", "evidence": [
+      { "type": "temporal", "excerpt": "设定 23 点关灯目标后，焦虑记录从每周 4 次降至 1 次，时间序列相关性明显", "weight": 0.80 },
+      { "type": "manual", "excerpt": "用户自行标注了这条因果关联，确认睡前干预对焦虑有缓解效果", "weight": 0.90 }
+    ]},
+    { "id": "assoc:3", "from": "task:5", "to": "memory:4", "relation_type": "derived_from", "confidence": 0.82, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "任务标题含「所有权」与记忆内容「所有权是核心创新」语义完全匹配", "weight": 0.95 },
+      { "type": "co_occurrence", "excerpt": "两条记录在 48 小时内相继创建，时间窗口极短，关联强度显著", "weight": 0.75 }
+    ]},
+    { "id": "assoc:4", "from": "task:7", "to": "memory:5", "relation_type": "co_occurrence", "confidence": 0.65, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "Trait 实现任务与 Trait 用法记忆同属 Rust 语法进阶主题，关键词重叠率 65%", "weight": 0.68 },
+      { "type": "temporal", "excerpt": "任务创建后 4 小时就记录了相关记忆，学习-总结模式明显", "weight": 0.60 }
+    ]},
+    { "id": "assoc:5", "from": "task:9", "to": "task:11", "relation_type": "tension", "confidence": 0.55, "status": "pending", "evidence": [
+      { "type": "co_occurrence", "excerpt": "后端重构与前端任务在 3 天内相继创建，存在资源竞争关系", "weight": 0.55 },
+      { "type": "semantic", "excerpt": "两个任务分别消耗不同技术栈的精力，形成注意力分配的张力", "weight": 0.50 }
+    ]},
+    { "id": "assoc:6", "from": "task:13", "to": "memory:10", "relation_type": "derived_from", "confidence": 0.88, "status": "accepted", "evidence": [
+      { "type": "semantic", "excerpt": "读 DDIA 第 5 章的记录与「分布式共识复杂」记忆直接相关，概念映射精确", "weight": 0.92 },
+      { "type": "co_occurrence", "excerpt": "阅读任务和认知记忆在同一天创建，即时学习反馈", "weight": 0.82 },
+      { "type": "manual", "excerpt": "用户手动将这条关联标记为 accepted，确认为可靠的推导关系", "weight": 0.95 }
+    ]},
+    { "id": "assoc:7", "from": "task:17", "to": "memory:13", "relation_type": "causal", "confidence": 0.72, "status": "pending", "evidence": [
+      { "type": "co_occurrence", "excerpt": "月度账单核对与超支习惯反思在 2 小时内记录，财务复盘行为一致", "weight": 0.78 },
+      { "type": "causal_hint", "excerpt": "账单记录触发用户自我反思，形成「行为→认知→改进」的标准因果链", "weight": 0.68 }
+    ]},
+    { "id": "assoc:8", "from": "decision:3", "to": "memory:8", "relation_type": "tension", "confidence": 0.48, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "「是否换 FastAPI」与「Line2 raycast 有局限」都涉及技术选型的权衡", "weight": 0.52 },
+      { "type": "temporal", "excerpt": "决策与记忆同时出现于 Axiom 开发 lifeline 下，技术栈选择的张力集中", "weight": 0.45 }
+    ]},
+    { "id": "assoc:9", "from": "task:5", "to": "task:6", "relation_type": "co_occurrence", "confidence": 0.68, "status": "pending", "evidence": [
+      { "type": "co_occurrence", "excerpt": "练习任务与笔记任务在同一个下午创建，学习心流状态连续产出", "weight": 0.72 },
+      { "type": "semantic", "excerpt": "两个任务都围绕「所有权」知识点，学习路径清晰连贯", "weight": 0.65 }
+    ]},
+    { "id": "assoc:10","from": "memory:11", "to": "task:14", "relation_type": "causal", "confidence": 0.60, "status": "accepted", "evidence": [
+      { "type": "causal_hint", "excerpt": "偏好硬科幻的用户倾向于选择类似的阅读任务，兴趣驱动行为模式", "weight": 0.62 },
+      { "type": "semantic", "excerpt": "「科幻」偏好与「三体」任务高度匹配，兴趣表达一致性", "weight": 0.58 }
+    ]}
   ]
 }
