@@ -26,6 +26,11 @@ let tooltipText = ''
 // Search
 const showSearch = ref(false)
 
+// Shortcuts hint
+const hintVisible = ref(true)
+const hintDismissed = ref(false)
+let hintTimer: number | undefined
+
 // Hover
 let hoveredNode: THREE.Mesh | null = null
 const HOVER_SCALE = 1.5
@@ -158,6 +163,15 @@ async function start() {
   })
 
   window.addEventListener('keydown', onKey)
+
+  // 快捷键提示：3s 后淡出，鼠标移入 HUD 重新显示
+  const hudEl = document.querySelector('.cosmos-hud')
+  hudEl?.addEventListener('mouseenter', () => {
+    hintVisible.value = true
+    if (hintTimer) clearTimeout(hintTimer)
+  })
+  hintTimer = window.setTimeout(() => { hintVisible.value = false; hintDismissed.value = true }, 3000)
+
   animate()
 }
 
@@ -402,6 +416,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
   if (labelGroup) { labelGroup.dispose(); labelGroup = null }
   if (labelRenderer?.domElement) { labelRenderer.domElement.remove() }
+  if (hintTimer) clearTimeout(hintTimer)
 })
 </script>
 
@@ -413,9 +428,41 @@ onBeforeUnmount(() => {
       <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" />
       <button v-if="!showSearch" class="search-trigger" @click="showSearch = true">搜索 ⌘K</button>
     </div>
-    <canvas ref="canvasRef" class="cosmos-canvas" />
-    <NodeDetailCard />
-    <div v-if="tooltipText && store.state.kind === 'relation_reveal'" class="tooltip">{{ tooltipText }}</div>
+
+    <!-- 加载态 -->
+    <div v-if="store.loading" class="overlay-state">
+      <div class="loader-ring" />
+      <div class="state-text">加载 Atlas…</div>
+    </div>
+
+    <!-- 错误态 -->
+    <div v-else-if="store.error" class="overlay-state">
+      <div class="state-text">Cosmos 数据加载失败</div>
+      <div class="state-sub">API 和 mock 均不可用</div>
+      <button class="retry-btn" @click="store.reload()">重试</button>
+    </div>
+
+    <!-- 空态 -->
+    <div v-else-if="store.data && store.data.lifelines.length === 0" class="overlay-state">
+      <div class="state-text">暂无 lifeline</div>
+      <div class="state-sub">在左侧面板中创建第一条 lifeline 来开始构建知识星球</div>
+    </div>
+
+    <!-- 3D 场景（加载/错误/空态时不渲染，但不销毁） -->
+    <template v-if="!store.loading && !store.error && store.data && store.data.lifelines.length > 0">
+      <canvas ref="canvasRef" class="cosmos-canvas" />
+      <NodeDetailCard />
+      <div v-if="tooltipText && store.state.kind === 'relation_reveal'" class="tooltip">{{ tooltipText }}</div>
+
+      <!-- 快捷键提示 -->
+      <div
+        v-if="store.state.kind === 'global_overview' && hintVisible"
+        class="shortcuts-hint"
+        :class="{ fade: hintDismissed }"
+      >
+        R 显示关联 &nbsp; Esc 返回 &nbsp; 滚轮缩放 &nbsp; 拖拽旋转 &nbsp; Ctrl+K 搜索
+      </div>
+    </template>
   </div>
 </template>
 
@@ -471,5 +518,75 @@ onBeforeUnmount(() => {
 .search-trigger:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* 加载/错误/空态 */
+.overlay-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  z-index: 30;
+  background: var(--surface-0);
+}
+
+.loader-ring {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--text-4);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.state-text {
+  font-size: var(--fs-3);
+  color: var(--text-3);
+}
+
+.state-sub {
+  font-size: var(--fs-2);
+  color: var(--text-4);
+}
+
+.retry-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-2);
+  color: var(--accent);
+  font-size: var(--fs-2);
+  padding: var(--s-1) var(--s-3);
+  cursor: pointer;
+}
+
+.retry-btn:hover {
+  background: var(--accent);
+  color: var(--surface-0);
+}
+
+/* 快捷键提示 */
+.shortcuts-hint {
+  position: absolute;
+  bottom: var(--s-3);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--fs-1);
+  color: var(--text-4);
+  background: var(--surface-1);
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-2);
+  z-index: 20;
+  transition: opacity 0.6s var(--ease);
+}
+
+.shortcuts-hint.fade {
+  opacity: 0.3;
 }
 </style>

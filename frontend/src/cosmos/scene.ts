@@ -8,7 +8,12 @@ import { computeLayout, type LayoutNode, RADII } from './layout'
 
 export function cssVar(name: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return v || '#6ee7d0'
+  if (!v) return '#6ee7d0'
+  const m = v.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+  if (m) {
+    return '#' + [m[1], m[2], m[3]].map(x => parseInt(x).toString(16).padStart(2, '0')).join('')
+  }
+  return v
 }
 
 function flattenPoints(points: THREE.Vector3[]): number[] {
@@ -90,6 +95,16 @@ export async function initScene(
     scene.add(mesh)
     meshes.push(mesh)
     pickables.push(mesh)
+
+    // R3 节点：不可见碰撞球，提升点击精度
+    if (n.layer === 3) {
+      const hitGeom = new THREE.SphereGeometry(0.04, 8, 8)
+      const hitMat = new THREE.MeshBasicMaterial({ visible: false })
+      const hitMesh = new THREE.Mesh(hitGeom, hitMat)
+      hitMesh.position.copy(n.position)
+      hitMesh.userData = mesh.userData
+      pickables.push(hitMesh)
+    }
   }
 
   // Parent-child lines (SLERP arcs) → Line2
