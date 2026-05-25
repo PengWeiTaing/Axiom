@@ -2,7 +2,7 @@
 /** CosmosView — Atlas 球形树宿主组件 */
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
-import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept } from '@/cosmos/scene'
+import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
 import type { CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
@@ -11,6 +11,7 @@ import * as THREE from 'three'
 import Breadcrumb from '@/components/cosmos/Breadcrumb.vue'
 import LifelinePanel from '@/components/LifelinePanel.vue'
 import NodeDetailCard from '@/components/cosmos/NodeDetailCard.vue'
+import AtlasSearch from '@/components/cosmos/AtlasSearch.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -21,6 +22,13 @@ let controls: any = null
 let animFrame = 0
 let assocLines: { line: any; data: any; fromNode: LayoutNode; toNode: LayoutNode }[] = []
 let tooltipText = ''
+
+// Search
+const showSearch = ref(false)
+
+// Hover
+let hoveredNode: THREE.Mesh | null = null
+const HOVER_SCALE = 1.5
 
 // CSS2D label renderer
 let labelRenderer: any = null
@@ -120,15 +128,33 @@ async function start() {
   })
 
   canvasRef.value.addEventListener('mousemove', (e: MouseEvent) => {
-    if (!sceneObjs || store.state.kind !== 'relation_reveal') return
+    if (!sceneObjs) return
     mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
     mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
     raycaster.setFromCamera(mouse, sceneObjs.camera)
+
+    // 0. 节点 hover 检测（所有状态下）
+    const nodeHits = raycaster.intersectObjects(sceneObjs.pickables)
+    if (nodeHits.length > 0) {
+      const hm = nodeHits[0].object as THREE.Mesh
+      if (hm !== hoveredNode) {
+        resetHover()
+        hoveredNode = hm
+        applyHover(hm)
+      }
+      canvasRef.value!.style.cursor = 'pointer'
+    } else {
+      resetHover()
+      canvasRef.value!.style.cursor = ''
+    }
+
+    // 1. 关联线 hover（relation_reveal 下）
+    if (store.state.kind !== 'relation_reveal') return
     const lineHits = raycaster.intersectObjects(sceneObjs.lines.concat(assocLines.map(l => l.line)))
     if (lineHits.length > 0 && assocLines.some(al => al.line === lineHits[0].object)) {
       const al = assocLines.find(al => al.line === lineHits[0].object)
       if (al) { tooltipText = al.data.evidence?.[0]?.excerpt || ''; canvasRef.value!.style.cursor = 'pointer' }
-    } else { tooltipText = ''; canvasRef.value!.style.cursor = '' }
+    } else { tooltipText = '' }
   })
 
   window.addEventListener('keydown', onKey)
@@ -147,9 +173,70 @@ function onResize() {
   lineSetResolution(w, h)
 }
 
+function applyHover(mesh: THREE.Mesh) {
+  mesh.scale.setScalar(HOVER_SCALE)
+  const mat = mesh.material as THREE.MeshBasicMaterial
+  ;(mat as any)._origColor = (mat as any)._origColor ?? mat.color.getHex()
+  mat.color.set(cssVar('--accent'))
+  mat.needsUpdate = true
+}
+
+function resetHover() {
+  if (!hoveredNode) return
+  hoveredNode.scale.setScalar(1)
+  const mat = hoveredNode.material as THREE.MeshBasicMaterial
+  if ((mat as any)._origColor !== undefined) {
+    mat.color.setHex((mat as any)._origColor)
+    delete (mat as any)._origColor
+    mat.needsUpdate = true
+  }
+  hoveredNode = null
+}
+
+function onSearchSelect(result: { id: string; kind: string; layer: number }) {
+  showSearch.value = false
+  if (!sceneObjs) return
+
+  if (result.kind === 'lifeline') {
+    if (result.layer === 1) {
+      store.transition({ kind: 'region_zoom', lifeline_id: result.id } as any)
+    } else {
+      let pid = store.data?.lifelines.find(l => l.id === result.id)?.parent_id
+      while (pid && pid !== 'ROOT') {
+        const p = store.data?.lifelines.find(l => l.id === pid)
+        if (p && p.parent_id === 'ROOT') break
+        pid = p?.parent_id
+      }
+      if (pid && pid !== 'ROOT') {
+        store.transition({ kind: 'region_zoom', lifeline_id: pid } as any)
+      }
+    }
+  } else {
+    store.transition({ kind: 'node_focus', entity_kind: result.kind as any, entity_id: result.id } as any)
+  }
+}
+
 function onKey(e: KeyboardEvent) {
+  // 搜索快捷键
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault()
+    showSearch.value = !showSearch.value
+    return
+  }
+  if (e.key === '/' && !showSearch.value) {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+    e.preventDefault()
+    showSearch.value = true
+    return
+  }
+
   const s = store.state
   if (e.key === 'Escape') {
+    if (showSearch.value) {
+      showSearch.value = false
+      return
+    }
     if (s.kind === 'relation_reveal') { clearAssoc(); store.transition({ kind: 'node_focus', entity_kind: (s as any).entity_kind, entity_id: (s as any).entity_id }) }
     else if (s.kind === 'node_focus') { store.transition({ kind: (s as any).lifeline_id ? 'region_zoom' : 'global_overview', lifeline_id: (s as any).lifeline_id }) }
     else if (s.kind === 'region_zoom') { store.transition({ kind: 'global_overview' }) }
@@ -321,7 +408,9 @@ onBeforeUnmount(() => {
   <div class="cosmos-view">
     <div class="cosmos-hud">
       <Breadcrumb :state="store.state" @nav="(s: CosmosState) => store.transition(s)" />
-      <LifelinePanel @focus-lifeline="onPanelFocusLifeline" />
+      <AtlasSearch v-if="showSearch" @select="onSearchSelect" @close="showSearch = false" />
+      <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" />
+      <button v-if="!showSearch" class="search-trigger" @click="showSearch = true">搜索 ⌘K</button>
     </div>
     <canvas ref="canvasRef" class="cosmos-canvas" />
     <NodeDetailCard />
@@ -366,5 +455,20 @@ onBeforeUnmount(() => {
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-2);
   z-index: 20;
+}
+
+.search-trigger {
+  background: var(--surface-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  color: var(--text-3);
+  font-size: var(--fs-1);
+  padding: var(--s-1) var(--s-2);
+  cursor: pointer;
+}
+
+.search-trigger:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 </style>

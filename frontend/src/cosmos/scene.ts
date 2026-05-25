@@ -6,7 +6,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 import type { CosmosData, CosmosAssociation } from './types'
 import { computeLayout, type LayoutNode, RADII } from './layout'
 
-function cssVar(name: string): string {
+export function cssVar(name: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   return v || '#6ee7d0'
 }
