@@ -10,6 +10,7 @@ import * as THREE from 'three'
 import Breadcrumb from '@/components/cosmos/Breadcrumb.vue'
 import LifelinePanel from '@/components/LifelinePanel.vue'
 import NodeDetailCard from '@/components/cosmos/NodeDetailCard.vue'
+import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -17,13 +18,19 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let sceneObjs: Awaited<ReturnType<typeof initScene>> | null = null
 let controls: any = null
 let animFrame = 0
-let assocLines: { line: THREE.Line; data: any; fromNode: LayoutNode; toNode: LayoutNode }[] = []
+let assocLines: { line: any; data: any; fromNode: LayoutNode; toNode: LayoutNode }[] = []
 let tooltipText = ''
+
+// CSS2D label renderer
+let labelRenderer: any = null
+let labelGroup: LabelGroup | null = null
+let lineSetResolution: ((w: number, h: number) => void) | null = null
 
 async function start() {
   if (!store.data || !canvasRef.value) return
   const Three = await import('three')
   const OrbitControls = (await import('three/examples/jsm/controls/OrbitControls.js')).OrbitControls
+  const { CSS2DRenderer } = await import('three/examples/jsm/renderers/CSS2DRenderer.js')
 
   sceneObjs = await initScene(canvasRef.value, store.data)
   controls = new OrbitControls(sceneObjs.camera, sceneObjs.renderer.domElement)
@@ -31,6 +38,22 @@ async function start() {
   controls.enableZoom = true; controls.zoomSpeed = 0.6
   controls.enablePan = false
   controls.minDistance = 0.5; controls.maxDistance = 6.0
+
+  // CSS2D label renderer
+  labelRenderer = new CSS2DRenderer()
+  labelRenderer.setSize(window.innerWidth, window.innerHeight)
+  labelRenderer.domElement.style.position = 'absolute'
+  labelRenderer.domElement.style.top = '0'
+  labelRenderer.domElement.style.pointerEvents = 'none'
+  document.querySelector('.cosmos-view')?.appendChild(labelRenderer.domElement)
+
+  const { createLabelGroup } = await import('@/cosmos/labels')
+  labelGroup = createLabelGroup()
+  labelGroup.create(sceneObjs.scene, sceneObjs.layoutNodes)
+
+  lineSetResolution = sceneObjs.setResolution
+
+  window.addEventListener('resize', onResize)
 
   const raycaster = new Three.Raycaster()
   const mouse = new Three.Vector2()
@@ -88,6 +111,14 @@ async function start() {
   animate()
 }
 
+function onResize() {
+  if (!labelRenderer || !lineSetResolution) return
+  const w = window.innerWidth
+  const h = window.innerHeight
+  labelRenderer.setSize(w, h)
+  lineSetResolution(w, h)
+}
+
 function onKey(e: KeyboardEvent) {
   const s = store.state
   if (e.key === 'Escape') {
@@ -115,7 +146,15 @@ function enterRelation() {
 
 function clearAssoc() {
   if (!sceneObjs) return
-  assocLines.forEach(al => { sceneObjs!.scene.remove(al.line); al.line.geometry.dispose(); (al.line.material as THREE.Material).dispose() })
+  assocLines.forEach(al => {
+    sceneObjs!.scene.remove(al.line)
+    al.line.geometry?.dispose()
+    if (al.line.material) {
+      const m = al.line.material
+      if (Array.isArray(m)) m.forEach(x => x.dispose())
+      else m.dispose()
+    }
+  })
   assocLines = []
   resetNodeAlpha(sceneObjs.nodes)
 }
@@ -141,6 +180,12 @@ function animate() {
   })
 
   sceneObjs.renderer.render(sceneObjs.scene, sceneObjs.camera)
+
+  // CSS2D labels
+  if (labelGroup && labelRenderer) {
+    labelGroup.update(store.state, sceneObjs.camera, store.data?.associations)
+    labelRenderer.render(sceneObjs.scene, sceneObjs.camera)
+  }
 }
 
 function onStateChange() {
@@ -173,6 +218,9 @@ onBeforeUnmount(() => {
   sceneObjs?.dispose()
   controls?.dispose()
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('resize', onResize)
+  if (labelGroup) { labelGroup.dispose(); labelGroup = null }
+  if (labelRenderer?.domElement) { labelRenderer.domElement.remove() }
 })
 </script>
 

@@ -130,10 +130,12 @@ export function useSmartCapture() {
   }
 
   async function acceptLifeline(result: CaptureSuccess) {
-    if (!result.suggestedLifelineId || !result.item) return
+    if (!result.suggestedLifelineId || !result.raw) return
     const kind = result.kind === 'file' || result.kind === 'url' ? 'item' : result.kind
+    const entityId = (result.raw as any).id
+    if (!entityId) return
     try {
-      await mountEntity(kind, result.item.id, result.suggestedLifelineId)
+      await mountEntity(kind, entityId, result.suggestedLifelineId)
     } catch {
       // 静默失败，不影响主流程
     }
