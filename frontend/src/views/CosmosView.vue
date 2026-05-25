@@ -2,7 +2,7 @@
 /** CosmosView — Atlas 球形树宿主组件 */
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
-import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha } from '@/cosmos/scene'
+import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
 import type { CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
@@ -138,7 +138,10 @@ function enterRelation() {
   if (s.kind !== 'node_focus') return
   const focusId = (s as any).entity_id as string
   store.transition({ kind: 'relation_reveal', entity_kind: (s as any).entity_kind, entity_id: focusId })
-  assocLines = createAssociationLines(sceneObjs.scene, store.data, sceneObjs.layoutNodes, focusId)
+  assocLines = createAssociationLines(
+    sceneObjs.scene, store.data, sceneObjs.layoutNodes, focusId,
+    new THREE.Vector2(canvasRef.value!.clientWidth, canvasRef.value!.clientHeight)
+  )
   const visibleIds = new Set<string>([focusId])
   assocLines.forEach(al => { visibleIds.add(al.fromNode.id); visibleIds.add(al.toNode.id) })
   fadeNodes(sceneObjs.nodes, visibleIds)
@@ -179,6 +182,10 @@ function animate() {
     l.visible = inFocusState || Math.max(fromLayer, toLayer) <= maxLayer
   })
 
+  // 节点位置 lerp + CSS2D 标签同步
+  updateNodePositions(sceneObjs.nodes, 0.016)
+  if (labelGroup) labelGroup.syncPositions(sceneObjs.nodes)
+
   sceneObjs.renderer.render(sceneObjs.scene, sceneObjs.camera)
 
   // CSS2D labels
@@ -188,21 +195,55 @@ function animate() {
   }
 }
 
-function onStateChange() {
+async function onStateChange() {
   if (!sceneObjs) return
   const s = store.state
   const nodes = sceneObjs.layoutNodes
-  if (s.kind === 'region_zoom' || s.kind === 'node_focus') {
-    const targetId = s.kind === 'region_zoom' ? (s as any).lifeline_id : (s as any).entity_id
+
+  if (s.kind === 'node_focus' || s.kind === 'relation_reveal') {
+    const targetId = (s as any).entity_id as string
     const n = nodes.find(ln => ln.id === targetId)
-    if (n) {
-      const dir = n.position.clone().normalize()
-      const dist = s.kind === 'region_zoom' ? n.position.length() + 1.8 : n.position.length() + 0.6
-      const camPos = dir.clone().multiplyScalar(dist)
-      tweenCamera(sceneObjs.camera, controls, camPos, n.position, s.kind === 'node_focus' ? 38 : 55, 800)
+    if (!n) return
+
+    // 相机 tween
+    const dir = n.position.clone().normalize()
+    const dist = n.position.length() + 0.6
+    const camPos = dir.clone().multiplyScalar(dist)
+    tweenCamera(sceneObjs.camera, controls, camPos, n.position, s.kind === 'node_focus' ? 38 : 55, 800)
+
+    // 星座布局
+    const { computeFocusLayout } = await import('@/cosmos/layout')
+    const { targets, constellationIds } = computeFocusLayout(
+      nodes,
+      targetId,
+      store.data?.associations || [],
+      dir
+    )
+    for (const m of sceneObjs.nodes) {
+      const id = m.userData.id as string
+      const tgt = targets.get(id)
+      m.userData.targetPosition = tgt ? tgt.clone() : m.userData.homePosition.clone()
     }
-  } else if (s.kind === 'global_overview') {
-    tweenCamera(sceneObjs.camera, controls, new THREE.Vector3(0, 2, 4), new THREE.Vector3(0, 0, 0), 60, 800)
+    applyConstellationOpacities(sceneObjs.nodes, constellationIds)
+  } else if (s.kind === 'global_overview' || s.kind === 'region_zoom') {
+    // 退出聚焦：恢复位置 + opacity
+    for (const m of sceneObjs.nodes) {
+      m.userData.targetPosition = m.userData.homePosition.clone()
+    }
+    resetNodeAlpha(sceneObjs.nodes)
+
+    // 相机 tween
+    if (s.kind === 'region_zoom') {
+      const targetId = (s as any).lifeline_id as string
+      const n = nodes.find(ln => ln.id === targetId)
+      if (n) {
+        const dir2 = n.position.clone().normalize()
+        const dist2 = n.position.length() + 1.8
+        tweenCamera(sceneObjs.camera, controls, dir2.clone().multiplyScalar(dist2), n.position, 55, 800)
+      }
+    } else {
+      tweenCamera(sceneObjs.camera, controls, new THREE.Vector3(0, 2, 4), new THREE.Vector3(0, 0, 0), 60, 800)
+    }
   }
 }
 

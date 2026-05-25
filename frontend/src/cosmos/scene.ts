@@ -80,7 +80,12 @@ export async function initScene(
 
     const mesh = new THREE.Mesh(geom, mat)
     mesh.position.copy(n.position)
-    mesh.userData = { id: n.id, name: n.name, kind: n.kind, layer: n.layer, parentId: n.parentId }
+    mesh.userData = {
+      id: n.id, name: n.name, kind: n.kind,
+      layer: n.layer, parentId: n.parentId,
+      homePosition: n.position.clone(),
+      targetPosition: n.position.clone(),
+    }
     scene.add(mesh)
     meshes.push(mesh)
     pickables.push(mesh)
@@ -236,4 +241,28 @@ export function resetNodeAlpha(meshes: THREE.Mesh[]) {
     mat.transparent = true
     mat.needsUpdate = true
   })
+}
+
+export function updateNodePositions(meshes: THREE.Mesh[], dt: number, rate: number = 6): void {
+  const t = 1 - Math.exp(-rate * dt)
+  for (const m of meshes) {
+    const target = m.userData.targetPosition as THREE.Vector3 | undefined
+    if (!target) continue
+    m.position.lerp(target, t)
+  }
+}
+
+export function applyConstellationOpacities(
+  meshes: THREE.Mesh[],
+  constellationIds: Set<string>,
+  ghostAlpha: number = 0.06
+): void {
+  for (const m of meshes) {
+    const id = m.userData.id as string
+    if (constellationIds.has(id)) continue
+    const mat = m.material as THREE.MeshBasicMaterial
+    mat.opacity = ghostAlpha
+    mat.transparent = true
+    mat.needsUpdate = true
+  }
 }

@@ -15,6 +15,7 @@ export interface LabelGroup {
   entries: LabelEntry[]
   create(scene: THREE.Scene, layoutNodes: LayoutNode[]): void
   update(state: CosmosState, camera: THREE.Camera, associations?: CosmosAssociation[]): void
+  syncPositions(meshes: THREE.Mesh[]): void
   dispose(): void
 }
 
@@ -154,6 +155,17 @@ export function createLabelGroup(): LabelGroup {
     }
   }
 
+  function syncPositions(meshes: THREE.Mesh[]) {
+    const meshMap = new Map<string, THREE.Vector3>()
+    for (const m of meshes) {
+      meshMap.set(m.userData.id as string, m.position)
+    }
+    for (const e of entries) {
+      const pos = meshMap.get(e.nodeId)
+      if (pos) e.object.position.copy(pos)
+    }
+  }
+
   function dispose() {
     for (const e of entries) {
       e.object.removeFromParent()
@@ -161,5 +173,5 @@ export function createLabelGroup(): LabelGroup {
     entries.length = 0
   }
 
-  return { entries, create, update, dispose }
+  return { entries, create, update, syncPositions, dispose }
 }
