@@ -55,6 +55,7 @@ try:
     cleanup_conn.execute("DELETE FROM memories")
     cleanup_conn.execute("DELETE FROM items")
     cleanup_conn.execute("DELETE FROM lifelines")
+    cleanup_conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('items', 'tasks')")
     cleanup_conn.commit()
 finally:
     cleanup_conn.close()
@@ -143,6 +144,7 @@ try:
     conn.execute("DELETE FROM tasks")
     conn.execute("DELETE FROM items")
     conn.execute("DELETE FROM lifelines")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('items', 'tasks')")
     conn.commit()
 finally:
     conn.close()
