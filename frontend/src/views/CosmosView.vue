@@ -192,10 +192,10 @@ async function start() {
         hoveredNode = hm
         applyHover(hm)
       }
-      canvasRef.value!.style.cursor = 'pointer'
+      canvasRef.value!.style.cursor = store.selectingTarget ? 'crosshair' : 'pointer'
     } else {
       resetHover()
-      canvasRef.value!.style.cursor = ''
+      canvasRef.value!.style.cursor = store.selectingTarget ? 'crosshair' : ''
     }
 
     // 1. 关联线 hover（relation_reveal 下）
@@ -522,6 +522,10 @@ function onKey(e: KeyboardEvent) {
 
   const s = store.state
   if (e.key === 'Escape') {
+    if (store.selectingTarget) {
+      store.cancelSelecting()
+      return
+    }
     if (showSearch.value) {
       showSearch.value = false
       return
