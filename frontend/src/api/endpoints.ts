@@ -177,6 +177,57 @@ export const reviewAssociation = (id: string, status: 'accepted' | 'rejected') =
     { method: 'POST', json: { status } },
   );
 
+// ---------- Entity CRUD（Atlas 编辑用） ----------
+const KIND_PLURAL: Record<string, string> = { task: 'tasks', memory: 'memories', decision: 'decisions', item: 'item' }
+
+export const updateEntity = (kind: string, id: number, data: { title?: string }) => {
+  const body: Record<string, string> = {}
+  if (data.title !== undefined) {
+    body[kind === 'memory' || kind === 'item' ? 'content' : 'title'] = data.title
+  }
+  if (kind === 'item') {
+    return apiRequest(`/item/${id}/update`, { method: 'POST', json: body })
+  }
+  return apiRequest(`/${KIND_PLURAL[kind]}/${id}`, { method: 'PUT', json: body })
+}
+
+export const deleteEntity = (kind: string, id: number) => {
+  const path = kind === 'item' ? `/item/${id}` : `/${KIND_PLURAL[kind]}/${id}`
+  return apiRequest(path, { method: 'DELETE' })
+}
+
+export const createEntity = async (kind: string, title: string, lifeline_id: string) => {
+  let resultId: number
+  if (kind === 'task') {
+    const r = await apiRequest<{ task: { id: number } }>('/tasks', { method: 'POST', json: { title } })
+    resultId = r.task.id
+  } else if (kind === 'memory') {
+    const r = await apiRequest<{ memory: { id: number } }>('/memories', { method: 'POST', json: { category: 'fact', content: title } })
+    resultId = r.memory.id
+  } else if (kind === 'decision') {
+    const r = await apiRequest<{ decision: { id: number } }>('/decisions', { method: 'POST', json: { title, decision: title } })
+    resultId = r.decision.id
+  } else {
+    const r = await apiRequest<{ item: { id: number } }>('/add', { method: 'POST', json: { text: title, source: 'atlas' } })
+    resultId = r.item.id
+  }
+  await mountEntity(kind, resultId, lifeline_id)
+  return resultId
+}
+
+// ---------- Association CRUD ----------
+export const createAssociation = (data: {
+  from: string; to: string; relation_type: string; confidence: number;
+  status?: string; evidence?: { type: string; excerpt: string; weight: number }[]
+}) => apiRequest<{ association: import('@/cosmos/types').CosmosAssociation }>('/cosmos/associations', { method: 'POST', json: data })
+
+export const updateAssociation = (id: string, data: {
+  relation_type?: string; confidence?: number; evidence?: { type: string; excerpt: string; weight: number }[]
+}) => apiRequest<{ association: import('@/cosmos/types').CosmosAssociation }>(`/cosmos/associations/${encodeURIComponent(id)}`, { method: 'PUT', json: data })
+
+export const deleteAssociation = (id: string) =>
+  apiRequest<{ ok: boolean; message: string }>(`/cosmos/associations/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
 // ---------- 系统 ----------
 export const health = () => apiRequest<{ service: string; db: string }>('/health', { skipAuth: true });
 // 注：后端没有 /ping 路由（receiver.py 里的 ai_ping 缺装饰器）；

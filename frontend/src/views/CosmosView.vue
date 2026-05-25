@@ -12,6 +12,10 @@ import Breadcrumb from '@/components/cosmos/Breadcrumb.vue'
 import LifelinePanel from '@/components/LifelinePanel.vue'
 import NodeDetailCard from '@/components/cosmos/NodeDetailCard.vue'
 import AtlasSearch from '@/components/cosmos/AtlasSearch.vue'
+import ContextMenu from '@/components/cosmos/ContextMenu.vue'
+import type { ContextMenuTarget } from '@/components/cosmos/ContextMenu.vue'
+import ConfirmDialog from '@/components/cosmos/ConfirmDialog.vue'
+import AssociationEditDialog from '@/components/cosmos/AssociationEditDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -25,6 +29,25 @@ let tooltipText = ''
 
 // Search
 const showSearch = ref(false)
+
+// Context menu
+const contextMenu = ref<{ x: number; y: number; target: ContextMenuTarget } | null>(null)
+
+// Confirm dialog
+const confirmDialog = ref<{ title: string; message: string; confirmLabel: string; danger: boolean; resolve: (v: boolean) => void } | null>(null)
+function showConfirm(title: string, message: string, confirmLabel: string, danger: boolean): Promise<boolean> {
+  return new Promise(resolve => {
+    confirmDialog.value = { title, message, confirmLabel, danger, resolve }
+  })
+}
+
+// Create entity dialog
+const createDialog = ref<{ kind: string; lifelineId: string; lifelineName: string } | null>(null)
+const createTitle = ref('')
+const createInputEl = ref<HTMLInputElement | null>(null)
+
+// NodeDetailCard ref for triggering inline edit
+const nodeDetailRef = ref<InstanceType<typeof NodeDetailCard> | null>(null)
 
 // Shortcuts hint
 const hintVisible = ref(true)
@@ -78,6 +101,27 @@ async function start() {
     mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
     mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
     raycaster.setFromCamera(mouse, sceneObjs.camera)
+
+    // 0. 选择目标模式（关联创建）
+    if (store.selectingTarget) {
+      const hits_ = raycaster.intersectObjects(sceneObjs.pickables)
+      if (hits_.length > 0) {
+        const obj_ = hits_[0].object as THREE.Mesh
+        if (obj_.userData.layer === 3 && obj_.userData.id !== store.selectingTarget.fromId) {
+          const toTitle = store.data?.entities.find(en => en.id === obj_.userData.id)?.title || ''
+          store.openEditAssoc({
+            id: '', from: store.selectingTarget.fromId, fromTitle: store.selectingTarget.fromTitle,
+            to: obj_.userData.id as string, toTitle: toTitle,
+            relation_type: 'manual', confidence: 0.7, status: 'accepted', evidence: []
+          })
+          store.cancelSelecting()
+          return
+        }
+      }
+      // 点击空白或自身 → 退出选择模式
+      store.cancelSelecting()
+      return
+    }
 
     // 1. 先检测关联线（仅在 relation_reveal 模式下）
     if (store.state.kind === 'relation_reveal' && assocLines.length > 0) {
@@ -171,6 +215,39 @@ async function start() {
       tooltipText = ''
       resetLineHover()
     }
+  })
+
+  // 右键上下文菜单
+  canvasRef.value.addEventListener('contextmenu', (e: MouseEvent) => {
+    e.preventDefault()
+    if (!sceneObjs || !store.data) return
+    // 不在 global_overview 下弹出菜单
+    if (store.state.kind === 'global_overview') return
+
+    mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
+    mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
+    raycaster.setFromCamera(mouse, sceneObjs.camera)
+
+    const hits = raycaster.intersectObjects(sceneObjs.pickables)
+    if (hits.length === 0) { contextMenu.value = null; return }
+
+    const obj = hits[0].object
+    const id = obj.userData.id as string
+    const kind = obj.userData.kind as string
+    const layer = obj.userData.layer as number
+    // 仅 R1/R2 lifeline 和 R3 entity 弹出菜单（R0 root 不弹）
+    if (layer < 1 || layer > 3) { contextMenu.value = null; return }
+
+    let title = ''
+    if (layer <= 2) {
+      const ll = store.data.lifelines.find(l => l.id === id)
+      title = ll?.name || id
+    } else {
+      const ent = store.data.entities.find(en => en.id === id)
+      title = ent?.title || id
+    }
+
+    contextMenu.value = { x: e.clientX, y: e.clientY, target: { id, kind, title, layer } }
   })
 
   window.addEventListener('keydown', onKey)
@@ -283,6 +360,148 @@ function onSearchSelect(result: { id: string; kind: string; layer: number }) {
   } else {
     store.transition({ kind: 'node_focus', entity_kind: result.kind as any, entity_id: result.id } as any)
   }
+}
+
+function onContextEditTitle(target: ContextMenuTarget) {
+  // For R3 entity: trigger NodeDetailCard inline edit
+  if (target.layer === 3) {
+    nodeDetailRef.value?.startEditTitle()
+  }
+}
+
+async function onContextDeleteEntity(target: ContextMenuTarget) {
+  const ok = await showConfirm(
+    `确定删除「${target.title.slice(0, 30)}」？`,
+    '此操作不可撤销。',
+    '删除',
+    true,
+  )
+  if (!ok) return
+  const parts = target.id.split(':')
+  const kind = parts[0]
+  const rawId = parseInt(parts.slice(1).join(':'), 10)
+  try {
+    await store.deleteEntityById(kind, rawId)
+  } catch {
+    await store.reload()
+  }
+  // 如果删除的是当前聚焦的 entity，回到 region_zoom
+  const s = store.state
+  if (s.kind === 'node_focus' || s.kind === 'relation_reveal') {
+    if ((s as any).entity_id === target.id) {
+      const ent = store.data?.entities.find(e => e.id === target.id)
+      const lid = ent?.lifeline_id
+      if (lid) store.transition({ kind: 'region_zoom', lifeline_id: lid } as any)
+      else store.transition({ kind: 'global_overview' })
+    }
+  }
+}
+
+async function onContextMoveLifeline(entityId: string, lifelineId: string) {
+  const parts = entityId.split(':')
+  const kind = parts[0]
+  const rawId = parseInt(parts.slice(1).join(':'), 10)
+  try {
+    await store.mountEntity(kind, rawId, lifelineId)
+  } catch {
+    await store.reload()
+  }
+}
+
+function onContextCreateEntity(kind: string, lifelineId: string) {
+  const lifeline = store.data?.lifelines.find(l => l.id === lifelineId)
+  createDialog.value = { kind, lifelineId, lifelineName: lifeline?.name || lifelineId }
+  createTitle.value = ''
+  setTimeout(() => createInputEl.value?.focus(), 50)
+}
+
+async function onCreateEntityConfirm() {
+  if (!createDialog.value) return
+  const title = createTitle.value.trim()
+  if (!title) return
+  const { kind, lifelineId } = createDialog.value
+  try {
+    await store.createEntityUnderLifeline(kind, title, lifelineId)
+  } catch {
+    await store.reload()
+  }
+  createDialog.value = null
+}
+
+function onCreateEntityCancel() {
+  createDialog.value = null
+}
+
+function onCreateKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') onCreateEntityConfirm()
+  else if (e.key === 'Escape') onCreateEntityCancel()
+}
+
+async function onContextEditLifelineName(target: ContextMenuTarget) {
+  // For R1/R2 lifeline: use a simple prompt approach via the store's updateLifeline
+  // We use a small inline approach — since we don't have a native prompt, we use the create dialog pattern
+  const newName = (window as any).prompt?.('编辑 lifeline 名称', target.title)
+  // Fallback: use a simple approach
+  if (!newName || newName === target.title) return
+  try {
+    await store.updateLifeline(target.id, { name: newName })
+  } catch {
+    await store.reload()
+  }
+}
+
+function onContextAssociateTo(target: ContextMenuTarget) {
+  store.startSelectingTarget(target.id, target.title)
+}
+
+async function onAssocCreate(data: {
+  from: string; to: string; relation_type: string; confidence: number
+  evidence: { type: string; excerpt: string; weight: number }[]
+}) {
+  await store.createAssoc(data)
+  store.closeEditAssoc()
+}
+
+async function onAssocUpdate(data: {
+  association_id: string; relation_type?: string; confidence?: number
+  evidence?: { type: string; excerpt: string; weight: number }[]
+}) {
+  await store.updateAssoc(data.association_id, {
+    relation_type: data.relation_type,
+    confidence: data.confidence,
+    evidence: data.evidence,
+  })
+  store.closeEditAssoc()
+}
+
+async function onAssocDelete(assocId: string) {
+  store.closeEditAssoc()
+  await store.deleteAssoc(assocId)
+}
+
+async function onNodeDetailEditAssoc(a: { id: string; relation_type: string; confidence: number; status: string; evidence?: { type: string; excerpt: string; weight: number }[] }) {
+  if (!store.data) return
+  const s = store.state
+  if (s.kind !== 'node_focus' && s.kind !== 'relation_reveal') return
+  const eid = (s as any).entity_id as string
+  const entity = store.data.entities.find(en => en.id === eid)
+  if (!entity) return
+  // Find the association in store.data
+  const assoc = store.data.associations.find(as => as.id === a.id)
+  if (!assoc) return
+  const fromEnt = store.data.entities.find(en => en.id === assoc.from)
+  const toEnt = store.data.entities.find(en => en.id === assoc.to)
+  store.openEditAssoc({
+    id: assoc.id, from: assoc.from, fromTitle: fromEnt?.title || assoc.from,
+    to: assoc.to, toTitle: toEnt?.title || assoc.to,
+    relation_type: assoc.relation_type, confidence: assoc.confidence,
+    status: assoc.status, evidence: assoc.evidence || [],
+  })
+}
+
+async function onNodeDetailDeleteAssoc(assocId: string) {
+  const ok = await showConfirm('删除关联', '确定删除这条关联？此操作不可撤销。', '确认删除', true)
+  if (ok) await store.deleteAssoc(assocId)
 }
 
 function onKey(e: KeyboardEvent) {
@@ -512,7 +731,7 @@ onBeforeUnmount(() => {
     <!-- 3D 场景（加载/错误/空态时不渲染，但不销毁） -->
     <template v-if="!store.loading && !store.error && store.data && store.data.lifelines.length > 0">
       <canvas ref="canvasRef" class="cosmos-canvas" />
-      <NodeDetailCard />
+      <NodeDetailCard ref="nodeDetailRef" @edit-assoc="onNodeDetailEditAssoc" @delete-assoc="onNodeDetailDeleteAssoc" />
       <div v-if="tooltipText && store.state.kind === 'relation_reveal'" class="tooltip">{{ tooltipText }}</div>
 
       <!-- 快捷键提示 -->
@@ -523,7 +742,77 @@ onBeforeUnmount(() => {
       >
         R 显示关联 &nbsp; Esc 返回 &nbsp; 滚轮缩放 &nbsp; 拖拽旋转 &nbsp; Ctrl+K 搜索
       </div>
+
+      <!-- 右键上下文菜单 -->
+      <ContextMenu
+        v-if="contextMenu"
+        :target="contextMenu.target"
+        :x="contextMenu.x"
+        :y="contextMenu.y"
+        @close="contextMenu = null"
+        @edit-title="onContextEditTitle"
+        @delete-entity="onContextDeleteEntity"
+        @move-lifeline="onContextMoveLifeline"
+        @create-entity="onContextCreateEntity"
+        @edit-lifeline-name="onContextEditLifelineName"
+        @associate-to="onContextAssociateTo"
+      />
+
+      <!-- 确认弹窗 -->
+      <ConfirmDialog
+        v-if="confirmDialog"
+        :title="confirmDialog.title"
+        :message="confirmDialog.message"
+        :confirm-label="confirmDialog.confirmLabel"
+        :danger="confirmDialog.danger"
+        @confirm="confirmDialog!.resolve(true); confirmDialog = null"
+        @cancel="confirmDialog!.resolve(false); confirmDialog = null"
+      />
+
+      <!-- 新建 entity 弹窗 -->
+      <div v-if="createDialog" class="create-overlay" @pointerdown="onCreateEntityCancel">
+        <div class="create-dialog" @pointerdown.stop>
+          <div class="create-title">新建 {{ createDialog.kind }}</div>
+          <div class="create-sub">添加到「{{ createDialog.lifelineName }}」</div>
+          <input
+            ref="createInputEl"
+            v-model="createTitle"
+            class="create-input"
+            placeholder="输入标题…"
+            @keydown="onCreateKeydown"
+          />
+          <div class="create-actions">
+            <button class="confirm-btn cancel-btn" @click="onCreateEntityCancel">取消</button>
+            <button class="confirm-btn primary-btn" :disabled="!createTitle.trim()" @click="onCreateEntityConfirm">创建</button>
+          </div>
+        </div>
+      </div>
     </template>
+
+    <!-- 关联编辑弹窗 -->
+    <AssociationEditDialog
+      v-if="store.editAssoc"
+      :from-id="store.editAssoc.from"
+      :from-title="store.editAssoc.fromTitle"
+      :to-id="store.editAssoc.to"
+      :to-title="store.editAssoc.toTitle"
+      :existing="store.editAssoc.id ? {
+        id: store.editAssoc.id,
+        relation_type: store.editAssoc.relation_type,
+        confidence: store.editAssoc.confidence,
+        status: store.editAssoc.status,
+        evidence: store.editAssoc.evidence,
+      } : undefined"
+      @cancel="store.closeEditAssoc()"
+      @create="onAssocCreate"
+      @update="onAssocUpdate"
+      @delete="onAssocDelete"
+    />
+
+    <!-- Selecting target hint -->
+    <div v-if="store.selectingTarget" class="select-hint">
+      crosshair 点击目标 entity 来创建关联 (Esc 取消)
+    </div>
   </div>
 </template>
 
@@ -649,5 +938,99 @@ onBeforeUnmount(() => {
 
 .shortcuts-hint.fade {
   opacity: 0.3;
+}
+
+/* 新建 entity 弹窗 */
+.create-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-dialog {
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  padding: var(--s-3);
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.create-title {
+  font-size: var(--fs-3);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.create-sub {
+  font-size: var(--fs-1);
+  color: var(--text-4);
+}
+
+.create-input {
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-1);
+  color: var(--text-1);
+  font-size: var(--fs-2);
+  padding: var(--s-1) var(--s-2);
+  outline: none;
+}
+
+.create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+
+.confirm-btn {
+  padding: var(--s-1) var(--s-3);
+  border: none;
+  border-radius: var(--r-1);
+  font-size: var(--fs-2);
+  cursor: pointer;
+}
+
+.cancel-btn {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.cancel-btn:hover {
+  color: var(--text-1);
+}
+
+.primary-btn {
+  background: var(--accent);
+  color: var(--surface-0);
+}
+
+.primary-btn:hover {
+  opacity: 0.85;
+}
+
+.primary-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.select-hint {
+  position: absolute;
+  bottom: var(--s-3);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--fs-2);
+  color: var(--accent);
+  background: var(--surface-1);
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-2);
+  z-index: 20;
 }
 </style>

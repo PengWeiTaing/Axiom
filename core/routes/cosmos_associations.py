@@ -411,4 +411,141 @@ def register_routes(app):
             },
         })
 
+    # === CRUD：手动创建/编辑/删除关联 ===
+
+    @app.route("/cosmos/associations", methods=["POST"])
+    def cosmos_assoc_create():
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        body = request.get_json(silent=True) or {}
+        from_raw = str(body.get("from", "")).strip()
+        to_raw = str(body.get("to", "")).strip()
+        relation_type = str(body.get("relation_type", "manual")).strip()
+        confidence = float(body.get("confidence", 0.7))
+        status = str(body.get("status", "accepted")).strip()
+        evidence_list = body.get("evidence", [])
+
+        if not from_raw or not to_raw:
+            return error_response(400, "missing_fields", "from 和 to 不能为空")
+        if ":" not in from_raw or ":" not in to_raw:
+            return error_response(400, "invalid_format", "from/to 格式应为 kind:id（如 task:7）")
+
+        from_kind, from_id_str = from_raw.split(":", 1)
+        to_kind, to_id_str = to_raw.split(":", 1)
+
+        if relation_type not in ("co_occurrence", "causal", "tension", "derived_from", "manual"):
+            relation_type = "manual"
+        if status not in ("pending", "accepted", "rejected"):
+            status = "accepted"
+        confidence = max(0.0, min(1.0, confidence))
+
+        if not isinstance(evidence_list, list):
+            evidence_list = []
+
+        assoc_id = str(uuid4())[:8]
+        evidence_json = json.dumps(evidence_list, ensure_ascii=False)
+
+        conn = get_db_connection()
+        try:
+            conn.execute(
+                "INSERT INTO associations (id, from_kind, from_id, to_kind, to_id, relation_type, confidence, status, evidence, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    assoc_id, from_kind, from_id_str, to_kind, to_id_str,
+                    relation_type, confidence, status,
+                    evidence_json,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return ok_response({
+            "association": {
+                "id": assoc_id,
+                "from": entity_id(from_kind, from_id_str),
+                "to": entity_id(to_kind, to_id_str),
+                "relation_type": relation_type,
+                "confidence": confidence,
+                "status": status,
+                "evidence": evidence_list,
+            },
+        })
+
+    @app.route("/cosmos/associations/<path:assoc_id>", methods=["PUT"])
+    def cosmos_assoc_update(assoc_id: str):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        conn = get_db_connection()
+        try:
+            row = conn.execute("SELECT * FROM associations WHERE id = ?", (assoc_id,)).fetchone()
+            if not row:
+                return error_response(404, "association_not_found", f"association '{assoc_id}' 不存在")
+
+            body = request.get_json(silent=True) or {}
+
+            updates: dict[str, str | float] = {}
+            if "relation_type" in body:
+                rt = str(body["relation_type"]).strip()
+                if rt in ("co_occurrence", "causal", "tension", "derived_from", "manual"):
+                    updates["relation_type"] = rt
+            if "confidence" in body:
+                updates["confidence"] = max(0.0, min(1.0, float(body["confidence"])))
+            if "status" in body:
+                st = str(body["status"]).strip()
+                if st in ("pending", "accepted", "rejected"):
+                    updates["status"] = st
+            if "evidence" in body:
+                ev = body["evidence"]
+                if isinstance(ev, list):
+                    updates["evidence"] = json.dumps(ev, ensure_ascii=False)
+
+            set_clauses = [f"{k} = ?" for k in updates]
+            values = list(updates.values())
+            if set_clauses:
+                values.append(assoc_id)
+                conn.execute(f"UPDATE associations SET {', '.join(set_clauses)} WHERE id = ?", values)
+                conn.commit()
+
+            row = conn.execute("SELECT * FROM associations WHERE id = ?", (assoc_id,)).fetchone()
+            evidence_raw = row["evidence"]
+            evidence = json.loads(evidence_raw) if evidence_raw else []
+        finally:
+            conn.close()
+
+        return ok_response({
+            "association": {
+                "id": row["id"],
+                "from": entity_id(row["from_kind"], row["from_id"]),
+                "to": entity_id(row["to_kind"], row["to_id"]),
+                "relation_type": row["relation_type"],
+                "confidence": row["confidence"],
+                "status": row["status"],
+                "evidence": evidence,
+            },
+        })
+
+    @app.route("/cosmos/associations/<path:assoc_id>", methods=["DELETE"])
+    def cosmos_assoc_delete(assoc_id: str):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        conn = get_db_connection()
+        try:
+            row = conn.execute("SELECT id FROM associations WHERE id = ?", (assoc_id,)).fetchone()
+            if not row:
+                return error_response(404, "association_not_found", f"association '{assoc_id}' 不存在")
+            conn.execute("DELETE FROM associations WHERE id = ?", (assoc_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
+        return ok_response({"ok": True, "message": f"已删除 association:{assoc_id}"})
+
     return  # register_routes 结束

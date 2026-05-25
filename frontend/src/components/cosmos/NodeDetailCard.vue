@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
 import type { CosmosEntity, CosmosAssociation } from '@/cosmos/types'
 
@@ -11,6 +11,52 @@ const entity = computed<CosmosEntity | null>(() => {
   const eid = (s as any).entity_id as string
   return store.data?.entities.find(e => e.id === eid) ?? null
 })
+
+// Inline title editing
+const editingTitle = ref(false)
+const editInput = ref<HTMLInputElement | null>(null)
+const editValue = ref('')
+
+function startEditTitle() {
+  if (!entity.value) return
+  editValue.value = entity.value.title
+  editingTitle.value = true
+  nextTick(() => editInput.value?.focus())
+}
+
+async function saveTitle() {
+  if (!entity.value) return
+  const newTitle = editValue.value.trim()
+  if (!newTitle || newTitle === entity.value.title) {
+    editingTitle.value = false
+    return
+  }
+  const parts = entity.value.id.split(':')
+  const kind = parts[0]
+  const rawId = parseInt(parts.slice(1).join(':'), 10)
+  try {
+    await store.updateEntityTitle(kind, rawId, newTitle)
+  } catch {
+    await store.reload()
+  }
+  editingTitle.value = false
+}
+
+function cancelEdit() {
+  editingTitle.value = false
+}
+
+function onEditKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') { e.stopPropagation(); saveTitle() }
+  else if (e.key === 'Escape') { e.stopPropagation(); cancelEdit() }
+}
+
+const emit = defineEmits<{
+  (e: 'edit-assoc', assoc: CosmosAssociation): void
+  (e: 'delete-assoc', assocId: string): void
+}>()
+
+defineExpose({ startEditTitle })
 
 const entityAssociations = computed<CosmosAssociation[]>(() => {
   if (!entity.value || !store.data) return []
@@ -93,7 +139,15 @@ async function rejectAssoc(assocId: string) {
     <!-- 头部 -->
     <div class="card-header">
       <span class="kind-badge">{{ kindLabel(entity.kind) }}</span>
-      <span class="entity-name">{{ entity.title.slice(0, 40) }}</span>
+      <input
+        v-if="editingTitle"
+        ref="editInput"
+        v-model="editValue"
+        class="title-input"
+        @blur="saveTitle"
+        @keydown="onEditKeydown"
+      />
+      <span v-else class="entity-name" @dblclick="startEditTitle">{{ entity.title.slice(0, 40) }}</span>
     </div>
 
     <!-- lifeline 路径 -->
@@ -128,6 +182,10 @@ async function rejectAssoc(assocId: string) {
           <span v-if="a.status === 'pending'" class="assoc-actions">
             <button class="btn-accept" @click="acceptAssoc(a.id)">✓</button>
             <button class="btn-reject" @click="rejectAssoc(a.id)">✗</button>
+          </span>
+          <span class="assoc-edit-actions">
+            <button class="btn-edit-assoc" @click.stop="emit('edit-assoc', a)">✎</button>
+            <button class="btn-del-assoc" @click.stop="emit('delete-assoc', a.id)">✕</button>
           </span>
           <button
             class="btn-expand"
@@ -195,6 +253,20 @@ async function rejectAssoc(assocId: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: default;
+}
+
+.title-input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-1);
+  color: var(--text-1);
+  font-size: var(--fs-3);
+  font-weight: 600;
+  padding: 2px var(--s-1);
+  outline: none;
+  min-width: 0;
 }
 
 .lifeline-path {
@@ -376,4 +448,27 @@ async function rejectAssoc(assocId: string) {
 .evidence-weight {
   color: var(--text-4);
 }
+
+/* 关联行编辑/删除按钮 */
+.assoc-edit-actions {
+  display: none;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.assoc-row:hover .assoc-edit-actions {
+  display: flex;
+}
+
+.btn-edit-assoc, .btn-del-assoc {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  color: var(--text-4);
+}
+
+.btn-edit-assoc:hover { color: var(--accent); }
+.btn-del-assoc:hover { color: var(--text-5); }
 </style>

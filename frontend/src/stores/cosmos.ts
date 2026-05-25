@@ -104,7 +104,77 @@ export const useCosmosStore = defineStore('cosmos', () => {
     }
   }
 
+  async function updateEntityTitle(kind: string, id: number, title: string) {
+    const { updateEntity: apiUpdate } = await import('@/api/endpoints')
+    await apiUpdate(kind, id, { title })
+    await reload()
+  }
+
+  async function deleteEntityById(kind: string, id: number) {
+    const { deleteEntity: apiDelete } = await import('@/api/endpoints')
+    await apiDelete(kind, id)
+    await reload()
+  }
+
+  async function createEntityUnderLifeline(kind: string, title: string, lifelineId: string) {
+    const { createEntity: apiCreate } = await import('@/api/endpoints')
+    await apiCreate(kind, title, lifelineId)
+    await reload()
+  }
+
+  // Association CRUD
+  async function createAssoc(data: {
+    from: string; to: string; relation_type: string; confidence: number
+    evidence?: { type: string; excerpt: string; weight: number }[]
+  }) {
+    const { createAssociation: apiCreate } = await import('@/api/endpoints')
+    await apiCreate({ ...data, status: 'accepted' })
+    await reload()
+  }
+
+  async function updateAssoc(id: string, data: {
+    relation_type?: string; confidence?: number
+    evidence?: { type: string; excerpt: string; weight: number }[]
+  }) {
+    const { updateAssociation: apiUpdate } = await import('@/api/endpoints')
+    await apiUpdate(id, data)
+    await reload()
+  }
+
+  async function deleteAssoc(id: string) {
+    const { deleteAssociation: apiDelete } = await import('@/api/endpoints')
+    await apiDelete(id)
+    await reload()
+  }
+
+  const selectingTarget = ref<{ fromId: string; fromTitle: string } | null>(null)
+  const editAssoc = ref<{
+    id: string; from: string; fromTitle: string; to: string; toTitle: string
+    relation_type: string; confidence: number; status: string
+    evidence: { type: string; excerpt: string; weight: number }[]
+  } | null>(null)
+
+  function startSelectingTarget(fromId: string, fromTitle: string) {
+    selectingTarget.value = { fromId, fromTitle }
+  }
+
+  function cancelSelecting() {
+    selectingTarget.value = null
+  }
+
+  function openEditAssoc(data: NonNullable<typeof editAssoc.value>) {
+    editAssoc.value = data
+  }
+
+  function closeEditAssoc() {
+    editAssoc.value = null
+  }
+
   return { data, state, loading, error, load, reload, transition, on,
     createLifeline, updateLifeline, deleteLifeline, mountEntity, reviewAssociation,
-    selectedAssocId, selectAssociation }
+    selectedAssocId, selectAssociation,
+    updateEntityTitle, deleteEntityById, createEntityUnderLifeline,
+    createAssoc, updateAssoc, deleteAssoc,
+    selectingTarget, startSelectingTarget, cancelSelecting,
+    editAssoc, openEditAssoc, closeEditAssoc }
 })
