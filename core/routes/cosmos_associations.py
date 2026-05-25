@@ -317,7 +317,7 @@ def generate_associations(lifeline_id: str | None = None, max_candidates: int = 
             "associations_generated": len(generated),
             "skipped_existing": skipped_existing,
             "associations": generated,
-            "errors": batch_errors if batch_errors else None,
+            "errors": batch_errors or [],
         }
     finally:
         conn.close()

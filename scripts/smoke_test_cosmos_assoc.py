@@ -127,12 +127,14 @@ check("seed: no unmarked entity", "一条游离的笔记" not in all_titles,
 import core._common as _c
 import core.routes.cosmos_associations as _ca
 saved = _c.DEEPSEEK_API_KEY
-_c.DEEPSEEK_API_KEY = ""
-_ca.DEEPSEEK_API_KEY = ""
-resp = req("/cosmos/associations/generate?max_candidates=1")
-check("503 without AI key", resp.status_code == 503, f"got {resp.status_code}")
-_c.DEEPSEEK_API_KEY = saved
-_ca.DEEPSEEK_API_KEY = saved
+try:
+    _c.DEEPSEEK_API_KEY = ""
+    _ca.DEEPSEEK_API_KEY = ""
+    resp = req("/cosmos/associations/generate?max_candidates=1")
+    check("503 without AI key", resp.status_code == 503, f"got {resp.status_code}")
+finally:
+    _c.DEEPSEEK_API_KEY = saved
+    _ca.DEEPSEEK_API_KEY = saved
 
 # ---- 5. 去重 ----
 conn = get_db_connection()
