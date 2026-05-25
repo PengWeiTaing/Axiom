@@ -183,6 +183,36 @@ interface AssociationLine {
   data: CosmosAssociation
   fromNode: LayoutNode
   toNode: LayoutNode
+  arrow?: THREE.Mesh
+}
+
+const MIN_LINEWIDTH = 1.0
+const MAX_LINEWIDTH = 3.5
+
+function confidenceToWidth(c: number): number {
+  return Math.max(MIN_LINEWIDTH, Math.min(MAX_LINEWIDTH, MIN_LINEWIDTH + (c - 0.3) * 3.57))
+}
+
+function createArrowhead(
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  color: string,
+  lineWidth: number
+): THREE.Mesh {
+  const dir = new THREE.Vector3().subVectors(to, from).normalize()
+  const arrowSize = 0.03 + lineWidth * 0.005
+  const geom = new THREE.ConeGeometry(arrowSize, arrowSize * 2.5, 6, 1)
+  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color) })
+  const arrow = new THREE.Mesh(geom, mat)
+
+  const arrowPos = to.clone().addScaledVector(dir, -0.04)
+  arrow.position.copy(arrowPos)
+
+  const quat = new THREE.Quaternion()
+  quat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+  arrow.setRotationFromQuaternion(quat)
+
+  return arrow
 }
 
 export function createAssociationLines(
@@ -203,6 +233,7 @@ export function createAssociationLines(
     causal: '--accent',
     tension: '--warm',
     derived_from: '--accent-dim',
+    manual: '--accent',
   }
 
   for (const assoc of relevant) {
@@ -213,12 +244,13 @@ export function createAssociationLines(
     const lineGeom = new LineGeometry()
     lineGeom.setPositions([from.position.x, from.position.y, from.position.z, to.position.x, to.position.y, to.position.z])
 
+    const lw = confidenceToWidth(assoc.confidence)
     const alpha = 0.5 + (assoc.confidence - 0.5) * 0.8
     const colorHex = cssVar(colorMap[assoc.relation_type] || '--text-3')
 
     const mat = new LineMaterial({
       color: new THREE.Color(colorHex),
-      linewidth: 2,
+      linewidth: lw,
       worldUnits: false,
       resolution: res,
       transparent: true,
@@ -231,9 +263,16 @@ export function createAssociationLines(
 
     const line = new Line2(lineGeom, mat)
     line.computeLineDistances()
-    line.userData = { associationId: assoc.id, ...assoc }
+    line.userData = { associationId: assoc.id, ...assoc, _origLinewidth: lw, _origColor: line.material.color.getHex() }
     scene.add(line)
-    results.push({ line, data: assoc, fromNode: from, toNode: to })
+
+    let arrow: THREE.Mesh | undefined
+    if (assoc.status === 'accepted') {
+      arrow = createArrowhead(from.position, to.position, colorHex, lw)
+      scene.add(arrow)
+    }
+
+    results.push({ line, data: assoc, fromNode: from, toNode: to, arrow })
   }
 
   return results

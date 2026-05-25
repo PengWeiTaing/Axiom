@@ -20,7 +20,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let sceneObjs: Awaited<ReturnType<typeof initScene>> | null = null
 let controls: any = null
 let animFrame = 0
-let assocLines: { line: any; data: any; fromNode: LayoutNode; toNode: LayoutNode }[] = []
+let assocLines: { line: any; data: any; fromNode: LayoutNode; toNode: LayoutNode; arrow?: any }[] = []
 let tooltipText = ''
 
 // Search
@@ -33,6 +33,7 @@ let hintTimer: number | undefined
 
 // Hover
 let hoveredNode: THREE.Mesh | null = null
+let hoveredAssocLine: any = null
 const HOVER_SCALE = 1.5
 
 // CSS2D label renderer
@@ -158,8 +159,18 @@ async function start() {
     const lineHits = raycaster.intersectObjects(sceneObjs.lines.concat(assocLines.map(l => l.line)))
     if (lineHits.length > 0 && assocLines.some(al => al.line === lineHits[0].object)) {
       const al = assocLines.find(al => al.line === lineHits[0].object)
-      if (al) { tooltipText = al.data.evidence?.[0]?.excerpt || ''; canvasRef.value!.style.cursor = 'pointer' }
-    } else { tooltipText = '' }
+      if (al) {
+        tooltipText = al.data.evidence?.[0]?.excerpt || ''
+        if (al.line !== hoveredAssocLine) {
+          resetLineHover()
+          hoveredAssocLine = al.line
+          applyLineHover(al)
+        }
+      }
+    } else {
+      tooltipText = ''
+      resetLineHover()
+    }
   })
 
   window.addEventListener('keydown', onKey)
@@ -205,6 +216,50 @@ function resetHover() {
     mat.needsUpdate = true
   }
   hoveredNode = null
+}
+
+function applyLineHover(al: typeof assocLines[0]) {
+  const mat = al.line.material as any
+  mat._origLinewidth = mat._origLinewidth ?? mat.linewidth
+  mat._origColor = mat._origColor ?? mat.color.getHex()
+  mat.linewidth = mat._origLinewidth * 1.3
+  mat.color.set(cssVar('--accent'))
+  mat.needsUpdate = true
+
+  assocLines.forEach(other => {
+    if (other.line !== al.line) {
+      const om = other.line.material as any
+      om.transparent = true
+      om._origOpacity = om._origOpacity ?? om.opacity
+      om.opacity = (om._origOpacity || 0.8) * 0.3
+      om.needsUpdate = true
+    }
+  })
+}
+
+function resetLineHover() {
+  if (!hoveredAssocLine) return
+  const mat = hoveredAssocLine.material as any
+  if (mat._origLinewidth !== undefined) {
+    mat.linewidth = mat._origLinewidth
+    delete mat._origLinewidth
+  }
+  if (mat._origColor !== undefined) {
+    mat.color.setHex(mat._origColor)
+    delete mat._origColor
+  }
+  mat.needsUpdate = true
+
+  assocLines.forEach(al => {
+    const om = al.line.material as any
+    if (om._origOpacity !== undefined) {
+      om.opacity = om._origOpacity
+      delete om._origOpacity
+      om.needsUpdate = true
+    }
+  })
+
+  hoveredAssocLine = null
 }
 
 function onSearchSelect(result: { id: string; kind: string; layer: number }) {
@@ -279,6 +334,7 @@ function enterRelation() {
 
 function clearAssoc() {
   if (!sceneObjs) return
+  resetLineHover()
   assocLines.forEach(al => {
     sceneObjs!.scene.remove(al.line)
     al.line.geometry?.dispose()
@@ -286,6 +342,11 @@ function clearAssoc() {
       const m = al.line.material
       if (Array.isArray(m)) m.forEach(x => x.dispose())
       else m.dispose()
+    }
+    if (al.arrow) {
+      sceneObjs!.scene.remove(al.arrow)
+      al.arrow.geometry?.dispose()
+      if (al.arrow.material instanceof THREE.Material) al.arrow.material.dispose()
     }
   })
   assocLines = []
