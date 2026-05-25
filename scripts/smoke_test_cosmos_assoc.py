@@ -36,8 +36,10 @@ def check(name: str, ok: bool, detail: str = ""):
         print(f"  FAIL [{name}] {detail}")
 
 
-def req(path: str):
+def req(path: str, json_body: dict | None = None):
     with app.test_client() as client:
+        if json_body is not None:
+            return client.post(path, json=json_body, headers={"X-Axiom-Key": AXIOM_KEY})
         return client.post(path, headers={"X-Axiom-Key": AXIOM_KEY})
 
 
@@ -91,6 +93,8 @@ try:
         ("text", "一条游离的笔记", "web_app"),
     )
     conn.commit()
+    item_id = conn.execute("SELECT id FROM items WHERE lifeline_id = 'L1' LIMIT 1").fetchone()["id"]
+    task_id = conn.execute("SELECT id FROM tasks WHERE lifeline_id = 'L1' LIMIT 1").fetchone()["id"]
 finally:
     conn.close()
 
@@ -165,6 +169,32 @@ try:
     conn.commit()
 finally:
     conn.close()
+
+# ---- 7. Review association ----
+conn = get_db_connection()
+try:
+    conn.execute(
+        "INSERT INTO associations (id, from_kind, from_id, to_kind, to_id, relation_type, confidence, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("REVIEW_TEST", "item", str(item_id), "task", str(task_id), "co_occurrence", 0.5, "pending"),
+    )
+    conn.commit()
+finally:
+    conn.close()
+
+resp = req("/cosmos/associations/REVIEW_TEST/review", {"status": "accepted"})
+check("review accept: 200", resp.status_code == 200)
+check("review accept: status", resp.get_json()["association"]["status"] == "accepted")
+
+resp = req("/cosmos/associations/REVIEW_TEST/review", {"status": "rejected"})
+check("review reject: 200", resp.status_code == 200)
+check("review reject: status", resp.get_json()["association"]["status"] == "rejected")
+
+resp = req("/cosmos/associations/REVIEW_TEST/review", {"status": "invalid"})
+check("review invalid status: 400", resp.status_code == 400)
+
+resp = req("/cosmos/associations/NONEXIST/review", {"status": "accepted"})
+check("review nonexist: 404", resp.status_code == 404)
 
 # ---- 总结 ----
 print()

@@ -171,6 +171,12 @@ export const deleteLifeline = (id: string) =>
 export const mountEntity = (kind: string, id: number, lifeline_id: string | null) =>
   apiRequest<{ ok: boolean; entity: { id: string; kind: string; title: string; lifeline_id: string | null } }>(`/cosmos/entities/${kind}/${id}/lifeline`, { method: 'PUT', json: { lifeline_id } });
 
+export const reviewAssociation = (id: string, status: 'accepted' | 'rejected') =>
+  apiRequest<{ association: import('@/cosmos/types').CosmosAssociation }>(
+    `/cosmos/associations/${encodeURIComponent(id)}/review`,
+    { method: 'POST', json: { status } },
+  );
+
 // ---------- 系统 ----------
 export const health = () => apiRequest<{ service: string; db: string }>('/health', { skipAuth: true });
 // 注：后端没有 /ping 路由（receiver.py 里的 ai_ping 缺装饰器）；

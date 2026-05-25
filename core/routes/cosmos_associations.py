@@ -370,3 +370,45 @@ def register_routes(app):
         if result.get("error") == "ai_unavailable":
             return error_response(503, "ai_unavailable", result.get("message", "AI key 未配置"))
         return ok_response(result)
+
+    @app.route("/cosmos/associations/<path:assoc_id>/review", methods=["POST"])
+    def cosmos_assoc_review(assoc_id: str):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        body = request.get_json(silent=True) or {}
+        status = str(body.get("status", "")).strip()
+        if status not in ("accepted", "rejected"):
+            return error_response(400, "invalid_status", "status 必须是 accepted 或 rejected")
+
+        conn = get_db_connection()
+        try:
+            row = conn.execute(
+                "SELECT id, from_kind, from_id, to_kind, to_id, relation_type, confidence, status, evidence "
+                "FROM associations WHERE id = ?", (assoc_id,)
+            ).fetchone()
+            if not row:
+                return error_response(404, "association_not_found", f"association '{assoc_id}' 不存在")
+
+            conn.execute("UPDATE associations SET status = ? WHERE id = ?", (status, assoc_id))
+            conn.commit()
+
+            evidence_raw = row["evidence"]
+            evidence = json.loads(evidence_raw) if evidence_raw else []
+        finally:
+            conn.close()
+
+        return ok_response({
+            "association": {
+                "id": row["id"],
+                "from": entity_id(row["from_kind"], row["from_id"]),
+                "to": entity_id(row["to_kind"], row["to_id"]),
+                "relation_type": row["relation_type"],
+                "confidence": row["confidence"],
+                "status": status,
+                "evidence": evidence,
+            },
+        })
+
+    return  # register_routes 结束

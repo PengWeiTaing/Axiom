@@ -9,6 +9,7 @@ import type { LayoutNode } from '@/cosmos/layout'
 import * as THREE from 'three'
 import Breadcrumb from '@/components/cosmos/Breadcrumb.vue'
 import LifelinePanel from '@/components/LifelinePanel.vue'
+import NodeDetailCard from '@/components/cosmos/NodeDetailCard.vue'
 
 const store = useCosmosStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -170,6 +171,7 @@ onBeforeUnmount(() => {
       <LifelinePanel />
     </div>
     <canvas ref="canvasRef" class="cosmos-canvas" />
+    <NodeDetailCard />
     <div v-if="tooltipText && store.state.kind === 'relation_reveal'" class="tooltip">{{ tooltipText }}</div>
   </div>
 </template>

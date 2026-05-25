@@ -21,7 +21,7 @@ export interface CosmosAssociation {
   to: string
   relation_type: 'co_occurrence' | 'causal' | 'tension' | 'derived_from'
   confidence: number
-  status: 'accepted' | 'pending'
+  status: 'accepted' | 'pending' | 'rejected'
   evidence?: { type: string; excerpt: string; weight: number }[]
 }
 

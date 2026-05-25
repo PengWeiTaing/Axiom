@@ -75,6 +75,29 @@ export const useCosmosStore = defineStore('cosmos', () => {
     await reload()
   }
 
+  async function reviewAssociation(assocId: string, status: 'accepted' | 'rejected') {
+    if (data.value) {
+      const idx = data.value.associations.findIndex(a => a.id === assocId)
+      if (idx !== -1) {
+        data.value = {
+          ...data.value,
+          associations: [
+            ...data.value.associations.slice(0, idx),
+            { ...data.value.associations[idx], status },
+            ...data.value.associations.slice(idx + 1),
+          ],
+        }
+      }
+    }
+
+    try {
+      const { reviewAssociation: apiReview } = await import('@/api/endpoints')
+      await apiReview(assocId, status)
+    } catch {
+      await reload()
+    }
+  }
+
   return { data, state, loading, error, load, reload, transition, on,
-    createLifeline, updateLifeline, deleteLifeline, mountEntity }
+    createLifeline, updateLifeline, deleteLifeline, mountEntity, reviewAssociation }
 })
