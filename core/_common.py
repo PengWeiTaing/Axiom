@@ -245,6 +245,7 @@ ARTIFACT_GROUPS = {
     "inbox-action-history",
     "audio-transcripts",
     "image-descriptions",
+    "cosmos",
 }
 ARTIFACT_WINDOWS = {"daily", "weekly"}
 ARTIFACT_MODES = {"dry-run", "apply"}
@@ -350,6 +351,18 @@ AUTOMATION_JOBS = {
         "openai_ready_note": "当前环境已配置 OpenAI key，可以执行真实图片自动描述。",
         "missing_key_note": "当前环境未配置 AXIOM_OPENAI_API_KEY 或 OPENAI_API_KEY，暂时不能执行真实图片自动描述。",
         "timeout_seconds": AUTOMATION_IMAGE_DESCRIBE_TIMEOUT_SECONDS,
+    },
+    "cosmos_assoc_generate": {
+        "label": "生成 Cosmos 关联",
+        "description": "扫描已挂载 lifeline 的 entity，规则初筛 + LLM 判定关联类型，写入 associations 表。",
+        "script_name": "generate_cosmos_associations.py",
+        "artifact_group": "cosmos",
+        "artifact_window": None,
+        "artifact_mode": None,
+        "build_args": lambda run_date: [],
+        "manual_enabled": True,
+        "requires_openai": False,
+        "timeout_seconds": 180,
     },
 }
 
