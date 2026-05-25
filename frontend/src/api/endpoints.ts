@@ -14,7 +14,7 @@ import type {
   MemoryList,
   DecisionList,
 } from './types';
-import type { CosmosData } from '@/cosmos/types';
+import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 
 // ---------- 采集 ----------
 export const addNote = (text: string, source = 'web_app') =>
@@ -157,6 +157,19 @@ export const deleteItem = (id: number) =>
 
 // ---------- Cosmos ----------
 export const getCosmos = () => apiRequest<CosmosData>('/cosmos');
+
+// ---------- Lifeline ----------
+export const createLifeline = (data: { id: string; name: string; parent_id?: string; order_index?: number }) =>
+  apiRequest<{ ok: boolean; lifeline: CosmosLifeline }>('/lifelines', { method: 'POST', json: data });
+
+export const updateLifeline = (id: string, data: { name?: string; parent_id?: string; order_index?: number }) =>
+  apiRequest<{ ok: boolean; lifeline: CosmosLifeline }>(`/lifelines/${encodeURIComponent(id)}`, { method: 'PUT', json: data });
+
+export const deleteLifeline = (id: string) =>
+  apiRequest<{ ok: boolean; message: string; unmounted_entities: number; reparented_children: number }>(`/lifelines/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+export const mountEntity = (kind: string, id: number, lifeline_id: string | null) =>
+  apiRequest<{ ok: boolean; entity: { id: string; kind: string; title: string; lifeline_id: string | null } }>(`/cosmos/entities/${kind}/${id}/lifeline`, { method: 'PUT', json: { lifeline_id } });
 
 // ---------- 系统 ----------
 export const health = () => apiRequest<{ service: string; db: string }>('/health', { skipAuth: true });

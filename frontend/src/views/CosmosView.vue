@@ -8,6 +8,7 @@ import type { CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
 import * as THREE from 'three'
 import Breadcrumb from '@/components/cosmos/Breadcrumb.vue'
+import LifelinePanel from '@/components/LifelinePanel.vue'
 
 const store = useCosmosStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -166,6 +167,7 @@ onBeforeUnmount(() => {
   <div class="cosmos-view">
     <div class="cosmos-hud">
       <Breadcrumb :state="store.state" @nav="(s: CosmosState) => store.transition(s)" />
+      <LifelinePanel />
     </div>
     <canvas ref="canvasRef" class="cosmos-canvas" />
     <div v-if="tooltipText && store.state.kind === 'relation_reveal'" class="tooltip">{{ tooltipText }}</div>

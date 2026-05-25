@@ -45,5 +45,36 @@ export const useCosmosStore = defineStore('cosmos', () => {
     emit(`enter_${next.kind}`, next)
   }
 
-  return { data, state, loading, error, load, transition, on }
+  async function reload() {
+    data.value = null
+    error.value = null
+    await load()
+  }
+
+  async function createLifeline(params: { id: string; name: string; parent_id?: string; order_index?: number }) {
+    const { createLifeline: apiCreate } = await import('@/api/endpoints')
+    await apiCreate(params)
+    await reload()
+  }
+
+  async function updateLifeline(id: string, params: { name?: string; parent_id?: string; order_index?: number }) {
+    const { updateLifeline: apiUpdate } = await import('@/api/endpoints')
+    await apiUpdate(id, params)
+    await reload()
+  }
+
+  async function deleteLifeline(id: string) {
+    const { deleteLifeline: apiDelete } = await import('@/api/endpoints')
+    await apiDelete(id)
+    await reload()
+  }
+
+  async function mountEntity(kind: string, entityId: number, lifelineId: string | null) {
+    const { mountEntity: apiMount } = await import('@/api/endpoints')
+    await apiMount(kind, entityId, lifelineId)
+    await reload()
+  }
+
+  return { data, state, loading, error, load, reload, transition, on,
+    createLifeline, updateLifeline, deleteLifeline, mountEntity }
 })
