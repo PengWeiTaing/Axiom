@@ -21,7 +21,20 @@ const emit = defineEmits<{
   (e: 'next-path'): void
   (e: 'clear'): void
   (e: 'focus-entity', entityId: string): void
+  (e: 'copied'): void
 }>()
+
+async function copyPath() {
+  let md = `**路径（${hops.value} 跳）**：\n`
+  currentPath.value.forEach((h, i) => {
+    md += `${i + 1}. ${h.entityTitle} (\`${h.entityId}\`)\n`
+    if (h.assocId) {
+      md += `   [${relLabel(h.assocType || '')} ${h.assocConfidence ? Math.round(h.assocConfidence * 100) + '%' : ''}] →\n`
+    }
+  })
+  await navigator.clipboard.writeText(md)
+  emit('copied')
+}
 
 const currentPath = computed(() => props.paths[props.currentPathIndex] || [])
 
@@ -59,6 +72,7 @@ function kindBadge(entityId: string): string {
     <div class="path-actions">
       <button v-if="paths.length > 1" class="path-btn" :disabled="currentPathIndex === 0" @click="emit('prev-path')">上一条</button>
       <button v-if="paths.length > 1" class="path-btn" :disabled="currentPathIndex >= paths.length - 1" @click="emit('next-path')">下一条</button>
+      <button class="path-btn" @click="copyPath">复制路径</button>
       <button class="path-btn clear" @click="emit('clear')">清除</button>
     </div>
   </div>

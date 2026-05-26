@@ -167,6 +167,7 @@ async function confirmOrArchiveMemory() {
 const emit = defineEmits<{
   (e: 'edit-assoc', assoc: CosmosAssociation): void
   (e: 'delete-assoc', assocId: string): void
+  (e: 'copied'): void
 }>()
 
 defineExpose({ startEditTitle })
@@ -222,6 +223,17 @@ function switchFocus(assoc: CosmosAssociation) {
   store.transition({ kind: 'node_focus', entity_kind: opp.kind, entity_id: opp.id } as any)
 }
 function zoomToLifeline(id: string) { store.transition({ kind: 'region_zoom', lifeline_id: id } as any) }
+
+async function copyId(id: string) {
+  await navigator.clipboard.writeText(id)
+  emit('copied')
+}
+
+async function copyMarkdown(ent: CosmosEntity) {
+  const md = `[${ent.kind}] ${ent.title} (\`${ent.id}\`)`
+  await navigator.clipboard.writeText(md)
+  emit('copied')
+}
 async function acceptAssoc(id: string) { await store.reviewAssociation(id, 'accepted') }
 async function rejectAssoc(id: string) { await store.reviewAssociation(id, 'rejected') }
 
@@ -251,6 +263,12 @@ function isDetailField(fn: string): boolean {
         @keydown="onEditKeydown"
       />
       <span v-else class="entity-name" @dblclick="startEditTitle">{{ entity.title.slice(0, 40) }}</span>
+    </div>
+
+    <!-- 实体 ID + 复制 -->
+    <div class="entity-id-row">
+      <span class="entity-id" @click="copyId(entity.id)" :title="'点击复制 ' + entity.id">{{ entity.id }}</span>
+      <button class="btn-copy-md" @click="copyMarkdown(entity)" title="复制为 Markdown">⎘</button>
     </div>
 
     <!-- lifeline 路径 -->
@@ -561,6 +579,21 @@ function isDetailField(fn: string): boolean {
   font-weight: 600; color: var(--text-1); font-size: var(--fs-3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default;
 }
+
+.entity-id-row {
+  display: flex; align-items: center; gap: var(--s-1);
+}
+
+.entity-id {
+  font-size: 10px; color: var(--text-4); cursor: pointer; font-family: var(--font-mono);
+}
+
+.entity-id:hover { color: var(--accent); }
+
+.btn-copy-md {
+  background: none; border: none; color: var(--text-4); cursor: pointer; font-size: var(--fs-1); padding: 0 2px;
+}
+.btn-copy-md:hover { color: var(--accent); }
 
 .title-input {
   flex: 1; background: var(--surface-2); border: 1px solid var(--accent); border-radius: var(--r-1);

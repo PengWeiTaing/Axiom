@@ -20,6 +20,7 @@ import LegendBar from '@/components/cosmos/LegendBar.vue'
 import Minimap from '@/components/cosmos/Minimap.vue'
 import PathPanel from '@/components/cosmos/PathPanel.vue'
 import type { PathHop } from '@/components/cosmos/PathPanel.vue'
+import ShortcutPanel from '@/components/cosmos/ShortcutPanel.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -33,6 +34,9 @@ let tooltipText = ''
 
 // Search
 const showSearch = ref(false)
+const showShortcuts = ref(false)
+const copiedToast = ref(false)
+let toastTimer: number | undefined
 
 // Context menu
 const contextMenu = ref<{ x: number; y: number; target: ContextMenuTarget } | null>(null)
@@ -196,6 +200,20 @@ function onPathFocusEntity(entityId: string) {
   const parts = entityId.split(':')
   store.transition({ kind: 'node_focus', entity_kind: parts[0] as any, entity_id: entityId } as any)
 }
+
+function showCopiedToast() {
+  copiedToast.value = true
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => { copiedToast.value = false }, 1500)
+}
+
+function onContextCopyTitle(target: ContextMenuTarget) {
+  navigator.clipboard.writeText(target.title).then(() => showCopiedToast())
+}
+
+function onPathCopied() { showCopiedToast() }
+
+function onNodeDetailCopied() { showCopiedToast() }
 
 // CSS2D label renderer
 let labelRenderer: any = null
@@ -687,6 +705,13 @@ function onKey(e: KeyboardEvent) {
     showSearch.value = true
     return
   }
+  if (e.key === '?') {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+    e.preventDefault()
+    showShortcuts.value = !showShortcuts.value
+    return
+  }
 
   const s = store.state
   if (e.key === 'Escape') {
@@ -926,7 +951,7 @@ onBeforeUnmount(() => {
     <!-- 3D 场景（加载/错误/空态时不渲染，但不销毁） -->
     <template v-if="!store.loading && !store.error && store.data && store.data.lifelines.length > 0">
       <canvas ref="canvasRef" class="cosmos-canvas" />
-      <NodeDetailCard ref="nodeDetailRef" @edit-assoc="onNodeDetailEditAssoc" @delete-assoc="onNodeDetailDeleteAssoc" />
+      <NodeDetailCard ref="nodeDetailRef" @edit-assoc="onNodeDetailEditAssoc" @delete-assoc="onNodeDetailDeleteAssoc" @copied="onNodeDetailCopied" />
       <div v-if="tooltipText && store.state.kind === 'relation_reveal'" class="tooltip">{{ tooltipText }}</div>
 
       <!-- 快捷键提示 -->
@@ -955,6 +980,7 @@ onBeforeUnmount(() => {
         @edit-lifeline-name="onContextEditLifelineName"
         @associate-to="onContextAssociateTo"
         @find-path-to="onContextFindPathTo"
+        @copy-title="onContextCopyTitle"
       />
 
       <!-- 确认弹窗 -->
@@ -1044,7 +1070,14 @@ onBeforeUnmount(() => {
       @next-path="onPathNext"
       @clear="clearPathMode"
       @focus-entity="onPathFocusEntity"
+      @copied="onPathCopied"
     />
+
+    <!-- Shortcut panel -->
+    <ShortcutPanel v-if="showShortcuts" @close="showShortcuts = false" />
+
+    <!-- Toast -->
+    <div v-if="copiedToast" class="copy-toast">已复制到剪贴板</div>
 
     <!-- LegendBar -->
     <LegendBar :show-assoc="store.state.kind === 'relation_reveal'" />
@@ -1318,6 +1351,20 @@ onBeforeUnmount(() => {
 .primary-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.copy-toast {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-2);
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-2);
+  z-index: 150;
+  transition: opacity 0.3s var(--ease);
 }
 
 .select-hint {

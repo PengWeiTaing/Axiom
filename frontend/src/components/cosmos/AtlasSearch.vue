@@ -10,6 +10,39 @@ interface SearchResult {
   layer: number
 }
 
+const LS_KEY = 'atlas_recent_searches'
+const MAX_RECENT = 5
+
+function loadRecent(): string[] {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
+}
+function saveRecent(terms: string[]) {
+  localStorage.setItem(LS_KEY, JSON.stringify(terms))
+}
+
+const recentSearches = ref<string[]>(loadRecent())
+
+function addRecent(term: string) {
+  const t = term.trim()
+  if (!t) return
+  const list = loadRecent().filter(x => x !== t)
+  list.unshift(t)
+  const trimmed = list.slice(0, MAX_RECENT)
+  saveRecent(trimmed)
+  recentSearches.value = trimmed
+}
+
+function clearRecent() {
+  localStorage.removeItem(LS_KEY)
+  recentSearches.value = []
+}
+
+function useRecent(term: string) {
+  query.value = term
+  addRecent(term)
+  inputEl.value?.focus()
+}
+
 const store = useCosmosStore()
 
 const query = ref('')
@@ -64,6 +97,7 @@ function kindBadge(kind: string): string {
 }
 
 function selectResult(result: SearchResult) {
+  addRecent(query.value)
   emit('select', result)
   emit('close')
 }
@@ -121,6 +155,12 @@ onMounted(() => {
           <div class="result-path">{{ r.path }}</div>
         </div>
       </div>
+    </div>
+
+    <div v-else-if="recentSearches.length > 0" class="recent">
+      <div class="recent-title">最近搜索</div>
+      <div v-for="(s, i) in recentSearches" :key="i" class="recent-row" @click="useRecent(s)">{{ s }}</div>
+      <button class="recent-clear" @click="clearRecent">清除历史</button>
     </div>
   </div>
 </template>
@@ -207,5 +247,34 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.recent {
+  padding: var(--s-2);
+}
+
+.recent-title {
+  font-size: var(--fs-1);
+  color: var(--text-4);
+  margin-bottom: var(--s-1);
+}
+
+.recent-row {
+  font-size: var(--fs-2);
+  color: var(--text-3);
+  padding: 4px var(--s-1);
+  cursor: pointer;
+  border-radius: var(--r-1);
+}
+
+.recent-row:hover { background: var(--surface-2); color: var(--text-1); }
+
+.recent-clear {
+  background: none; border: none;
+  color: var(--text-5);
+  font-size: var(--fs-1);
+  cursor: pointer;
+  padding: var(--s-1);
+  margin-top: var(--s-1);
 }
 </style>

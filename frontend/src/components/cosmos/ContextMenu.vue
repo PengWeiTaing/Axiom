@@ -25,6 +25,7 @@ const emit = defineEmits<{
   (e: 'edit-lifeline-name', target: ContextMenuTarget): void
   (e: 'associate-to', target: ContextMenuTarget): void
   (e: 'find-path-to', target: ContextMenuTarget): void
+  (e: 'copy-title', target: ContextMenuTarget): void
 }>()
 
 const store = useCosmosStore()
@@ -94,6 +95,11 @@ function onFindPathTo() {
   emit('close')
 }
 
+function onCopyTitle() {
+  emit('copy-title', props.target)
+  emit('close')
+}
+
 function onEditLifelineName() {
   emit('edit-lifeline-name', props.target)
   emit('close')
@@ -156,6 +162,7 @@ onBeforeUnmount(() => {
 
       <button class="ctx-item" @click="onAssociateTo">关联到…</button>
       <button class="ctx-item" @click="onFindPathTo">查找路径到…</button>
+      <button class="ctx-item" @click="onCopyTitle">复制标题</button>
       <div class="ctx-separator" />
       <button class="ctx-item danger" @click="onDelete">删除</button>
     </template>
