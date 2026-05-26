@@ -2,7 +2,8 @@
 /** CosmosView — Atlas 球形树宿主组件 */
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
-import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar, addHalo, removeHalo, highlightPath, clearPathHighlight } from '@/cosmos/scene'
+import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar, addHalo, removeHalo, highlightPaths, clearPathHighlight, clearPathDecorations, addPathStepLabels, PATH_PALETTE } from '@/cosmos/scene'
+import type { PathHighlight3D } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
 import type { CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
@@ -182,18 +183,35 @@ function onPathTargetClick(entityId: string) {
 }
 
 function applyCurrentPathHighlight(path: PathHop[]) {
-  if (!sceneObjs) return
+  if (!sceneObjs || !store.data) return
   clearPathHighlight(sceneObjs.nodes, assocLines)
-  const entityIds = new Set(path.map(h => h.entityId))
+  clearPathDecorations(sceneObjs.scene)
+
+  const entityIds = path.map(h => h.entityId)
   const assocIds = new Set(path.filter(h => h.assocId).map(h => h.assocId!))
-  highlightPath(sceneObjs.nodes, assocLines, entityIds, assocIds)
+
+  const ph: PathHighlight3D = {
+    startId: entityIds[0],
+    endId: entityIds[entityIds.length - 1],
+    pathEntityIds: new Set(entityIds),
+    pathAssocIds: assocIds,
+    color: PATH_PALETTE[currentPathIdx.value % PATH_PALETTE.length],
+    isCurrent: true,
+  }
+
+  const highlightLines = assocLines.filter(al => assocIds.has(al.data.id))
+  highlightPaths(sceneObjs.nodes, highlightLines.length > 0 ? highlightLines : assocLines, [ph], sceneObjs.scene)
+  addPathStepLabels(entityIds, sceneObjs.nodes, sceneObjs.scene)
 }
 
 function clearPathMode() {
   pathFindingFrom.value = null
   pathResult.value = null
   currentPathIdx.value = 0
-  if (sceneObjs) clearPathHighlight(sceneObjs.nodes, assocLines)
+  if (sceneObjs) {
+    clearPathHighlight(sceneObjs.nodes, assocLines)
+    clearPathDecorations(sceneObjs.scene)
+  }
 }
 
 function onPathPrev() {

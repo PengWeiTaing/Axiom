@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
+import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { CosmosData, CosmosAssociation } from './types'
 import { computeLayout, type LayoutNode, RADII } from './layout'
 
@@ -378,35 +379,105 @@ export function removeHalo(scene: THREE.Scene) {
   }
 }
 
-/** 路径查找高亮 */
-export function highlightPath(
-  nodes: THREE.Mesh[],
-  assocLines: Array<{ line: any; data: any }>,
-  pathEntityIds: Set<string>,
+/** 路径查找 3D 高亮 — 增强版（起终点分色 + 多路径分色） */
+export const PATH_PALETTE = [0xa0fff0, 0xffeaa0, 0xffa0ff, 0xa0a0a0]
+
+export interface PathHighlight3D {
+  startId: string
+  endId: string
+  pathEntityIds: Set<string>
   pathAssocIds: Set<string>
+  color: number
+  isCurrent: boolean
+}
+
+let pathStepLabels: THREE.Object3D[] = []
+let pathCones: THREE.Mesh[] = []
+
+export function highlightPaths(
+  nodes: THREE.Mesh[],
+  assocLines: Array<{ line: any; data: any; fromNode: any; toNode: any }>,
+  paths: PathHighlight3D[],
+  scene: THREE.Scene
 ) {
+  clearPathDecorations(scene)
+
+  const allEntityIds = new Set(paths.flatMap(p => [...p.pathEntityIds]))
+  const allAssocIds = new Set(paths.flatMap(p => [...p.pathAssocIds]))
+
+  // Dim non-path
   for (const m of nodes) {
-    const id = m.userData.id as string
-    if (m.userData.layer === 3 && pathEntityIds.has(id)) {
-      m.scale.setScalar(1.3)
+    if (m.userData.layer === 3 && !allEntityIds.has(m.userData.id as string)) {
       const mat = m.material as THREE.MeshBasicMaterial
-      ;(mat as any)._pathOrigColor = (mat as any)._pathOrigColor ?? mat.color.getHex()
-      mat.color.set('#a0fff0')
-      mat.needsUpdate = true
+      mat.opacity = 0.3; mat.transparent = true; mat.needsUpdate = true
     }
   }
   for (const al of assocLines) {
-    const mat = al.line.material
-    if (pathAssocIds.has(al.data.id)) {
-      ;(mat as any)._pathOrigLinewidth = (mat as any)._pathOrigLinewidth ?? mat.linewidth
+    if (!allAssocIds.has(al.data.id)) al.line.material.opacity = 0.1
+  }
+
+  // Highlight each path
+  for (const ph of paths) {
+    const scale = ph.isCurrent ? 1.3 : 1.1
+    const lwMult = ph.isCurrent ? 2 : 1
+
+    for (const m of nodes) {
+      const id = m.userData.id as string
+      if (!ph.pathEntityIds.has(id)) continue
+      const mat = m.material as THREE.MeshBasicMaterial
       ;(mat as any)._pathOrigColor = (mat as any)._pathOrigColor ?? mat.color.getHex()
-      mat.linewidth = ((mat as any)._pathOrigLinewidth || 1.5) * 2
-      mat.color.set('#a0fff0')
+
+      if (id === ph.startId) { m.scale.setScalar(1.5); mat.color.set('#80ff80') }
+      else if (id === ph.endId) { m.scale.setScalar(1.5); mat.color.set('#ffaa44') }
+      else { m.scale.setScalar(scale); mat.color.set(ph.color) }
+      mat.needsUpdate = true
+    }
+
+    for (const al of assocLines) {
+      if (!ph.pathAssocIds.has(al.data.id)) continue
+      const mat = al.line.material
+      ;(mat as any)._pathOrigLinewidth = (mat as any)._pathOrigLinewidth ?? mat.linewidth
+      mat.linewidth = ((mat as any)._pathOrigLinewidth || 1.5) * lwMult
       mat.opacity = 1
-    } else {
-      mat.opacity = 0.15
+
+      if (ph.isCurrent) addDirectionCones(al.fromNode, al.toNode, ph.color, scene)
     }
   }
+}
+
+function addDirectionCones(fromNode: any, toNode: any, color: number, scene: THREE.Scene) {
+  const mid = new THREE.Vector3().addVectors(fromNode.position, toNode.position).multiplyScalar(0.5)
+  const dir = new THREE.Vector3().subVectors(toNode.position, fromNode.position).normalize()
+  const coneGeom = new THREE.ConeGeometry(0.015, 0.04, 6)
+  const coneMat = new THREE.MeshBasicMaterial({ color })
+  const cone = new THREE.Mesh(coneGeom, coneMat)
+  cone.position.copy(mid)
+  cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+  cone.userData.isPathCone = true
+  scene.add(cone)
+  pathCones.push(cone)
+}
+
+export function addPathStepLabels(path: string[], nodes: any[], scene: THREE.Scene) {
+  for (let i = 1; i < path.length - 1; i++) {
+    const node = nodes.find(n => n.userData.id === path[i])
+    if (!node) continue
+    const div = document.createElement('div')
+    div.style.cssText = 'width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;'
+    div.textContent = String(i)
+    const label = new CSS2DObject(div)
+    label.position.copy(node.position.clone().add(new THREE.Vector3(0, 0.05, 0)))
+    label.userData.isPathLabel = true
+    scene.add(label)
+    pathStepLabels.push(label)
+  }
+}
+
+export function clearPathDecorations(scene: THREE.Scene) {
+  for (const l of pathStepLabels) { scene.remove(l) }
+  for (const c of pathCones) { scene.remove(c); c.geometry?.dispose(); (c.material as THREE.Material).dispose() }
+  pathStepLabels = []
+  pathCones = []
 }
 
 export function clearPathHighlight(
@@ -427,10 +498,6 @@ export function clearPathHighlight(
     if ((mat as any)._pathOrigLinewidth !== undefined) {
       mat.linewidth = (mat as any)._pathOrigLinewidth
       delete (mat as any)._pathOrigLinewidth
-    }
-    if ((mat as any)._pathOrigColor !== undefined) {
-      mat.color.setHex((mat as any)._pathOrigColor)
-      delete (mat as any)._pathOrigColor
     }
     mat.opacity = mat.opacity < 0.2 ? 0.8 : mat.opacity
   }
