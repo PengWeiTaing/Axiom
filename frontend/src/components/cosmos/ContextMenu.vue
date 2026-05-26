@@ -27,6 +27,7 @@ const emit = defineEmits<{
   (e: 'find-path-to', target: ContextMenuTarget): void
   (e: 'copy-title', target: ContextMenuTarget): void
   (e: 'delete-lifeline', lifelineId: string, name: string): void
+  (e: 'quick-create', lifelineId?: string): void
 }>()
 
 const store = useCosmosStore()
@@ -63,9 +64,6 @@ const currentLifelineId = computed(() => {
   return e?.lifeline_id ?? null
 })
 
-const entityKinds = ['task', 'memory', 'decision', 'item'] as const
-const kindLabels: Record<string, string> = { task: '任务', memory: '记忆', decision: '决策', item: '条目' }
-
 function onEditTitle() {
   emit('edit-title', props.target)
   emit('close')
@@ -78,11 +76,6 @@ function onDelete() {
 
 function onMoveToLifeline(lifelineId: string) {
   emit('move-lifeline', props.target.id, lifelineId)
-  emit('close')
-}
-
-function onCreateEntity(kind: string) {
-  emit('create-entity', kind, props.target.id)
   emit('close')
 }
 
@@ -170,21 +163,8 @@ onBeforeUnmount(() => {
 
     <!-- R1/R2 lifeline node menu -->
     <template v-else>
-      <div
-        class="ctx-item has-sub"
-        @pointerenter="submenuKind = 'entity'"
-        @pointerleave="submenuKind = null"
-      >
-        新建 entity ▸
-        <div v-if="submenuKind === 'entity'" class="submenu">
-          <button
-            v-for="k in entityKinds"
-            :key="k"
-            class="subitem"
-            @click="onCreateEntity(k)"
-          >{{ kindLabels[k] }}</button>
-        </div>
-      </div>
+      <button class="ctx-item" @click="emit('quick-create', props.target.id); emit('close')">新建 entity…</button>
+      <div class="ctx-separator" />
       <button class="ctx-item" @click="onEditLifelineName">编辑名称…</button>
       <div class="ctx-separator" />
       <button class="ctx-item danger" @click="emit('delete-lifeline', props.target.id, props.target.title); emit('close')">删除 lifeline</button>

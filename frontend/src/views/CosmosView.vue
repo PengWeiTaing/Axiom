@@ -21,6 +21,7 @@ import Minimap from '@/components/cosmos/Minimap.vue'
 import PathPanel from '@/components/cosmos/PathPanel.vue'
 import type { PathHop } from '@/components/cosmos/PathPanel.vue'
 import ShortcutPanel from '@/components/cosmos/ShortcutPanel.vue'
+import QuickCreateDialog from '@/components/cosmos/QuickCreateDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -37,6 +38,15 @@ const showSearch = ref(false)
 const showShortcuts = ref(false)
 const copiedToast = ref(false)
 let toastTimer: number | undefined
+
+// Quick create
+const quickCreateVisible = ref(false)
+const quickCreateDefaultLifeline = ref<string | undefined>()
+
+function openQuickCreate(lifelineId?: string) {
+  quickCreateDefaultLifeline.value = lifelineId
+  quickCreateVisible.value = true
+}
 
 // Context menu
 const contextMenu = ref<{ x: number; y: number; target: ContextMenuTarget } | null>(null)
@@ -416,15 +426,22 @@ async function start() {
   canvasRef.value.addEventListener('contextmenu', (e: MouseEvent) => {
     e.preventDefault()
     if (!sceneObjs || !store.data) return
-    // 不在 global_overview 下弹出菜单
-    if (store.state.kind === 'global_overview') return
 
     mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
     mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
     raycaster.setFromCamera(mouse, sceneObjs.camera)
 
     const hits = raycaster.intersectObjects(sceneObjs.pickables)
-    if (hits.length === 0) { contextMenu.value = null; return }
+    if (hits.length === 0) {
+      const s2k = (store.state as any).kind as string
+      if (s2k === 'global_overview' || s2k === 'region_zoom') {
+        openQuickCreate()
+      }
+      contextMenu.value = null
+      return
+    }
+    // 不在 global_overview 下为节点弹出菜单
+    if (store.state.kind === 'global_overview') { contextMenu.value = null; return }
 
     const obj = hits[0].object
     const id = obj.userData.id as string
@@ -730,6 +747,18 @@ function onKey(e: KeyboardEvent) {
     showSearch.value = !showSearch.value
     return
   }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+    e.preventDefault()
+    let defaultLid: string | undefined
+    const sk = (store.state as any).kind as string
+    if (sk === 'region_zoom') defaultLid = (store.state as any).lifeline_id
+    else if (sk === 'node_focus' || sk === 'relation_reveal') {
+      const eid = (store.state as any).entity_id as string
+      defaultLid = store.data?.entities.find(e => e.id === eid)?.lifeline_id
+    }
+    openQuickCreate(defaultLid)
+    return
+  }
   if (e.key === '/' && !showSearch.value) {
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
@@ -1014,6 +1043,7 @@ onBeforeUnmount(() => {
         @find-path-to="onContextFindPathTo"
         @copy-title="onContextCopyTitle"
         @delete-lifeline="onContextDeleteLifeline"
+        @quick-create="openQuickCreate"
       />
 
       <!-- 确认弹窗 -->
@@ -1108,6 +1138,7 @@ onBeforeUnmount(() => {
 
     <!-- Shortcut panel -->
     <ShortcutPanel v-if="showShortcuts" @close="showShortcuts = false" />
+    <QuickCreateDialog v-if="quickCreateVisible" :default-lifeline-id="quickCreateDefaultLifeline" @close="quickCreateVisible = false" />
 
     <!-- Toast -->
     <div v-if="copiedToast" class="copy-toast">已复制到剪贴板</div>
