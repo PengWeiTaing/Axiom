@@ -18,6 +18,7 @@ import type { ContextMenuTarget } from '@/components/cosmos/ContextMenu.vue'
 import ConfirmDialog from '@/components/cosmos/ConfirmDialog.vue'
 import AssociationEditDialog from '@/components/cosmos/AssociationEditDialog.vue'
 import LegendBar from '@/components/cosmos/LegendBar.vue'
+import type { AssocFilter29 } from '@/components/cosmos/LegendBar.vue'
 import Minimap from '@/components/cosmos/Minimap.vue'
 import PathPanel from '@/components/cosmos/PathPanel.vue'
 import type { PathHop } from '@/components/cosmos/PathPanel.vue'
@@ -83,6 +84,11 @@ let hoveredAssocLine: any = null
 const HOVER_SCALE = 1.5
 
 // 关联筛选
+const legendFilter = ref<AssocFilter29>({
+  types: { causal: true, co_occurrence: true, tension: true, derived_from: true, manual: true },
+  statuses: { accepted: true, pending: true, rejected: true },
+})
+
 const assocFilter = reactive({
   types: ['co_occurrence', 'causal', 'tension', 'derived_from', 'manual'] as string[],
   minConfidence: 0.0,
@@ -94,7 +100,10 @@ function applyAssocFilter() {
     const typeMatch = assocFilter.types.includes(al.data.relation_type)
     const confMatch = al.data.confidence >= assocFilter.minConfidence
     const statusMatch = assocFilter.status === 'all' || al.data.status === assocFilter.status
-    const vis = typeMatch && confMatch && statusMatch
+    const lf = legendFilter.value
+    const legendTypeMatch = lf.types[al.data.relation_type as keyof typeof lf.types] ?? true
+    const legendStatusMatch = lf.statuses[al.data.status as keyof typeof lf.statuses] ?? true
+    const vis = typeMatch && confMatch && statusMatch && legendTypeMatch && legendStatusMatch
     al.line.visible = vis
     if (al.arrow) al.arrow.visible = vis
   }
@@ -1140,7 +1149,7 @@ onBeforeUnmount(() => {
     <div v-if="copiedToast" class="copy-toast">已复制到剪贴板</div>
 
     <!-- LegendBar -->
-    <LegendBar :show-assoc="store.state.kind === 'relation_reveal'" />
+    <LegendBar :show-assoc="store.state.kind === 'relation_reveal'" :filter="legendFilter" @update:filter="(f: AssocFilter29) => { legendFilter = f; applyAssocFilter() }" />
 
     <!-- Minimap -->
     <div v-if="sceneObjs && store.state.kind !== 'node_focus' && store.state.kind !== 'relation_reveal'" class="minimap-wrapper">
