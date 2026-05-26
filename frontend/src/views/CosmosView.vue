@@ -17,6 +17,7 @@ import type { ContextMenuTarget } from '@/components/cosmos/ContextMenu.vue'
 import ConfirmDialog from '@/components/cosmos/ConfirmDialog.vue'
 import AssociationEditDialog from '@/components/cosmos/AssociationEditDialog.vue'
 import LegendBar from '@/components/cosmos/LegendBar.vue'
+import Minimap from '@/components/cosmos/Minimap.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -739,6 +740,12 @@ async function onStateChange() {
 }
 
 watch(() => store.state, onStateChange, { deep: true })
+watch(() => store.state.kind, () => {
+  hintVisible.value = true
+  hintDismissed.value = false
+  if (hintTimer) clearTimeout(hintTimer)
+  hintTimer = window.setTimeout(() => { hintVisible.value = false; hintDismissed.value = true }, 3000)
+})
 
 onMounted(async () => {
   await store.load()
@@ -761,6 +768,12 @@ onBeforeUnmount(() => {
   <div class="cosmos-view">
     <div class="cosmos-hud">
       <Breadcrumb :state="store.state" @nav="(s: CosmosState) => store.transition(s)" />
+      <button
+        v-if="store.state.kind !== 'global_overview'"
+        class="home-btn"
+        @click="store.transition({ kind: 'global_overview' })"
+        title="回到全局"
+      >⌂</button>
       <AtlasSearch v-if="showSearch" @select="onSearchSelect" @close="showSearch = false" />
       <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" />
       <button v-if="!showSearch" class="search-trigger" @click="showSearch = true">搜索 ⌘K</button>
@@ -793,11 +806,14 @@ onBeforeUnmount(() => {
 
       <!-- 快捷键提示 -->
       <div
-        v-if="store.state.kind === 'global_overview' && hintVisible"
+        v-if="hintVisible"
         class="shortcuts-hint"
         :class="{ fade: hintDismissed }"
       >
-        R 显示关联 &nbsp; Esc 返回 &nbsp; 滚轮缩放 &nbsp; 拖拽旋转 &nbsp; Ctrl+K 搜索
+        <template v-if="store.state.kind === 'global_overview'">点击 R1 进入 lifeline &nbsp; 滚轮缩放 &nbsp; 拖拽旋转 &nbsp; Ctrl+K 搜索</template>
+        <template v-else-if="store.state.kind === 'region_zoom'">点击 R2/R3 聚焦 entity &nbsp; 滚轮缩放 &nbsp; Esc 返回全局 &nbsp; Ctrl+K 搜索</template>
+        <template v-else-if="store.state.kind === 'node_focus'">R 查看关联 &nbsp; Esc 返回 lifeline &nbsp; 拖拽旋转</template>
+        <template v-else-if="store.state.kind === 'relation_reveal'">Esc 返回焦点 &nbsp; 点击关联线查看证据 &nbsp; 底部筛选</template>
       </div>
 
       <!-- 右键上下文菜单 -->
@@ -891,6 +907,18 @@ onBeforeUnmount(() => {
     <!-- LegendBar -->
     <LegendBar :show-assoc="store.state.kind === 'relation_reveal'" />
 
+    <!-- Minimap -->
+    <div v-if="sceneObjs && store.state.kind !== 'node_focus' && store.state.kind !== 'relation_reveal'" class="minimap-wrapper">
+      <Minimap
+        :layout-nodes="sceneObjs.layoutNodes"
+        :camera="sceneObjs.camera"
+        :controls="controls"
+        :world-radius="RADII.R3"
+        :focused-lifeline-id="store.state.kind === 'region_zoom' ? (store.state as any).lifeline_id : null"
+        @jump="(pos, tgt) => tweenCamera(sceneObjs!.camera, controls, pos, tgt, 60, 800)"
+      />
+    </div>
+
     <!-- 关联筛选条 -->
     <div v-if="store.state.kind === 'relation_reveal'" class="assoc-filter-bar">
       <div class="filter-chips">
@@ -961,6 +989,26 @@ onBeforeUnmount(() => {
   background: var(--surface-2);
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-2);
+  z-index: 20;
+}
+
+.home-btn {
+  background: var(--surface-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-1);
+  color: var(--text-3);
+  font-size: var(--fs-3);
+  cursor: pointer;
+  padding: 0 6px;
+  line-height: 1.5;
+}
+
+.home-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.minimap-wrapper {
+  position: absolute;
+  bottom: var(--s-8);
+  right: var(--s-4);
   z-index: 20;
 }
 
