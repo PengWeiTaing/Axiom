@@ -24,6 +24,7 @@ import type { PathHop } from '@/components/cosmos/PathPanel.vue'
 import ShortcutPanel from '@/components/cosmos/ShortcutPanel.vue'
 import QuickCreateDialog from '@/components/cosmos/QuickCreateDialog.vue'
 import PendingReviewPanel from '@/components/cosmos/PendingReviewPanel.vue'
+import ExportDialog from '@/components/cosmos/ExportDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -45,6 +46,7 @@ let toastTimer: number | undefined
 const quickCreateVisible = ref(false)
 const quickCreateDefaultLifeline = ref<string | undefined>()
 const showPendingReview = ref(false)
+const showExport = ref(false)
 
 const pendingAssocCount = computed(() => {
   if (!store.data) return 0
@@ -777,6 +779,7 @@ function onKey(e: KeyboardEvent) {
   }
   if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); store.navigateBack(); return }
   if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); store.navigateForward(); return }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); showExport.value = true; return }
 
   const s = store.state
   if (e.key === 'Escape') {
@@ -994,6 +997,7 @@ onBeforeUnmount(() => {
       <button v-if="pendingAssocCount > 0" class="pending-trigger" @click="showPendingReview = !showPendingReview">
         待确认 {{ pendingAssocCount }}
       </button>
+      <button v-if="store.data" class="export-trigger" @click="showExport = true" title="导出数据 (Ctrl+E)">导出</button>
       <AtlasSearch v-if="showSearch" @select="onSearchSelect" @close="showSearch = false" />
       <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" @focus-entity="onPanelFocusEntity" />
       <button v-if="!showSearch" class="search-trigger" @click="showSearch = true">搜索 ⌘K</button>
@@ -1130,6 +1134,7 @@ onBeforeUnmount(() => {
     <ShortcutPanel v-if="showShortcuts" @close="showShortcuts = false" />
     <QuickCreateDialog v-if="quickCreateVisible" :default-lifeline-id="quickCreateDefaultLifeline" @close="quickCreateVisible = false" />
     <PendingReviewPanel v-if="showPendingReview" @close="showPendingReview = false" @focus-entity="(eid: string) => { showPendingReview = false; onPanelFocusEntity(eid) }" />
+    <ExportDialog v-if="showExport" @close="showExport = false" />
 
     <!-- Toast -->
     <div v-if="copiedToast" class="copy-toast">已复制到剪贴板</div>
@@ -1252,6 +1257,14 @@ onBeforeUnmount(() => {
 }
 
 .pending-trigger:hover { background: rgba(250, 180, 100, 0.08); }
+
+.export-trigger {
+  background: var(--surface-1); border: 1px solid var(--line-2);
+  border-radius: var(--r-1); color: var(--text-3); font-size: var(--fs-2);
+  cursor: pointer; padding: 0 6px; line-height: 1.5;
+}
+
+.export-trigger:hover { border-color: var(--accent); color: var(--accent); }
 
 .minimap-wrapper {
   position: absolute;
