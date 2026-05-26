@@ -5,6 +5,7 @@ import type { CosmosLifeline, CosmosEntity } from '@/cosmos/types'
 
 const emit = defineEmits<{
   (e: 'focus-lifeline', lifelineId: string): void
+  (e: 'focus-entity', entityId: string): void
 }>()
 
 const store = useCosmosStore()
@@ -17,6 +18,30 @@ const activeLifelineId = computed<string | null>(() => {
   }
   return null
 })
+
+const activeEntityId = computed<string | null>(() => {
+  const s = store.state
+  if (s.kind === 'node_focus' || s.kind === 'relation_reveal') return (s as any).entity_id ?? null
+  return null
+})
+
+const stats = computed(() => {
+  if (!store.data) return { lifelines: 0, entities: 0, byKind: { task: 0, memory: 0, decision: 0, item: 0 } }
+  const byKind = { task: 0, memory: 0, decision: 0, item: 0 }
+  for (const e of store.data.entities) {
+    if (byKind[e.kind] !== undefined) byKind[e.kind]++
+  }
+  return { lifelines: store.data.lifelines.length, entities: store.data.entities.length, byKind }
+})
+
+function entityCountsByKind(lifelineId: string) {
+  const byKind = { task: 0, memory: 0, decision: 0, item: 0 }
+  if (!store.data) return byKind
+  for (const e of store.data.entities) {
+    if (e.lifeline_id === lifelineId && byKind[e.kind] !== undefined) byKind[e.kind]++
+  }
+  return byKind
+}
 
 const expandedIds = ref<Set<string>>(new Set())
 const creating = ref(false)
@@ -204,6 +229,16 @@ function parentOptions(): Array<{ id: string; name: string }> {
       <button class="btn-text" @click="creating = !creating">+ 新建</button>
     </div>
 
+    <div class="stats-row">
+      <span class="stats-count">{{ stats.lifelines }} lifeline · {{ stats.entities }} entity</span>
+      <span class="stats-kinds">
+        <span class="kind-t">T:{{ stats.byKind.task }}</span>
+        <span class="kind-m">M:{{ stats.byKind.memory }}</span>
+        <span class="kind-d">D:{{ stats.byKind.decision }}</span>
+        <span class="kind-i">I:{{ stats.byKind.item }}</span>
+      </span>
+    </div>
+
     <!-- 新建表单 -->
     <div v-if="creating" class="inline-form">
       <input
@@ -244,7 +279,13 @@ function parentOptions(): Array<{ id: string; name: string }> {
           <!-- 名称 + badge -->
           <span class="name" @click="clickLifeline(node.lifeline.id)">
             {{ node.lifeline.name }}
-            <span class="badge">{{ entityCount(node.lifeline.id) }}</span>
+            <template v-if="isExpanded(node.lifeline.id)">
+              <span class="kind-t">T:{{ entityCountsByKind(node.lifeline.id).task }}</span>
+              <span class="kind-m">M:{{ entityCountsByKind(node.lifeline.id).memory }}</span>
+              <span class="kind-d">D:{{ entityCountsByKind(node.lifeline.id).decision }}</span>
+              <span class="kind-i">I:{{ entityCountsByKind(node.lifeline.id).item }}</span>
+            </template>
+            <span class="badge">({{ entityCount(node.lifeline.id) }})</span>
           </span>
 
           <!-- 操作按钮 -->
@@ -290,11 +331,13 @@ function parentOptions(): Array<{ id: string; name: string }> {
             v-for="ent in entitiesFor(node.lifeline.id)"
             :key="ent.id"
             class="entity-row"
+            :class="{ active: activeEntityId === ent.id }"
             :style="{ paddingLeft: (node.depth * 16 + 28) + 'px' }"
+            @click="emit('focus-entity', ent.id)"
           >
             <span class="entity-kind">{{ ent.kind[0].toUpperCase() }}</span>
             <span class="entity-title">{{ ent.title.slice(0, 30) }}</span>
-            <button class="btn-icon" @click="unmountEntity(ent)" title="卸载">×</button>
+            <button class="btn-icon" @click.stop="unmountEntity(ent)" title="卸载">×</button>
           </div>
           <div
             class="entity-row add-entity"
@@ -308,7 +351,13 @@ function parentOptions(): Array<{ id: string; name: string }> {
 
     <!-- 空状态 -->
     <div v-if="tree.length === 0 && !creating" class="empty">
-      暂无 lifeline，点击「+ 新建」创建
+      <div class="empty-icon">◇</div>
+      <div class="empty-title">暂无 Lifeline</div>
+      <div class="empty-desc">
+        Lifeline 是实体分类的主线，例如"健康""学习""工作"。<br />
+        创建后实体将分布在 3D 球面上。
+      </div>
+      <button class="btn-text" @click="creating = true">+ 创建第一个 Lifeline</button>
     </div>
 
     <!-- 搜索弹窗 -->
@@ -504,8 +553,61 @@ function parentOptions(): Array<{ id: string; name: string }> {
 }
 
 .empty {
-  color: var(--text-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--s-3) 0;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 24px;
+  color: var(--text-4);
+  margin-bottom: var(--s-2);
+}
+
+.empty-title {
+  font-size: var(--fs-3);
+  color: var(--text-2);
+  margin-bottom: var(--s-1);
+}
+
+.empty-desc {
   font-size: var(--fs-2);
+  color: var(--text-3);
+  margin-bottom: var(--s-2);
+}
+
+/* 统计行 */
+.stats-row {
+  font-size: var(--fs-1);
+  color: var(--text-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats-kinds {
+  display: flex;
+  gap: var(--s-1);
+}
+
+.kind-t { color: var(--accent); font-size: var(--fs-1); }
+.kind-m { color: var(--text-2); font-size: var(--fs-1); }
+.kind-d { color: var(--warm); font-size: var(--fs-1); }
+.kind-i { color: var(--text-3); font-size: var(--fs-1); }
+
+.entity-row {
+  cursor: pointer;
+}
+
+.entity-row:hover {
+  background: var(--surface-2);
+}
+
+.entity-row.active {
+  background: var(--surface-2);
+  color: var(--text-1);
 }
 
 .search-overlay {

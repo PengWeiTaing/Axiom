@@ -245,6 +245,25 @@ async function start() {
   labelGroup = createLabelGroup()
   labelGroup.create(sceneObjs.scene, sceneObjs.layoutNodes)
 
+  // R1/R2 count badges
+  const countMap = new Map<string, number>()
+  for (const e of store.data.entities) {
+    countMap.set(e.lifeline_id, (countMap.get(e.lifeline_id) || 0) + 1)
+  }
+  const countLabels: any[] = []
+  for (const n of sceneObjs.layoutNodes) {
+    if (n.layer !== 1 && n.layer !== 2) continue
+    const div = document.createElement('div')
+    const cnt = countMap.get(n.id) || 0
+    div.textContent = String(cnt)
+    div.style.cssText = 'font-size:9px;color:var(--text-4);font-family:var(--font-mono);text-align:center;'
+    const { CSS2DObject } = await import('three/examples/jsm/renderers/CSS2DRenderer.js')
+    const label = new CSS2DObject(div)
+    label.position.copy(n.position.clone().add(new THREE.Vector3(0, -0.07, 0)))
+    sceneObjs.scene.add(label)
+    countLabels.push(label)
+  }
+
   lineSetResolution = sceneObjs.setResolution
 
   window.addEventListener('resize', onResize)
@@ -435,6 +454,13 @@ async function start() {
 
 function onPanelFocusLifeline(lifelineId: string) {
   store.transition({ kind: 'region_zoom', lifeline_id: lifelineId } as any)
+}
+
+function onPanelFocusEntity(entityId: string) {
+  if (!store.data) return
+  const ent = store.data.entities.find(e => e.id === entityId)
+  if (!ent) return
+  store.transition({ kind: 'node_focus', entity_kind: ent.kind, entity_id: entityId } as any)
 }
 
 function onResize() {
@@ -925,7 +951,7 @@ onBeforeUnmount(() => {
         title="回到全局"
       >⌂</button>
       <AtlasSearch v-if="showSearch" @select="onSearchSelect" @close="showSearch = false" />
-      <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" />
+      <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" @focus-entity="onPanelFocusEntity" />
       <button v-if="!showSearch" class="search-trigger" @click="showSearch = true">搜索 ⌘K</button>
     </div>
 
