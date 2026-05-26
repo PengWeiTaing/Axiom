@@ -1,7 +1,22 @@
 /** Cosmos Pinia store — 数据 + 状态 + 极小事件总线 */
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { CosmosState, CosmosData } from '@/cosmos/types'
+
+interface FocusEntry {
+  state: CosmosState
+  title: string
+}
+
+function sameState(a: CosmosState, b: CosmosState): boolean {
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'global_overview') return true
+  const alid = (a as any).lifeline_id; const blid = (b as any).lifeline_id
+  if (alid && blid) return alid === blid
+  const aeid = (a as any).entity_id; const beid = (b as any).entity_id
+  if (aeid && beid) return aeid === beid
+  return false
+}
 
 export const useCosmosStore = defineStore('cosmos', () => {
   const data = ref<CosmosData | null>(null)
@@ -9,6 +24,46 @@ export const useCosmosStore = defineStore('cosmos', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const selectedAssocId = ref<string | null>(null)
+
+  // Focus history
+  const historyStack = ref<FocusEntry[]>([{ state: { kind: 'global_overview' }, title: '全局' }])
+  const historyCursor = ref(0)
+
+  const canGoBack = computed(() => historyCursor.value > 0)
+  const canGoForward = computed(() => historyCursor.value < historyStack.value.length - 1)
+
+  function stateTitle(s: CosmosState): string {
+    switch (s.kind) {
+      case 'global_overview': return '全局'
+      case 'region_zoom': {
+        const name = data.value?.lifelines.find(l => l.id === (s as any).lifeline_id)?.name
+        return name || (s as any).lifeline_id || '?'
+      }
+      case 'node_focus':
+      case 'relation_reveal': {
+        const eid = (s as any).entity_id as string
+        const ent = data.value?.entities.find(e => e.id === eid)
+        const t = ent?.title || eid
+        return s.kind === 'relation_reveal' ? `${t} · 关联` : t
+      }
+    }
+  }
+
+  function pushHistory(next: CosmosState) {
+    const cur = historyStack.value[historyCursor.value]
+    if (cur && sameState(cur.state, next)) return
+    historyStack.value = historyStack.value.slice(0, historyCursor.value + 1)
+    historyStack.value.push({ state: { ...next }, title: stateTitle(next) })
+    if (historyStack.value.length > 50) historyStack.value.shift()
+    else historyCursor.value = historyStack.value.length - 1
+  }
+
+  function applyState(next: CosmosState) {
+    emit(`leave_${state.value.kind}`, state.value)
+    state.value = next
+    selectedAssocId.value = null
+    emit(`enter_${next.kind}`, next)
+  }
 
   function selectAssociation(id: string | null) {
     selectedAssocId.value = id
@@ -31,11 +86,14 @@ export const useCosmosStore = defineStore('cosmos', () => {
     try {
       const { apiRequest } = await import('@/api/client')
       data.value = await apiRequest<CosmosData>('/cosmos')
+      historyStack.value = [{ state: { kind: 'global_overview' }, title: '全局' }]
+      historyCursor.value = 0
     } catch (e: unknown) {
-      // 线上失败时退回 mock 作为 fallback
       try {
         const resp = await fetch('/mock/cosmos.json')
         data.value = await resp.json()
+        historyStack.value = [{ state: { kind: 'global_overview' }, title: '全局' }]
+        historyCursor.value = 0
       } catch {
         error.value = 'Cosmos 数据加载失败'
       }
@@ -45,10 +103,20 @@ export const useCosmosStore = defineStore('cosmos', () => {
   }
 
   function transition(next: CosmosState) {
-    emit(`leave_${state.value.kind}`, state.value)
-    state.value = next
-    selectedAssocId.value = null
-    emit(`enter_${next.kind}`, next)
+    pushHistory(next)
+    applyState(next)
+  }
+
+  function navigateBack() {
+    if (!canGoBack.value) return
+    historyCursor.value--
+    applyState(historyStack.value[historyCursor.value].state)
+  }
+
+  function navigateForward() {
+    if (!canGoForward.value) return
+    historyCursor.value++
+    applyState(historyStack.value[historyCursor.value].state)
   }
 
   async function reload() {
@@ -171,6 +239,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
     createLifeline, updateLifeline, deleteLifeline, mountEntity, reviewAssociation,
     selectedAssocId, selectAssociation,
     updateEntityTitle, deleteEntityById,
+    canGoBack, canGoForward, navigateBack, navigateForward,
     createAssoc, updateAssoc, deleteAssoc,
     selectingTarget, startSelectingTarget, cancelSelecting,
     editAssoc, openEditAssoc, closeEditAssoc,

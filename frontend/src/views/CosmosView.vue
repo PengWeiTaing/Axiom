@@ -750,6 +750,8 @@ function onKey(e: KeyboardEvent) {
     showShortcuts.value = !showShortcuts.value
     return
   }
+  if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); store.navigateBack(); return }
+  if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); store.navigateForward(); return }
 
   const s = store.state
   if (e.key === 'Escape') {
@@ -962,6 +964,8 @@ onBeforeUnmount(() => {
         @click="store.transition({ kind: 'global_overview' })"
         title="回到全局"
       >⌂</button>
+      <button class="nav-btn" :disabled="!store.canGoBack" @click="store.navigateBack()" title="后退 (Alt+←)">←</button>
+      <button class="nav-btn" :disabled="!store.canGoForward" @click="store.navigateForward()" title="前进 (Alt+→)">→</button>
       <AtlasSearch v-if="showSearch" @select="onSearchSelect" @close="showSearch = false" />
       <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" @focus-entity="onPanelFocusEntity" />
       <button v-if="!showSearch" class="search-trigger" @click="showSearch = true">搜索 ⌘K</button>
@@ -1201,6 +1205,16 @@ onBeforeUnmount(() => {
 }
 
 .home-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.nav-btn {
+  background: var(--surface-1); border: 1px solid var(--line-2);
+  border-radius: var(--r-1); color: var(--text-3); font-size: var(--fs-2);
+  cursor: pointer; padding: 0 6px; line-height: 1.5;
+}
+
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nav-btn:disabled { opacity: 0.3; cursor: default; }
+.nav-btn:disabled:hover { border-color: var(--line-2); color: var(--text-3); }
 
 .minimap-wrapper {
   position: absolute;
