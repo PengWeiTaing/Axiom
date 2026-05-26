@@ -168,11 +168,51 @@ const emit = defineEmits<{
   (e: 'edit-assoc', assoc: CosmosAssociation): void
   (e: 'delete-assoc', assocId: string): void
   (e: 'copied'): void
+  (e: 'enter-relation'): void
+  (e: 'navigate-entity', entityId: string): void
 }>()
 
 defineExpose({ startEditTitle })
 
-// Associations
+// Association summary
+const assocSummaries = computed(() => {
+  if (!entity.value || !store.data) return []
+  const eid = entity.value.id
+  const results: Array<{ assoc: CosmosAssociation; isFrom: boolean; target: CosmosEntity }> = []
+  for (const a of store.data.associations) {
+    if (a.status === 'rejected') continue
+    const isFrom = a.from === eid
+    const isTo = a.to === eid
+    if (!isFrom && !isTo) continue
+    const targetId = isFrom ? a.to : a.from
+    const target = store.data.entities.find(e => e.id === targetId)
+    if (target) results.push({ assoc: a, isFrom, target })
+  }
+  return results
+})
+
+const topAssociations = computed(() => assocSummaries.value.slice(0, 5))
+
+const assocTypeCounts = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const { assoc } of assocSummaries.value) {
+    counts[assoc.relation_type] = (counts[assoc.relation_type] || 0) + 1
+  }
+  return counts
+})
+
+const assocExpanded = ref(true)
+
+function navigateAssoc(targetId: string) {
+  emit('navigate-entity', targetId)
+}
+
+function relLabelShort(rt: string): string {
+  const m: Record<string, string> = { co_occurrence: '共现', causal: '因果', tension: '张力', derived_from: '衍生', manual: '人工' }
+  return m[rt] || rt
+}
+
+// Associations (existing full list for relation_reveal)
 const entityAssociations = computed<CosmosAssociation[]>(() => {
   if (!entity.value || !store.data) return []
   const eid = entity.value.id
@@ -514,7 +554,38 @@ function isDetailField(fn: string): boolean {
       </template>
     </div>
 
-    <!-- 关联列表 -->
+    <!-- 关联摘要 -->
+    <div v-if="assocSummaries.length > 0" class="assoc-summary">
+      <div class="assoc-title" @click="assocExpanded = !assocExpanded">
+        关联 ({{ assocSummaries.length }})
+        <span class="assoc-type-counts">
+          <template v-for="(cnt, rt) in assocTypeCounts" :key="rt">
+            <span class="assoc-type-cnt">{{ relLabelShort(rt) }}:{{ cnt }}</span>
+          </template>
+        </span>
+        <button class="btn-r" @click.stop="emit('enter-relation')" title="查看关联 (R)">R</button>
+      </div>
+      <div v-if="assocExpanded" class="assoc-summary-list">
+        <div
+          v-for="item in topAssociations"
+          :key="item.assoc.id"
+          class="assoc-summary-row"
+          :class="{ pending: item.assoc.status === 'pending' }"
+          @click="navigateAssoc(item.target.id)"
+        >
+          <span class="assoc-summary-type">{{ relLabelShort(item.assoc.relation_type) }}</span>
+          <span class="assoc-summary-conf">{{ Math.round(item.assoc.confidence * 100) }}%</span>
+          <span class="assoc-summary-arrow">{{ item.isFrom ? '→' : '←' }}</span>
+          <span class="assoc-summary-kind">{{ kindLabel(item.target.kind) }}</span>
+          <span class="assoc-summary-title">{{ item.target.title.slice(0, 25) }}</span>
+        </div>
+        <div v-if="assocSummaries.length > 5" class="assoc-summary-more">
+          … 查看全部 (共 {{ assocSummaries.length }} 条)
+        </div>
+      </div>
+    </div>
+
+    <!-- 关联列表（relation_reveal 详情） -->
     <div class="assoc-section">
       <div class="assoc-title">关联 ({{ entityAssociations.length }})</div>
       <div v-if="entityAssociations.length === 0" class="empty-text">暂无关联</div>
@@ -657,6 +728,57 @@ function isDetailField(fn: string): boolean {
   color: var(--accent); font-size: var(--fs-1); padding: var(--s-1) var(--s-2); cursor: pointer;
 }
 .btn-action:hover { background: var(--accent); color: var(--surface-0); }
+
+/* 关联摘要 */
+.assoc-summary {
+  display: flex; flex-direction: column; gap: var(--s-1);
+  padding-top: var(--s-1); border-top: 1px solid var(--line-1);
+}
+
+.assoc-summary .assoc-title {
+  cursor: pointer; display: flex; align-items: center; gap: var(--s-1); flex-wrap: wrap;
+}
+
+.assoc-type-counts {
+  display: flex; gap: var(--s-1); font-size: var(--fs-1); font-weight: 400; color: var(--text-4);
+}
+
+.btn-r {
+  background: var(--surface-2); border: 1px solid var(--accent); border-radius: var(--r-1);
+  color: var(--accent); font-size: 10px; cursor: pointer; padding: 1px 6px; margin-left: auto;
+}
+
+.btn-r:hover { background: var(--accent); color: var(--surface-0); }
+
+.assoc-summary-list {
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+.assoc-summary-row {
+  display: flex; align-items: center; gap: 4px; padding: 3px 4px; cursor: pointer; border-radius: var(--r-1);
+  font-size: var(--fs-1);
+}
+
+.assoc-summary-row:hover { background: var(--surface-2); }
+.assoc-summary-row.pending { opacity: 0.55; }
+
+.assoc-summary-type { color: var(--accent); font-size: 10px; flex-shrink: 0; }
+.assoc-summary-conf { color: var(--text-4); font-size: 10px; flex-shrink: 0; }
+.assoc-summary-arrow { color: var(--text-4); flex-shrink: 0; }
+.assoc-summary-kind {
+  width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;
+  font-size: 8px; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-1);
+  flex-shrink: 0;
+}
+.assoc-summary-title {
+  flex: 1; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.assoc-summary-more {
+  font-size: var(--fs-1); color: var(--text-4); padding: 2px 4px; cursor: pointer;
+}
+
+.assoc-summary-more:hover { color: var(--accent); }
 
 /* Associations (keeping existing styles) */
 .assoc-section { display: flex; flex-direction: column; gap: var(--s-1); }

@@ -226,6 +226,17 @@ function onPathCopied() { showCopiedToast() }
 
 function onNodeDetailCopied() { showCopiedToast() }
 
+function onNodeDetailEnterRelation() {
+  enterRelation()
+}
+
+function onNodeDetailNavigate(entityId: string) {
+  if (!store.data) return
+  const ent = store.data.entities.find(e => e.id === entityId)
+  if (!ent) return
+  store.transition({ kind: 'node_focus', entity_kind: ent.kind, entity_id: entityId } as any)
+}
+
 // CSS2D label renderer
 let labelRenderer: any = null
 let labelGroup: LabelGroup | null = null
@@ -978,7 +989,7 @@ onBeforeUnmount(() => {
     <!-- 3D 场景（加载/错误/空态时不渲染，但不销毁） -->
     <template v-if="!store.loading && !store.error && store.data && store.data.lifelines.length > 0">
       <canvas ref="canvasRef" class="cosmos-canvas" />
-      <NodeDetailCard ref="nodeDetailRef" @edit-assoc="onNodeDetailEditAssoc" @delete-assoc="onNodeDetailDeleteAssoc" @copied="onNodeDetailCopied" />
+      <NodeDetailCard ref="nodeDetailRef" @edit-assoc="onNodeDetailEditAssoc" @delete-assoc="onNodeDetailDeleteAssoc" @copied="onNodeDetailCopied" @enter-relation="onNodeDetailEnterRelation" @navigate-entity="onNodeDetailNavigate" />
       <div v-if="tooltipText && store.state.kind === 'relation_reveal'" class="tooltip">{{ tooltipText }}</div>
 
       <!-- 快捷键提示 -->
