@@ -202,25 +202,6 @@ export const deleteEntity = (kind: string, id: number) => {
   return apiRequest(path, { method: 'DELETE' })
 }
 
-export const createEntity = async (kind: string, title: string, lifeline_id: string) => {
-  let resultId: number
-  if (kind === 'task') {
-    const r = await apiRequest<{ task: { id: number } }>('/tasks', { method: 'POST', json: { title } })
-    resultId = r.task.id
-  } else if (kind === 'memory') {
-    const r = await apiRequest<{ memory: { id: number } }>('/memories', { method: 'POST', json: { category: 'fact', content: title } })
-    resultId = r.memory.id
-  } else if (kind === 'decision') {
-    const r = await apiRequest<{ decision: { id: number } }>('/decisions', { method: 'POST', json: { title, decision: title } })
-    resultId = r.decision.id
-  } else {
-    const r = await apiRequest<{ item: { id: number } }>('/add', { method: 'POST', json: { text: title, source: 'atlas' } })
-    resultId = r.item.id
-  }
-  await mountEntity(kind, resultId, lifeline_id)
-  return resultId
-}
-
 export const updateEntityField = (kind: string, id: number, data: Record<string, string>) => {
   if (kind === 'item') {
     return apiRequest(`/item/${id}/update`, { method: 'POST', json: data })

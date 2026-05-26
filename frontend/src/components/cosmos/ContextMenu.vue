@@ -21,7 +21,6 @@ const emit = defineEmits<{
   (e: 'edit-title', target: ContextMenuTarget): void
   (e: 'delete-entity', target: ContextMenuTarget): void
   (e: 'move-lifeline', entityId: string, lifelineId: string): void
-  (e: 'create-entity', kind: string, lifelineId: string): void
   (e: 'edit-lifeline-name', target: ContextMenuTarget): void
   (e: 'associate-to', target: ContextMenuTarget): void
   (e: 'find-path-to', target: ContextMenuTarget): void

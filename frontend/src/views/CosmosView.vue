@@ -59,11 +59,6 @@ function showConfirm(title: string, message: string, confirmLabel: string, dange
   })
 }
 
-// Create entity dialog
-const createDialog = ref<{ kind: string; lifelineId: string; lifelineName: string } | null>(null)
-const createTitle = ref('')
-const createInputEl = ref<HTMLInputElement | null>(null)
-
 // NodeDetailCard ref for triggering inline edit
 const nodeDetailRef = ref<InstanceType<typeof NodeDetailCard> | null>(null)
 
@@ -627,35 +622,6 @@ async function onContextMoveLifeline(entityId: string, lifelineId: string) {
   }
 }
 
-function onContextCreateEntity(kind: string, lifelineId: string) {
-  const lifeline = store.data?.lifelines.find(l => l.id === lifelineId)
-  createDialog.value = { kind, lifelineId, lifelineName: lifeline?.name || lifelineId }
-  createTitle.value = ''
-  setTimeout(() => createInputEl.value?.focus(), 50)
-}
-
-async function onCreateEntityConfirm() {
-  if (!createDialog.value) return
-  const title = createTitle.value.trim()
-  if (!title) return
-  const { kind, lifelineId } = createDialog.value
-  try {
-    await store.createEntityUnderLifeline(kind, title, lifelineId)
-  } catch {
-    await store.reload()
-  }
-  createDialog.value = null
-}
-
-function onCreateEntityCancel() {
-  createDialog.value = null
-}
-
-function onCreateKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') onCreateEntityConfirm()
-  else if (e.key === 'Escape') onCreateEntityCancel()
-}
-
 // Lifeline edit dialog
 const lifelineEditDialog = ref<{ id: string; name: string } | null>(null)
 const lifelineEditName = ref('')
@@ -1037,7 +1003,6 @@ onBeforeUnmount(() => {
         @edit-title="onContextEditTitle"
         @delete-entity="onContextDeleteEntity"
         @move-lifeline="onContextMoveLifeline"
-        @create-entity="onContextCreateEntity"
         @edit-lifeline-name="onContextEditLifelineName"
         @associate-to="onContextAssociateTo"
         @find-path-to="onContextFindPathTo"
@@ -1074,24 +1039,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- 新建 entity 弹窗 -->
-      <div v-if="createDialog" class="create-overlay" @pointerdown="onCreateEntityCancel">
-        <div class="create-dialog" @pointerdown.stop>
-          <div class="create-title">新建 {{ createDialog.kind }}</div>
-          <div class="create-sub">添加到「{{ createDialog.lifelineName }}」</div>
-          <input
-            ref="createInputEl"
-            v-model="createTitle"
-            class="create-input"
-            placeholder="输入标题…"
-            @keydown="onCreateKeydown"
-          />
-          <div class="create-actions">
-            <button class="confirm-btn cancel-btn" @click="onCreateEntityCancel">取消</button>
-            <button class="confirm-btn primary-btn" :disabled="!createTitle.trim()" @click="onCreateEntityConfirm">创建</button>
-          </div>
-        </div>
-      </div>
     </template>
 
     <!-- 关联编辑弹窗 -->

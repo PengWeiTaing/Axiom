@@ -117,12 +117,6 @@ export const useCosmosStore = defineStore('cosmos', () => {
     await reload()
   }
 
-  async function createEntityUnderLifeline(kind: string, title: string, lifelineId: string) {
-    const { createEntity: apiCreate } = await import('@/api/endpoints')
-    await apiCreate(kind, title, lifelineId)
-    await reload()
-  }
-
   // Association CRUD
   async function createAssoc(data: {
     from: string; to: string; relation_type: string; confidence: number
@@ -176,7 +170,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
   return { data, state, loading, error, load, reload, transition, on,
     createLifeline, updateLifeline, deleteLifeline, mountEntity, reviewAssociation,
     selectedAssocId, selectAssociation,
-    updateEntityTitle, deleteEntityById, createEntityUnderLifeline,
+    updateEntityTitle, deleteEntityById,
     createAssoc, updateAssoc, deleteAssoc,
     selectingTarget, startSelectingTarget, cancelSelecting,
     editAssoc, openEditAssoc, closeEditAssoc,
