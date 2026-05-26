@@ -366,3 +366,61 @@ export function removeHalo(scene: THREE.Scene) {
     }
   }
 }
+
+/** 路径查找高亮 */
+export function highlightPath(
+  nodes: THREE.Mesh[],
+  assocLines: Array<{ line: any; data: any }>,
+  pathEntityIds: Set<string>,
+  pathAssocIds: Set<string>
+) {
+  for (const m of nodes) {
+    const id = m.userData.id as string
+    if (m.userData.layer === 3 && pathEntityIds.has(id)) {
+      m.scale.setScalar(1.3)
+      const mat = m.material as THREE.MeshBasicMaterial
+      ;(mat as any)._pathOrigColor = (mat as any)._pathOrigColor ?? mat.color.getHex()
+      mat.color.set('#a0fff0')
+      mat.needsUpdate = true
+    }
+  }
+  for (const al of assocLines) {
+    const mat = al.line.material
+    if (pathAssocIds.has(al.data.id)) {
+      ;(mat as any)._pathOrigLinewidth = (mat as any)._pathOrigLinewidth ?? mat.linewidth
+      ;(mat as any)._pathOrigColor = (mat as any)._pathOrigColor ?? mat.color.getHex()
+      mat.linewidth = ((mat as any)._pathOrigLinewidth || 1.5) * 2
+      mat.color.set('#a0fff0')
+      mat.opacity = 1
+    } else {
+      mat.opacity = 0.15
+    }
+  }
+}
+
+export function clearPathHighlight(
+  nodes: THREE.Mesh[],
+  assocLines: Array<{ line: any; data: any }>
+) {
+  for (const m of nodes) {
+    const mat = m.material as THREE.MeshBasicMaterial
+    if ((mat as any)._pathOrigColor !== undefined) {
+      mat.color.setHex((mat as any)._pathOrigColor)
+      delete (mat as any)._pathOrigColor
+      m.scale.setScalar(1)
+      mat.needsUpdate = true
+    }
+  }
+  for (const al of assocLines) {
+    const mat = al.line.material
+    if ((mat as any)._pathOrigLinewidth !== undefined) {
+      mat.linewidth = (mat as any)._pathOrigLinewidth
+      delete (mat as any)._pathOrigLinewidth
+    }
+    if ((mat as any)._pathOrigColor !== undefined) {
+      mat.color.setHex((mat as any)._pathOrigColor)
+      delete (mat as any)._pathOrigColor
+    }
+    mat.opacity = mat.opacity < 0.2 ? 0.8 : mat.opacity
+  }
+}

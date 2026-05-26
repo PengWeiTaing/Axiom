@@ -2,7 +2,7 @@
 /** CosmosView — Atlas 球形树宿主组件 */
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
-import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar, addHalo, removeHalo } from '@/cosmos/scene'
+import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar, addHalo, removeHalo, highlightPath, clearPathHighlight } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
 import type { CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
@@ -18,6 +18,8 @@ import ConfirmDialog from '@/components/cosmos/ConfirmDialog.vue'
 import AssociationEditDialog from '@/components/cosmos/AssociationEditDialog.vue'
 import LegendBar from '@/components/cosmos/LegendBar.vue'
 import Minimap from '@/components/cosmos/Minimap.vue'
+import PathPanel from '@/components/cosmos/PathPanel.vue'
+import type { PathHop } from '@/components/cosmos/PathPanel.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -90,6 +92,111 @@ function toggleFilterType(t: string) {
 
 const visibleAssocCount = computed(() => assocLines.filter(al => al.line.visible).length)
 
+// Path finding
+const pathFindingFrom = ref<{ id: string; title: string } | null>(null)
+const pathResult = ref<PathHop[][] | null>(null)
+const currentPathIdx = ref(0)
+
+type AssocEdge = { to: string; assocId: string; type: string; confidence: number }
+
+function findShortestPaths(fromId: string, toId: string): PathHop[][] {
+  if (!store.data) return []
+  const adj = new Map<string, AssocEdge[]>()
+  for (const a of store.data.associations) {
+    if (a.status === 'rejected') continue
+    if (!adj.has(a.from)) adj.set(a.from, [])
+    if (!adj.has(a.to)) adj.set(a.to, [])
+    adj.get(a.from)!.push({ to: a.to, assocId: a.id, type: a.relation_type, confidence: a.confidence })
+    adj.get(a.to)!.push({ to: a.from, assocId: a.id, type: a.relation_type, confidence: a.confidence })
+  }
+
+  const visited = new Set<string>()
+  const queue: Array<{ id: string; path: PathHop[] }> = [
+    { id: fromId, path: [{ entityId: fromId, entityTitle: '', assocId: null, assocType: null, assocConfidence: null }] }
+  ]
+  visited.add(fromId)
+  const results: PathHop[][] = []
+  let foundDepth = -1
+  const MAX_DEPTH = 5
+
+  while (queue.length > 0) {
+    const { id, path } = queue.shift()!
+    if (foundDepth > -1 && path.length > foundDepth) break
+    if (id === toId) {
+      // fill titles
+      path.forEach(p => {
+        if (!p.entityTitle) {
+          p.entityTitle = store.data?.entities.find(e => e.id === p.entityId)?.title || p.entityId
+        }
+      })
+      results.push(path)
+      foundDepth = path.length
+      continue
+    }
+    if (path.length >= MAX_DEPTH) continue
+    for (const nb of adj.get(id) || []) {
+      if (!visited.has(nb.to) || (foundDepth > -1 && path.length < foundDepth)) {
+        visited.add(nb.to)
+        const ent = store.data?.entities.find(e => e.id === nb.to)
+        queue.push({
+          id: nb.to,
+          path: [...path, { entityId: nb.to, entityTitle: ent?.title || nb.to, assocId: nb.assocId, assocType: nb.type, assocConfidence: nb.confidence }]
+        })
+      }
+    }
+  }
+  return results
+}
+
+function onContextFindPathTo(target: ContextMenuTarget) {
+  pathFindingFrom.value = { id: target.id, title: target.title }
+}
+
+function onPathTargetClick(entityId: string) {
+  if (!pathFindingFrom.value) return
+  if (entityId === pathFindingFrom.value.id) { clearPathMode(); return }
+  const results = findShortestPaths(pathFindingFrom.value.id, entityId)
+  pathResult.value = results.length > 0 ? results : []
+  currentPathIdx.value = 0
+  pathFindingFrom.value = null
+
+  if (results.length > 0 && sceneObjs) {
+    applyCurrentPathHighlight(results[0])
+  }
+}
+
+function applyCurrentPathHighlight(path: PathHop[]) {
+  if (!sceneObjs) return
+  clearPathHighlight(sceneObjs.nodes, assocLines)
+  const entityIds = new Set(path.map(h => h.entityId))
+  const assocIds = new Set(path.filter(h => h.assocId).map(h => h.assocId!))
+  highlightPath(sceneObjs.nodes, assocLines, entityIds, assocIds)
+}
+
+function clearPathMode() {
+  pathFindingFrom.value = null
+  pathResult.value = null
+  currentPathIdx.value = 0
+  if (sceneObjs) clearPathHighlight(sceneObjs.nodes, assocLines)
+}
+
+function onPathPrev() {
+  if (!pathResult.value) return
+  currentPathIdx.value = Math.max(0, currentPathIdx.value - 1)
+  applyCurrentPathHighlight(pathResult.value[currentPathIdx.value])
+}
+
+function onPathNext() {
+  if (!pathResult.value) return
+  currentPathIdx.value = Math.min(pathResult.value.length - 1, currentPathIdx.value + 1)
+  applyCurrentPathHighlight(pathResult.value[currentPathIdx.value])
+}
+
+function onPathFocusEntity(entityId: string) {
+  const parts = entityId.split(':')
+  store.transition({ kind: 'node_focus', entity_kind: parts[0] as any, entity_id: entityId } as any)
+}
+
 // CSS2D label renderer
 let labelRenderer: any = null
 let labelGroup: LabelGroup | null = null
@@ -132,6 +239,20 @@ async function start() {
     mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
     mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
     raycaster.setFromCamera(mouse, sceneObjs.camera)
+
+    // -1. 路径查找目标选择模式
+    if (pathFindingFrom.value) {
+      const hits__ = raycaster.intersectObjects(sceneObjs.pickables)
+      if (hits__.length > 0) {
+        const obj__ = hits__[0].object as THREE.Mesh
+        if (obj__.userData.layer === 3) {
+          onPathTargetClick(obj__.userData.id as string)
+          return
+        }
+      }
+      clearPathMode()
+      return
+    }
 
     // 0. 选择目标模式（关联创建）
     if (store.selectingTarget) {
@@ -573,6 +694,10 @@ function onKey(e: KeyboardEvent) {
       store.cancelSelecting()
       return
     }
+    if (pathFindingFrom.value || pathResult.value) {
+      clearPathMode()
+      return
+    }
     if (showSearch.value) {
       showSearch.value = false
       return
@@ -829,6 +954,7 @@ onBeforeUnmount(() => {
         @create-entity="onContextCreateEntity"
         @edit-lifeline-name="onContextEditLifelineName"
         @associate-to="onContextAssociateTo"
+        @find-path-to="onContextFindPathTo"
       />
 
       <!-- 确认弹窗 -->
@@ -903,6 +1029,22 @@ onBeforeUnmount(() => {
     <div v-if="store.selectingTarget" class="select-hint">
       crosshair 点击目标 entity 来创建关联 (Esc 取消)
     </div>
+    <div v-if="pathFindingFrom" class="select-hint">
+      crosshair 点击目标 entity 查找最短路径 (Esc 取消)
+    </div>
+
+    <!-- Path panel -->
+    <PathPanel
+      v-if="pathResult"
+      :paths="pathResult"
+      :current-path-index="currentPathIdx"
+      :from-title="pathResult[currentPathIdx]?.[0]?.entityTitle || ''"
+      :to-title="pathResult[currentPathIdx]?.[pathResult[currentPathIdx].length - 1]?.entityTitle || ''"
+      @prev-path="onPathPrev"
+      @next-path="onPathNext"
+      @clear="clearPathMode"
+      @focus-entity="onPathFocusEntity"
+    />
 
     <!-- LegendBar -->
     <LegendBar :show-assoc="store.state.kind === 'relation_reveal'" />
