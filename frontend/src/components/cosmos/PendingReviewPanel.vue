@@ -1,7 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
 const store = useCosmosStore()
+
+const expandedIds = ref<Set<string>>(new Set())
+
+function toggleEvidence(id: string) {
+  if (expandedIds.value.has(id)) expandedIds.value.delete(id)
+  else expandedIds.value.add(id)
+  expandedIds.value = new Set(expandedIds.value)
+}
+
+function evidenceTypeLabel(t: string): string {
+  const m: Record<string, string> = { semantic: '语义', keyword: '关键词', co_occurrence: '共现', temporal: '时序', causal: '因果', manual: '手动' }
+  return m[t] || t
+}
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -66,6 +79,23 @@ function focusEntity(id: string) {
           <span class="pending-kind">{{ kindBadge(item.assoc.to) }}</span>
           <span class="pending-entity-title" @click="focusEntity(item.assoc.to)">{{ item.toTitle.slice(0, 30) }}</span>
         </div>
+        <!-- evidence toggle -->
+        <div v-if="item.assoc.evidence && item.assoc.evidence.length > 0" class="evidence-toggle" @click="toggleEvidence(item.assoc.id)">
+          <span class="ev-toggle-icon">{{ expandedIds.has(item.assoc.id) ? '▾' : '▸' }}</span>
+          <span>{{ item.assoc.evidence.length }} 条证据</span>
+        </div>
+        <div v-else class="no-evidence">无证据</div>
+        <div v-if="expandedIds.has(item.assoc.id) && item.assoc.evidence" class="evidence-list">
+          <div v-for="(ev, i) in (item.assoc.evidence || [])" :key="i" class="ev-item">
+            <div class="ev-header">
+              <span class="ev-type">{{ evidenceTypeLabel(ev.type) }}</span>
+              <span class="ev-weight">{{ Math.round(ev.weight * 100) }}%</span>
+            </div>
+            <div class="ev-weight-track"><div class="ev-weight-fill" :style="{ width: (ev.weight * 100) + '%' }"></div></div>
+            <div class="ev-excerpt" :title="ev.excerpt">{{ ev.excerpt.slice(0, 100) }}{{ ev.excerpt.length > 100 ? '…' : '' }}</div>
+          </div>
+        </div>
+
         <div class="pending-actions">
           <button class="pending-btn accept" @click="acceptAssoc(item.assoc.id)">✓</button>
           <button class="pending-btn reject" @click="rejectAssoc(item.assoc.id)">✗</button>
@@ -146,4 +176,43 @@ function focusEntity(id: string) {
 
 .pending-btn.accept:hover { border-color: var(--accent); color: var(--accent); }
 .pending-btn.reject:hover { border-color: var(--text-5); color: var(--text-5); }
+
+/* evidence */
+.evidence-toggle {
+  display: flex; align-items: center; gap: 4px; font-size: var(--fs-1);
+  color: var(--text-4); cursor: pointer; padding: 2px 0;
+}
+
+.evidence-toggle:hover { color: var(--accent); }
+
+.no-evidence { font-size: var(--fs-1); color: var(--text-5); font-style: italic; }
+
+.evidence-list {
+  display: flex; flex-direction: column; gap: var(--s-1);
+  padding-left: var(--s-1); border-left: 2px solid var(--line-2);
+  margin-top: 2px;
+}
+
+.ev-item {
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+.ev-header {
+  display: flex; gap: var(--s-1); align-items: center; font-size: var(--fs-1);
+}
+
+.ev-type { color: var(--accent); font-size: 10px; }
+.ev-weight { color: var(--text-4); font-size: 10px; }
+
+.ev-weight-track {
+  height: 2px; background: var(--line-2); border-radius: 1px;
+}
+
+.ev-weight-fill {
+  height: 100%; background: var(--accent); border-radius: 1px;
+}
+
+.ev-excerpt {
+  font-size: var(--fs-1); color: var(--text-3); line-height: 1.4;
+}
 </style>
