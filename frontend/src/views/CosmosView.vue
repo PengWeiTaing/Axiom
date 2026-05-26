@@ -22,6 +22,7 @@ import PathPanel from '@/components/cosmos/PathPanel.vue'
 import type { PathHop } from '@/components/cosmos/PathPanel.vue'
 import ShortcutPanel from '@/components/cosmos/ShortcutPanel.vue'
 import QuickCreateDialog from '@/components/cosmos/QuickCreateDialog.vue'
+import PendingReviewPanel from '@/components/cosmos/PendingReviewPanel.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -42,6 +43,12 @@ let toastTimer: number | undefined
 // Quick create
 const quickCreateVisible = ref(false)
 const quickCreateDefaultLifeline = ref<string | undefined>()
+const showPendingReview = ref(false)
+
+const pendingAssocCount = computed(() => {
+  if (!store.data) return 0
+  return store.data.associations.filter(a => a.status === 'pending').length
+})
 
 function openQuickCreate(lifelineId?: string) {
   quickCreateDefaultLifeline.value = lifelineId
@@ -966,6 +973,9 @@ onBeforeUnmount(() => {
       >⌂</button>
       <button class="nav-btn" :disabled="!store.canGoBack" @click="store.navigateBack()" title="后退 (Alt+←)">←</button>
       <button class="nav-btn" :disabled="!store.canGoForward" @click="store.navigateForward()" title="前进 (Alt+→)">→</button>
+      <button v-if="pendingAssocCount > 0" class="pending-trigger" @click="showPendingReview = !showPendingReview">
+        待确认 {{ pendingAssocCount }}
+      </button>
       <AtlasSearch v-if="showSearch" @select="onSearchSelect" @close="showSearch = false" />
       <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" @focus-entity="onPanelFocusEntity" />
       <button v-if="!showSearch" class="search-trigger" @click="showSearch = true">搜索 ⌘K</button>
@@ -1101,6 +1111,7 @@ onBeforeUnmount(() => {
     <!-- Shortcut panel -->
     <ShortcutPanel v-if="showShortcuts" @close="showShortcuts = false" />
     <QuickCreateDialog v-if="quickCreateVisible" :default-lifeline-id="quickCreateDefaultLifeline" @close="quickCreateVisible = false" />
+    <PendingReviewPanel v-if="showPendingReview" @close="showPendingReview = false" @focus-entity="(eid: string) => { showPendingReview = false; onPanelFocusEntity(eid) }" />
 
     <!-- Toast -->
     <div v-if="copiedToast" class="copy-toast">已复制到剪贴板</div>
@@ -1215,6 +1226,14 @@ onBeforeUnmount(() => {
 .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
 .nav-btn:disabled { opacity: 0.3; cursor: default; }
 .nav-btn:disabled:hover { border-color: var(--line-2); color: var(--text-3); }
+
+.pending-trigger {
+  background: var(--surface-1); border: 1px solid var(--warm);
+  border-radius: var(--r-1); color: var(--warm); font-size: var(--fs-2);
+  cursor: pointer; padding: 0 6px; line-height: 1.5;
+}
+
+.pending-trigger:hover { background: rgba(250, 180, 100, 0.08); }
 
 .minimap-wrapper {
   position: absolute;
