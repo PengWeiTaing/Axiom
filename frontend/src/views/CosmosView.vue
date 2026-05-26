@@ -26,6 +26,7 @@ import ShortcutPanel from '@/components/cosmos/ShortcutPanel.vue'
 import QuickCreateDialog from '@/components/cosmos/QuickCreateDialog.vue'
 import PendingReviewPanel from '@/components/cosmos/PendingReviewPanel.vue'
 import ExportDialog from '@/components/cosmos/ExportDialog.vue'
+import RecentPanel from '@/components/cosmos/RecentPanel.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -48,6 +49,26 @@ const quickCreateVisible = ref(false)
 const quickCreateDefaultLifeline = ref<string | undefined>()
 const showPendingReview = ref(false)
 const showExport = ref(false)
+const showRecent = ref(false)
+
+const LS_RECENT = 'axiom_recent_entities'
+
+function recordRecentVisit(entityId: string) {
+  const ent = store.data?.entities.find(e => e.id === entityId)
+  if (!ent) return
+  const ll = store.data?.lifelines.find(l => l.id === ent.lifeline_id)
+  const entry = {
+    entityId, title: ent.title, kind: ent.kind,
+    lifelineId: ent.lifeline_id, lifelineName: ll?.name || '', visitedAt: Date.now(),
+  }
+  try {
+    const raw = localStorage.getItem(LS_RECENT) || '[]'
+    const list: Array<typeof entry> = JSON.parse(raw)
+    const filtered = list.filter(e => e.entityId !== entityId)
+    filtered.unshift(entry)
+    localStorage.setItem(LS_RECENT, JSON.stringify(filtered.slice(0, 10)))
+  } catch { /* ignore */ }
+}
 
 const pendingAssocCount = computed(() => {
   if (!store.data) return 0
@@ -971,7 +992,10 @@ async function onStateChange() {
   }
 }
 
-watch(() => store.state, onStateChange, { deep: true })
+watch(() => store.state, (s) => {
+  if (s.kind === 'node_focus') recordRecentVisit((s as any).entity_id as string)
+  onStateChange()
+}, { deep: true })
 watch(() => store.state.kind, () => {
   hintVisible.value = true
   hintDismissed.value = false
@@ -1012,6 +1036,7 @@ onBeforeUnmount(() => {
         待确认 {{ pendingAssocCount }}
       </button>
       <button v-if="store.data" class="export-trigger" @click="showExport = true" title="导出数据 (Ctrl+E)">导出</button>
+      <button class="nav-btn" @click="showRecent = !showRecent" title="最近访问">🕐</button>
       <AtlasSearch v-if="showSearch" @select="onSearchSelect" @close="showSearch = false" />
       <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" @focus-entity="onPanelFocusEntity" />
       <button v-if="!showSearch" class="search-trigger" @click="showSearch = true">搜索 ⌘K</button>
@@ -1149,6 +1174,7 @@ onBeforeUnmount(() => {
     <QuickCreateDialog v-if="quickCreateVisible" :default-lifeline-id="quickCreateDefaultLifeline" @close="quickCreateVisible = false" />
     <PendingReviewPanel v-if="showPendingReview" @close="showPendingReview = false" @focus-entity="(eid: string) => { showPendingReview = false; onPanelFocusEntity(eid) }" />
     <ExportDialog v-if="showExport" @close="showExport = false" />
+    <RecentPanel v-if="showRecent" @close="showRecent = false" @focus-entity="(eid: string) => { showRecent = false; onPanelFocusEntity(eid) }" />
 
     <!-- Toast -->
     <div v-if="copiedToast" class="copy-toast">已复制到剪贴板</div>
