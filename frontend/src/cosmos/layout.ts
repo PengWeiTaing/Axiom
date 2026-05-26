@@ -9,6 +9,7 @@ export interface LayoutNode {
   position: THREE.Vector3
   parentId?: string
   kind?: string // entity kind for R3 leaves
+  meta?: Record<string, unknown>
 }
 
 // Shell radii
@@ -54,7 +55,7 @@ export function computeLayout(data: CosmosData): LayoutNode[] {
     const offset = idx - (siblings.length - 1) / 2
     const phi = parentPhi + offset * (sectorWidth / Math.max(siblings.length, 1))
     const pos = spherical(RADII.R3, phi + (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.12)
-    nodes.push({ id: e.id, name: e.title, layer: 3, position: pos, parentId: e.lifeline_id, kind: e.kind })
+    nodes.push({ id: e.id, name: e.title, layer: 3, position: pos, parentId: e.lifeline_id, kind: e.kind, meta: e.meta })
   })
 
   return nodes

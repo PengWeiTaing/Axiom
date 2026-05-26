@@ -84,7 +84,13 @@ export async function initScene(
 
       const kindColorMap: Record<string, string> = { task: '--accent', memory: '--text-2', decision: '--warm', item: '--text-3' }
       const kindColor = kindColorMap[n.kind || ''] || '--text-3'
-      mat = new THREE.MeshBasicMaterial({ color: cssVar(kindColor), transparent: true, opacity: alpha })
+      let r3Alpha = alpha
+      if (n.kind === 'task' && n.meta) {
+        if (n.meta.status === 'done') r3Alpha = 0.4
+        else if (n.meta.status === 'cancelled') r3Alpha = 0.25
+        else if (n.meta.priority === 'high') r3Alpha = 0.95
+      }
+      mat = new THREE.MeshBasicMaterial({ color: cssVar(kindColor), transparent: true, opacity: r3Alpha })
     }
 
     const mesh = new THREE.Mesh(geom, mat)
@@ -94,6 +100,11 @@ export async function initScene(
       layer: n.layer, parentId: n.parentId,
       homePosition: n.position.clone(),
       targetPosition: n.position.clone(),
+    }
+    // task 节点 done 状态缩小
+    if (n.layer === 3 && n.kind === 'task' && n.meta) {
+      if (n.meta.status === 'done') mesh.scale.setScalar(0.75)
+      else if (n.meta.status === 'cancelled') mesh.scale.setScalar(0.6)
     }
     scene.add(mesh)
     meshes.push(mesh)

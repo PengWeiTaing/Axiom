@@ -48,6 +48,7 @@ const store = useCosmosStore()
 const query = ref('')
 const selectedIdx = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
+const kindFilter = ref<string | null>(null)
 
 const results = computed<SearchResult[]>(() => {
   const q = query.value.trim().toLowerCase()
@@ -78,6 +79,15 @@ const results = computed<SearchResult[]>(() => {
 
   return list.slice(0, 8)
 })
+
+const filteredResults = computed(() => {
+  if (!kindFilter.value) return results.value
+  return results.value.filter(r => r.kind === kindFilter.value)
+})
+
+function toggleKindFilter(kind: string) {
+  kindFilter.value = kindFilter.value === kind ? null : kind
+}
 
 function buildLifelinePath(lifelineId: string): string {
   if (!store.data) return ''
@@ -141,9 +151,16 @@ onMounted(() => {
     />
 
     <div v-if="query.trim()" class="results">
-      <div v-if="results.length === 0" class="no-results">无匹配结果</div>
+      <div class="kind-chips">
+        <button class="kind-chip" :class="{ active: !kindFilter }" @click="kindFilter = null">全部</button>
+        <button class="kind-chip" :class="{ active: kindFilter === 'task' }" @click="toggleKindFilter('task')">T</button>
+        <button class="kind-chip" :class="{ active: kindFilter === 'memory' }" @click="toggleKindFilter('memory')">M</button>
+        <button class="kind-chip" :class="{ active: kindFilter === 'decision' }" @click="toggleKindFilter('decision')">D</button>
+        <button class="kind-chip" :class="{ active: kindFilter === 'item' }" @click="toggleKindFilter('item')">I</button>
+      </div>
+      <div v-if="filteredResults.length === 0" class="no-results">无匹配结果</div>
       <div
-        v-for="(r, i) in results"
+        v-for="(r, i) in filteredResults"
         :key="r.id"
         class="result-row"
         :class="{ selected: i === selectedIdx }"
@@ -188,6 +205,17 @@ onMounted(() => {
 .search-input::placeholder {
   color: var(--text-4);
 }
+
+.kind-chips {
+  display: flex; gap: 4px; padding: var(--s-1) var(--s-2);
+}
+
+.kind-chip {
+  background: none; border: 1px solid var(--text-5); border-radius: var(--r-pill);
+  color: var(--text-4); font-size: var(--fs-1); padding: 2px 8px; cursor: pointer;
+}
+
+.kind-chip.active { border-color: var(--accent); color: var(--accent); }
 
 .results {
   max-height: 320px;
