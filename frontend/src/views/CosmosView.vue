@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /** CosmosView — Atlas 球形树宿主组件 */
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
-import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar } from '@/cosmos/scene'
+import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar, addHalo, removeHalo } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
 import type { CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
@@ -16,6 +16,7 @@ import ContextMenu from '@/components/cosmos/ContextMenu.vue'
 import type { ContextMenuTarget } from '@/components/cosmos/ContextMenu.vue'
 import ConfirmDialog from '@/components/cosmos/ConfirmDialog.vue'
 import AssociationEditDialog from '@/components/cosmos/AssociationEditDialog.vue'
+import LegendBar from '@/components/cosmos/LegendBar.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -58,6 +59,35 @@ let hintTimer: number | undefined
 let hoveredNode: THREE.Mesh | null = null
 let hoveredAssocLine: any = null
 const HOVER_SCALE = 1.5
+
+// 关联筛选
+const assocFilter = reactive({
+  types: ['co_occurrence', 'causal', 'tension', 'derived_from', 'manual'] as string[],
+  minConfidence: 0.0,
+  status: 'all' as 'all' | 'accepted' | 'pending',
+})
+
+function applyAssocFilter() {
+  for (const al of assocLines) {
+    const typeMatch = assocFilter.types.includes(al.data.relation_type)
+    const confMatch = al.data.confidence >= assocFilter.minConfidence
+    const statusMatch = assocFilter.status === 'all' || al.data.status === assocFilter.status
+    const vis = typeMatch && confMatch && statusMatch
+    al.line.visible = vis
+    if (al.arrow) al.arrow.visible = vis
+  }
+}
+
+function toggleFilterType(t: string) {
+  if (assocFilter.types.includes(t)) {
+    if (assocFilter.types.length > 1) assocFilter.types = assocFilter.types.filter((x: string) => x !== t)
+  } else {
+    assocFilter.types = [...assocFilter.types, t]
+  }
+  applyAssocFilter()
+}
+
+const visibleAssocCount = computed(() => assocLines.filter(al => al.line.visible).length)
 
 // CSS2D label renderer
 let labelRenderer: any = null
@@ -569,6 +599,7 @@ function enterRelation() {
   const visibleIds = new Set<string>([focusId])
   assocLines.forEach(al => { visibleIds.add(al.fromNode.id); visibleIds.add(al.toNode.id) })
   fadeNodes(sceneObjs.nodes, visibleIds)
+  applyAssocFilter()
 }
 
 function clearAssoc() {
@@ -631,6 +662,7 @@ async function onStateChange() {
   const nodes = sceneObjs.layoutNodes
 
   if (s.kind === 'global_overview') {
+    removeHalo(sceneObjs.scene)
     // 恢复所有节点位置 + opacity
     for (const m of sceneObjs.nodes) {
       m.userData.targetPosition = m.userData.homePosition.clone()
@@ -638,6 +670,7 @@ async function onStateChange() {
     resetNodeAlpha(sceneObjs.nodes)
     tweenCamera(sceneObjs.camera, controls, new THREE.Vector3(0, 2.5, 5.5), new THREE.Vector3(0, 0, 0), 60, 800)
   } else if (s.kind === 'region_zoom') {
+    removeHalo(sceneObjs.scene)
     // 恢复节点位置
     for (const m of sceneObjs.nodes) {
       m.userData.targetPosition = m.userData.homePosition.clone()
@@ -677,6 +710,10 @@ async function onStateChange() {
     const targetId = (s as any).entity_id as string
     const n = nodes.find(ln => ln.id === targetId)
     if (!n) return
+
+    // 焦点 halo
+    removeHalo(sceneObjs.scene)
+    addHalo(sceneObjs.scene, n.position, cssVar('--accent'))
 
     // 相机 tween
     const dir = n.position.clone().normalize()
@@ -849,6 +886,41 @@ onBeforeUnmount(() => {
     <!-- Selecting target hint -->
     <div v-if="store.selectingTarget" class="select-hint">
       crosshair 点击目标 entity 来创建关联 (Esc 取消)
+    </div>
+
+    <!-- LegendBar -->
+    <LegendBar :show-assoc="store.state.kind === 'relation_reveal'" />
+
+    <!-- 关联筛选条 -->
+    <div v-if="store.state.kind === 'relation_reveal'" class="assoc-filter-bar">
+      <div class="filter-chips">
+        <button
+          v-for="t in ['co_occurrence', 'causal', 'tension', 'derived_from', 'manual']"
+          :key="t"
+          class="filter-chip"
+          :class="{ active: assocFilter.types.includes(t) }"
+          @click="toggleFilterType(t)"
+        >{{ {co_occurrence:'共现',causal:'因果',tension:'张力', derived_from:'衍生', manual:'人工'}[t] }}</button>
+      </div>
+      <div class="filter-slider">
+        <span class="filter-label">信心度 ≥ {{ assocFilter.minConfidence.toFixed(2) }}</span>
+        <input
+          v-model.number="assocFilter.minConfidence"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          class="filter-range"
+          @input="applyAssocFilter"
+        />
+      </div>
+      <select v-model="assocFilter.status" class="filter-select" @change="applyAssocFilter">
+        <option value="all">全部</option>
+        <option value="accepted">已确认</option>
+        <option value="pending">待定</option>
+      </select>
+      <span class="filter-count">显示 {{ visibleAssocCount }}/{{ assocLines.length }} 条关联</span>
+      <span v-if="assocLines.length > 0 && visibleAssocCount === 0" class="filter-empty">当前筛选条件下无可见关联</span>
     </div>
   </div>
 </template>
@@ -1069,5 +1141,77 @@ onBeforeUnmount(() => {
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-2);
   z-index: 20;
+}
+
+/* 关联筛选条 */
+.assoc-filter-bar {
+  position: absolute;
+  bottom: var(--s-2);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-3);
+  background: var(--surface-1);
+  border-radius: var(--r-2);
+  z-index: 21;
+  font-size: var(--fs-1);
+}
+
+.filter-chips {
+  display: flex;
+  gap: 4px;
+}
+
+.filter-chip {
+  background: none;
+  border: 1px solid var(--text-5);
+  border-radius: var(--r-pill);
+  color: var(--text-4);
+  font-size: var(--fs-1);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.filter-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(110, 231, 208, 0.08);
+}
+
+.filter-slider {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filter-label {
+  color: var(--text-4);
+  white-space: nowrap;
+}
+
+.filter-range {
+  width: 70px;
+  accent-color: var(--accent);
+}
+
+.filter-select {
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  padding: 2px 4px;
+}
+
+.filter-count {
+  color: var(--text-4);
+  white-space: nowrap;
+}
+
+.filter-empty {
+  color: var(--text-5);
+  white-space: nowrap;
 }
 </style>

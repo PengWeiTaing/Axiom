@@ -81,7 +81,10 @@ export async function initScene(
       else if (n.kind === 'memory') geom = new THREE.SphereGeometry(0.02, 8, 8)
       else if (n.kind === 'item') geom = new THREE.TetrahedronGeometry(0.02)
       else geom = new THREE.SphereGeometry(0.015, 8, 8)
-      mat = new THREE.MeshBasicMaterial({ color: cssVar('--text-3'), transparent: true, opacity: alpha })
+
+      const kindColorMap: Record<string, string> = { task: '--accent', memory: '--text-2', decision: '--warm', item: '--text-3' }
+      const kindColor = kindColorMap[n.kind || ''] || '--text-3'
+      mat = new THREE.MeshBasicMaterial({ color: cssVar(kindColor), transparent: true, opacity: alpha })
     }
 
     const mesh = new THREE.Mesh(geom, mat)
@@ -335,5 +338,31 @@ export function ghostExcept(meshes: THREE.Mesh[], visibleIds: Set<string>, ghost
     }
     mat.transparent = true
     mat.needsUpdate = true
+  }
+}
+
+/** 给聚焦节点加光环 */
+export function addHalo(scene: THREE.Scene, position: THREE.Vector3, color: string): THREE.Mesh {
+  const haloGeom = new THREE.TorusGeometry(0.04, 0.004, 8, 16)
+  const haloMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0.5 })
+  const halo = new THREE.Mesh(haloGeom, haloMat)
+  halo.position.copy(position)
+  halo.name = 'focusHalo'
+  halo.renderOrder = 999
+  halo.material.depthTest = false
+  halo.material.depthWrite = false
+  scene.add(halo)
+  return halo
+}
+
+export function removeHalo(scene: THREE.Scene) {
+  const halo = scene.getObjectByName('focusHalo')
+  if (halo) {
+    scene.remove(halo)
+    if ((halo as THREE.Mesh).geometry) (halo as THREE.Mesh).geometry.dispose()
+    if ((halo as THREE.Mesh).material) {
+      const m = (halo as THREE.Mesh).material as THREE.Material
+      if (Array.isArray(m)) m.forEach(x => x.dispose()); else m.dispose()
+    }
   }
 }
