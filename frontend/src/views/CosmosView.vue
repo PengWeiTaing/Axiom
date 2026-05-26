@@ -789,6 +789,11 @@ function onKey(e: KeyboardEvent) {
   if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); store.navigateBack(); return }
   if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); store.navigateForward(); return }
   if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); showExport.value = true; return }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    e.preventDefault()
+    store.undoLast().then(name => { if (name) showCopiedToast() })
+    return
+  }
 
   const s = store.state
   if (e.key === 'Escape') {

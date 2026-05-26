@@ -119,6 +119,27 @@ export const useCosmosStore = defineStore('cosmos', () => {
     applyState(historyStack.value[historyCursor.value].state)
   }
 
+  // Undo
+  interface UndoEntry { action: string; redo: () => Promise<void> }
+  const undoEntry = ref<UndoEntry | null>(null)
+  const canUndo = computed(() => undoEntry.value !== null)
+
+  function pushUndo(entry: UndoEntry) { undoEntry.value = entry }
+
+  async function undoLast(): Promise<string | null> {
+    if (!undoEntry.value) return null
+    try {
+      await undoEntry.value.redo()
+      const name = undoEntry.value.action
+      undoEntry.value = null
+      return name
+    } catch {
+      await reload()
+      undoEntry.value = null
+      return null
+    }
+  }
+
   async function reload() {
     data.value = null
     error.value = null
@@ -151,6 +172,14 @@ export const useCosmosStore = defineStore('cosmos', () => {
   }
 
   async function reviewAssociation(assocId: string, status: 'accepted' | 'rejected') {
+    const old = data.value?.associations.find(a => a.id === assocId)
+    const oldStatus = old?.status
+    if (oldStatus && oldStatus !== status) {
+      pushUndo({
+        action: status === 'accepted' ? '确认关联' : '拒绝关联',
+        redo: async () => { await reviewAssociation(assocId, oldStatus as 'accepted' | 'rejected') }
+      })
+    }
     if (data.value) {
       const idx = data.value.associations.findIndex(a => a.id === assocId)
       if (idx !== -1) {
@@ -174,12 +203,49 @@ export const useCosmosStore = defineStore('cosmos', () => {
   }
 
   async function updateEntityTitle(kind: string, id: number, title: string) {
+    const eid = `${kind}:${id}`
+    const oldTitle = data.value?.entities.find(e => e.id === eid)?.title
+    if (oldTitle && oldTitle !== title) {
+      pushUndo({
+        action: '修改标题',
+        redo: async () => { await updateEntityTitle(kind, id, oldTitle) }
+      })
+    }
     const { updateEntity: apiUpdate } = await import('@/api/endpoints')
     await apiUpdate(kind, id, { title })
     await reload()
   }
 
   async function deleteEntityById(kind: string, id: number) {
+    const eid = `${kind}:${id}`
+    const ent = data.value?.entities.find(e => e.id === eid)
+    if (ent) {
+      const snap = { kind, id, title: ent.title, lifeline_id: ent.lifeline_id }
+      pushUndo({
+        action: `删除 entity "${ent.title.slice(0, 20)}"`,
+        redo: async () => {
+          // Recreate via API
+          if (kind === 'task') {
+            const { createTask } = await import('@/api/endpoints')
+            const r = await createTask({ title: snap.title })
+            if (snap.lifeline_id) await mountEntity('task', r.id, snap.lifeline_id)
+          } else if (kind === 'memory') {
+            const { createMemory: cm } = await import('@/api/endpoints')
+            const r = await cm({ category: 'fact', content: snap.title })
+            if (snap.lifeline_id) await mountEntity('memory', r.id, snap.lifeline_id)
+          } else if (kind === 'decision') {
+            const { createDecision: cd } = await import('@/api/endpoints')
+            const r = await cd({ title: snap.title, decision: snap.title })
+            if (snap.lifeline_id) await mountEntity('decision', r.id, snap.lifeline_id)
+          } else {
+            const { addNote } = await import('@/api/endpoints')
+            const r = await addNote(snap.title)
+            if (snap.lifeline_id) await mountEntity('item', r.id, snap.lifeline_id)
+          }
+          await reload()
+        }
+      })
+    }
     const { deleteEntity: apiDelete } = await import('@/api/endpoints')
     await apiDelete(kind, id)
     await reload()
@@ -205,6 +271,14 @@ export const useCosmosStore = defineStore('cosmos', () => {
   }
 
   async function deleteAssoc(id: string) {
+    const assoc = data.value?.associations.find(a => a.id === id)
+    if (assoc) {
+      const snap = { from: assoc.from, to: assoc.to, relation_type: assoc.relation_type, confidence: assoc.confidence, evidence: assoc.evidence || [] }
+      pushUndo({
+        action: '删除关联',
+        redo: async () => { await createAssoc(snap) }
+      })
+    }
     const { deleteAssociation: apiDelete } = await import('@/api/endpoints')
     await apiDelete(id)
     await reload()
@@ -240,6 +314,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
     selectedAssocId, selectAssociation,
     updateEntityTitle, deleteEntityById,
     canGoBack, canGoForward, navigateBack, navigateForward,
+    canUndo, undoLast,
     createAssoc, updateAssoc, deleteAssoc,
     selectingTarget, startSelectingTarget, cancelSelecting,
     editAssoc, openEditAssoc, closeEditAssoc,
