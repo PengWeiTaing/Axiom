@@ -104,10 +104,16 @@ export const listMemories = (params: {
   page_size?: number;
 } = {}) => apiRequest<MemoryList>('/memories', { query: params });
 
+export const getTask = (id: number) =>
+  apiRequest<{ task: Task }>(`/tasks/${id}`)
+
 export const getMemory = (id: number) =>
   apiRequest<{ memory: Memory; linked_tasks: Task[]; task_progress: { total: number; done: number; todo: number } }>(
     `/memories/${id}`,
   );
+
+export const getDecision = (id: number) =>
+  apiRequest<{ decision: Decision }>(`/decisions/${id}`)
 
 export const memoriesStats = () =>
   apiRequest<{ total: number; by_category: Record<string, number>; by_status: Record<string, number> }>(
@@ -214,6 +220,19 @@ export const createEntity = async (kind: string, title: string, lifeline_id: str
   await mountEntity(kind, resultId, lifeline_id)
   return resultId
 }
+
+export const updateEntityField = (kind: string, id: number, data: Record<string, string>) => {
+  if (kind === 'item') {
+    return apiRequest(`/item/${id}/update`, { method: 'POST', json: data })
+  }
+  return apiRequest(`/${KIND_PLURAL[kind]}/${id}`, { method: 'PUT', json: data })
+}
+
+// Quick actions
+export const markTaskDone = (id: number) => apiRequest(`/tasks/${id}/done`, { method: 'POST' })
+export const markTaskTodo = (id: number) => apiRequest(`/tasks/${id}/todo`, { method: 'POST' })
+export const confirmMemory = (id: number) => apiRequest(`/memories/${id}/confirm`, { method: 'POST' })
+export const archiveMemory = (id: number) => apiRequest(`/memories/${id}/archive`, { method: 'POST' })
 
 // ---------- Association CRUD ----------
 export const createAssociation = (data: {

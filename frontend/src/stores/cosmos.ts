@@ -54,6 +54,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
   async function reload() {
     data.value = null
     error.value = null
+    entityDetailCache.value.clear()
     await load()
   }
 
@@ -147,6 +148,8 @@ export const useCosmosStore = defineStore('cosmos', () => {
     await reload()
   }
 
+  const entityDetailCache = ref<Map<string, Record<string, unknown>>>(new Map())
+
   const selectingTarget = ref<{ fromId: string; fromTitle: string } | null>(null)
   const editAssoc = ref<{
     id: string; from: string; fromTitle: string; to: string; toTitle: string
@@ -176,5 +179,6 @@ export const useCosmosStore = defineStore('cosmos', () => {
     updateEntityTitle, deleteEntityById, createEntityUnderLifeline,
     createAssoc, updateAssoc, deleteAssoc,
     selectingTarget, startSelectingTarget, cancelSelecting,
-    editAssoc, openEditAssoc, closeEditAssoc }
+    editAssoc, openEditAssoc, closeEditAssoc,
+    entityDetailCache }
 })

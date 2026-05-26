@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** CosmosView — Atlas 球形树宿主组件 */
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
 import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
@@ -437,17 +437,33 @@ function onCreateKeydown(e: KeyboardEvent) {
   else if (e.key === 'Escape') onCreateEntityCancel()
 }
 
-async function onContextEditLifelineName(target: ContextMenuTarget) {
-  // For R1/R2 lifeline: use a simple prompt approach via the store's updateLifeline
-  // We use a small inline approach — since we don't have a native prompt, we use the create dialog pattern
-  const newName = (window as any).prompt?.('编辑 lifeline 名称', target.title)
-  // Fallback: use a simple approach
-  if (!newName || newName === target.title) return
+// Lifeline edit dialog
+const lifelineEditDialog = ref<{ id: string; name: string } | null>(null)
+const lifelineEditName = ref('')
+const lifelineEditEl = ref<HTMLInputElement | null>(null)
+
+function onContextEditLifelineName(target: ContextMenuTarget) {
+  lifelineEditDialog.value = { id: target.id, name: target.title }
+  lifelineEditName.value = target.title
+  nextTick(() => lifelineEditEl.value?.focus())
+}
+
+async function onLifelineEditSave() {
+  if (!lifelineEditDialog.value) return
+  const newName = lifelineEditName.value.trim()
+  if (!newName || newName === lifelineEditDialog.value.name) { lifelineEditDialog.value = null; return }
   try {
-    await store.updateLifeline(target.id, { name: newName })
+    await store.updateLifeline(lifelineEditDialog.value.id, { name: newName })
+    lifelineEditDialog.value = null
   } catch {
     await store.reload()
+    lifelineEditDialog.value = null
   }
+}
+
+function onLifelineEditKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') { e.stopPropagation(); onLifelineEditSave() }
+  else if (e.key === 'Escape') { e.stopPropagation(); lifelineEditDialog.value = null }
 }
 
 function onContextAssociateTo(target: ContextMenuTarget) {
@@ -772,6 +788,23 @@ onBeforeUnmount(() => {
         @confirm="confirmDialog!.resolve(true); confirmDialog = null"
         @cancel="confirmDialog!.resolve(false); confirmDialog = null"
       />
+
+      <!-- Lifeline 编辑弹窗 -->
+      <div v-if="lifelineEditDialog" class="create-overlay" @pointerdown="lifelineEditDialog = null">
+        <div class="create-dialog" @pointerdown.stop>
+          <div class="create-title">编辑 lifeline 名称</div>
+          <input
+            ref="lifelineEditEl"
+            v-model="lifelineEditName"
+            class="create-input"
+            @keydown="onLifelineEditKeydown"
+          />
+          <div class="create-actions">
+            <button class="confirm-btn cancel-btn" @click="lifelineEditDialog = null">取消</button>
+            <button class="confirm-btn primary-btn" :disabled="!lifelineEditName.trim()" @click="onLifelineEditSave">保存</button>
+          </div>
+        </div>
+      </div>
 
       <!-- 新建 entity 弹窗 -->
       <div v-if="createDialog" class="create-overlay" @pointerdown="onCreateEntityCancel">
