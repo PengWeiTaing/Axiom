@@ -211,6 +211,12 @@ function onContextCopyTitle(target: ContextMenuTarget) {
   navigator.clipboard.writeText(target.title).then(() => showCopiedToast())
 }
 
+async function onContextDeleteLifeline(lifelineId: string, name: string) {
+  if (!window.confirm(`确定删除 lifeline「${name}」？挂载的 entity 将被卸载。`)) return
+  await store.deleteLifeline(lifelineId)
+  store.transition({ kind: 'global_overview' })
+}
+
 function onPathCopied() { showCopiedToast() }
 
 function onNodeDetailCopied() { showCopiedToast() }
@@ -1007,6 +1013,7 @@ onBeforeUnmount(() => {
         @associate-to="onContextAssociateTo"
         @find-path-to="onContextFindPathTo"
         @copy-title="onContextCopyTitle"
+        @delete-lifeline="onContextDeleteLifeline"
       />
 
       <!-- 确认弹窗 -->

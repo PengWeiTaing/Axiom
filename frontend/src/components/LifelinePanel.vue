@@ -48,6 +48,71 @@ const creating = ref(false)
 const editingId = ref<string | null>(null)
 const deletingId = ref<string | null>(null)
 const searchLifelineId = ref<string | null>(null)
+
+// 拖拽排序
+const dragItem = ref<{ id: string; parentId: string } | null>(null)
+const dragOverIndex = ref(-1)
+const dragParentId = ref<string | null>(null)
+
+function onDragStart(e: DragEvent, ll: CosmosLifeline) {
+  dragItem.value = { id: ll.id, parentId: ll.parent_id }
+  dragParentId.value = ll.parent_id
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', ll.id)
+  }
+}
+
+function onDragOver(e: DragEvent, idx: number) {
+  e.preventDefault()
+  dragOverIndex.value = idx
+}
+
+function onDragLeave() {
+  dragOverIndex.value = -1
+}
+
+function onPanelDragOver(e: DragEvent) {
+  e.preventDefault()
+}
+
+async function onDrop(e: DragEvent, targetIdx: number, targetParentId: string) {
+  e.preventDefault()
+  dragOverIndex.value = -1
+  if (!dragItem.value || !store.data) return
+
+  const { id, parentId } = dragItem.value
+  if (parentId !== targetParentId) { dragItem.value = null; dragParentId.value = null; return }
+
+  // 计算新 order_index，使用浮点数插入
+  const siblings = store.data.lifelines.filter(l => l.parent_id === parentId)
+  siblings.sort((a, b) => a.order_index - b.order_index)
+  const srcIdx = siblings.findIndex(s => s.id === id)
+  if (srcIdx === -1 || srcIdx === targetIdx) { dragItem.value = null; dragParentId.value = null; return }
+
+  // 移除源
+  const withoutSrc = [...siblings.slice(0, srcIdx), ...siblings.slice(srcIdx + 1)]
+  // 确定插入目标位置的左右邻居
+  const adjustedTarget = targetIdx > srcIdx ? targetIdx - 1 : targetIdx
+  const prev = adjustedTarget > 0 ? withoutSrc[adjustedTarget - 1] : null
+  const next = adjustedTarget < withoutSrc.length ? withoutSrc[adjustedTarget] : null
+
+  let newOrder: number
+  if (!prev) newOrder = (next?.order_index ?? 1) - 1
+  else if (!next) newOrder = prev.order_index + 1
+  else newOrder = (prev.order_index + next.order_index) / 2
+
+  dragItem.value = null
+  dragParentId.value = null
+
+  await store.updateLifeline(id, { order_index: newOrder })
+}
+
+function onDragEnd() {
+  dragItem.value = null
+  dragParentId.value = null
+  dragOverIndex.value = -1
+}
 const searchQuery = ref('')
 const searchResults = ref<Array<{ id: string; kind: string; title: string; lifeline_id?: string; mounted_name?: string }>>([])
 const searchLoading = ref(false)
@@ -263,13 +328,24 @@ function parentOptions(): Array<{ id: string; name: string }> {
     </div>
 
     <!-- 树 -->
-    <div class="tree">
-      <template v-for="node in tree" :key="node.lifeline.id">
+    <div class="tree" @dragover="onPanelDragOver" @drop.prevent>
+      <template v-for="(node, idx) in tree" :key="node.lifeline.id">
+        <!-- 插入线（拖拽时） -->
+        <div v-if="dragOverIndex === idx && dragParentId === node.lifeline.parent_id" class="drop-line" />
+
         <div
           class="tree-row"
           :style="{ paddingLeft: (node.depth * 16 + 4) + 'px' }"
-          :class="{ active: isCurrentLifeline(node.lifeline.id) }"
+          :class="{ active: isCurrentLifeline(node.lifeline.id), dragging: dragItem?.id === node.lifeline.id }"
+          :draggable="true"
+          @dragstart="onDragStart($event, node.lifeline)"
+          @dragover="onDragOver($event, idx)"
+          @dragleave="onDragLeave"
+          @drop="onDrop($event, idx, node.lifeline.parent_id)"
+          @dragend="onDragEnd"
         >
+          <!-- 拖拽手柄 -->
+          <span class="drag-handle" :class="{ visible: dragItem }">⠿</span>
           <!-- 展开箭头 -->
           <span
             class="arrow"
@@ -277,7 +353,7 @@ function parentOptions(): Array<{ id: string; name: string }> {
           >{{ isExpanded(node.lifeline.id) ? '▼' : '▶' }}</span>
 
           <!-- 名称 + badge -->
-          <span class="name" @click="clickLifeline(node.lifeline.id)">
+          <span class="name" @click="clickLifeline(node.lifeline.id)" @dblclick.stop="startEdit(node.lifeline)">
             {{ node.lifeline.name }}
             <template v-if="isExpanded(node.lifeline.id)">
               <span class="kind-t">T:{{ entityCountsByKind(node.lifeline.id).task }}</span>
@@ -288,13 +364,10 @@ function parentOptions(): Array<{ id: string; name: string }> {
             <span class="badge">({{ entityCount(node.lifeline.id) }})</span>
           </span>
 
-          <!-- 操作按钮 -->
-          <span class="actions">
-            <button
-              v-if="editingId !== node.lifeline.id"
-              class="btn-icon"
-              @click.stop="startEdit(node.lifeline)"
-            >...</button>
+          <!-- 操作按钮（hover 显示） -->
+          <span class="actions" v-if="editingId !== node.lifeline.id">
+            <button class="btn-icon" @click.stop="startEdit(node.lifeline)" title="编辑名称">✎</button>
+            <button class="btn-icon" @click.stop="deletingId = node.lifeline.id" title="删除 lifeline">✕</button>
           </span>
         </div>
 
@@ -608,6 +681,47 @@ function parentOptions(): Array<{ id: string; name: string }> {
 .entity-row.active {
   background: var(--surface-2);
   color: var(--text-1);
+}
+
+/* 拖拽 */
+.drag-handle {
+  color: var(--text-4);
+  font-size: 10px;
+  cursor: grab;
+  opacity: 0;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.tree-row:hover .drag-handle,
+.drag-handle.visible {
+  opacity: 0.4;
+}
+
+.tree-row:active .drag-handle {
+  cursor: grabbing;
+  opacity: 1;
+}
+
+.tree-row.dragging {
+  opacity: 0.4;
+}
+
+.drop-line {
+  height: 2px;
+  background: var(--accent);
+  margin: 0 4px;
+}
+
+/* actions hover */
+.actions {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.tree-row:hover .actions {
+  opacity: 1;
 }
 
 .search-overlay {

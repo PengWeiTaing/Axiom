@@ -26,6 +26,7 @@ const emit = defineEmits<{
   (e: 'associate-to', target: ContextMenuTarget): void
   (e: 'find-path-to', target: ContextMenuTarget): void
   (e: 'copy-title', target: ContextMenuTarget): void
+  (e: 'delete-lifeline', lifelineId: string, name: string): void
 }>()
 
 const store = useCosmosStore()
@@ -185,6 +186,8 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <button class="ctx-item" @click="onEditLifelineName">编辑名称…</button>
+      <div class="ctx-separator" />
+      <button class="ctx-item danger" @click="emit('delete-lifeline', props.target.id, props.target.title); emit('close')">删除 lifeline</button>
     </template>
   </div>
 </template>
