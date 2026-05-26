@@ -228,6 +228,9 @@ export const updateAssociation = (id: string, data: {
 export const deleteAssociation = (id: string) =>
   apiRequest<{ ok: boolean; message: string }>(`/cosmos/associations/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
+export const importCosmos = (data: Record<string, unknown>) =>
+  apiRequest<{ imported: { lifelines: { created: number; updated: number }; entities: { created: number }; associations: { created: number; skipped: number } } }>('/cosmos/import', { method: 'POST', json: data })
+
 // ---------- 系统 ----------
 export const health = () => apiRequest<{ service: string; db: string }>('/health', { skipAuth: true });
 // 注：后端没有 /ping 路由（receiver.py 里的 ai_ping 缺装饰器）；

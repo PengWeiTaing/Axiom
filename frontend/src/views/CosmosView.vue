@@ -27,6 +27,7 @@ import QuickCreateDialog from '@/components/cosmos/QuickCreateDialog.vue'
 import PendingReviewPanel from '@/components/cosmos/PendingReviewPanel.vue'
 import ExportDialog from '@/components/cosmos/ExportDialog.vue'
 import RecentPanel from '@/components/cosmos/RecentPanel.vue'
+import ImportDialog from '@/components/cosmos/ImportDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 
 const store = useCosmosStore()
@@ -50,6 +51,7 @@ const quickCreateDefaultLifeline = ref<string | undefined>()
 const showPendingReview = ref(false)
 const showExport = ref(false)
 const showRecent = ref(false)
+const showImport = ref(false)
 
 const LS_RECENT = 'axiom_recent_entities'
 
@@ -810,6 +812,7 @@ function onKey(e: KeyboardEvent) {
   if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); store.navigateBack(); return }
   if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); store.navigateForward(); return }
   if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); showExport.value = true; return }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'i') { e.preventDefault(); showImport.value = true; return }
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
     e.preventDefault()
     store.undoLast().then(name => { if (name) showCopiedToast() })
@@ -1036,6 +1039,7 @@ onBeforeUnmount(() => {
         待确认 {{ pendingAssocCount }}
       </button>
       <button v-if="store.data" class="export-trigger" @click="showExport = true" title="导出数据 (Ctrl+E)">导出</button>
+      <button v-if="store.data" class="export-trigger" @click="showImport = true" title="导入数据 (Ctrl+I)">导入</button>
       <button class="nav-btn" @click="showRecent = !showRecent" title="最近访问">🕐</button>
       <AtlasSearch v-if="showSearch" @select="onSearchSelect" @close="showSearch = false" />
       <LifelinePanel v-if="!showSearch" @focus-lifeline="onPanelFocusLifeline" @focus-entity="onPanelFocusEntity" />
@@ -1174,6 +1178,7 @@ onBeforeUnmount(() => {
     <QuickCreateDialog v-if="quickCreateVisible" :default-lifeline-id="quickCreateDefaultLifeline" @close="quickCreateVisible = false" />
     <PendingReviewPanel v-if="showPendingReview" @close="showPendingReview = false" @focus-entity="(eid: string) => { showPendingReview = false; onPanelFocusEntity(eid) }" />
     <ExportDialog v-if="showExport" @close="showExport = false" />
+    <ImportDialog v-if="showImport" @close="showImport = false" @imported="store.reload()" />
     <RecentPanel v-if="showRecent" @close="showRecent = false" @focus-entity="(eid: string) => { showRecent = false; onPanelFocusEntity(eid) }" />
 
     <!-- Toast -->
