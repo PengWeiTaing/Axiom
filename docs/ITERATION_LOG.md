@@ -587,3 +587,14 @@
 - `app.js` 新增 `loadDecisions`、`renderDecisionCards`、`handleDecisionQuickCreate`、`handleReviewDecision`
 - 导航栏新增"决策"按钮
 - 本地验证通过：决策 API 8 项测试全部通过
+
+## 2026-05-27
+
+- 打通 item → memory 升级流（backend-tasks/001 ~ 008）
+  - 新增 `POST /item/<id>/promote-to-memory`，写入 `memories.source_item_id` 与 `memories.source_text`（item 文本前 200 字），默认 status = candidate，审计动作 `memory_promote_from_item`
+  - `POST /memories/suggest` 让 LLM 输出 `item_id|category|content`，建议清单每条带 `source_item_id`（无法回溯具体 item 时为 null），同时兼容旧 2 段格式
+  - `GET /memories/<id>` 响应新增 `source_item: {id, type, type_label, snippet, created_at}`，无来源时为 null
+  - `GET /item/<id>` 响应新增 `derived_memories: [{id, category, content, status, ...}]`，按 created_at desc，最多 10 条
+  - 旧前端 item viewer 加"升级为记忆"按钮，memory 卡片显示"派生自 item #N"，可直接跳回原 item
+  - 前端采纳 AI 建议走分支路径：`source_item_id != null` 走 promote，否则走 `POST /memories` 凭空新建
+  - smoke test 覆盖派生写入、反向读取、FK SET NULL（用 throwaway item 验证 item 删除后 memory 仍在、来源指针置空）

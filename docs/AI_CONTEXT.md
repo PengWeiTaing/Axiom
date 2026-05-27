@@ -274,3 +274,37 @@ flowchart TD
 - 自动提交和推送已被允许，但提交前要先看 `git diff` 和验证结果。
 - 默认持续推进，不因为阶段性汇报而停下；除非遇到必要的人为干预点，否则继续完成下一步实现、验证、提交、推送和部署。
 - 所有项目说明默认用中文。
+
+## item ↔ memory 反向链
+
+Axiom 把"原始记录 (item)"和"长期记忆 (memory)"按显式反向链组织。打通这条链是
+从"输入/存储/检索系统"向"知识—任务—记忆—决策系统"过渡的第一段。
+
+### 写入路径
+
+- `POST /item/<id>/promote-to-memory`
+  - body: `{category, content?, detail?}`
+  - 自动写入 `memories.source_item_id`、`memories.source_text`（item 文本前 200 字）
+  - 新 memory 默认 status = candidate
+  - 审计动作：`memory_promote_from_item`
+- `POST /memories/suggest` 让 LLM 输出 `item_id|category|content`，响应里每条建议带 `source_item_id`（无法回溯到具体 item 时为 `null`）
+- 前端采纳建议路径：当 `source_item_id != null` 走 `POST /item/<id>/promote-to-memory`，
+  否则走 `POST /memories`——保证 LLM 已经定位的来源不会丢失
+
+### 读取路径
+
+- `GET /memories/<id>` 返回的 memory 含 `source_item: {id, type, type_label, snippet,
+  created_at}`（无来源时为 `null`）
+- `GET /item/<id>` 返回的 item 含 `derived_memories: [{id, category, content, status, ...}]`，
+  按 `created_at desc`，最多 10 条
+
+### 删除语义
+
+- 删除 item → `memories.source_item_id` 由 FK `ON DELETE SET NULL` 自动置空；
+  memory 本身保留，前端不再展示来源链
+- 删除 memory → 不影响 item
+
+### 下一段
+
+memory → task / decision 的反向链尚未打通（goal 类 memory 可关联 task，但 task 来源
+不显式回指 memory）。这是后续任务，参见 `docs/backend-tasks/`。

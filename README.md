@@ -57,11 +57,16 @@ receiver 已提供：
 记忆与任务系统：
 
 - `/memories`：记忆列表（五类：事实/偏好/目标/人际关系/事件，三态：候选→确认→归档）
-- `/memories/<id>`：记忆 CRUD + confirm/archive
+- `/memories/<id>`：记忆 CRUD + confirm/archive；`GET` 响应包含 `source_item: {id, type, type_label, snippet, created_at}`（无来源时为 `null`），用于回看派生记忆的原始 item
 - `/memories/stats`：记忆统计
+- `/memories/suggest`：让 LLM 从最近 item 中提取候选记忆；每条建议带 `source_item_id`（无法对应到具体 item 时为 `null`）
+- `POST /item/<id>/promote-to-memory`：把指定 item 升级为 candidate 记忆，自动写入 `memories.source_item_id` 与 `memories.source_text`（item 文本前 200 字），并写审计 `memory_promote_from_item`
+- `GET /item/<id>`：响应额外包含 `derived_memories: [{id, category, content, status, ...}]`，按 `created_at desc` 排序，最多 10 条
 - `/tasks`：任务列表（三态：待办→完成→取消，三级优先级：高/中/低）
 - `/tasks/<id>`：任务 CRUD + done/todo/cancel
 - `/tasks/today`：今日任务汇总（含过期提醒）
+
+item ↔ memory 通过显式反向链 `memories.source_item_id` 关联，外键采用 `ON DELETE SET NULL`：删除 item 时只清空来源指针，已派生的 memory 不会被一并删除。
 
 治理系统：
 
