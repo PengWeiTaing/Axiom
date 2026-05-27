@@ -1687,6 +1687,14 @@ function buildItemViewerActions(item) {
             },
         },
         {
+            label: "升级为记忆",
+            className: "secondary-button",
+            dataset: {
+                action: "promote-item-to-memory",
+                itemId: item.id,
+            },
+        },
+        {
             label: "删除",
             className: "text-button",
             style: "color:var(--color-error)",
@@ -1696,6 +1704,43 @@ function buildItemViewerActions(item) {
             },
         },
     ];
+}
+
+// item viewer 底部追加"派生记忆"区域。derived_memories 永远是数组，
+// 空数组直接跳过不渲染（避免无意义的占位）。
+function appendDerivedMemoriesSection(derivedMemories) {
+    const memories = Array.isArray(derivedMemories) ? derivedMemories : [];
+    if (!memories.length) {
+        return;
+    }
+
+    const section = document.createElement("section");
+    section.className = "viewer-text-section";
+
+    const title = document.createElement("h3");
+    title.textContent = "派生记忆";
+    section.append(title);
+
+    const list = document.createElement("ul");
+    list.style.margin = "0";
+    list.style.paddingLeft = "1.2em";
+
+    memories.forEach((mem) => {
+        const item = document.createElement("li");
+        item.style.margin = "4px 0";
+        const previewContent = summarizeText(mem.content || "", 80);
+        const parts = [
+            `[${mem.category_label || mem.category || ""}]`,
+            previewContent,
+            mem.status_label || mem.status || "",
+            formatDateTime(mem.created_at),
+        ].filter(Boolean);
+        item.textContent = parts.join(" · ");
+        list.append(item);
+    });
+
+    section.append(list);
+    elements.viewerContent.append(section);
 }
 
 function updateKnownItem(item) {
@@ -2255,16 +2300,19 @@ async function openItemViewer(itemId) {
 
     if (item.type === "image" && item.file_url) {
         await openViewerWithImage(title, item.file_url, buildItemMetaRows(item), buildItemViewerActions(item));
+        appendDerivedMemoriesSection(item.derived_memories);
         return;
     }
 
     if (item.type === "audio" && item.file_url) {
         await openViewerWithAudio(title, item.file_url, item, buildItemMetaRows(item), buildItemViewerActions(item));
+        appendDerivedMemoriesSection(item.derived_memories);
         return;
     }
 
     if (isPdfItem(item) && item.file_url) {
         await openViewerWithPdf(title, item.file_url, item, buildItemMetaRows(item), buildItemViewerActions(item));
+        appendDerivedMemoriesSection(item.derived_memories);
         return;
     }
 
@@ -2287,6 +2335,7 @@ async function openItemViewer(itemId) {
             buildItemMetaRows(item),
             buildItemViewerActions(item),
         );
+        appendDerivedMemoriesSection(item.derived_memories);
         return;
     }
 
@@ -2296,6 +2345,7 @@ async function openItemViewer(itemId) {
         buildItemMetaRows(item),
         buildItemViewerActions(item),
     );
+    appendDerivedMemoriesSection(item.derived_memories);
 }
 
 function closeViewer() {
@@ -2706,6 +2756,37 @@ async function handleMemoryQuickCreate(event) {
     } catch (error) {
         setFeedback(elements.memoryQuickFeedback, error.message, "error");
         setConnectionState("error", error.message);
+    }
+}
+
+async function handlePromoteItemToMemory(itemId) {
+    const category = prompt(
+        "选择记忆类别：fact / preference / goal / relationship / event",
+        "fact",
+    );
+    if (!category) return;
+    const trimmed = category.trim();
+    const allowed = ["fact", "preference", "goal", "relationship", "event"];
+    if (!allowed.includes(trimmed)) {
+        alert("类别非法，请输入：" + allowed.join(" / "));
+        return;
+    }
+
+    const customContent = prompt("自定义记忆内容（留空则从 item 自动派生）", "");
+    const body = { category: trimmed };
+    if (customContent && customContent.trim()) {
+        body.content = customContent.trim();
+    }
+
+    try {
+        const payload = await apiRequest(`/item/${itemId}/promote-to-memory`, {
+            method: "POST",
+            json: body,
+        });
+        alert(`已升级为记忆 #${payload.memory.id}`);
+        await openItemViewer(itemId);
+    } catch (error) {
+        alert("升级失败：" + error.message);
     }
 }
 
@@ -3859,6 +3940,8 @@ function bindDelegatedActions() {
             await handleItemView(target.getAttribute("data-item-id"));
         } else if (action === "edit-item") {
             await handleItemEdit(target.getAttribute("data-item-id"));
+        } else if (action === "promote-item-to-memory") {
+            await handlePromoteItemToMemory(target.getAttribute("data-item-id"));
         } else if (action === "save-item-edit") {
             const form = elements.viewerContent.querySelector("[data-role='item-edit-form']");
             if (!form) {
