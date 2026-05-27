@@ -131,22 +131,7 @@ NNN-短主题.md
 
 见 [`_template.md`](_template.md)。
 
-## 当前批次：item ↔ memory 双向链（001 ~ 008）
+## 历史批次
 
-打通对象关系链 `item → memory → task → decision → lifeline → association → review` 的第一段。
-
-**执行顺序**（按依赖 + 风险控制，**严格按序**，不要并行交付）：
-
-| # | 任务单 | 范围 | 依赖 |
-|---|---|---|---|
-| 1 | [001](001-item-promote-to-memory.md) | 后端：核心写入端点 `POST /item/<id>/promote-to-memory` | — |
-| 2 | [003](003-bidirectional-link-fields.md) | 后端：详情接口暴露反向链（source_item / derived_memories） | 001 |
-| 3 | [006](006-smoke-test-promote.md) | smoke：端到端验证 + throwaway item 测 FK SET NULL | 001、003 |
-| 4 | [002](002-memory-suggest-with-item-id.md) | 后端：`/memories/suggest` 返回 source_item_id | — |
-| 5 | [004](004-frontend-promote-button.md) | 旧前端：item viewer 升级按钮 + derived_memories 展示 | 001、003 |
-| 6 | [005](005-frontend-show-source-item.md) | 旧前端：memory 卡片显示来源 item | 003 |
-| 7 | [008](008-suggest-adopt-keeps-source.md) | 旧前端：采纳建议时按 source_item_id 分支走 promote / 凭空 | 001、002 |
-| 8 | [007](007-docs-sync-item-to-memory.md) | 文档同步：README / AI_CONTEXT / ITERATION_LOG | 全部完成 |
-
-> **不要跳号**：001 是其他所有任务的基础；003 解锁前端读取；006 早做让后续每一步都有 smoke 兜底；002 是 008 的前置。
-> **不要打包做完再 review**：每份任务单 DeepSeek 实现完，Opus 单独 review，合格才进下一份。
+- **001 ~ 008（2026-05-27 完成）**：item ↔ memory 双向链，commits `892f48b` ~ `882f31e`。任务单已归档到 `done/`，详见 `docs/ITERATION_LOG.md` 2026-05-27 条目。
+- **009（2026-05-27 完成）**：阶段标签 v0.1 alpha → v0.2+，commit `a6e2d98`。无任务单（最小文本编辑由 Opus 直接做）。
