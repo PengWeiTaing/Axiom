@@ -77,13 +77,13 @@ export async function initScene(
       geom = new THREE.SphereGeometry(0.03, 8, 8)
       mat = new THREE.MeshBasicMaterial({ color: cssVar('--text-2'), transparent: true, opacity: alpha })
     } else {
-      if (n.kind === 'task') geom = new THREE.BoxGeometry(0.022, 0.022, 0.022)
-      else if (n.kind === 'decision') geom = new THREE.OctahedronGeometry(0.022)
-      else if (n.kind === 'memory') geom = new THREE.SphereGeometry(0.02, 8, 8)
-      else if (n.kind === 'item') geom = new THREE.TetrahedronGeometry(0.02)
-      else geom = new THREE.SphereGeometry(0.015, 8, 8)
+      if (n.kind === 'task') geom = new THREE.BoxGeometry(0.026, 0.026, 0.026)
+      else if (n.kind === 'decision') geom = new THREE.OctahedronGeometry(0.026)
+      else if (n.kind === 'memory') geom = new THREE.SphereGeometry(0.024, 8, 8)
+      else if (n.kind === 'item') geom = new THREE.TetrahedronGeometry(0.024)
+      else geom = new THREE.SphereGeometry(0.018, 8, 8)
 
-      const kindColorMap: Record<string, string> = { task: '--accent', memory: '--text-2', decision: '--warm', item: '--text-3' }
+      const kindColorMap: Record<string, string> = { task: '--accent', memory: '--warn', decision: '--warm', item: '--text-3' }
       const kindColor = kindColorMap[n.kind || ''] || '--text-3'
       let r3Alpha = alpha
       if (n.kind === 'task' && n.meta) {

@@ -6,20 +6,24 @@
     { "id": "lifeline:health-cardio", "name": "心肺", "parent_id": "lifeline:health", "order_index": 0 },
     { "id": "lifeline:health-diet", "name": "饮食", "parent_id": "lifeline:health", "order_index": 1 },
     { "id": "lifeline:health-sleep", "name": "睡眠", "parent_id": "lifeline:health", "order_index": 2 },
+    { "id": "lifeline:health-mind", "name": "心理健康", "parent_id": "lifeline:health", "order_index": 3 },
 
     { "id": "lifeline:rust", "name": "Rust 学习", "parent_id": "ROOT", "order_index": 1 },
     { "id": "lifeline:rust-ownership", "name": "所有权", "parent_id": "lifeline:rust", "order_index": 0 },
     { "id": "lifeline:rust-trait", "name": "Trait 系统", "parent_id": "lifeline:rust", "order_index": 1 },
     { "id": "lifeline:rust-async", "name": "异步编程", "parent_id": "lifeline:rust", "order_index": 2 },
+    { "id": "lifeline:rust-unsafe", "name": "Unsafe Rust", "parent_id": "lifeline:rust", "order_index": 3 },
 
     { "id": "lifeline:axiom", "name": "Axiom 开发", "parent_id": "ROOT", "order_index": 2 },
     { "id": "lifeline:axiom-backend", "name": "后端架构", "parent_id": "lifeline:axiom", "order_index": 0 },
     { "id": "lifeline:axiom-frontend", "name": "前端 Atlas", "parent_id": "lifeline:axiom", "order_index": 1 },
     { "id": "lifeline:axiom-modules", "name": "模块系统", "parent_id": "lifeline:axiom", "order_index": 2 },
+    { "id": "lifeline:axiom-ai", "name": "AI 集成", "parent_id": "lifeline:axiom", "order_index": 3 },
 
     { "id": "lifeline:reading", "name": "阅读", "parent_id": "ROOT", "order_index": 3 },
     { "id": "lifeline:reading-tech", "name": "技术书", "parent_id": "lifeline:reading", "order_index": 0 },
     { "id": "lifeline:reading-fic", "name": "小说", "parent_id": "lifeline:reading", "order_index": 1 },
+    { "id": "lifeline:reading-phil", "name": "哲学", "parent_id": "lifeline:reading", "order_index": 2 },
 
     { "id": "lifeline:social", "name": "社交", "parent_id": "ROOT", "order_index": 4 },
     { "id": "lifeline:social-family", "name": "家人", "parent_id": "lifeline:social", "order_index": 0 },
@@ -30,112 +34,235 @@
     { "id": "lifeline:finance-invest", "name": "投资", "parent_id": "lifeline:finance", "order_index": 1 },
 
     { "id": "lifeline:creative", "name": "创作", "parent_id": "ROOT", "order_index": 6 },
-    { "id": "lifeline:creative-blog", "name": "博客", "parent_id": "lifeline:creative", "order_index": 0 }
+    { "id": "lifeline:creative-blog", "name": "博客", "parent_id": "lifeline:creative", "order_index": 0 },
+    { "id": "lifeline:creative-oss", "name": "开源项目", "parent_id": "lifeline:creative", "order_index": 1 }
   ],
   "entities": [
-    { "id": "task:1", "kind": "task", "title": "每天跑步 30 分钟", "lifeline_id": "lifeline:health-cardio", "meta": { "priority": "high" } },
-    { "id": "task:2", "kind": "task", "title": "周末徒步 5km", "lifeline_id": "lifeline:health-cardio", "meta": { "priority": "medium" } },
-    { "id": "memory:1", "kind": "memory", "title": "空腹有氧更利于减脂", "lifeline_id": "lifeline:health-cardio" },
-    { "id": "item:1", "kind": "item", "title": "今天血压 125/82", "lifeline_id": "lifeline:health-cardio" },
+    { "id": "task:1", "kind": "task", "title": "每天晨跑 30 分钟", "lifeline_id": "lifeline:health-cardio", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "task:2", "kind": "task", "title": "周末徒步 5 公里", "lifeline_id": "lifeline:health-cardio", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "task:20", "kind": "task", "title": "报名半程马拉松", "lifeline_id": "lifeline:health-cardio", "meta": { "priority": "low", "status": "done" } },
+    { "id": "memory:1", "kind": "memory", "title": "空腹有氧比饭后跑步更利于减脂", "lifeline_id": "lifeline:health-cardio" },
+    { "id": "memory:20", "kind": "memory", "title": "心率区间 140-160 是有氧最佳区间", "lifeline_id": "lifeline:health-cardio" },
+    { "id": "item:1", "kind": "item", "title": "今天血压记录 125/82", "lifeline_id": "lifeline:health-cardio" },
+    { "id": "item:10", "kind": "item", "title": "Garmin 跑步数据截图 — 5 月汇总", "lifeline_id": "lifeline:health-cardio" },
 
-    { "id": "task:3", "kind": "task", "title": "每天摄入 < 1800 kcal", "lifeline_id": "lifeline:health-diet", "meta": { "priority": "high" } },
-    { "id": "memory:2", "kind": "memory", "title": "晚餐碳水多会失眠", "lifeline_id": "lifeline:health-diet" },
-    { "id": "decision:1", "kind": "decision", "title": "尝试生酮还是地中海饮食", "lifeline_id": "lifeline:health-diet" },
+    { "id": "task:3", "kind": "task", "title": "每日热量摄入 < 1800 kcal", "lifeline_id": "lifeline:health-diet", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "task:21", "kind": "task", "title": "每周 meal prep 一次", "lifeline_id": "lifeline:health-diet", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "memory:2", "kind": "memory", "title": "晚餐碳水吃太多会导致入睡困难", "lifeline_id": "lifeline:health-diet" },
+    { "id": "memory:21", "kind": "memory", "title": "蛋白质摄入不足时容易下午犯困", "lifeline_id": "lifeline:health-diet" },
+    { "id": "decision:1", "kind": "decision", "title": "尝试生酮饮食还是地中海饮食", "lifeline_id": "lifeline:health-diet" },
 
-    { "id": "task:4", "kind": "task", "title": "23 点前关灯睡觉", "lifeline_id": "lifeline:health-sleep", "meta": { "priority": "high" } },
-    { "id": "memory:3", "kind": "memory", "title": "睡前刷手机让我焦虑", "lifeline_id": "lifeline:health-sleep" },
-    { "id": "item:2", "kind": "item", "title": "昨晚睡眠记录 7h 深睡 2h", "lifeline_id": "lifeline:health-sleep" },
+    { "id": "task:4", "kind": "task", "title": "23 点前关灯放下手机", "lifeline_id": "lifeline:health-sleep", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "memory:3", "kind": "memory", "title": "睡前刷短视频会显著增加入睡焦虑", "lifeline_id": "lifeline:health-sleep" },
+    { "id": "memory:22", "kind": "memory", "title": "固定起床时间比固定入睡时间更重要", "lifeline_id": "lifeline:health-sleep" },
+    { "id": "item:2", "kind": "item", "title": "昨晚睡眠记录：7h 总量，深睡 2h", "lifeline_id": "lifeline:health-sleep" },
 
-    { "id": "task:5", "kind": "task", "title": "完成 Rust book 第 4 章练习", "lifeline_id": "lifeline:rust-ownership", "meta": { "priority": "medium" } },
-    { "id": "task:6", "kind": "task", "title": "写一篇所有权与借用的笔记", "lifeline_id": "lifeline:rust-ownership", "meta": { "priority": "medium" } },
-    { "id": "memory:4", "kind": "memory", "title": "所有权是 Rust 最核心的创新", "lifeline_id": "lifeline:rust-ownership" },
-    { "id": "item:3", "kind": "item", "title": "Rust 官方书 — 所有权章节截图", "lifeline_id": "lifeline:rust-ownership" },
+    { "id": "task:25", "kind": "task", "title": "每天冥想 10 分钟", "lifeline_id": "lifeline:health-mind", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "memory:25", "kind": "memory", "title": "正念冥想对注意力恢复有显著效果", "lifeline_id": "lifeline:health-mind" },
+    { "id": "item:20", "kind": "item", "title": "Headspace 冥想记录 — 连续 7 天", "lifeline_id": "lifeline:health-mind" },
 
-    { "id": "task:7", "kind": "task", "title": "实现一个自定义 Iterator trait 示例", "lifeline_id": "lifeline:rust-trait", "meta": { "priority": "medium" } },
-    { "id": "memory:5", "kind": "memory", "title": "Trait bound 的 where 语法更可读", "lifeline_id": "lifeline:rust-trait" },
-    { "id": "decision:2", "kind": "decision", "title": "derive 宏 vs 手动实现 Display", "lifeline_id": "lifeline:rust-trait" },
+    { "id": "task:5", "kind": "task", "title": "完成 Rust Book 第 4 章所有权练习", "lifeline_id": "lifeline:rust-ownership", "meta": { "priority": "medium", "status": "done" } },
+    { "id": "task:6", "kind": "task", "title": "写一篇所有权与借用的对比笔记", "lifeline_id": "lifeline:rust-ownership", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "task:30", "kind": "task", "title": "用 Rust 实现一个简单的链表", "lifeline_id": "lifeline:rust-ownership", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "memory:4", "kind": "memory", "title": "所有权是 Rust 区别于其他语言最核心的创新", "lifeline_id": "lifeline:rust-ownership" },
+    { "id": "memory:30", "kind": "memory", "title": "Rc 和 Arc 用于突破单一所有权限制的场景", "lifeline_id": "lifeline:rust-ownership" },
+    { "id": "item:3", "kind": "item", "title": "Rust Book 所有权章节的思维导图截图", "lifeline_id": "lifeline:rust-ownership" },
 
-    { "id": "task:8", "kind": "task", "title": "用 tokio 写一个 echo server", "lifeline_id": "lifeline:rust-async", "meta": { "priority": "low" } },
-    { "id": "memory:6", "kind": "memory", "title": "async/await 比 Future 链更直观", "lifeline_id": "lifeline:rust-async" },
-    { "id": "item:4", "kind": "item", "title": "Tokio tutorial — 异步 IO 笔记", "lifeline_id": "lifeline:rust-async" },
+    { "id": "task:7", "kind": "task", "title": "实现一个自定义 Iterator trait", "lifeline_id": "lifeline:rust-trait", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "task:31", "kind": "task", "title": "对比 Rust trait 和 Go interface 的设计差异", "lifeline_id": "lifeline:rust-trait", "meta": { "priority": "low", "status": "todo" } },
+    { "id": "memory:5", "kind": "memory", "title": "Trait bound 的 where 子句比内联写法更可读", "lifeline_id": "lifeline:rust-trait" },
+    { "id": "decision:2", "kind": "decision", "title": "选择 derive 宏还是手动实现 Display trait", "lifeline_id": "lifeline:rust-trait" },
 
-    { "id": "task:9", "kind": "task", "title": "重构 /cosmos API 返回结构", "lifeline_id": "lifeline:axiom-backend", "meta": { "priority": "high" } },
-    { "id": "task:10", "kind": "task", "title": "给 lifeline 表加迁移脚本", "lifeline_id": "lifeline:axiom-backend", "meta": { "priority": "medium" } },
-    { "id": "memory:7", "kind": "memory", "title": "SQLite FTS5 + CJK 分词方案可行", "lifeline_id": "lifeline:axiom-backend" },
-    { "id": "decision:3", "kind": "decision", "title": "Flask 是否换成 FastAPI", "lifeline_id": "lifeline:axiom-backend" },
+    { "id": "task:8", "kind": "task", "title": "用 tokio 写一个多线程 echo server", "lifeline_id": "lifeline:rust-async", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "task:32", "kind": "task", "title": "阅读 tokio 官方 tutorial 前 3 章", "lifeline_id": "lifeline:rust-async", "meta": { "priority": "medium", "status": "done" } },
+    { "id": "memory:6", "kind": "memory", "title": "async/await 语法比 Future 链式调用直观很多", "lifeline_id": "lifeline:rust-async" },
+    { "id": "item:4", "kind": "item", "title": "Tokio tutorial 笔记 — 异步 IO 模型", "lifeline_id": "lifeline:rust-async" },
 
-    { "id": "task:11", "kind": "task", "title": "完成 Atlas 3D 球面原型", "lifeline_id": "lifeline:axiom-frontend", "meta": { "priority": "high" } },
-    { "id": "memory:8", "kind": "memory", "title": "Three.js Line2 的 raycast 有局限", "lifeline_id": "lifeline:axiom-frontend" },
-    { "id": "item:5", "kind": "item", "title": "Axiom Atlas 截图 — 在球面上", "lifeline_id": "lifeline:axiom-frontend" },
+    { "id": "task:35", "kind": "task", "title": "理解 Unsafe Rust 的五大超能力", "lifeline_id": "lifeline:rust-unsafe", "meta": { "priority": "low", "status": "todo" } },
+    { "id": "memory:35", "kind": "memory", "title": "大多数应用层代码不需要碰 unsafe", "lifeline_id": "lifeline:rust-unsafe" },
 
-    { "id": "task:12", "kind": "task", "title": "设计 module registry 接口", "lifeline_id": "lifeline:axiom-modules", "meta": { "priority": "medium" } },
-    { "id": "memory:9", "kind": "memory", "title": "模块需支持 蓝图 + DB table + 自动化job", "lifeline_id": "lifeline:axiom-modules" },
+    { "id": "task:9", "kind": "task", "title": "重构 /cosmos API 的返回结构", "lifeline_id": "lifeline:axiom-backend", "meta": { "priority": "high", "status": "done" } },
+    { "id": "task:10", "kind": "task", "title": "给 lifeline 表写 Alembic 迁移脚本", "lifeline_id": "lifeline:axiom-backend", "meta": { "priority": "medium", "status": "done" } },
+    { "id": "task:40", "kind": "task", "title": "实现 /cosmos/import 端点", "lifeline_id": "lifeline:axiom-backend", "meta": { "priority": "high", "status": "done" } },
+    { "id": "memory:7", "kind": "memory", "title": "SQLite FTS5 + jieba 分词对中文搜索效果很好", "lifeline_id": "lifeline:axiom-backend" },
+    { "id": "memory:40", "kind": "memory", "title": "Flask 的 error_response 模式需要统一错误码", "lifeline_id": "lifeline:axiom-backend" },
+    { "id": "decision:3", "kind": "decision", "title": "后端框架选型：Flask 继续还是迁移 FastAPI", "lifeline_id": "lifeline:axiom-backend" },
 
-    { "id": "task:13", "kind": "task", "title": "读完 Designing Data-Intensive Apps Ch5", "lifeline_id": "lifeline:reading-tech", "meta": { "priority": "medium" } },
-    { "id": "memory:10", "kind": "memory", "title": "分布式共识比我想的复杂一个数量级", "lifeline_id": "lifeline:reading-tech" },
-    { "id": "item:6", "kind": "item", "title": "DDIA Ch4 笔记 — 编码与演进", "lifeline_id": "lifeline:reading-tech" },
+    { "id": "task:11", "kind": "task", "title": "实现 3D 球面的四层径向布局", "lifeline_id": "lifeline:axiom-frontend", "meta": { "priority": "high", "status": "done" } },
+    { "id": "task:41", "kind": "task", "title": "优化 Line2 大批量渲染性能", "lifeline_id": "lifeline:axiom-frontend", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "task:42", "kind": "task", "title": "给 R3 entity 节点加 halo 聚焦效果", "lifeline_id": "lifeline:axiom-frontend", "meta": { "priority": "medium", "status": "done" } },
+    { "id": "memory:8", "kind": "memory", "title": "Three.js Line2 的 fat line raycast 有精度局限", "lifeline_id": "lifeline:axiom-frontend" },
+    { "id": "memory:41", "kind": "memory", "title": "CSS2DRenderer 的 label 在缩放时不会变形", "lifeline_id": "lifeline:axiom-frontend" },
+    { "id": "item:5", "kind": "item", "title": "Atlas 3D 截图 — 四层布局效果", "lifeline_id": "lifeline:axiom-frontend" },
 
-    { "id": "task:14", "kind": "task", "title": "周末读完三体 III", "lifeline_id": "lifeline:reading-fic", "meta": { "priority": "low" } },
-    { "id": "memory:11", "kind": "memory", "title": "我喜欢硬科幻多于奇幻", "lifeline_id": "lifeline:reading-fic" },
+    { "id": "task:12", "kind": "task", "title": "设计 module registry 接口规范", "lifeline_id": "lifeline:axiom-modules", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "memory:9", "kind": "memory", "title": "模块需同时支持：蓝图注册 + DB 初始化 + 自动化 job", "lifeline_id": "lifeline:axiom-modules" },
+    { "id": "decision:5", "kind": "decision", "title": "模块间依赖用事件总线还是直接调用", "lifeline_id": "lifeline:axiom-modules" },
 
-    { "id": "task:15", "kind": "task", "title": "周末给妈妈打电话", "lifeline_id": "lifeline:social-family", "meta": { "priority": "high" } },
-    { "id": "memory:12", "kind": "memory", "title": "妈妈最近血压偏高需要关注", "lifeline_id": "lifeline:social-family" },
+    { "id": "task:45", "kind": "task", "title": "设计 AI 关联生成的 prompt 模板", "lifeline_id": "lifeline:axiom-ai", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "task:46", "kind": "task", "title": "对比本地 LLM 和 API 调用的延迟", "lifeline_id": "lifeline:axiom-ai", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "memory:45", "kind": "memory", "title": "关联生成的质量严重依赖 evidence 的丰富程度", "lifeline_id": "lifeline:axiom-ai" },
 
-    { "id": "task:16", "kind": "task", "title": "约小王周末打球", "lifeline_id": "lifeline:social-friends", "meta": { "priority": "low" } },
-    { "id": "item:7", "kind": "item", "title": "群聊截图 — 关于周末聚会", "lifeline_id": "lifeline:social-friends" },
+    { "id": "task:13", "kind": "task", "title": "读完 DDIA 第 5 章：复制", "lifeline_id": "lifeline:reading-tech", "meta": { "priority": "medium", "status": "done" } },
+    { "id": "task:50", "kind": "task", "title": "读完《A Philosophy of Software Design》", "lifeline_id": "lifeline:reading-tech", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "memory:10", "kind": "memory", "title": "分布式共识（Paxos/Raft）比直觉复杂一个数量级", "lifeline_id": "lifeline:reading-tech" },
+    { "id": "memory:50", "kind": "memory", "title": "好的抽象应该是 deep 而非 shallow", "lifeline_id": "lifeline:reading-tech" },
+    { "id": "item:6", "kind": "item", "title": "DDIA Ch4 笔记 — 编码与数据演化", "lifeline_id": "lifeline:reading-tech" },
 
-    { "id": "task:17", "kind": "task", "title": "同步本月信用卡账单", "lifeline_id": "lifeline:finance-track", "meta": { "priority": "high" } },
-    { "id": "memory:13", "kind": "memory", "title": "月底常超支在餐饮和网购", "lifeline_id": "lifeline:finance-track" },
+    { "id": "task:14", "kind": "task", "title": "周末读完《三体 III：死神永生》", "lifeline_id": "lifeline:reading-fic", "meta": { "priority": "low", "status": "done" } },
+    { "id": "memory:11", "kind": "memory", "title": "硬科幻的物理设定比奇幻的魔法体系更吸引我", "lifeline_id": "lifeline:reading-fic" },
+    { "id": "memory:51", "kind": "memory", "title": "刘慈欣的黑暗森林理论是对费米悖论的独特回答", "lifeline_id": "lifeline:reading-fic" },
+    { "id": "item:30", "kind": "item", "title": "《三体》三部曲读完的书架照片", "lifeline_id": "lifeline:reading-fic" },
 
-    { "id": "task:18", "kind": "task", "title": "研究 ETF 定投策略", "lifeline_id": "lifeline:finance-invest", "meta": { "priority": "medium" } },
-    { "id": "decision:4", "kind": "decision", "title": "定投沪深 300 还是标普 500", "lifeline_id": "lifeline:finance-invest" },
-    { "id": "item:8", "kind": "item", "title": "基金定投回测数据", "lifeline_id": "lifeline:finance-invest" },
+    { "id": "task:55", "kind": "task", "title": "阅读尼采《查拉图斯特拉如是说》", "lifeline_id": "lifeline:reading-phil", "meta": { "priority": "low", "status": "todo" } },
+    { "id": "memory:55", "kind": "memory", "title": "斯多葛主义的核心是区分可控与不可控", "lifeline_id": "lifeline:reading-phil" },
 
-    { "id": "task:19", "kind": "task", "title": "写一篇《我为什么建 Axiom》", "lifeline_id": "lifeline:creative-blog", "meta": { "priority": "medium" } },
-    { "id": "memory:14", "kind": "memory", "title": "写作让我整理思路，不是炫耀", "lifeline_id": "lifeline:creative-blog" }
+    { "id": "task:15", "kind": "task", "title": "每周末给妈妈打视频电话", "lifeline_id": "lifeline:social-family", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "memory:12", "kind": "memory", "title": "妈妈最近血压有点偏高，需要注意饮食", "lifeline_id": "lifeline:social-family" },
+    { "id": "decision:6", "kind": "decision", "title": "春节回家还是出去旅行", "lifeline_id": "lifeline:social-family" },
+
+    { "id": "task:16", "kind": "task", "title": "约小王和小李周末打篮球", "lifeline_id": "lifeline:social-friends", "meta": { "priority": "low", "status": "todo" } },
+    { "id": "memory:60", "kind": "memory", "title": "小王最近在学 Rust，可以一起做 side project", "lifeline_id": "lifeline:social-friends" },
+    { "id": "item:7", "kind": "item", "title": "微信群聊截图 — 周末聚会计划", "lifeline_id": "lifeline:social-friends" },
+
+    { "id": "task:17", "kind": "task", "title": "核对本月信用卡账单", "lifeline_id": "lifeline:finance-track", "meta": { "priority": "high", "status": "todo" } },
+    { "id": "task:65", "kind": "task", "title": "把订阅服务汇总到一张表里", "lifeline_id": "lifeline:finance-track", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "memory:13", "kind": "memory", "title": "月底经常超支在餐饮外卖和网购冲动消费", "lifeline_id": "lifeline:finance-track" },
+    { "id": "memory:65", "kind": "memory", "title": "记账三个月后发现最大开销是外出就餐", "lifeline_id": "lifeline:finance-track" },
+
+    { "id": "task:18", "kind": "task", "title": "研究 ETF 定投的长期策略", "lifeline_id": "lifeline:finance-invest", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "decision:4", "kind": "decision", "title": "定投标的：沪深 300 还是标普 500 ETF", "lifeline_id": "lifeline:finance-invest" },
+    { "id": "item:8", "kind": "item", "title": "基金定投历史回测数据表格", "lifeline_id": "lifeline:finance-invest" },
+    { "id": "item:40", "kind": "item", "title": "2024 年投资收益汇总截图", "lifeline_id": "lifeline:finance-invest" },
+
+    { "id": "task:19", "kind": "task", "title": "写博客《我为什么自己动手建 Axiom》", "lifeline_id": "lifeline:creative-blog", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "task:70", "kind": "task", "title": "把博客从 Hexo 迁移到自建的静态站点", "lifeline_id": "lifeline:creative-blog", "meta": { "priority": "low", "status": "cancelled" } },
+    { "id": "memory:14", "kind": "memory", "title": "写作不是为了炫耀知识，而是整理自己的思路", "lifeline_id": "lifeline:creative-blog" },
+
+    { "id": "task:75", "kind": "task", "title": "给 Axiom 前端贡献一个 PR", "lifeline_id": "lifeline:creative-oss", "meta": { "priority": "medium", "status": "todo" } },
+    { "id": "memory:70", "kind": "memory", "title": "开源社区更看重好的 issue 描述而非代码量", "lifeline_id": "lifeline:creative-oss" }
   ],
   "associations": [
     { "id": "assoc:1", "from": "task:1", "to": "memory:1", "relation_type": "causal", "confidence": 0.75, "status": "pending", "evidence": [
-      { "type": "co_occurrence", "excerpt": "用户在 7 天内同时记录了 4 次跑步任务和 6 条血压数据，共现频率高于随机基线", "weight": 0.85 },
-      { "type": "semantic", "excerpt": "「跑步」与「有氧减脂」语义向量余弦相似度 0.72，同属健康管理主题域", "weight": 0.70 },
-      { "type": "causal_hint", "excerpt": "连续数据暗示规律运动可能对血压控制有直接改善效果", "weight": 0.65 }
+      { "type": "co_occurrence", "excerpt": "用户在 7 天内记录了 4 次晨跑和 6 条心率数据，共现频率显著高于随机基线", "weight": 0.85 },
+      { "type": "semantic", "excerpt": "「晨跑」与「有氧减脂」在健康管理主题域中语义余弦相似度 0.72", "weight": 0.70 }
     ]},
-    { "id": "assoc:2", "from": "task:4", "to": "memory:3", "relation_type": "causal", "confidence": 0.70, "status": "accepted", "evidence": [
-      { "type": "temporal", "excerpt": "设定 23 点关灯目标后，焦虑记录从每周 4 次降至 1 次，时间序列相关性明显", "weight": 0.80 },
-      { "type": "manual", "excerpt": "用户自行标注了这条因果关联，确认睡前干预对焦虑有缓解效果", "weight": 0.90 }
+    { "id": "assoc:2", "from": "task:4", "to": "memory:3", "relation_type": "causal", "confidence": 0.82, "status": "accepted", "evidence": [
+      { "type": "temporal", "excerpt": "设定 23 点目标后 2 周，焦虑记录从每周 4 次降至 1 次，时间序列相关", "weight": 0.80 },
+      { "type": "manual", "excerpt": "用户自行标注了这条因果关联，确认睡前干预对焦虑缓解有效", "weight": 0.90 }
     ]},
-    { "id": "assoc:3", "from": "task:5", "to": "memory:4", "relation_type": "derived_from", "confidence": 0.82, "status": "pending", "evidence": [
-      { "type": "semantic", "excerpt": "任务标题含「所有权」与记忆内容「所有权是核心创新」语义完全匹配", "weight": 0.95 },
-      { "type": "co_occurrence", "excerpt": "两条记录在 48 小时内相继创建，时间窗口极短，关联强度显著", "weight": 0.75 }
+    { "id": "assoc:3", "from": "task:5", "to": "memory:4", "relation_type": "derived_from", "confidence": 0.88, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "任务标题含「所有权」与记忆「所有权是核心创新」完全匹配", "weight": 0.95 },
+      { "type": "co_occurrence", "excerpt": "两记录在 48 小时内相继创建，时间窗口极短", "weight": 0.75 }
     ]},
     { "id": "assoc:4", "from": "task:7", "to": "memory:5", "relation_type": "co_occurrence", "confidence": 0.65, "status": "pending", "evidence": [
-      { "type": "semantic", "excerpt": "Trait 实现任务与 Trait 用法记忆同属 Rust 语法进阶主题，关键词重叠率 65%", "weight": 0.68 },
-      { "type": "temporal", "excerpt": "任务创建后 4 小时就记录了相关记忆，学习-总结模式明显", "weight": 0.60 }
+      { "type": "semantic", "excerpt": "Iterator trait 任务与 trait 用法记忆同属 Rust 语法进阶，关键词重叠率 65%", "weight": 0.68 },
+      { "type": "temporal", "excerpt": "任务和记忆在同一下午创建，学习-总结模式明显", "weight": 0.60 }
     ]},
     { "id": "assoc:5", "from": "task:9", "to": "task:11", "relation_type": "tension", "confidence": 0.55, "status": "pending", "evidence": [
-      { "type": "co_occurrence", "excerpt": "后端重构与前端任务在 3 天内相继创建，存在资源竞争关系", "weight": 0.55 },
-      { "type": "semantic", "excerpt": "两个任务分别消耗不同技术栈的精力，形成注意力分配的张力", "weight": 0.50 }
+      { "type": "co_occurrence", "excerpt": "后端重构与前端 3D 任务在同一周创建，存在开发资源竞争", "weight": 0.55 },
+      { "type": "semantic", "excerpt": "两个任务消耗不同技术栈精力，形成注意力分配的天然张力", "weight": 0.50 }
     ]},
-    { "id": "assoc:6", "from": "task:13", "to": "memory:10", "relation_type": "derived_from", "confidence": 0.88, "status": "accepted", "evidence": [
-      { "type": "semantic", "excerpt": "读 DDIA 第 5 章的记录与「分布式共识复杂」记忆直接相关，概念映射精确", "weight": 0.92 },
+    { "id": "assoc:6", "from": "task:13", "to": "memory:10", "relation_type": "derived_from", "confidence": 0.90, "status": "accepted", "evidence": [
+      { "type": "semantic", "excerpt": "DDIA Ch5 阅读与「分布式共识」记忆直接对应，概念映射精确", "weight": 0.92 },
       { "type": "co_occurrence", "excerpt": "阅读任务和认知记忆在同一天创建，即时学习反馈", "weight": 0.82 },
-      { "type": "manual", "excerpt": "用户手动将这条关联标记为 accepted，确认为可靠的推导关系", "weight": 0.95 }
+      { "type": "manual", "excerpt": "用户手动标记为 accepted，确认为可靠的推导关系", "weight": 0.95 }
     ]},
     { "id": "assoc:7", "from": "task:17", "to": "memory:13", "relation_type": "causal", "confidence": 0.72, "status": "pending", "evidence": [
-      { "type": "co_occurrence", "excerpt": "月度账单核对与超支习惯反思在 2 小时内记录，财务复盘行为一致", "weight": 0.78 },
-      { "type": "causal_hint", "excerpt": "账单记录触发用户自我反思，形成「行为→认知→改进」的标准因果链", "weight": 0.68 }
+      { "type": "co_occurrence", "excerpt": "账单核对与超支反思在 2 小时内记录，财务复盘行为连贯", "weight": 0.78 },
+      { "type": "causal_hint", "excerpt": "账单记录触发自我反思，形成「行为→认知→改进」标准因果链", "weight": 0.68 }
     ]},
-    { "id": "assoc:8", "from": "decision:3", "to": "memory:8", "relation_type": "tension", "confidence": 0.48, "status": "pending", "evidence": [
-      { "type": "semantic", "excerpt": "「是否换 FastAPI」与「Line2 raycast 有局限」都涉及技术选型的权衡", "weight": 0.52 },
-      { "type": "temporal", "excerpt": "决策与记忆同时出现于 Axiom 开发 lifeline 下，技术栈选择的张力集中", "weight": 0.45 }
+    { "id": "assoc:8", "from": "decision:3", "to": "memory:7", "relation_type": "tension", "confidence": 0.48, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "「Flask vs FastAPI」选型与「FTS5 分词」都涉及技术栈决策考量", "weight": 0.52 },
+      { "type": "temporal", "excerpt": "决策与记忆同在 Axiom 后端 lifeline 下，技术选型张力集中", "weight": 0.45 }
     ]},
     { "id": "assoc:9", "from": "task:5", "to": "task:6", "relation_type": "co_occurrence", "confidence": 0.68, "status": "pending", "evidence": [
-      { "type": "co_occurrence", "excerpt": "练习任务与笔记任务在同一个下午创建，学习心流状态连续产出", "weight": 0.72 },
-      { "type": "semantic", "excerpt": "两个任务都围绕「所有权」知识点，学习路径清晰连贯", "weight": 0.65 }
+      { "type": "co_occurrence", "excerpt": "练习任务与笔记任务在同一时段创建，学习心流连续产出", "weight": 0.72 },
+      { "type": "semantic", "excerpt": "两个任务都围绕所有权知识点，学习路径清晰连贯", "weight": 0.65 }
     ]},
-    { "id": "assoc:10","from": "memory:11", "to": "task:14", "relation_type": "causal", "confidence": 0.60, "status": "accepted", "evidence": [
-      { "type": "causal_hint", "excerpt": "偏好硬科幻的用户倾向于选择类似的阅读任务，兴趣驱动行为模式", "weight": 0.62 },
-      { "type": "semantic", "excerpt": "「科幻」偏好与「三体」任务高度匹配，兴趣表达一致性", "weight": 0.58 }
+    { "id": "assoc:10", "from": "memory:11", "to": "task:14", "relation_type": "causal", "confidence": 0.60, "status": "accepted", "evidence": [
+      { "type": "causal_hint", "excerpt": "偏好硬科幻的用户倾向于选择同类阅读任务，兴趣驱动行为", "weight": 0.62 },
+      { "type": "semantic", "excerpt": "「科幻」偏好与「三体」任务高度匹配", "weight": 0.58 }
+    ]},
+    { "id": "assoc:11", "from": "task:3", "to": "task:1", "relation_type": "co_occurrence", "confidence": 0.70, "status": "accepted", "evidence": [
+      { "type": "co_occurrence", "excerpt": "饮食控制与运动任务同属健康 lifeline，减肥双支柱", "weight": 0.75 },
+      { "type": "semantic", "excerpt": "热量控制与有氧运动在健身计划中总是一起出现", "weight": 0.68 }
+    ]},
+    { "id": "assoc:12", "from": "task:21", "to": "task:3", "relation_type": "derived_from", "confidence": 0.78, "status": "accepted", "evidence": [
+      { "type": "semantic", "excerpt": "Meal prep 是实现热量目标的执行手段，手段-目标关系明确", "weight": 0.82 },
+      { "type": "temporal", "excerpt": "Meal prep 任务在热量任务之后创建，计划细化过程", "weight": 0.72 }
+    ]},
+    { "id": "assoc:13", "from": "task:4", "to": "task:25", "relation_type": "co_occurrence", "confidence": 0.62, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "良好睡眠和冥想都属于心理健康的基础习惯", "weight": 0.66 },
+      { "type": "co_occurrence", "excerpt": "两个健康习惯任务在 24 小时内创建", "weight": 0.58 }
+    ]},
+    { "id": "assoc:14", "from": "task:30", "to": "memory:30", "relation_type": "derived_from", "confidence": 0.74, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "链表实现需要理解 Rc/Arc 智能指针，与记忆内容直接关联", "weight": 0.78 },
+      { "type": "co_occurrence", "excerpt": "任务在记忆创建后 3 天出现，学习路径递进", "weight": 0.68 }
+    ]},
+    { "id": "assoc:15", "from": "task:31", "to": "task:7", "relation_type": "co_occurrence", "confidence": 0.58, "status": "accepted", "evidence": [
+      { "type": "semantic", "excerpt": "trait 对比和 trait 实现同属一个学习主题的不同侧面", "weight": 0.62 },
+      { "type": "manual", "excerpt": "用户手动确认了这两个 Rust trait 任务的关联", "weight": 0.85 }
+    ]},
+    { "id": "assoc:16", "from": "task:8", "to": "task:32", "relation_type": "derived_from", "confidence": 0.80, "status": "accepted", "evidence": [
+      { "type": "temporal", "excerpt": "先读完教程再动手写代码，学习顺序合理", "weight": 0.85 },
+      { "type": "semantic", "excerpt": "tokio tutorial 是写 echo server 的前提知识", "weight": 0.76 }
+    ]},
+    { "id": "assoc:17", "from": "task:40", "to": "task:9", "relation_type": "derived_from", "confidence": 0.85, "status": "accepted", "evidence": [
+      { "type": "temporal", "excerpt": "重构 /cosmos API 为 /cosmos/import 打下了数据基础", "weight": 0.88 },
+      { "type": "semantic", "excerpt": "两者都是 /cosmos 端点的功能扩展，代码位置相近", "weight": 0.80 }
+    ]},
+    { "id": "assoc:18", "from": "task:11", "to": "task:42", "relation_type": "derived_from", "confidence": 0.86, "status": "accepted", "evidence": [
+      { "type": "temporal", "excerpt": "四层布局完成后 3 天，halo 聚焦效果作为视觉增强叠加", "weight": 0.88 },
+      { "type": "semantic", "excerpt": "3D 球面原型与节点聚焦同属前端视觉层改进", "weight": 0.82 }
+    ]},
+    { "id": "assoc:19", "from": "task:45", "to": "memory:45", "relation_type": "causal", "confidence": 0.72, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "AI prompt 设计需要基于 evidence 质量的认知，理论与实践对应", "weight": 0.75 },
+      { "type": "co_occurrence", "excerpt": "AI 任务和记忆在同一天记录", "weight": 0.68 }
+    ]},
+    { "id": "assoc:20", "from": "task:50", "to": "memory:50", "relation_type": "derived_from", "confidence": 0.82, "status": "accepted", "evidence": [
+      { "type": "semantic", "excerpt": "读书任务与 deep module 认知直接相关", "weight": 0.85 },
+      { "type": "temporal", "excerpt": "APoSD 阅读在第 1 章就提到了 deep/shallow module 概念", "weight": 0.76 }
+    ]},
+    { "id": "assoc:21", "from": "memory:11", "to": "memory:51", "relation_type": "derived_from", "confidence": 0.68, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "硬科幻偏好与黑暗森林理论同属科幻主题深度思考", "weight": 0.72 },
+      { "type": "co_occurrence", "excerpt": "两条记忆在三体相关上下文中创建", "weight": 0.62 }
+    ]},
+    { "id": "assoc:22", "from": "task:15", "to": "memory:12", "relation_type": "causal", "confidence": 0.78, "status": "accepted", "evidence": [
+      { "type": "causal_hint", "excerpt": "妈妈血压偏高的事实直接驱动了定期关心的任务创建", "weight": 0.82 },
+      { "type": "semantic", "excerpt": "家人健康关注与亲情互动高度相关", "weight": 0.72 }
+    ]},
+    { "id": "assoc:23", "from": "task:65", "to": "memory:65", "relation_type": "causal", "confidence": 0.76, "status": "pending", "evidence": [
+      { "type": "temporal", "excerpt": "3 个月记账后形成的洞察直接触发了订阅汇总任务", "weight": 0.80 },
+      { "type": "causal_hint", "excerpt": "财务认知 → 行动优化的标准链路", "weight": 0.70 }
+    ]},
+    { "id": "assoc:24", "from": "decision:4", "to": "task:18", "relation_type": "tension", "confidence": 0.55, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "标的决策与策略研究相互依存，先有方向才能做策略", "weight": 0.60 },
+      { "type": "temporal", "excerpt": "决策和任务在同一周内创建", "weight": 0.50 }
+    ]},
+    { "id": "assoc:25", "from": "task:19", "to": "memory:14", "relation_type": "derived_from", "confidence": 0.72, "status": "accepted", "evidence": [
+      { "type": "semantic", "excerpt": "博客主题直接对应写作目的认知", "weight": 0.78 },
+      { "type": "manual", "excerpt": "用户确认了这条关联", "weight": 0.90 }
+    ]},
+    { "id": "assoc:26", "from": "memory:60", "to": "task:16", "relation_type": "co_occurrence", "confidence": 0.58, "status": "accepted", "evidence": [
+      { "type": "semantic", "excerpt": "小王学 Rust + 约小王打球，社交与共同兴趣重叠", "weight": 0.62 },
+      { "type": "co_occurrence", "excerpt": "同一社交圈内的相关记录", "weight": 0.55 }
+    ]},
+    { "id": "assoc:27", "from": "task:30", "to": "task:35", "relation_type": "tension", "confidence": 0.45, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "链表实现（safe Rust 挑战）与 Unsafe Rust 学习形成对照张力", "weight": 0.50 },
+      { "type": "temporal", "excerpt": "两个任务同属 Rust 进阶，但分别探索 safe 和 unsafe 边界", "weight": 0.42 }
+    ]},
+    { "id": "assoc:28", "from": "task:11", "to": "memory:41", "relation_type": "co_occurrence", "confidence": 0.65, "status": "accepted", "evidence": [
+      { "type": "semantic", "excerpt": "3D 布局任务与 CSS2DRenderer 记忆同属前端可视化技术栈", "weight": 0.68 },
+      { "type": "temporal", "excerpt": "在实现布局时发现了 label 渲染的这个问题", "weight": 0.62 }
+    ]},
+    { "id": "assoc:29", "from": "task:1", "to": "task:25", "relation_type": "co_occurrence", "confidence": 0.55, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "跑步和冥想都是每日健康习惯的基石", "weight": 0.58 },
+      { "type": "co_occurrence", "excerpt": "两个习惯任务在健康 lifeline 下相邻创建", "weight": 0.52 }
+    ]},
+    { "id": "assoc:30", "from": "decision:3", "to": "decision:5", "relation_type": "derived_from", "confidence": 0.62, "status": "pending", "evidence": [
+      { "type": "semantic", "excerpt": "框架选型与模块通信架构都是架构层面的技术决策", "weight": 0.66 },
+      { "type": "co_occurrence", "excerpt": "两个架构决策同在 Axiom 开发 lifeline 下", "weight": 0.58 }
     ]}
   ]
 }

@@ -24,6 +24,9 @@ export const useCosmosStore = defineStore('cosmos', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const selectedAssocId = ref<string | null>(null)
+  // 当真实 /cosmos 不可用 / 空库时回退到 mock 数据时翻为 true，
+  // 仅在 DEV 模式下可能为 true（生产环境不 fallback）。UI 可据此渲染 "demo 数据" 角标。
+  const usingMockFallback = ref(false)
 
   // Focus history
   const historyStack = ref<FocusEntry[]>([{ state: { kind: 'global_overview' }, title: '全局' }])
@@ -83,15 +86,29 @@ export const useCosmosStore = defineStore('cosmos', () => {
   async function load() {
     if (data.value) return
     loading.value = true
+    const isDev = import.meta.env.DEV
     try {
       const { apiRequest } = await import('@/api/client')
       data.value = await apiRequest<CosmosData>('/cosmos')
+      const isEmpty = !data.value || data.value.lifelines.length === 0
+      if (isEmpty && isDev) {
+        // DEV: 空库时 fallback 到 mock，方便本地展示。生产环境不走这条路，
+        // 让 UI 直接渲染 empty state，避免把 mock 数据伪装成真实数据。
+        throw new Error('empty')
+      }
       historyStack.value = [{ state: { kind: 'global_overview' }, title: '全局' }]
       historyCursor.value = 0
     } catch (e: unknown) {
+      if (!isDev) {
+        // 生产环境：网络/服务错误 → error state；空库 → 上面已 set data.value 为真实空数据，UI 渲染 empty。
+        error.value = 'Cosmos 数据加载失败'
+        loading.value = false
+        return
+      }
       try {
         const resp = await fetch('/mock/cosmos.json')
         data.value = await resp.json()
+        usingMockFallback.value = true
         historyStack.value = [{ state: { kind: 'global_overview' }, title: '全局' }]
         historyCursor.value = 0
       } catch {
@@ -309,7 +326,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
     editAssoc.value = null
   }
 
-  return { data, state, loading, error, load, reload, transition, on,
+  return { data, state, loading, error, usingMockFallback, load, reload, transition, on,
     createLifeline, updateLifeline, deleteLifeline, mountEntity, reviewAssociation,
     selectedAssocId, selectAssociation,
     updateEntityTitle, deleteEntityById,

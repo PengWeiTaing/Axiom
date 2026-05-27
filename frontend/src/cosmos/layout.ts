@@ -13,7 +13,7 @@ export interface LayoutNode {
 }
 
 // Shell radii
-export const RADII = { R0: 0.35, R1: 1.6, R2: 2.2, R3: 3.0 }
+export const RADII = { R0: 0.35, R1: 1.6, R2: 2.3, R3: 3.5 }
 
 export function computeLayout(data: CosmosData): LayoutNode[] {
   const nodes: LayoutNode[] = []
@@ -44,17 +44,20 @@ export function computeLayout(data: CosmosData): LayoutNode[] {
     nodes.push({ id: l.id, name: l.name, layer: 2, position: pos, parentId: l.parent_id })
   })
 
-  // R3: entity leaves
+  // R3: entity leaves — sector scales with count, vertical distribution spreads more
   data.entities.forEach(e => {
     const parent = nodes.find(n => n.id === e.lifeline_id)
     if (!parent) return
     const siblings = data.entities.filter(s => s.lifeline_id === e.lifeline_id)
     const idx = siblings.findIndex(s => s.id === e.id)
     const parentPhi = Math.atan2(parent.position.y, parent.position.x)
-    const sectorWidth = Math.PI / 6
+    // Sector: base 45° + ~5° per extra sibling, min 30°
+    const sectorWidth = Math.max(Math.PI / 6, Math.PI / 4 + siblings.length * 0.09)
     const offset = idx - (siblings.length - 1) / 2
     const phi = parentPhi + offset * (sectorWidth / Math.max(siblings.length, 1))
-    const pos = spherical(RADII.R3, phi + (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.12)
+    // Vertical spread: base ±10° + ~2° per sibling
+    const thetaSpread = 0.18 + siblings.length * 0.035
+    const pos = spherical(RADII.R3, phi + (Math.random() - 0.5) * 0.10, (Math.random() - 0.5) * thetaSpread)
     nodes.push({ id: e.id, name: e.title, layer: 3, position: pos, parentId: e.lifeline_id, kind: e.kind, meta: e.meta })
   })
 
