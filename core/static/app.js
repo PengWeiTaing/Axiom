@@ -4547,7 +4547,17 @@ function bindForms() {
             }
             let created = 0;
             for (const s of suggestions) {
-                await apiRequest("/memories", { method: "POST", json: s });
+                if (s.source_item_id != null) {
+                    await apiRequest(`/item/${s.source_item_id}/promote-to-memory`, {
+                        method: "POST",
+                        json: { category: s.category, content: s.content },
+                    });
+                } else {
+                    await apiRequest("/memories", {
+                        method: "POST",
+                        json: { category: s.category, content: s.content },
+                    });
+                }
                 created++;
             }
             await loadMemories({ reset: true });
