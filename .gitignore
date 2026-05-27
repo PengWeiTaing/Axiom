@@ -25,3 +25,4 @@ frontend/*.tsbuildinfo
 .playwright-mcp/
 screenshots/
 /*.png
+/page-snapshot.md
