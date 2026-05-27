@@ -225,7 +225,7 @@ def register_routes(app):
             auth_error = require_key()
             if auth_error:
                 return auth_error
-    
+
             row = get_item_by_id(item_id)
             if row is None:
                 return error_response(404, "item_not_found", "item 不存在")
@@ -233,6 +233,31 @@ def register_routes(app):
             item = row_to_item(row)
             item["storage"] = get_storage_area(row["file_path"])
             item["file_url"] = build_file_url(item_id)
+
+            # 反向链：本 item 被升级出来的 memory 列表，最多 10 条，避免列表接口里
+            # 每行多查一次（只在 GET /item/<id> 详情里出现）。
+            conn = get_db_connection()
+            try:
+                memory_rows = conn.execute(
+                    "SELECT id, category, content, status, created_at "
+                    "FROM memories WHERE source_item_id = ? "
+                    "ORDER BY created_at DESC LIMIT 10",
+                    (item_id,),
+                ).fetchall()
+            finally:
+                conn.close()
+            item["derived_memories"] = [
+                {
+                    "id": m["id"],
+                    "category": m["category"],
+                    "category_label": MEMORY_CATEGORY_LABELS.get(m["category"], m["category"]),
+                    "content": m["content"],
+                    "status": m["status"],
+                    "status_label": MEMORY_STATUS_LABELS.get(m["status"], m["status"]),
+                    "created_at": m["created_at"],
+                }
+                for m in memory_rows
+            ]
             return ok_response({"item": item})
     
     

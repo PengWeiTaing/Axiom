@@ -185,6 +185,33 @@ def register_routes(app):
                 if linked_tasks:
                     done = sum(1 for t in linked_tasks if t["status"] == "done")
                     memory["task_progress"] = {"done": done, "total": len(linked_tasks)}
+
+                # 反向链：附带 source item 摘要，避免前端再发一次请求。
+                # source_item_id 已是 SET NULL 字段，item 若被删则这里为 None。
+                source_item = None
+                source_item_id = row["source_item_id"]
+                if source_item_id is not None:
+                    item_row = conn.execute(
+                        "SELECT id, type, content, original_name, derived_text, transcript_text, created_at "
+                        "FROM items WHERE id = ?",
+                        (source_item_id,),
+                    ).fetchone()
+                    if item_row is not None:
+                        snippet_source = ""
+                        for field in ("content", "original_name", "derived_text", "transcript_text"):
+                            value = item_row[field]
+                            if value and str(value).strip():
+                                snippet_source = str(value).strip()
+                                break
+                        source_item = {
+                            "id": item_row["id"],
+                            "type": item_row["type"],
+                            "type_label": get_type_label(item_row["type"]),
+                            "snippet": snippet_source[:120],
+                            "created_at": item_row["created_at"],
+                        }
+                memory["source_item"] = source_item
+
                 return ok_response({"memory": memory})
 
             if request.method == "DELETE":
