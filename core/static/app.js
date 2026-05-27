@@ -2687,8 +2687,10 @@ function renderMemoryCards(data) {
     const cardsHtml = data.items.map((mem) => {
         const statusClass = mem.status === "confirmed" ? "tag-ok" : mem.status === "archived" ? "tag-dim" : "tag-warn";
         const catClass = `tag-${mem.category}`;
-        const sourceLink = mem.source_item_id
-            ? `<button type="button" class="text-button" data-action="view-item" data-item-id="${mem.source_item_id}">来源 #${mem.source_item_id}</button>`
+        // B-005：派生自 item 反向链。列表接口只暴露 source_item_id，不查 snippet。
+        // source_item_id 为 null 不渲染；source_item 已删（FK SET NULL 之后 source_item_id 也会被置 null）同样不渲染。
+        const sourceLineHtml = mem.source_item_id
+            ? `<div class="memory-source-line" style="font-size:12px;opacity:0.65;margin-top:4px">派生自 item #<span class="text-link" data-action="open-item-from-memory" data-item-id="${mem.source_item_id}">${mem.source_item_id}</span></div>`
             : "";
         const detailHtml = mem.detail ? `<p class="item-meta">${escapeHtml(mem.detail)}</p>` : "";
 
@@ -2719,7 +2721,8 @@ function renderMemoryCards(data) {
                     <p class="item-card-text">${escapeHtml(mem.content)}</p>
                     ${detailHtml}
                     ${progressHtml}
-                    <p class="item-meta">${formatDateTime(mem.created_at)}${sourceLink ? " · " + sourceLink : ""}</p>
+                    <p class="item-meta">${formatDateTime(mem.created_at)}</p>
+                    ${sourceLineHtml}
                 </div>
                 <div class="item-card-actions">${actions.join("")}</div>
             </div>
@@ -3938,6 +3941,12 @@ function bindDelegatedActions() {
             );
         } else if (action === "view-item") {
             await handleItemView(target.getAttribute("data-item-id"));
+        } else if (action === "open-item-from-memory") {
+            // B-005：memory 卡片"派生自 item #N"链接，跳转到 item viewer
+            const itemId = parseInt(target.getAttribute("data-item-id"), 10);
+            if (Number.isFinite(itemId)) {
+                await openItemViewer(itemId);
+            }
         } else if (action === "edit-item") {
             await handleItemEdit(target.getAttribute("data-item-id"));
         } else if (action === "promote-item-to-memory") {
