@@ -380,6 +380,80 @@ def register_routes(app):
             )
     
     
+        @app.route("/item/<int:item_id>/promote-to-memory", methods=["POST"])
+        def promote_item_to_memory(item_id: int):
+            auth_error = require_key()
+            if auth_error:
+                return auth_error
+
+            row = get_item_by_id(item_id)
+            if row is None:
+                return error_response(404, "item_not_found", "item 不存在")
+
+            body = request.get_json(silent=True) or {}
+            category = str(body.get("category", "")).strip()
+            if category not in MEMORY_CATEGORIES:
+                return error_response(400, "invalid_category", f"category 不支持: {category}")
+
+            detail = str(body.get("detail", "")).strip() or None
+            raw_content = str(body.get("content", "")).strip()
+
+            row_keys = row.keys()
+            candidates = [
+                row["content"] if "content" in row_keys else None,
+                row["derived_text"] if "derived_text" in row_keys else None,
+                row["transcript_text"] if "transcript_text" in row_keys else None,
+                row["original_name"] if "original_name" in row_keys else None,
+            ]
+            first_non_empty = next(
+                (c.strip() for c in candidates if c and c.strip()),
+                None,
+            )
+            source_text = first_non_empty[:200] if first_non_empty else None
+
+            content = raw_content if raw_content else (source_text or "")
+            if not content:
+                return error_response(400, "missing_content", "无法派生 content，请显式传入")
+
+            now = utc_now().isoformat(timespec="seconds")
+            conn = get_db_connection()
+            try:
+                cursor = conn.execute(
+                    "INSERT INTO memories (category, content, detail, status, source_item_id, source_text, created_at, updated_at) "
+                    "VALUES (?, ?, ?, 'candidate', ?, ?, ?, ?)",
+                    (category, content, detail, item_id, source_text, now, now),
+                )
+                conn.commit()
+                memory_id = cursor.lastrowid
+                write_audit_log("memory_promote_from_item", "memory", memory_id)
+                new_row = conn.execute(
+                    "SELECT id, category, content, detail, status, source_item_id, source_text, created_at, updated_at "
+                    "FROM memories WHERE id = ?",
+                    (memory_id,),
+                ).fetchone()
+            finally:
+                conn.close()
+
+            # row_to_memory 闭包定义在 memories.py 的 register_routes 内部，这里复制等价字段拼装
+            memory = {
+                "id": new_row["id"],
+                "category": new_row["category"],
+                "category_label": MEMORY_CATEGORY_LABELS.get(new_row["category"], new_row["category"]),
+                "content": new_row["content"],
+                "detail": new_row["detail"],
+                "status": new_row["status"],
+                "status_label": MEMORY_STATUS_LABELS.get(new_row["status"], new_row["status"]),
+                "source_item_id": new_row["source_item_id"],
+                "source_text": new_row["source_text"],
+                "created_at": new_row["created_at"],
+                "updated_at": new_row["updated_at"],
+                "linked_tasks": [],
+                "task_progress": None,
+            }
+            logger.info("promoted item id=%s to memory id=%s", item_id, memory_id)
+            return ok_response({"memory": memory}, 201)
+    
+    
         @app.route("/file/<int:item_id>", methods=["GET"])
         def get_item_file(item_id: int):
             auth_error = require_key()

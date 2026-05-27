@@ -1,25 +1,33 @@
-# docs/tasks/ — DeepSeek 实现工任务区
+# docs/tasks/ — 实现工任务区
 
-这个目录里的每一个 `*.md` 都是一份**给 DeepSeek v4 Pro 的工作单**，由 Opus（架构师）出题，DeepSeek 执行。
+这个目录里的每一个 `*.md` 都是一份**给"实现工"角色的工作单**，由 Opus（架构师）出题，实现工执行。
+
+> **执行者变更（2026-05-27）**：原方案是 Opus + DeepSeek + ccswitch，用户每次切换工具链。已改为 Opus 在主会话内直接调用 Haiku 4.5 子代理执行（Claude Code Agent 工具原生支持）。**历史任务单本体里"DeepSeek"措辞保留，按通用"实现工"角色理解即可**。
 
 ## 分工
 
 | 角色 | 干什么 |
 |---|---|
-| **Opus** | 出任务单、定视觉/交互/接口、审 DeepSeek 提交的代码 |
-| **DeepSeek v4 Pro** | 按任务单写代码、跑构建、报错调试，不做架构决策 |
+| **Opus 4.7** | 出任务单、定视觉/交互/接口、审实现工提交的代码、在主会话里调度 Haiku 执行 |
+| **Haiku 4.5（实现 Agent）** | 按任务单写代码、跑构建、报错调试，不做架构决策 |
 
 ## 任务单生命周期
 
 ```
 Opus 写 docs/tasks/NNN-xxx.md
-  → 用户把任务单递给 DeepSeek
-  → DeepSeek 按任务单直接写代码进仓库（动 frontend/src 等指定路径）
-  → 用户告诉 Opus "做完了"
+  → Opus 在同一会话里用 Agent(subagent_type="general-purpose", model="haiku") 派出去
+  → Haiku 按任务单直接写代码进仓库（动 frontend/src 等指定路径）
+  → Haiku 跑通验收命令后返回结果
   → Opus 看 git diff，做 code review
   → 合格 → 任务单移到 docs/tasks/done/
-  → 不合格 → Opus 提反馈，DeepSeek 再改
+  → 不合格 → Opus 提反馈，再次派 Haiku 改
 ```
+
+**用户介入时机**（除此之外 Opus 自动推进）：
+- 任务单涉及大架构决策需要用户拍板
+- Haiku 报 BLOCKED 求救
+- review 发现需要用户判断的取舍
+- 需要凭证 / VPS 部署 / 不可逆操作
 
 ## DeepSeek 上岗须知（每份任务单生效，不要在任务单里重复）
 
