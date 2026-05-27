@@ -293,16 +293,20 @@ def register_routes(app):
 
         lines = [
             "你是一个个人知识助手。请从以下用户记录中提取可以作为长期记忆的信息。",
-            "每条建议一行，格式为：category|content",
-            "category 可选：fact（事实）、preference（偏好）、goal（目标）、relationship（人际关系）、event（事件）",
+            "每条建议一行，格式为：item_id|category|content",
+            "- item_id 是上下文行最前面 [id=N] 里的 N，必须照抄；如果一条建议综合多条记录无法归到单一来源，写 0。",
+            "- category 可选：fact（事实）、preference（偏好）、goal（目标）、relationship（人际关系）、event（事件）",
+            "- content 是记忆正文，简短直接，不要带格式符。",
             "只提取稳定、值得长期保留的信息，不要提取临时或琐碎的内容。",
             "最多提取 5 条。如果没有值得长期记忆的内容，输出 NONE。",
             "",
         ]
+        fed_ids: set[int] = set()
         for r in rows:
             text = (r["content"] or r["original_name"] or r["derived_text"] or r["transcript_text"] or "")[:200]
             if text.strip():
-                lines.append(f"- [{r['type']}] {text}")
+                fed_ids.add(r["id"])
+                lines.append(f"- [id={r['id']}] [{r['type']}] {text}")
 
         prompt = "\n".join(lines)
 
@@ -326,12 +330,29 @@ def register_routes(app):
         suggestions = []
         for line in text.split("\n"):
             line = line.strip().lstrip("- ").strip()
-            if "|" in line:
-                parts = line.split("|", 1)
+            if "|" not in line:
+                continue
+            parts = line.split("|", 2)
+            # 兼容旧 2 段格式 category|content
+            if len(parts) == 2:
+                source_item_id: int | None = None
                 cat = parts[0].strip()
                 content = parts[1].strip()
-                if cat in MEMORY_CATEGORIES and content:
-                    suggestions.append({"category": cat, "content": content})
+            else:
+                raw_id = parts[0].strip()
+                try:
+                    parsed_id = int(raw_id)
+                except ValueError:
+                    parsed_id = 0
+                source_item_id = parsed_id if parsed_id in fed_ids and parsed_id != 0 else None
+                cat = parts[1].strip()
+                content = parts[2].strip()
+            if cat in MEMORY_CATEGORIES and content:
+                suggestions.append({
+                    "category": cat,
+                    "content": content,
+                    "source_item_id": source_item_id,
+                })
 
         return ok_response({"suggestions": suggestions})
 
