@@ -39,6 +39,7 @@ function Sidebar(props: {
   return (
     <aside className="board-sidebar">
       <div className="board-sidebar__header">
+        <a href="/app" className="board-back-link" title="返回 Axiom 主应用">&larr; Axiom</a>
         <h2>{board.title || '学习白板'}</h2>
         {board.goal && <p className="board-goal">{board.goal}</p>}
       </div>

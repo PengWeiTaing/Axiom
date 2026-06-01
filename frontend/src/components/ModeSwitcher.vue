@@ -9,6 +9,7 @@ const tabs: { key: AppMode; label: string }[] = [
   { key: 'capture', label: 'Capture' },
   { key: 'atlas', label: 'Atlas' },
   { key: 'recent', label: '近况' },
+  { key: 'board', label: 'Board' },
 ]
 
 const containerOpacity = computed(() => mode.mode === 'atlas' ? 0.65 : 1)

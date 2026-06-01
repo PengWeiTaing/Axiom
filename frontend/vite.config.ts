@@ -37,10 +37,15 @@ export default defineConfig(({ command }) => ({
       // 开发时把所有 API 代理到本地 Flask
       // 注意：所有规则必须用单词边界（结尾加 / 或 $），否则像 `m` 会误匹配 `/mock/...`、`/manifest.webmanifest` 等静态资源
       '^/(add|upload|fetch|recent|stats|overview|cosmos|api|memories|tasks|decisions|parse|chat|suggestions|brief|report|alerts|system|metrics|health|ping|export|import|timeline)(/|$|\\?)': {
-        target: 'http://127.0.0.1:5000',
+        target: 'http://127.0.0.1:5001',
         changeOrigin: true,
       },
       '^/(item|file|archive|restore|search|audit-log|admin|automation|artifacts|processing|tools)/': {
+        target: 'http://127.0.0.1:5001',
+        changeOrigin: true,
+      },
+      // Board 白板页面（React 应用，由 Flask serve）
+      '^/board': {
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
       },

@@ -258,6 +258,17 @@ select {
   border-bottom: 1px solid var(--line-1);
 }
 
+.board-back-link {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: var(--fs-2);
+  color: var(--accent);
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity var(--t-base) var(--ease);
+}
+.board-back-link:hover { opacity: 1; }
+
 .board-sidebar__header h2 {
   font-size: var(--fs-5);
   color: var(--text-1);
