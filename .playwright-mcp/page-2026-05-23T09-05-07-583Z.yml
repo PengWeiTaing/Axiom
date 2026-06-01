@@ -1,6 +1,0 @@
-- generic [ref=e2]:
-  - generic [ref=e69]:
-    - button "Atlas" [ref=e71] [cursor=pointer]
-    - button "× 退出 Atlas" [ref=e72] [cursor=pointer]
-  - button "AI 管家" [ref=e65] [cursor=pointer]:
-    - img [ref=e66]
