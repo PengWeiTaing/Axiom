@@ -8,7 +8,7 @@
 
 import type { ApiResponse } from '../types'
 
-const KEY_STORAGE_KEY = 'axiom_key'
+const KEY_STORAGE_KEY = 'axiom.key'
 
 /** 相对当前 origin 请求，开发时由 Vite proxy 转发到 Flask */
 const BASE = ''
