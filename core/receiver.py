@@ -11,16 +11,27 @@ from pathlib import Path
 
 from flask import Response, request
 
-# 共享模块
-from core._common import *  # noqa: F401, F403, E402
+# 共享兼容层
 from core._common import (  # noqa: E402
     app, logger, AXIOM_ROOT, DB_PATH, INBOX_PATH, ARCHIVE_PATH, LOG_PATH,
+    ITEM_JOIN_SELECT_FIELDS,
+    ITEM_TYPE_AUDIO, ITEM_TYPE_DOCUMENT,
+    build_audio_transcript_sidecar_candidates,
+    extract_audio_transcript_text_from_file,
+    extract_document_text,
+    normalize_audio_transcript_text,
+    normalize_extracted_text,
     init_app_storage, get_db_connection, init_db,
+    cjk_tokenize,
+    SECRET_KEY,
     ok_response, error_response, require_key,
     resolve_stored_file_path, build_archive_file_path,
     escape_fts_query, escape_like,
     write_audit_log, fts_delete_item, fts_backfill,
-    parse_positive_int, local_date_now, utc_now, build_item_payload,
+    parse_positive_int, local_date_now, resolve_run_date_value, utc_now, build_item_payload, row_to_item,
+    vector_search, rebuild_all_vectors,
+    learn_user_patterns, get_preference,
+    execute_logged_automation_job,
     DEEPSEEK_API_KEY, DEEPSEEK_MODEL, DEEPSEEK_BASE_URL,
     AUTOMATION_JOBS,
 )
@@ -601,7 +612,7 @@ def admin_run_workflow(wf_id: int):
     result = {"workflow": wf["name"], "action": wf["action_type"]}
     try:
         if wf["action_type"] == "brief":
-            from core.routes.ai import register_routes
+            from core.routes.ai import _fetch_ai_context
             # Call brief generation
             ctx = _fetch_ai_context(get_db_connection())
             # brief generation happens in /brief endpoint, just note it
@@ -651,7 +662,6 @@ def admin_workflow_templates():
 def admin_insights():
     auth_error = require_key()
     if auth_error: return auth_error
-    from core._common import learn_user_patterns
     patterns = learn_user_patterns()
     conn = get_db_connection()
     try:
@@ -672,7 +682,6 @@ def admin_insights():
     if patterns["peak_hours"]: recs.append(f"最活跃时段是 {patterns['peak_hours'][0]} 点，可在此处理任务")
 
     # Parse accuracy
-    from core._common import get_preference
     corrections = sum(int(get_preference(f"parse_misc:{t}", "0")) for t in ["task","memory","decision","note","health","url"])
     total_parse = sum(int(get_preference(f"parse_correction:{a}:{u}", "0"))
                       for a in ["task","memory","decision","note","health","url"]
@@ -745,7 +754,6 @@ def admin_dedup():
 def admin_rebuild_fts():
     auth_error = require_key()
     if auth_error: return auth_error
-    from core._common import cjk_tokenize
     conn = get_db_connection()
     try:
         conn.execute("DELETE FROM items_fts")
