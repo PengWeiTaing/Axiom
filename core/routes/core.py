@@ -59,6 +59,21 @@ document.getElementById("b").href="javascript:"+encodeURIComponent(
 )}up()</script></body></html>''')
 
 
+        @app.route("/board", defaults={"_subpath": ""}, methods=["GET"], strict_slashes=False)
+        @app.route("/board/<path:_subpath>", methods=["GET"], strict_slashes=False)
+        def board_shell(_subpath: str):
+            """React Learning Board 前端入口."""
+            static_root = Path(app.static_folder or "").resolve() if app.static_folder else None
+            board_index = static_root / "v2" / "board" / "index.html" if static_root else None
+            if board_index and board_index.exists():
+                return send_file(board_index, mimetype="text/html")
+            return render_template_string(
+                """<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>Axiom Learning Board (未构建)</title><style>body{font-family:system-ui;max-width:560px;margin:80px auto;padding:24px;background:#07090d;color:#b4bcc9}
+h1{color:#6ee7d0}code{background:#141921;padding:2px 8px;border-radius:4px}</style></head><body>
+<h1>Learning Board 未构建</h1><p>运行 <code>cd frontend/board && npm run build</code></p>
+</body></html>"""), 404
+
         @app.route("/health", methods=["GET"])
         def health_check():
             db_ok = True
