@@ -1,5 +1,27 @@
 """AI routes: alerts, chat, suggestions."""
-from core._common import *
+import json
+from datetime import datetime, timedelta
+
+from flask import Response, request
+
+from core._common import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    DEEPSEEK_MODEL,
+    SUGGESTIONS_CACHE,
+    compute_streak,
+    error_response,
+    get_db_connection,
+    get_preference,
+    list_review_artifacts,
+    local_date_now,
+    logger,
+    ok_response,
+    require_key,
+    set_preference,
+    utc_now,
+    write_audit_log,
+)
 
 AI_CONTEXT_KEY = "ai_context"
 

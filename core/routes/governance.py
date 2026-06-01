@@ -1,5 +1,26 @@
 """Governance routes: export, audit-log, modules."""
-from core._common import *
+import json
+import sqlite3
+
+from flask import request, send_file
+
+from core._common import (
+    AXIOM_ROOT,
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    cleanup_file,
+    error_response,
+    fts_delete_item,
+    get_db_connection,
+    local_date_now,
+    logger,
+    ok_response,
+    parse_positive_int,
+    require_key,
+    resolve_stored_file_path,
+    utc_now,
+    write_audit_log,
+)
 
 def register_routes(app):
     # ===== 治理路由 =====

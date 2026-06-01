@@ -1,5 +1,44 @@
 """Automation routes: jobs, runs, artifacts, processing."""
-from core._common import *
+from flask import jsonify, request, send_file
+
+from core._common import (
+    AUTOMATION_JOBS,
+    artifact_matches_filters,
+    artifact_sort_key,
+    build_artifact_counts,
+    build_artifact_latest_summary,
+    build_artifact_summary_payload,
+    build_automation_job_payload,
+    build_processing_backlog_payload,
+    error_response,
+    execute_logged_automation_job,
+    fetch_automation_run_rows,
+    fetch_next_pending_item_row,
+    get_items_by_ids,
+    get_request_body_data,
+    iter_automation_job_items,
+    list_review_artifacts,
+    logger,
+    normalize_item_id_list,
+    ok_response,
+    parse_positive_int,
+    read_artifact_date_range,
+    read_artifact_group_filter,
+    read_artifact_mode_filter,
+    read_artifact_window_filter,
+    read_automation_job_filter,
+    read_automation_status_filter,
+    read_group_limit,
+    read_item_type_filter,
+    read_optional_run_date,
+    read_pagination,
+    read_preview_chars,
+    require_key,
+    resolve_review_artifact_path,
+    row_to_automation_run,
+    row_to_item,
+    update_items_processing_override,
+)
 
 def register_routes(app):
         @app.route("/processing/backlog", methods=["GET"])

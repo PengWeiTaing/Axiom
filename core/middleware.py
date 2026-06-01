@@ -72,6 +72,10 @@ def register_middleware(app):
         accept = request.headers.get("Accept-Encoding", "")
         if "gzip" not in accept:
             return response
+        if getattr(response, "direct_passthrough", False):
+            return response
+        if response.headers.get("Content-Encoding"):
+            return response
         if response.content_length and response.content_length < 500:
             return response
         if "text/event-stream" in response.content_type:

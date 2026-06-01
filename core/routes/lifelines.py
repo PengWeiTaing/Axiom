@@ -1,5 +1,9 @@
 """Lifeline CRUD + Entity 挂载端点."""
-from core._common import *
+import re
+
+from flask import request
+
+from core._common import error_response, get_db_connection, ok_response, require_key
 from core.routes.cosmos import PREFIX_TO_TABLE, entity_id
 
 LIFELINE_ID_RE = re.compile(r'^[a-zA-Z0-9_-]+$')

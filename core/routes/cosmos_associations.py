@@ -1,5 +1,20 @@
 """Cosmos 关联自动生成 — 规则初筛 + LLM 分类."""
-from core._common import *
+import json
+from datetime import datetime, timezone
+from uuid import uuid4
+
+from flask import request
+
+from core._common import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    DEEPSEEK_MODEL,
+    error_response,
+    get_db_connection,
+    ok_response,
+    parse_positive_int,
+    require_key,
+)
 from core.routes.cosmos import PREFIX_TO_TABLE, entity_id
 
 SYSTEM_PROMPT = """你是个人知识图谱的关联分类器。对每对 entity，判断关系类型：

@@ -1,5 +1,65 @@
 """Item routes: capture, upload, file, archive, restore."""
-from core._common import *
+import os
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+
+from flask import request, send_file
+
+from core._common import (
+    ARCHIVE_PATH,
+    AXIOM_ROOT,
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    DEEPSEEK_MODEL,
+    DEFAULT_SOURCE,
+    INBOX_PATH,
+    ITEM_TYPE_AUDIO,
+    ITEM_TYPE_DOCUMENT,
+    ITEM_TYPE_TEXT,
+    MEMORY_CATEGORIES,
+    MEMORY_CATEGORY_LABELS,
+    MEMORY_STATUS_LABELS,
+    build_archive_file_path,
+    build_binary_file_path,
+    build_download_name,
+    build_file_url,
+    build_item_payload,
+    build_restore_file_path,
+    build_text_file_path,
+    cleanup_file,
+    error_response,
+    extract_audio_transcript_text_from_upload,
+    extract_document_text,
+    fetch_url_content,
+    fts_sync_item,
+    get_db_connection,
+    get_item_by_id,
+    get_request_body_data,
+    get_request_field,
+    get_storage_area,
+    get_type_label,
+    insert_item,
+    insert_text_item,
+    is_path_under,
+    logger,
+    normalize_audio_transcript_text,
+    normalize_extracted_text,
+    normalize_processing_override,
+    ok_response,
+    parse_uploaded_file,
+    read_optional_body_field,
+    read_upload_content,
+    require_key,
+    resolve_stored_file_path,
+    row_to_item,
+    update_item_content_source_text_fields,
+    update_item_file_path,
+    utc_now,
+    write_audit_log,
+    write_binary_file_atomic,
+    write_text_file_atomic,
+)
 
 def register_routes(app):
         @app.route("/fetch", methods=["POST"])

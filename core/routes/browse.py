@@ -1,5 +1,37 @@
 """Browse routes: recent, search, stats, overview."""
-from core._common import *
+import json
+import sqlite3
+
+from flask import request
+
+from core._common import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    DEEPSEEK_MODEL,
+    ITEM_JOIN_SELECT_FIELDS,
+    ITEM_LIST_SELECT_FIELDS,
+    build_item_filter_conditions,
+    build_overview_payload,
+    build_overview_text,
+    build_stats_payload,
+    error_response,
+    escape_fts_query,
+    get_db_connection,
+    join_conditions,
+    logger,
+    ok_response,
+    read_created_range,
+    read_item_type_filter,
+    read_pagination,
+    read_preview_chars,
+    read_processing_override_filter,
+    read_processing_state_filter,
+    read_recent_limit,
+    read_source_filter,
+    read_storage_filter,
+    require_key,
+    row_to_item,
+)
 
 def register_routes(app):
         @app.route("/stats", methods=["GET"])
