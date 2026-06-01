@@ -1356,6 +1356,14 @@ function renderItemCards(container, items, emptyText) {
         }
         void loadProtectedImage(imageElement, fileUrl);
     });
+
+    container.querySelectorAll("[data-action='view-item']").forEach((button) => {
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void handleItemView(button.getAttribute("data-item-id"));
+        });
+    });
 }
 
 function flattenArtifactCards(summaryPayload) {
@@ -3462,6 +3470,8 @@ async function handleUrlFetchSubmit(event) {
 async function handleTextCaptureSubmit(event) {
     event.preventDefault();
     const text = elements.textInput.value.trim();
+    const sourceInput = document.getElementById("text-source-input");
+    const source = sourceInput?.value.trim() || "web_app";
     if (!text) { setFeedback(elements.captureFeedback, "内容不能为空。", "error"); return; }
     elements.textInput.value = "";
 
@@ -3489,8 +3499,8 @@ async function handleTextCaptureSubmit(event) {
             const r = await apiRequest("/fetch", { method: "POST", json: { url: text } });
             resultMsg = `已抓取: ${r.item?.original_name || text}`;
         } else {
-            await apiRequest("/add", { method: "POST", json: { text, source: "web_app" } });
-            resultMsg = `已保存 (${type})`;
+            await apiRequest("/add", { method: "POST", json: { text, source } });
+            resultMsg = `已保存 (${type}) 到 inbox`;
         }
         setFeedback(elements.captureFeedback, resultMsg, "ok");
         setConnectionState("ready", resultMsg);
@@ -4109,6 +4119,27 @@ const PANEL_GROUPS = {
 };
 
 // Module panels are injected outside .layout, need separate handling
+function setActivePanel(panelId) {
+    const group = PANEL_GROUPS[panelId] || [panelId];
+    document.querySelectorAll(".layout > .panel").forEach((panel) => {
+        panel.classList.toggle("active", group.includes(panel.id));
+    });
+
+    const moduleContainer = document.getElementById("module-panels");
+    if (moduleContainer) {
+        moduleContainer.querySelectorAll(".panel").forEach((panel) => {
+            panel.classList.toggle("active", panel.id === panelId || group.includes(panel.id));
+        });
+    }
+
+    const sidebar = document.getElementById("desktop-sidebar");
+    sidebar?.querySelectorAll("button[data-panel]").forEach((button) => {
+        button.classList.toggle("active", button.getAttribute("data-panel") === panelId);
+    });
+
+    if (panelId === "chat-panel") showChatGreeting();
+}
+
 function updateSidebarBadges() {
     try {
         // Task count
@@ -4142,12 +4173,6 @@ function updateSidebarBadges() {
     } catch (e) { /* noop */ }
 }
 
-function getModulePanelIds() {
-    const container = document.getElementById("module-panels");
-    if (!container) return [];
-    return Array.from(container.querySelectorAll(".panel")).map(p => p.id);
-}
-
 function bindSidebarTabs() {
     const sidebar = document.getElementById("desktop-sidebar");
     if (!sidebar) return;
@@ -4155,27 +4180,12 @@ function bindSidebarTabs() {
         btn.addEventListener("click", () => {
             const panelId = btn.getAttribute("data-panel");
             const group = PANEL_GROUPS[panelId] || [panelId];
-            // Desktop: show only panels in the group
-            document.querySelectorAll(".layout > .panel").forEach(p => {
-                p.classList.toggle("active", group.includes(p.id));
-            });
-            // Module panels: show if the panelId matches a module
-            const moduleIds = getModulePanelIds();
-            const moduleContainer = document.getElementById("module-panels");
-            if (moduleContainer) {
-                moduleContainer.querySelectorAll(".panel").forEach(p => {
-                    p.classList.toggle("active", p.id === panelId || group.includes(p.id));
-                });
-            }
+            setActivePanel(panelId);
             // Mobile: scroll to the first panel in group
             if (window.innerWidth < 768) {
                 const target = document.getElementById(group[0]);
                 if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
             }
-            // Update sidebar active state
-            sidebar.querySelectorAll("button[data-panel]").forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            if (panelId === "chat-panel") showChatGreeting();
         });
     });
 }
@@ -4201,6 +4211,7 @@ function bindForms() {
         saveKey(key);
         setFeedback(elements.keyFeedback, "key 已保存在当前浏览器。", "ok");
         await syncDashboard({ showMessage: true });
+        setActivePanel("overview-panel");
     });
 
     elements.exportDataButton.addEventListener("click", async () => {
@@ -4243,6 +4254,7 @@ function bindForms() {
         setFeedback(elements.searchFeedback, "", "muted");
         setFeedback(elements.automationFeedback, "", "muted");
         setFeedback(elements.automationRunsFeedback, "", "muted");
+        setActivePanel("capture-panel");
         setConnectionState("idle", "尚未同步");
         elements.overviewGeneratedAt.textContent = "";
         elements.overviewBacklogTotal.textContent = "待处理 0 条";
@@ -4680,7 +4692,7 @@ async function registerServiceWorker() {
     }
 
     try {
-        await navigator.serviceWorker.register("/sw.js");
+        await navigator.serviceWorker.register("/sw.js", { scope: "/app/legacy" });
     } catch (error) {
         console.warn("service worker register failed", error);
     }
@@ -5003,6 +5015,7 @@ function init() {
     registerServiceWorker();
     renderInitialEmptyStates();
     loadStoredKey();
+    setActivePanel(state.key ? "overview-panel" : "capture-panel");
 
     if (state.key) {
         setFeedback(elements.keyFeedback, "已读取浏览器中的本地 key。", "ok");

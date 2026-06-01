@@ -4,6 +4,8 @@
 资料依据：GitHub 仓库 `PengWeiTaing/Axiom` 的 `main` 分支文档与代码、项目上下文记录。  
 说明：本文是“现状描述”，不是下一阶段规划；也不是实时 VPS 巡检报告。由于未直接登录 VPS 读取生产库，生产数据条数、备份实际时间、服务实时健康状态等只按仓库文档和代码记录描述，不作为当前秒级事实。
 
+2026-05-31 补充：当前主入口、旧版前端边界、Atlas / Cosmos 主线和构建产物策略，以 `docs/PROJECT_MAINLINE.md` 为准。本文保留为 2026-05-27 的阶段盘点。
+
 ---
 
 ## 1. 一句话总览
@@ -145,22 +147,17 @@ core.routes.cosmos_import
 
 ### 4.3 共享层
 
-`core/_common.py` 是当前系统真正的共享核心。它负责：
+`core/_common.py` 已从真正的共享核心退回为兼容层。当前主体职责已经拆到：
 
-- Flask app 与基础配置。
-- 环境变量读取。
-- 数据库连接。
-- 建表与迁移。
-- FTS5 检索。
-- 认证、分页、过滤器。
-- item CRUD 与文件读写。
-- 文本处理、PDF/DOCX 抽取、音频转写文本处理。
-- 统计、overview、item payload 构建。
-- 自动化任务与 artifact 读取。
-- 审计日志与文件清理。
-- URL 抓取。
+- `core/config.py`：Flask app、路径、环境变量、常量。
+- `core/database.py`：数据库连接、建表/迁移、FTS5。
+- `core/items.py`：item payload、文件读写、CRUD 辅助。
+- `core/http_utils.py`：认证、分页、过滤器、请求/响应工具。
+- `core/system_state.py`：统计、overview、处理积压、偏好。
+- `core/artifacts.py` / `core/automation_core.py`：自动化产物与自动化运行。
+- `core/text_extract.py` / `core/audit.py` / `core/vector_search.py` / `core/fetch.py`：文本抽取、审计、向量搜索、URL 抓取。
 
-风险点：`_common.py` 仍然承担过多职责。它现在更像一个“系统内核文件”，短期可接受，但中后期继续膨胀会带来维护压力。
+风险点：`_common.py` 仍要兼容旧 route 的 `from core._common import *`，因此还保留少量隐式导出符号。后续应逐步把旧 route 改为显式导入，并补最小单元测试。
 
 ---
 
@@ -718,29 +715,31 @@ Axiom v0.2+ current baseline
 当前架构状态：v0.2+
 ```
 
-### 16.2 `_common.py` 过重
+### 16.2 `_common.py` 兼容层收口
 
-`_common.py` 已经像“巨型内核”。它短期方便，但长期会导致：
+`_common.py` 已不再是巨型内核，但仍承担兼容层职责。残余风险主要来自：
 
-- 修改风险集中。
-- 单文件认知负荷过高。
-- 测试粒度不清晰。
-- 领域边界模糊。
+- 旧 route 的 `from core._common import *` 仍会引入隐式依赖。
+- 新模块边界已经清晰，但单元测试还没跟上。
+- 下一轮大功能开发前，应避免再把领域逻辑塞回 `_common.py`。
 
-后续可以考虑拆为：
+当前已经拆为：
 
 ```text
 core/config.py
-core/db.py
+core/database.py
 core/items.py
 core/search.py
 core/artifacts.py
 core/automation_core.py
 core/text_extract.py
 core/audit.py
+core/vector_search.py
+core/system_state.py
+core/http_utils.py
 ```
 
-但这属于后续架构升级，不应现在为了“好看”强拆。
+下一步不是继续“为了好看”拆文件，而是清理旧 route 的 `import *` 和补核心单元测试。
 
 ### 16.3 Cosmos 文档不足
 
@@ -827,4 +826,3 @@ item -> memory -> task -> decision -> lifeline -> association -> review
 ## 19. 当前一句话结论
 
 Axiom 目前已经完成了从“最小输入后端”到“可运行个人外脑底座”的跃迁。它现在具备输入、存储、检索、处理、回顾、自动化、记忆、任务、决策、治理、模块化和关系图谱雏形。下一阶段真正的关键不再是继续堆接口，而是统一系统模型：明确 item、memory、task、decision、lifeline、association、module 之间的关系，让 Axiom 从“功能集合”收束成一个可解释、可维护、可扩展的个人认知操作系统。
-

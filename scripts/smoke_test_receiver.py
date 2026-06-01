@@ -137,14 +137,44 @@ def main() -> None:
             health = assert_status(client.get("/health"), 200, "health")
             assert health["ok"] is True
 
-            app_shell = client.get("/app")
+            vite_app_shell = client.get("/app")
+            if vite_app_shell.status_code != 200:
+                raise AssertionError(
+                    f"vite app shell: expected HTTP 200, got {vite_app_shell.status_code}"
+                )
+            vite_app_body = vite_app_shell.get_data(as_text=True)
+            if '<div id="app"></div>' not in vite_app_body or "assets/index.js" not in vite_app_body:
+                raise AssertionError(f"vite app shell body unexpected: {vite_app_body[:200]}")
+
+            atlas_shell = client.get("/atlas")
+            if atlas_shell.status_code != 200:
+                raise AssertionError(
+                    f"atlas shell: expected HTTP 200, got {atlas_shell.status_code}"
+                )
+            atlas_body = atlas_shell.get_data(as_text=True)
+            if '<div id="app"></div>' not in atlas_body or "assets/index.js" not in atlas_body:
+                raise AssertionError(f"atlas shell body unexpected: {atlas_body[:200]}")
+
+            app_v2_redirect = client.get("/app/v2")
+            if app_v2_redirect.status_code not in {301, 302, 308}:
+                raise AssertionError(
+                    "app v2 redirect: "
+                    f"expected redirect, got {app_v2_redirect.status_code}"
+                )
+            if not app_v2_redirect.headers.get("Location", "").endswith("/app"):
+                raise AssertionError(
+                    "app v2 redirect location unexpected: "
+                    f"{app_v2_redirect.headers.get('Location')}"
+                )
+
+            app_shell = client.get("/app/legacy")
             if app_shell.status_code != 200:
                 raise AssertionError(
-                    f"app shell: expected HTTP 200, got {app_shell.status_code}"
+                    f"legacy app shell: expected HTTP 200, got {app_shell.status_code}"
                 )
             app_shell_body = app_shell.get_data(as_text=True)
             if "Axiom 外脑控制台" not in app_shell_body:
-                raise AssertionError(f"app shell body unexpected: {app_shell_body[:200]}")
+                raise AssertionError(f"legacy app shell body unexpected: {app_shell_body[:200]}")
 
             app_css = client.get("/static/app.css")
             if app_css.status_code != 200:
@@ -177,7 +207,7 @@ def main() -> None:
                     "service worker: "
                     f"expected HTTP 200, got {service_worker.status_code}"
                 )
-            if "axiom-app-shell-v1" not in service_worker.get_data(as_text=True):
+            if "axiom-legacy-app-shell-v2" not in service_worker.get_data(as_text=True):
                 raise AssertionError("service worker body unexpected")
 
             app_icon = client.get("/static/icons/axiom-mark.svg")
@@ -187,6 +217,13 @@ def main() -> None:
                 )
             if "<svg" not in app_icon.get_data(as_text=True):
                 raise AssertionError("app icon body unexpected")
+
+            admin_modules = assert_status(
+                client.get("/admin/modules", headers={"X-Axiom-Key": "test-key"}),
+                200,
+                "admin modules",
+            )
+            assert isinstance(admin_modules["modules"], list)
 
             unauthorized = assert_status(
                 client.get("/add", query_string={"text": "hello"}),

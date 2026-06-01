@@ -163,11 +163,8 @@ h3 { font-size: 0.95rem; font-weight: 550; color: var(--ink-soft); text-transfor
 
     .content-area { padding-top: 0; padding-bottom: 32px; }
 
-    .layout > .panel { display: none; }
-    .layout > .panel.active {
-        display: block;
-        animation: panelIn 250ms ease;
-    }
+    .layout > .panel { display: block; }
+    .layout > .panel.active { animation: panelIn 250ms ease; }
 
 @keyframes panelIn {
     from { opacity: 0; transform: translateY(8px); }

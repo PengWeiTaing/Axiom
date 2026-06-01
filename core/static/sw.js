@@ -1,6 +1,6 @@
-const CACHE_NAME = "axiom-app-shell-v1";
+const CACHE_NAME = "axiom-legacy-app-shell-v2";
 const SHELL_URLS = [
-    "/app",
+    "/app/legacy",
     "/static/app.css",
     "/static/app.js",
     "/static/manifest.webmanifest",
@@ -48,9 +48,9 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
-    if (requestUrl.pathname === "/app") {
+    if (requestUrl.pathname === "/app/legacy") {
         event.respondWith(
-            fetch(event.request).catch(() => caches.match("/app")),
+            fetch(event.request).catch(() => caches.match("/app/legacy")),
         );
         return;
     }

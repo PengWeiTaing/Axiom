@@ -217,7 +217,7 @@ def main() -> None:
                 with sync_playwright() as playwright:
                     browser = playwright.chromium.launch(headless=True)
                     page = browser.new_page()
-                    page.goto(f"{base_url}/app", wait_until="networkidle")
+                    page.goto(f"{base_url}/app/legacy", wait_until="networkidle")
 
                     if page.locator("#key-form").count() != 1:
                         raise AssertionError("app shell did not render key form")

@@ -598,3 +598,30 @@
   - 旧前端 item viewer 加"升级为记忆"按钮，memory 卡片显示"派生自 item #N"，可直接跳回原 item
   - 前端采纳 AI 建议走分支路径：`source_item_id != null` 走 promote，否则走 `POST /memories` 凭空新建
   - smoke test 覆盖派生写入、反向读取、FK SET NULL（用 throwaway item 验证 item 删除后 memory 仍在、来源指针置空）
+
+## 2026-06-01
+
+- 按 `docs/DEBT_BOARD.md` 的第二轮顺序开始 DB-001 `_common.py` 渐进拆分。
+- 新增 `core/config.py`，承接 Flask app、路径、上传/类型常量、Artifact/Automation 常量与 `AUTOMATION_JOBS` 定义。
+- 新增 `core/fetch.py`，承接 URL 抓取逻辑：Bilibili 视频信息/字幕抓取、通用网页标题与正文提取。
+- 新增 `core/database.py`，承接存储目录初始化、DB 连接、建表/迁移、FTS5 CJK 分词、FTS 同步/删除/回填。
+- 新增 `core/search.py`，承接 `escape_like`、`escape_fts_query` 等搜索查询构造工具。
+- 新增 `core/artifacts.py`，承接 review/system-status 等自动化产物的路径解析、扫描、过滤、计数、预览与 summary 生成。
+- 新增 `core/automation_core.py`，承接自动化运行记录、任务 payload、命令构造、锁、执行、状态落库与产物回连。
+- 新增 `core/items.py`、`core/text_extract.py`、`core/audit.py`、`core/vector_search.py`、`core/system_state.py`、`core/http_utils.py`，继续承接 Items、文本抽取、审计、向量搜索、系统概览/偏好、请求响应/鉴权/过滤器。
+- `core/_common.py` 删除基础配置块、DB/FTS 块、搜索查询工具、Artifacts 工具、Automation core、Items、文本抽取、审计、向量搜索、系统状态和 HTTP 工具实现，改为从新模块导入同名对象，现有 route 和脚本继续通过 `_common.py` 兼容导入。
+- `_common.py` 行数从 3761 降到约 312；后续剩余任务是逐步替换旧 route 的 `from core._common import *` 并补核心单元测试。
+- 本地验证通过：`python -m compileall -q core scripts`、`python scripts/smoke_test_receiver.py`、`system_status_day` 本地自动化验证。
+
+- 按 DB-001 第三阶段继续收口导入边界：`core/routes/*.py` 和 `core/receiver.py` 已全部移除 `from core._common import *`。
+- 旧 route 改为显式导入所需的 Flask/stdlib 名称和 `_common.py` 兼容层名称，先消除隐式命名空间风险，不改变路由行为。
+- `core/receiver.py` 保留老脚本依赖的显式兼容出口（如音频/文档抽取、自动化运行、`SECRET_KEY`），避免恢复 `import *`。
+- 修复 `admin_run_workflow` 中 `_fetch_ai_context` 的潜在导入错误：直接从 `core.routes.ai` 导入 `_fetch_ai_context`。
+- 本地验证通过：`python -m compileall -q core scripts`、`python scripts/smoke_test_receiver.py`；`core/routes/*.py` 与 `core/receiver.py` 无 `from core._common import *` 命中。
+
+- 按 `docs/DEBT_BOARD.md` 第二轮继续完成 DB-004 自动生产状态快照基础设施。
+- 新增 `scripts/build_system_status.py`：通过 Flask test client 汇总 `/health`、`/system`、`/stats`、`/metrics`、`/processing/backlog`、`/automation/runs`，并调用 `check_consistency.build_report()` 生成 Markdown。
+- 新增自动化 job `system_status_day`，报告落盘到 `data/reviews/system-status/YYYY/YYYY-MM-DD.md`。
+- `/artifacts` 现在识别 `system-status` artifact，自动化运行完成后能回连到生成的快照文件。
+- 新增 `deploy/axiom-daily-system-status.service` 与 `.timer`，后续部署后可启用每日 system status 生成。
+- 本地验证通过：`python scripts/build_system_status.py --root <temp> --date 2026-06-01 --stdout`、`python scripts/run_logged_automation.py --job-id system_status_day --root <temp> --date 2026-06-01 --utc-offset +08:00`、`python -m compileall -q core scripts`、`python scripts/smoke_test_receiver.py`。
