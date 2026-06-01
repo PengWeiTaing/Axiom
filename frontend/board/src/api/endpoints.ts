@@ -125,3 +125,29 @@ export async function getReviewQueue(): Promise<ReviewItem[]> {
 export async function searchBoard(boardId: string, q: string): Promise<{ results: unknown[] }> {
   return apiRequest(`/api/learning/boards/${boardId}/search?q=${encodeURIComponent(q)}`)
 }
+
+export async function createBoard(title: string): Promise<Board> {
+  const wid = `w_${Math.random().toString(36).slice(2, 10)}`
+  const raw = await apiRequest<BackendResponse>('/api/learning/boards', {
+    method: 'POST',
+    body: JSON.stringify({
+      title,
+      source_type: 'manual',
+      widgets: [{
+        id: wid,
+        type: 'quiz_card',
+        spec_version: '1.0.0',
+        title: '快速测验',
+        input: {
+          items: [{ id: 'q1', kind: 'single_choice', prompt: '占位题目 (可在右侧编辑)', options: ['A', 'B', 'C'], answer: 'A', concept_refs: ['demo'] }],
+          scoring: { mode: 'deterministic' },
+        },
+        state: {},
+        security: 'pure_client',
+        writeback: ['mastery'],
+      }],
+      nodes: [{ widget_id: wid, x: 200, y: 160, w: 440, h: 320, size_family: 'M' }],
+    }),
+  })
+  return adaptBoard(raw)
+}

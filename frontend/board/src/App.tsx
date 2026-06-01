@@ -99,25 +99,22 @@ export default function App() {
           </div>
           <div className="board-empty__actions">
             <p className="muted">
-              通过 AI 生成一个新白板，或从已有的白板链接进入。
+              创建一张空白白板开始，或输入学习目标让 AI 自动生成。
             </p>
             <button
               className="board-empty__btn"
-              onClick={() => {
-                // 切换到生成模式——BoardShell 会处理
-                setState({
-                  phase: 'loaded',
-                  board: {
-                    id: '',
-                    title: '新白板',
-                    goal: '',
-                    widgets: [],
-                    source_refs: [],
-                    created_at: '',
-                    updated_at: '',
-                    version: 0,
-                  },
-                })
+              onClick={async () => {
+                try {
+                  const { createBoard } = await import('./api/endpoints')
+                  const board = await createBoard('新白板')
+                  window.location.href = `/board/${board.id}`
+                } catch {
+                  // 降级：用内联空板
+                  setState({
+                    phase: 'loaded',
+                    board: { id: '', title: '新白板', goal: '', widgets: [], source_refs: [], created_at: '', updated_at: '', version: 0 },
+                  })
+                }
               }}
             >
               创建新白板
