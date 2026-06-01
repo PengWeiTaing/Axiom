@@ -1,0 +1,710 @@
+/* ============================================================
+ * Axiom Learning Board — 全局样式
+ *
+ * 与 Axiom Atlas 保持一致的暗色视觉语言。
+ * 色彩令牌沿用 tokens.css 的定义。
+ * ============================================================ */
+
+/* ---- CSS 变量（独立应用，不依赖 tokens.css） ---- */
+:root {
+  color-scheme: dark;
+
+  --surface-0: #060b14;
+  --surface-1: #0d1116;
+  --surface-2: #141921;
+  --surface-3: #1c2330;
+  --surface-4: #262e3d;
+
+  --text-1: #e8ecf2;
+  --text-2: #b4bcc9;
+  --text-3: #7d8694;
+  --text-4: #4a5260;
+
+  --line-1: rgba(255, 255, 255, 0.04);
+  --line-2: rgba(255, 255, 255, 0.08);
+  --line-3: rgba(255, 255, 255, 0.14);
+
+  --accent: #6ee7d0;
+  --accent-bright: #a5f3e0;
+  --accent-dim: rgba(110, 231, 208, 0.18);
+  --accent-glow: rgba(110, 231, 208, 0.10);
+
+  --warm: #f4c060;
+  --warn: #e8a87c;
+  --error: #e87878;
+
+  --r-1: 4px;
+  --r-2: 8px;
+  --r-3: 12px;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable",
+    "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", ui-monospace, monospace;
+
+  --fs-1: 11px;
+  --fs-2: 12px;
+  --fs-3: 13px;
+  --fs-4: 14px;
+  --fs-5: 16px;
+  --fs-6: 20px;
+
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-fast: 120ms;
+  --t-base: 180ms;
+}
+
+/* ---- Reset ---- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--surface-0);
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-4);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+}
+
+/* ---- 滚动条 ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--surface-4); }
+
+/* ---- 工具类 ---- */
+.muted { color: var(--text-3) !important; }
+.dim { color: var(--text-4) !important; }
+.mono { font-family: var(--font-mono); }
+
+/* ================================================================
+ * 加载 / 错误 / 空状态
+ * ================================================================ */
+
+.board-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+}
+
+.board-loading__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--line-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: board-spin 0.8s linear infinite;
+}
+
+@keyframes board-spin {
+  to { transform: rotate(360deg); }
+}
+
+.board-loading__text {
+  color: var(--text-3);
+  font-size: var(--fs-3);
+}
+
+.board-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  text-align: center;
+  padding: 24px;
+}
+
+.board-error__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(232, 120, 120, 0.15);
+  color: var(--error);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.board-error h2 {
+  color: var(--text-1);
+  font-size: var(--fs-6);
+}
+
+.board-error p {
+  color: var(--text-3);
+  max-width: 400px;
+}
+
+.board-error__retry {
+  margin-top: 8px;
+  padding: 8px 24px;
+  border-radius: var(--r-2);
+  background: var(--surface-3);
+  color: var(--text-2);
+  transition: background var(--t-fast) var(--ease);
+}
+
+.board-error__retry:hover {
+  background: var(--surface-4);
+}
+
+.board-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 32px;
+  text-align: center;
+  padding: 24px;
+}
+
+.board-empty__hero h1 {
+  font-size: 28px;
+  color: var(--text-1);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.board-empty__hero p {
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: var(--fs-4);
+}
+
+.board-empty__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.board-empty__btn {
+  padding: 10px 28px;
+  border-radius: var(--r-2);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 500;
+  transition: all var(--t-fast) var(--ease);
+}
+
+.board-empty__btn:hover {
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+  box-shadow: 0 0 24px var(--accent-glow);
+}
+
+/* ================================================================
+ * BoardShell 布局
+ * ================================================================ */
+
+.board-shell {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---- 侧边栏 ---- */
+.board-sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: var(--surface-1);
+  border-right: 1px solid var(--line-1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.board-sidebar__header {
+  padding: 16px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.board-sidebar__header h2 {
+  font-size: var(--fs-5);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.board-sidebar__header .board-goal {
+  margin-top: 4px;
+  font-size: var(--fs-2);
+  color: var(--text-3);
+}
+
+.board-sidebar__section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.board-sidebar__section h3 {
+  font-size: var(--fs-1);
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+/* ---- 控件列表 ---- */
+.widget-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.widget-list__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--r-1);
+  font-size: var(--fs-3);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.widget-list__item:hover {
+  background: var(--surface-2);
+}
+
+.widget-list__item--active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.widget-list__status {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.widget-list__status--idle { background: var(--text-4); }
+.widget-list__status--active { background: var(--accent); }
+.widget-list__status--completed { background: var(--warm); }
+.widget-list__status--error { background: var(--error); }
+
+/* ---- 复习列表 ---- */
+.review-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-list__item {
+  padding: 8px;
+  border-radius: var(--r-1);
+  background: var(--surface-2);
+  font-size: var(--fs-2);
+}
+
+.review-list__item .urgency {
+  font-size: var(--fs-1);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.urgency--high { color: var(--error); }
+.urgency--medium { color: var(--warn); }
+.urgency--low { color: var(--text-3); }
+
+.review-list__item .reason {
+  margin-top: 2px;
+  color: var(--text-3);
+}
+
+/* ---- 生成按钮 ---- */
+.board-gen-btn {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 16px;
+  padding: 10px 0;
+  border-radius: var(--r-2);
+  background: var(--accent);
+  color: var(--surface-0);
+  font-weight: 600;
+  font-size: var(--fs-4);
+  transition: all var(--t-fast) var(--ease);
+}
+
+.board-gen-btn:hover {
+  background: var(--accent-bright);
+}
+
+/* ---- 画布区域 ---- */
+.board-canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.board-canvas .tldraw__editor {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- 白板标题栏 ---- */
+.board-titlebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, rgba(6, 11, 20, 0.95) 0%, rgba(6, 11, 20, 0) 100%);
+  pointer-events: none;
+}
+
+.board-titlebar h1 {
+  font-size: var(--fs-5);
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+/* ================================================================
+ * 生成对话框
+ * ================================================================ */
+
+.gen-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gen-dialog {
+  width: 480px;
+  max-width: 90vw;
+  background: var(--surface-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-3);
+  padding: 24px;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+}
+
+.gen-dialog h2 {
+  font-size: var(--fs-6);
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.gen-dialog .sub {
+  font-size: var(--fs-2);
+  color: var(--text-3);
+  margin-bottom: 20px;
+}
+
+.gen-dialog__field {
+  margin-bottom: 16px;
+}
+
+.gen-dialog__field label {
+  display: block;
+  font-size: var(--fs-2);
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+.gen-dialog__field textarea,
+.gen-dialog__field input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
+  color: var(--text-1);
+  transition: border-color var(--t-fast) var(--ease);
+}
+
+.gen-dialog__field textarea:focus,
+.gen-dialog__field input:focus {
+  border-color: var(--accent);
+}
+
+.gen-dialog__field textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.gen-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.gen-dialog__cancel {
+  padding: 8px 20px;
+  border-radius: var(--r-2);
+  color: var(--text-3);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.gen-dialog__cancel:hover {
+  color: var(--text-2);
+}
+
+.gen-dialog__submit {
+  padding: 8px 20px;
+  border-radius: var(--r-2);
+  background: var(--accent);
+  color: var(--surface-0);
+  font-weight: 600;
+  transition: all var(--t-fast) var(--ease);
+}
+
+.gen-dialog__submit:hover {
+  background: var(--accent-bright);
+}
+
+.gen-dialog__submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ================================================================
+ * Widget 卡片基础样式（所有 widget 共享）
+ * ================================================================ */
+
+.widget-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+.widget-card__header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line-1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.widget-card__header .type-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-4);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--surface-1);
+}
+
+.widget-card__header .title {
+  font-size: var(--fs-3);
+  color: var(--text-1);
+  font-weight: 500;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.widget-card__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  font-size: var(--fs-3);
+}
+
+/* ---- 尺寸族变体 ---- */
+.widget-S .widget-card__body { padding: 6px 8px; font-size: var(--fs-2); }
+.widget-M .widget-card__body { padding: 10px 12px; font-size: var(--fs-3); }
+.widget-L .widget-card__body { padding: 14px 18px; font-size: var(--fs-4); }
+.widget-XL .widget-card__body { padding: 18px 24px; font-size: var(--fs-4); }
+
+.widget-S .widget-card__header { padding: 4px 8px; }
+.widget-M .widget-card__header { padding: 8px 12px; }
+.widget-L .widget-card__header { padding: 10px 16px; }
+.widget-XL .widget-card__header { padding: 12px 20px; }
+
+/* ================================================================
+ * 通用交互元素
+ * ================================================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--r-1);
+  font-size: var(--fs-3);
+  font-weight: 500;
+  transition: all var(--t-fast) var(--ease);
+}
+
+.btn--primary {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.btn--primary:hover {
+  background: rgba(110, 231, 208, 0.28);
+  color: var(--accent-bright);
+}
+
+.btn--secondary {
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+
+.btn--secondary:hover {
+  background: var(--surface-4);
+}
+
+.btn--ghost {
+  color: var(--text-3);
+}
+
+.btn--ghost:hover {
+  color: var(--text-2);
+  background: var(--surface-1);
+}
+
+.btn--small {
+  padding: 3px 8px;
+  font-size: var(--fs-2);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- 输入框 ---- */
+.input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--r-1);
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  color: var(--text-1);
+  font-size: var(--fs-3);
+  transition: border-color var(--t-fast) var(--ease);
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+/* ---- 进度条 ---- */
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--surface-1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s var(--ease);
+}
+
+/* ---- 提示 ---- */
+.hint-text {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-1);
+  background: rgba(244, 192, 96, 0.08);
+  border: 1px solid rgba(244, 192, 96, 0.15);
+  color: var(--warm);
+  font-size: var(--fs-2);
+  line-height: 1.5;
+}
+
+/* ---- 反馈 ---- */
+.feedback {
+  padding: 8px 10px;
+  border-radius: var(--r-1);
+  font-size: var(--fs-2);
+  margin-top: 8px;
+}
+
+.feedback--correct {
+  background: rgba(110, 231, 208, 0.08);
+  border: 1px solid rgba(110, 231, 208, 0.2);
+  color: var(--accent);
+}
+
+.feedback--incorrect {
+  background: rgba(232, 120, 120, 0.08);
+  border: 1px solid rgba(232, 120, 120, 0.2);
+  color: var(--error);
+}
+
+/* ================================================================
+ * tldraw 暗色主题覆写
+ * ================================================================ */
+
+/* 隐藏 tldraw 默认 UI（我们用自己的侧边栏和标题栏） */
+.tlui-layout__top,
+.tlui-layout__bottom,
+.tlui-style-panel,
+.tlui-toolbar {
+  display: none !important;
+}
+
+.tl-container {
+  background: var(--surface-0) !important;
+}
+
+.tl-background {
+  background: var(--surface-0) !important;
+}

@@ -1,0 +1,15 @@
+{
+  "name": "axiom-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Axiom Desktop — Tauri v2 shell wrapping the Vite + Vue 3 frontend.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "predev": "cd ../frontend && npm run dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
