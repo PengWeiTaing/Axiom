@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    axiom_desktop::run();
+    axiom_desktop::run().expect("failed to start Axiom");
 }

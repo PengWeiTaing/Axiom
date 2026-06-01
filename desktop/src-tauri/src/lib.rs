@@ -47,7 +47,7 @@ fn start_flask() -> Option<Child> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let backend = Backend(Mutex::new(start_flask()));
 
     // wait up to 15s for Flask
@@ -64,6 +64,20 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .manage(backend)
-        .run(tauri::generate_context!())
-        .expect("error while running Axiom desktop app");
+        .setup(|app| {
+            use tauri::WebviewUrl;
+            let _window = tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                WebviewUrl::External("http://127.0.0.1:5000/app".parse().unwrap()),
+            )
+            .title("Axiom — 个人外脑系统")
+            .inner_size(1280.0, 800.0)
+            .min_inner_size(900.0, 600.0)
+            .build()?;
+            Ok(())
+        })
+        .build(tauri::generate_context!())?
+        .run(|_, _| {});
+    Ok(())
 }
