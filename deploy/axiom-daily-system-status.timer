@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Axiom daily system status snapshot
+
+[Timer]
+OnCalendar=*-*-* 16:35:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=axiom-daily-system-status.service
+
+[Install]
+WantedBy=timers.target

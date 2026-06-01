@@ -1,0 +1,8 @@
+[Unit]
+Description=Axiom daily system status snapshot
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/axiom
+EnvironmentFile=/opt/axiom/.env
+ExecStart=/opt/axiom/.venv/bin/python /opt/axiom/scripts/run_logged_automation.py --job-id system_status_day --root /opt/axiom --days-offset 0 --utc-offset +08:00
