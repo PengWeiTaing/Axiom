@@ -99,7 +99,7 @@ function Sidebar(props: {
 
 function GenerateDialog(props: {
   onClose: () => void
-  onSubmit: (goal: string, sourceRefs: string[], maxWidgets: number) => void
+  onSubmit: (goal: string, sourceRefs: { kind: string; id: string }[], maxWidgets: number) => void
   loading: boolean
 }) {
   const { onClose, onSubmit, loading } = props
@@ -114,7 +114,7 @@ function GenerateDialog(props: {
       .split('\n')
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
-    onSubmit(goal.trim(), refs, maxWidgets)
+        onSubmit(goal.trim(), refs.map(r => ({ kind: 'memory', id: r })), maxWidgets)
   }
 
   return (
@@ -366,7 +366,7 @@ export default function BoardShell({ board, onBoardUpdate }: BoardShellProps) {
 
   // 生成白板
   const handleGenerate = useCallback(
-    async (goal: string, sourceRefs: string[], maxWidgets: number) => {
+    async (goal: string, sourceRefs: { kind: string; id: string }[], maxWidgets: number) => {
       setGenLoading(true)
       try {
         const newBoard = await generateBoard(goal, sourceRefs, maxWidgets)
