@@ -15,6 +15,7 @@ import type {
   DecisionList,
 } from './types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
+import type { AtlasGraphPayload } from '@/atlas/types';
 
 // ---------- 采集 ----------
 export const addNote = (text: string, source = 'web_app') =>
@@ -163,6 +164,9 @@ export const deleteItem = (id: number) =>
 
 // ---------- Cosmos ----------
 export const getCosmos = () => apiRequest<CosmosData>('/cosmos');
+
+export const getAtlasGraph = (params: { max_nodes?: number } = {}) =>
+  apiRequest<AtlasGraphPayload>('/api/atlas/graph', { query: params });
 
 // ---------- Lifeline ----------
 export const createLifeline = (data: { id: string; name: string; parent_id?: string; order_index?: number }) =>

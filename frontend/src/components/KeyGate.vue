@@ -33,8 +33,18 @@ async function submit() {
 
       <form @submit.prevent="submit">
         <input
+          class="visually-hidden"
+          type="text"
+          name="username"
+          autocomplete="username"
+          value="axiom"
+          tabindex="-1"
+          aria-hidden="true"
+        />
+        <input
           v-model="input"
           type="password"
+          name="axiom-key"
           autocomplete="current-password"
           placeholder="X-Axiom-Key"
           autofocus
@@ -99,6 +109,18 @@ async function submit() {
 form {
   display: flex;
   gap: var(--s-2);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 form input {

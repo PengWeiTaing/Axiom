@@ -1,21 +1,49 @@
-/*
- * Mode store — Capture / Atlas 切换
- *
- * 不持久化。每次刷新都从 Capture 进，这是有意的——
- * 让 Atlas 永远是"被主动走进的"，不是默认。
- */
-
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 export type AppMode = 'capture' | 'atlas' | 'recent';
 
-export const useModeStore = defineStore('mode', () => {
-  const mode = ref<AppMode>('capture');
+const MODES: AppMode[] = ['capture', 'atlas', 'recent'];
 
-  function set(m: AppMode) {
+function isMode(value: string | null): value is AppMode {
+  return Boolean(value && MODES.includes(value as AppMode));
+}
+
+function modeFromLocation(): AppMode {
+  if (typeof window === 'undefined') return 'capture';
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (path === '/atlas') return 'atlas';
+  const requested = new URLSearchParams(window.location.search).get('mode');
+  return isMode(requested) ? requested : 'capture';
+}
+
+function urlForMode(mode: AppMode): string {
+  if (mode === 'atlas') return '/atlas';
+  if (mode === 'recent') return '/app?mode=recent';
+  return '/app';
+}
+
+export const useModeStore = defineStore('mode', () => {
+  const mode = ref<AppMode>(modeFromLocation());
+  let listening = false;
+
+  function set(m: AppMode, updateUrl = true) {
     mode.value = m;
+    if (!updateUrl || typeof window === 'undefined') return;
+    const next = urlForMode(m);
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (current !== next) window.history.pushState({}, '', next);
   }
 
-  return { mode, set };
+  function syncFromLocation() {
+    set(modeFromLocation(), false);
+  }
+
+  function bindHistory() {
+    if (listening || typeof window === 'undefined') return;
+    window.addEventListener('popstate', syncFromLocation);
+    listening = true;
+  }
+
+  return { mode, set, bindHistory };
 });

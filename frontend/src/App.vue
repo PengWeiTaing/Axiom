@@ -16,6 +16,7 @@ const auth = useAuthStore();
 const mode = useModeStore();
 
 onMounted(async () => {
+  mode.bindHistory();
   if (auth.hasKey) {
     await auth.verify();
   }
