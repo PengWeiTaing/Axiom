@@ -26,3 +26,8 @@ frontend/*.tsbuildinfo
 screenshots/
 /*.png
 /page-snapshot.md
+
+# Desktop (Tauri v2)
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/

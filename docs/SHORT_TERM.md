@@ -8,15 +8,21 @@
 
 当前阶段：`v0.2+`（历史标签：`v0.1 alpha`）
 
-> 本文件其余章节（主线 / 状态图 / 已有清单）仍是 v0.1 时代写的，跟当前真实状态有差距。
-> **当前真实状态以 `docs/axiom_current_status_2026-05-27.md` 为准**。此处保留旧内容
-> 作为历史参考，待后续重写本文档时统一更新。
+> 本文件各章节已更新至 v0.2+ 状态。当前真实状态细节以 `docs/axiom_current_status_2026-05-27.md` 为准，
+> 债务清理以 `docs/DEBT_BOARD.md` 为准，演进总览见 `docs/PROJECT_EVOLUTION.md`。
 
 当前主线：
 
 ```text
-稳定接收 -> 可靠存储 -> 可查可取 -> 可备份恢复 -> 可回顾 -> 可安全处理 inbox
+对象关系链打通 → 图谱交互增强 → AI 推理层建设 → 白板与空间思维
 ```
+
+当前阶段核心方向：
+- 打通 item → memory → task → decision → lifeline → association → review 全链
+- Atlas v1 交互增强（搜索、路径查找、实体/关联编辑、数据导出导入）
+- Cosmos 关联自动生成（规则初筛 + LLM 分类：co_occurrence / causal / tension / derived_from）
+- 模块系统扩展（以减脂模块为模板，承载更多垂直领域）
+- AI 从工具层向主动推理层过渡
 
 当前已经不再把早期技术边界作为硬约束。Flask、SQLite、文件系统和 VPS 是已验证基线；如果后续有明确收益，可以调整架构，但必须先完成决策说明、迁移方案、回滚方案和验证方案。
 
@@ -27,17 +33,39 @@
 ## 当前状态图
 
 ```mermaid
-flowchart LR
-    A["输入"] --> B["receiver"]
-    B --> C["文件系统"]
-    B --> D["SQLite items"]
-    D --> E["查询 / 检索"]
-    C --> F["备份"]
-    D --> F
-    D --> G["回顾底稿"]
-    D --> H["inbox 处理报告"]
-    H --> I["action 快照"]
-    I --> J["action history"]
+flowchart TB
+    subgraph 输入层
+        A["iOS 快捷指令 / HTTPS 输入"]
+    end
+    subgraph 网关层
+        B["Nginx"] --> C["gunicorn"]
+    end
+    subgraph 后端层
+        C --> D["core/receiver.py\nApp 组装入口"]
+        D --> E1["core/routes/\n15 个路由模块"]
+        E1 --> E2["core/_common.py\n共享兼容层 (~312行)"]
+        E1 --> E3["core/graph/\n图谱核心"]
+    end
+    subgraph 存储层
+        E2 --> F1["SQLite\nitems / memories / tasks / decisions / lifelines"]
+        E2 --> F2["文件系统\ninbox / archive / reviews"]
+    end
+    subgraph 前端层
+        G1["frontend/src/\nVue 3 + Three.js\n主前端"]
+        G2["core/static/app.js\n旧前端 (兼容保留)"]
+    end
+    subgraph 自动化层
+        H1["systemd timers\n8 个定时任务"]
+        H2["artifact 产物\nreviews/ 落盘"]
+    end
+    subgraph 扩展层
+        I1["modules/\n插件系统"]
+        I2["Cosmos / Atlas\n关系图谱"]
+    end
+    F1 --> G1
+    F1 --> G2
+    F1 --> H1
+    F1 --> I2
 ```
 
 ## 当前已经有的东西
@@ -60,7 +88,9 @@ flowchart LR
 - `/artifacts`
 - `/artifacts/summary`
 - `/artifacts/file/<path>`
-- `/app`
+- `/app`：当前主前端入口
+- `/atlas`：Atlas 深链接
+- `/app/legacy`：旧移动 Web App 兼容入口
 - SQLite `items` 表
 - `data/inbox` 和 `data/archive`
 - 每日自动备份
@@ -77,21 +107,73 @@ flowchart LR
 
 ## 当前已稳住的点
 
-- 文本、图片、PDF / Word 文档和常见音频都能进入 inbox 并写入 SQLite。
-- PDF `.pdf` 与 Word `.docx` 上传后都会自动抽取正文，可直接进入 `/search` 和 `/app` 的文档查看器。
-- 音频 item 现在既可以直接携带 `transcript_text`，也可以通过 `transcript_file` 导入 `txt / md / srt / vtt` 转写内容，并进入 `/search`、`/item/<id>` 和 `/app` 的统一读取 / 编辑链路。
-- 当配置 OpenAI key 后，`audio_transcribe_day` 还可以为当日 audio item 批量补全转写，并在 `data/reviews/audio-transcripts` 留下一份可回看的日报。
-- 当配置 OpenAI key 后，`image_describe_day` 还可以为当日 image item 批量补全中文描述，并在 `data/reviews/image-descriptions` 留下一份可回看的日报。
-- 文件取回、元数据读取、统计、类型过滤、来源过滤、存储区过滤、处理状态过滤、时间范围过滤已经验证。
-- `/app` 已经能直接覆盖文本写入、文件上传、总览、最近记录、搜索和自动化产物浏览，并补了 PDF 预览与正文预览、音频播放与转写查看 / 编辑，以及 Word 正文预览；现在也能直接筛出待补正文 / 待补转写 / 待补图片描述条目并在 viewer 里补齐。
-- 归档和恢复不会破坏 `/file/<id>` 的取回路径。
-- 备份包含 SQLite、inbox、archive 和 manifest。
-- 一致性检查覆盖 inbox 与 archive。
-- review、inbox processing、action snapshot、action history 都已经能落盘。
-- 自动处理默认 dry-run，真正执行需要显式 `--apply`。
-- action 执行支持 `--only-id`、`--exclude-id`、`--max-items`，用于降低误操作风险。
+**输入与存储：**
+- 文本、图片、PDF/Word 文档和常见音频都能进入 inbox 并写入 SQLite。
+- PDF/DOCX 上传后自动抽取正文，进入搜索和文档查看器。
+- 音频支持直接携带 `transcript_text` 或通过 sidecar 文件导入转写（txt/md/srt/vtt），srt/vtt 自动清洗时间轴。
+- 文件取回、元数据读取、统计、类型/来源/存储区/处理状态/时间范围过滤已验证。
+- 归档和恢复不破坏取回路径。
+- 备份包含 SQLite、inbox、archive 和 manifest，每日自动执行。
+
+**检索与前端：**
+- FTS5 中文全文搜索（BM25 排序 + CJK 字符级分词），覆盖 content / original_name / derived_text / transcript_text。
+- `/app` 为当前主前端入口（Vue 3，Capture/Atlas/近况 三模式），`/app/legacy` 保留旧处理工作台兼容。
+- PWA 主屏入口，移动端低摩擦使用。
+
+**AI 预处理：**
+- 音频自动转写（`audio_transcribe_day`），图片自动描述（`image_describe_day`），缺 key 时跳过并留痕。
+- 所有 AI 预处理产物落盘 `data/reviews/`，可回看。
+
+**结构化对象：**
+- 五类记忆系统（fact / preference / goal / relationship / event），candidate → confirmed → archived。
+- 任务系统（三级优先级 high/medium/low + due_date）。
+- 决策系统（pending → reviewed），支持复盘记录。
+- Item → Memory 反向链：`promote-to-memory` 已打通。
+
+**自动化与治理：**
+- 8 个 systemd timers 线上运行（日/周回顾、inbox 处理、action 执行+留痕、音频转写、图片描述、备份）。
+- 自动化默认 dry-run，真执行需显式 `--apply`；支持 `--max-items`、`--only-id`、`--exclude-id` 分批操作。
+- 审计日志覆盖 items / memories / tasks CUD 操作。
+- `/system` 端点提供 DB 大小、表计数、FTS 条目、备份年龄、孤立引用、健康分数等运行指标。
+- 部署脚本化：`deploy_to_vps.py` 一键部署 + 验证。
+
+**关系图谱：**
+- Cosmos 聚合 items / tasks / memories / decisions / lifelines / associations 为统一图谱数据源。
+- Lifelines 树结构（parent_id + order_index），支持实体挂载与卸载。
+- 关联自动生成（规则初筛：同 lifeline、时间邻接、bigram 文本相似 → LLM 分类：co_occurrence / causal / tension / derived_from / none）。
+- Atlas v1 前端（Three.js 3D 图，搜索、路径查找、实体/关联编辑、数据导出/导入）。
+
+**模块系统：**
+- 自动模块发现、Blueprint 注册、Prompt 模板加载、前端 nav item。
+- 减脂模块为第一个垂直领域示例（体重/饮食/运动/围度/备注）。
+- Learning Board v0.1。
 
 ## 当前最重要的风险
+
+### _common.py 过重（P0 — DEBT_BOARD DB-001）
+
+- `core/_common.py` 已从巨型共享核心降到约 312 行，主体职责已拆到 `core/config.py`、`core/fetch.py`、`core/database.py`、`core/search.py`、`core/artifacts.py`、`core/automation_core.py`、`core/items.py`、`core/text_extract.py`、`core/audit.py`、`core/vector_search.py`、`core/system_state.py`、`core/http_utils.py`。
+- `core/routes/*.py` 和 `core/receiver.py` 已移除 `from core._common import *`，隐式共享命名空间风险已收窄。
+- 下一步收口：把 route 从 `_common.py` 兼容层逐步迁到具体模块直接导入，并为 DB / Items / Search / HTTP 工具补最小单元测试。
+
+### 文档漂移（P0 — DEBT_BOARD DB-002）
+
+- `docs/AI_CONTEXT.md` 和 `docs/SHORT_TERM.md` 版本标签长期停留在 v0.1 alpha，与代码实际 v0.2+ 脱节。
+- Cosmos/Atlas/Lifelines 在 README 和 AI_CONTEXT 中完全缺失，新接手者不知道关系图谱主线已存在。
+- 自动生产状态快照基础脚本已补（DB-004），后续需要随部署启用 systemd timer 并观察线上报告质量。
+
+### 前端双轨并存（P1 — DEBT_BOARD DB-005）
+
+- 主前端 `frontend/src/`（Vue 3 + Vite）+ 旧前端 `core/static/app.js`（~4200 行 vanilla JS）同时维护。
+- 旧前端不再加新功能，只修 bug；新功能一律进入 Vue 3 前端。
+- 处理工作台、自动化中心、记忆/任务/决策面板仍在旧前端，需逐步小块迁移。
+
+### AI 层深度不足（P1 — DEBT_BOARD DB-006）
+
+- AI 当前只做被动调用响应（parse/transcribe/describe/suggestions），未形成主动推理层。
+- 不会主动检测"用户三天没记录"、不会在 inbox 积压时自动建议处理优先级。
+- 关联生成（cosmos_associations）只在手动触发时运行。
+- 生产状态快照基础设施已补，下一步可在其基础上做 alarm / suggestion 定时主动推送。
 
 ### 数据安全
 
@@ -103,14 +185,7 @@ flowchart LR
 
 - `apply_inbox_actions.py` 默认 dry-run。
 - `--apply` 只在确认候选条目后使用。
-- 大批量处理前加 `--max-items`。
-- 对单条数据处理时优先使用 `--only-id`。
-
-### 文档漂移
-
-- 小改动只更新 `docs/ITERATION_LOG.md`。
-- 大改动同步 README、DeepWiki、AI/Human/Short Term 上下文。
-- DeepWiki 生成脚本要和真实代码保持一致。
+- 大批量处理前加 `--max-items`，单条优先 `--only-id`。
 
 ### 架构升级
 
@@ -120,23 +195,26 @@ flowchart LR
 
 ## 短期优先级
 
-第一优先级：
+基于 `docs/DEBT_BOARD.md` 当前债务结构。
 
-- 保持 VPS 运行稳定。
-- 保持备份、恢复、一致性检查可用。
-- 保持 action snapshot 和 history 可回看。
-- 把新治理规则写入项目文档和 DeepWiki。
+### 第一优先级（P0 — 阻塞级）
 
-第二优先级：
+- `_common.py` 收口：已降到约 312 行；旧 route / receiver 的 `import *` 已清理，继续推进具体模块直连导入和核心单元测试。
+- 统一文档版本标签：AI_CONTEXT.md / HUMAN_CONTEXT.md / README.md → v0.2+，核心文档补 Cosmos / Atlas / Lifelines 描述。
+- 保持 VPS 运行稳定，备份/恢复/一致性检查持续可用。
 
-- 改善人类阅读层，让 review、inbox report、action history 更容易消费。
-- 为图片描述、文档处理和后续语音自动转写 / AI 摘要准备更清晰的数据入口。
-- 梳理需要架构升级时的决策模板。
+### 第二优先级（P1 — 重要）
 
-第三优先级：
+- 部署并观察自动生产状态快照（每日 system-status 报告，含 /health /system /stats /metrics 摘要）。
+- 旧前端功能逐步小块迁移到 Vue 3 前端（处理工作台、自动化中心、记忆/任务/决策面板）。
+- AI 层向主动推理过渡：先做 alarm / suggestion 定时主动推送。
+- 改善人类阅读层，让 review / inbox report / action history 更容易消费。
 
-- 在证据足够时评估数据模型、检索层或服务结构升级。
-- 引入 AI 摘要、分类建议、周回顾增强。
+### 第三优先级（P2 — 改善级）
+
+- `_common.py` 拆分后为核心模块补最小单元测试（DB / Items / Search 优先）。
+- `.gitignore` 补全 desktop 构建产物（tauri target / gen / node_modules）。
+- 旧前端代码不单独投入，随迁移自然消除。
 
 ## 当前建议顺序
 
