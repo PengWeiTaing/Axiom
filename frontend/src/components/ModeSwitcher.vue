@@ -9,6 +9,7 @@ const tabs: { key: AppMode; label: string }[] = [
   { key: 'capture', label: 'Capture' },
   { key: 'atlas', label: 'Atlas' },
   { key: 'recent', label: '近况' },
+  { key: 'tasks', label: '任务' },
   { key: 'automation', label: '自动化' },
   { key: 'board', label: 'Board' },
 ]

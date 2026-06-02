@@ -11,6 +11,7 @@ import FloatChat from '@/components/FloatChat.vue';
 // 懒加载，避免拖慢 Capture 启动
 const AtlasView = defineAsyncComponent(() => import('@/views/AtlasView.vue'));
 const RecentView = defineAsyncComponent(() => import('@/views/RecentView.vue'));
+const TasksView = defineAsyncComponent(() => import('@/views/TasksView.vue'));
 const AutomationView = defineAsyncComponent(() => import('@/views/AutomationView.vue'));
 
 const auth = useAuthStore();
@@ -32,6 +33,7 @@ onMounted(async () => {
       <CaptureView v-if="mode.mode === 'capture'" key="capture" />
       <AtlasView v-else-if="mode.mode === 'atlas'" key="atlas" />
       <RecentView v-else-if="mode.mode === 'recent'" key="recent" />
+      <TasksView v-else-if="mode.mode === 'tasks'" key="tasks" />
       <AutomationView v-else-if="mode.mode === 'automation'" key="automation" />
       <RecentView v-else key="fallback-recent" />
     </Transition>

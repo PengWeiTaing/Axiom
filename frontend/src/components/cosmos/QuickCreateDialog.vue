@@ -46,7 +46,7 @@ async function submit() {
     if (kind.value === 'task') {
       const { createTask } = await import('@/api/endpoints')
       const r = await createTask({ title: title.value.trim() })
-      entityId = r.id
+      entityId = r.task.id
     } else if (kind.value === 'memory') {
       const { createMemory: apiMem } = await import('@/api/endpoints')
       const r = await apiMem({ category: category.value as any, content: content.value.trim() })

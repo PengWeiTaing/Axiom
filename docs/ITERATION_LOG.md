@@ -641,3 +641,7 @@
 - 自动化页支持运行日期、任务 ready/runtime 状态、手动触发、运行记录任务/状态过滤、运行详情和选中记录重跑；smoke 使用非破坏性的 Inbox 报告任务验证按钮链路，避免污染待处理图片夹具。
 - 前端 API 增加 `getAutomationJobs()`、`getAutomationRuns()`、`runAutomationJob()` 和自动化相关类型；`frontend/` 重新构建到 `core/static/v2/`。
 - 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`；Browser 打开 `http://localhost:8765/app?mode=automation` 确认新版 KeyGate，服务端 bundle 已确认包含 automation 模式。
+- 任务台迁入 Vue 主线：新增 `frontend/src/views/TasksView.vue`，顶部模式增加“任务”，页面读取 `/tasks/today` 和 `/tasks`。
+- 任务台支持快速新增、今日/逾期概览、全部任务状态/优先级筛选，以及完成、恢复、取消、安排到今天；前端 API 增加 `listTasks()`、`cancelTask()`、`rescheduleTask()` 并校正 `createTask()` 返回类型。
+- `scripts/smoke_test_web_app.py` 补充 `/app?mode=tasks` 浏览器链路：创建 smoke 任务、确认列表出现、点击完成并确认状态变为“已完成”。
+- 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`；Browser 尝试打开 `/app?mode=tasks` 时命中旧 bundle 缓存，未作为失败处理，后续可单独处理固定文件名构建的缓存刷新策略。

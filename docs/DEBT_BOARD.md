@@ -88,7 +88,7 @@ core/_common.py          # 保留为兼容层，re-export各模块 (~312行)
   - 新功能进入 `frontend/src/`
   - 逐步小块迁移旧功能到新前端（如处理工作台、自动化中心）
   - 迁移完成后删除旧文件
-- **当前迁移进度估测：** ~30%（Capture + Atlas + 近况看板已迁；近况页已具备处理积压单条打开、标记就绪和退回待处理；自动化中心已迁入 Vue 主线，支持任务列表、运行记录、手动触发和详情查看；完整处理工作台/记忆/任务/决策面板仍在旧前端）
+- **当前迁移进度估测：** ~36%（Capture + Atlas + 近况看板已迁；近况页已具备处理积压单条打开、标记就绪和退回待处理；任务台已迁入 Vue 主线，支持快速新增、今日/逾期、状态/优先级筛选和基础状态动作；自动化中心已迁入 Vue 主线，支持任务列表、运行记录、手动触发和详情查看；完整处理工作台/记忆/决策面板仍在旧前端）
 - **预计完全迁移：** 长期，不做一次性硬切
 
 ### DB-006: AI 层仍在工具层
@@ -183,3 +183,4 @@ desktop/src-tauri/gen/
 | DB-005 | 2026-06-02 | 第一阶段：`RecentView.vue` 从旧前端包装改为 Vue 原生只读近况页，覆盖运行摘要、处理积压、最近记录和自动化产物摘要 | `npm run type-check`、`npm run build`、`python scripts/smoke_test_web_app.py`、Playwright 打开 `/app?mode=recent` |
 | DB-005 | 2026-06-02 | 第二阶段：Vue 近况页增加处理积压单条打开、标记就绪和手动完成项退回待处理；web smoke 同时覆盖 Vue 动作与旧 Recent 批量处理兼容链路 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` |
 | DB-005 | 2026-06-02 | 第三阶段：新增 `AutomationView.vue`，将自动化中心迁入 Vue 主线；顶部模式增加“自动化”，页面覆盖任务卡、ready/runtime 状态、运行日期、运行记录过滤、手动触发和详情面板 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`、Browser 打开新版 KeyGate 并确认服务端 bundle 包含 automation 模式 |
+| DB-005 | 2026-06-02 | 第四阶段：新增 `TasksView.vue`，将任务台迁入 Vue 主线；顶部模式增加“任务”，页面覆盖快速新增、今日/逾期、全部任务筛选、完成/恢复/取消/安排到今天 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` |

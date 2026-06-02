@@ -627,6 +627,33 @@ def main() -> None:
                         if len(restored_ids) < 2:
                             raise AssertionError(f"Vue recent action restore missed smoke image ids: {restored_ids}")
 
+                        vue_task_title = "Vue smoke task"
+                        today = datetime.now().date().isoformat()
+                        vue_page.goto(f"{base_url}/app?mode=tasks", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="任务台").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="今日任务").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="全部任务").wait_for(timeout=15_000)
+                        vue_page.get_by_label("任务标题").fill(vue_task_title)
+                        vue_page.get_by_label("任务详情").fill("created by smoke test")
+                        vue_page.get_by_label("截止日期").fill(today)
+                        with vue_page.expect_response(
+                            lambda response: response.url.endswith("/tasks")
+                            and response.request.method == "POST"
+                            and response.status == 201
+                        ):
+                            vue_page.get_by_role("button", name="添加任务").click()
+                        vue_task_row = vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).first
+                        vue_task_row.wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/tasks/" in response.url
+                            and response.url.endswith("/done")
+                            and response.status == 200
+                        ):
+                            vue_task_row.get_by_role("button", name="完成").click()
+                        vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).filter(
+                            has_text="已完成"
+                        ).first.wait_for(timeout=15_000)
+
                         vue_page.goto(f"{base_url}/app?mode=automation", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="自动化中心").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="可执行任务").wait_for(timeout=15_000)

@@ -17,6 +17,9 @@ import type {
   AutomationRunPayload,
   MemoryList,
   DecisionList,
+  TaskList,
+  TaskPriority,
+  TaskStatus,
   OverviewPayload,
   ProcessingBacklogPayload,
   ProcessingMarkPayload,
@@ -113,17 +116,26 @@ export const aiParseFeedback = (text: string, aiType: string, userType: string) 
 // ---------- 任务 ----------
 export const createTask = (data: {
   title: string;
-  priority?: 'high' | 'medium' | 'low';
+  detail?: string;
+  priority?: TaskPriority;
   due_date?: string;
   estimated_minutes?: number;
   memory_id?: number;
-}) => apiRequest<{ id: number; task: Task }>('/tasks', { method: 'POST', json: data });
+}) => apiRequest<{ task: Task }>('/tasks', { method: 'POST', json: data });
+
+export const listTasks = (params: {
+  status?: TaskStatus | '';
+  priority?: TaskPriority | '';
+  due_date?: string;
+  page?: number;
+  page_size?: number;
+} = {}) => apiRequest<TaskList>('/tasks', { query: params });
 
 export const tasksToday = () =>
   apiRequest<{ today: Task[]; overdue: Task[] }>('/tasks/today');
 
 export const completeTask = (id: number) =>
-  apiRequest(`/tasks/${id}/done`, { method: 'POST' });
+  apiRequest<{ task: Task }>(`/tasks/${id}/done`, { method: 'POST' });
 
 // ---------- 记忆 ----------
 export const createMemory = (data: {
@@ -258,8 +270,11 @@ export const updateEntityField = (kind: string, id: number, data: Record<string,
 }
 
 // Quick actions
-export const markTaskDone = (id: number) => apiRequest(`/tasks/${id}/done`, { method: 'POST' })
-export const markTaskTodo = (id: number) => apiRequest(`/tasks/${id}/todo`, { method: 'POST' })
+export const markTaskDone = (id: number) => apiRequest<{ task: Task }>(`/tasks/${id}/done`, { method: 'POST' })
+export const markTaskTodo = (id: number) => apiRequest<{ task: Task }>(`/tasks/${id}/todo`, { method: 'POST' })
+export const cancelTask = (id: number) => apiRequest<{ task: Task }>(`/tasks/${id}/cancel`, { method: 'POST' })
+export const rescheduleTask = (id: number, due_date?: string) =>
+  apiRequest<{ task: Task }>(`/tasks/${id}/reschedule`, { method: 'POST', json: { due_date } })
 export const confirmMemory = (id: number) => apiRequest(`/memories/${id}/confirm`, { method: 'POST' })
 export const archiveMemory = (id: number) => apiRequest(`/memories/${id}/archive`, { method: 'POST' })
 
