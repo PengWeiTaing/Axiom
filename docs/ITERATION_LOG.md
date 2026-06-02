@@ -658,3 +658,5 @@
 - 处理工作台基础版迁入 Vue 主线：新增 `frontend/src/views/ProcessingView.vue`，顶部模式增加“处理”，页面读取 `/processing/backlog`。
 - 处理工作台支持全局下一条、队列分组、分组批量标记就绪、刚处理记录退回待处理，并复用 `ItemDrawer` 打开条目详情。
 - `scripts/smoke_test_web_app.py` 补充 `/app?mode=processing` 浏览器链路：确认处理工作台、全局下一条和队列分组出现，批量标记就绪后从刚处理记录退回待处理。
+- Vue `ItemDrawer` 增加处理动作：待处理条目支持“标记就绪”和“完成并打开同类下一条”，手动完成条目支持退回待处理；前端补 `/processing/next` typed endpoint。
+- `scripts/smoke_test_web_app.py` 的 `/app?mode=processing` 链路补充抽屉内“完成并打开同类下一条”验证，覆盖从处理工作台进入详情后的连续处理动作。

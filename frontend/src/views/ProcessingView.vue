@@ -120,8 +120,8 @@ function openItem(item: Item | null | undefined) {
   selectedItemId.value = item.id;
 }
 
-function onDrawerChanged() {
-  selectedItemId.value = null;
+function onDrawerChanged(options?: { nextItemId?: number }) {
+  selectedItemId.value = options?.nextItemId ?? null;
   loadQueue();
 }
 

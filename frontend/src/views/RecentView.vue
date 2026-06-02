@@ -102,8 +102,8 @@ function artifactTitle(artifact: ArtifactSummary | null): string {
   return artifact.report_date || artifact.generated_name || artifact.relative_path;
 }
 
-function onChanged() {
-  selectedItemId.value = null;
+function onChanged(options?: { nextItemId?: number }) {
+  selectedItemId.value = options?.nextItemId ?? null;
   loadOverview();
 }
 

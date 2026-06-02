@@ -7,15 +7,15 @@
  */
 
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
-import { getItem, archiveItem, restoreItem, deleteItem } from '@/api/endpoints'
+import { getItem, archiveItem, restoreItem, deleteItem, getProcessingNext, markProcessingPending, markProcessingReady } from '@/api/endpoints'
 import { typeAccent } from '@/composables/useTypeAccent'
 import { humanSize } from '@/composables/useHumanSize'
 import { formatRelative } from '@/composables/useRelativeTime'
 import { ApiError } from '@/api/client'
-import type { Item } from '@/api/types'
+import type { ItemDetail } from '@/api/types'
 
 const props = defineProps<{ itemId: number | null }>()
-const emit = defineEmits<{ close: []; changed: [] }>()
+const emit = defineEmits<{ close: []; changed: [options?: { nextItemId?: number }] }>()
 
 const now = ref(Date.now())
 const nowDate = computed(() => new Date(now.value))
@@ -23,7 +23,7 @@ const nowDate = computed(() => new Date(now.value))
 const loading = ref(false)
 const acting = ref(false)
 const error = ref<string | null>(null)
-const detail = ref<(Item & { derived_text_preview?: string; storage?: string; file_url?: string }) | null>(null)
+const detail = ref<ItemDetail | null>(null)
 
 // 删除二次确认
 const deleteConfirm = ref(false)
@@ -48,6 +48,8 @@ watch(() => props.itemId, async (id) => {
 })
 
 const isInbox = computed(() => detail.value?.storage !== 'archive')
+const isPending = computed(() => detail.value?.processing_state === 'pending')
+const isOverridden = computed(() => Boolean(detail.value?.processing_is_overridden))
 
 const typeLabel = computed(() => {
   const map: Record<string, string> = { text: 'TEXT', image: 'IMAGE', document: 'DOC', audio: 'AUDIO' }
@@ -77,6 +79,62 @@ async function doArchive() {
     emit('changed')
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '操作失败'
+  } finally {
+    acting.value = false
+  }
+}
+
+async function doMarkReady() {
+  if (!detail.value) return
+  acting.value = true
+  error.value = null
+  try {
+    await markProcessingReady([detail.value.id])
+    const data = await getItem(detail.value.id)
+    detail.value = data.item
+    emit('changed')
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '标记就绪失败'
+  } finally {
+    acting.value = false
+  }
+}
+
+async function doMarkPending() {
+  if (!detail.value) return
+  acting.value = true
+  error.value = null
+  try {
+    await markProcessingPending([detail.value.id])
+    const data = await getItem(detail.value.id)
+    detail.value = data.item
+    emit('changed')
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '退回待处理失败'
+  } finally {
+    acting.value = false
+  }
+}
+
+async function doReadyAndNext() {
+  if (!detail.value) return
+  const current = detail.value
+  acting.value = true
+  error.value = null
+  try {
+    await markProcessingReady([current.id])
+    const next = await getProcessingNext({ type: current.type, exclude_id: current.id })
+    if (next.item) {
+      const data = await getItem(next.item.id)
+      detail.value = data.item
+      emit('changed', { nextItemId: data.item.id })
+    } else {
+      detail.value = null
+      emit('close')
+      emit('changed')
+    }
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '处理下一条失败'
   } finally {
     acting.value = false
   }
@@ -198,6 +256,14 @@ onBeforeUnmount(() => {
         <div v-if="detail" class="drawer-meta">
           <div class="meta-row"><span class="meta-key mono">ID</span><span class="meta-val mono">#{{ detail.id }}</span></div>
           <div class="meta-row"><span class="meta-key mono">来源</span><span class="meta-val">{{ detail.source }}</span></div>
+          <div v-if="detail.processing_note" class="meta-row">
+            <span class="meta-key mono">处理</span>
+            <span class="meta-val">{{ detail.processing_note }}</span>
+          </div>
+          <div v-if="detail.processing_override_label" class="meta-row">
+            <span class="meta-key mono">覆盖</span>
+            <span class="meta-val">{{ detail.processing_override_label }}</span>
+          </div>
           <div v-if="detail.size_bytes" class="meta-row">
             <span class="meta-key mono">大小</span><span class="meta-val mono">{{ humanSize(detail.size_bytes) }}</span>
           </div>
@@ -212,6 +278,33 @@ onBeforeUnmount(() => {
 
         <!-- Actions -->
         <div v-if="detail" class="drawer-actions">
+          <button
+            v-if="isPending"
+            class="action-btn primary-btn"
+            type="button"
+            :disabled="acting"
+            @click="doReadyAndNext"
+          >
+            完成并打开同类下一条
+          </button>
+          <button
+            v-if="isPending"
+            class="action-btn archive-btn"
+            type="button"
+            :disabled="acting"
+            @click="doMarkReady"
+          >
+            标记就绪
+          </button>
+          <button
+            v-if="isOverridden"
+            class="action-btn archive-btn"
+            type="button"
+            :disabled="acting"
+            @click="doMarkPending"
+          >
+            退回待处理
+          </button>
           <button
             class="action-btn archive-btn"
             type="button"
@@ -403,6 +496,7 @@ onBeforeUnmount(() => {
 /* Actions */
 .drawer-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s-2);
   padding: var(--s-3) var(--s-4);
   border-top: 1px solid var(--line-1);
@@ -410,11 +504,22 @@ onBeforeUnmount(() => {
 }
 
 .action-btn {
-  flex: 1;
+  flex: 1 1 42%;
   padding: var(--s-2) var(--s-3);
   font-size: var(--fs-3);
   border-radius: var(--r-2);
   transition: all var(--t-fast) var(--ease);
+}
+
+.primary-btn {
+  flex-basis: 100%;
+  background: var(--accent);
+  border: 1px solid transparent;
+  color: var(--bg);
+}
+
+.primary-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
 }
 
 .archive-btn {

@@ -18,8 +18,8 @@ const showSearch = ref(false);
 const timeline = useTimelineStore();
 const selectedId = ref<number | null>(null);
 
-function onChanged() {
-  selectedId.value = null;
+function onChanged(options?: { nextItemId?: number }) {
+  selectedId.value = options?.nextItemId ?? null;
   timeline.reset();
   timeline.loadInitial();
 }

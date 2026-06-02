@@ -15,7 +15,18 @@ export interface Item {
   derived_text: string | null;
   transcript_text: string | null;
   processing_override: string | null;
+  processing_state?: 'ready' | 'pending';
+  processing_label?: string;
+  processing_note?: string;
+  processing_override_label?: string | null;
+  processing_is_overridden?: boolean;
   file_sha256: string | null;
+}
+
+export interface ItemDetail extends Item {
+  derived_text_preview?: string;
+  storage?: string;
+  file_url?: string;
 }
 
 export type MemoryCategory = 'fact' | 'preference' | 'goal' | 'relationship' | 'event';
@@ -157,6 +168,13 @@ export interface ProcessingMarkPayload {
   ids: number[];
   by_type: Record<string, number>;
   items: Item[];
+}
+
+export interface ProcessingNextPayload {
+  type: ItemType | null;
+  processing_state: 'pending';
+  exclude_id: number | null;
+  item: Item | null;
 }
 
 export type AutomationRunStatus = 'success' | 'failed' | 'skipped' | 'running' | 'timeout';

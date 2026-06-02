@@ -6,6 +6,8 @@
 import { apiRequest } from './client';
 import type {
   Item,
+  ItemDetail,
+  ItemType,
   Memory,
   Task,
   Decision,
@@ -27,6 +29,7 @@ import type {
   OverviewPayload,
   ProcessingBacklogPayload,
   ProcessingMarkPayload,
+  ProcessingNextPayload,
 } from './types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 import type { AtlasGraphPayload } from '@/atlas/types';
@@ -64,6 +67,9 @@ export const getOverview = (params: { recent_limit?: number; preview_chars?: num
 
 export const getProcessingBacklog = (params: { group_limit?: number } = {}) =>
   apiRequest<ProcessingBacklogPayload>('/processing/backlog', { query: params });
+
+export const getProcessingNext = (params: { type?: ItemType; exclude_id?: number } = {}) =>
+  apiRequest<ProcessingNextPayload>('/processing/next', { query: params });
 
 export const getArtifactsSummary = (params: { preview_chars?: number } = {}) =>
   apiRequest<ArtifactsSummaryPayload>('/artifacts/summary', { query: params });
@@ -208,7 +214,7 @@ export const dailyStats = (days = 30) =>
 
 // ---------- Item 详情与操作 ----------
 export const getItem = (id: number) =>
-  apiRequest<{ item: Item & { derived_text_preview?: string; storage?: string; file_url?: string } }>(`/item/${id}`);
+  apiRequest<{ item: ItemDetail }>(`/item/${id}`);
 
 export const updateItem = (id: number, data: {
   content?: string

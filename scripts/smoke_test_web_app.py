@@ -636,6 +636,24 @@ def main() -> None:
                         vue_page.get_by_role("heading", name="处理工作台").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="全局下一条").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="队列分组").wait_for(timeout=15_000)
+                        image_group = vue_page.locator(".group-card").filter(has_text="图片待补说明").first
+                        image_group.get_by_role("button", name="打开下一条").click()
+                        vue_page.get_by_role("button", name="完成并打开同类下一条").wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/processing/mark-ready" in response.url and response.status == 200
+                        ):
+                            vue_page.get_by_role("button", name="完成并打开同类下一条").click()
+                        vue_page.get_by_role("button", name="完成并打开同类下一条").wait_for(timeout=15_000)
+                        vue_page.wait_for_function(
+                            """
+                            () => {
+                                const closeButton = document.querySelector('button[aria-label="关闭"]');
+                                return closeButton && !closeButton.disabled;
+                            }
+                            """,
+                            timeout=15_000,
+                        )
+                        vue_page.get_by_label("关闭").click()
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-ready" in response.url and response.status == 200
                         ):
