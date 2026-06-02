@@ -631,6 +631,21 @@ def main() -> None:
                         ):
                             pending_button.click()
                         vue_page.get_by_role("button", name="标记就绪").first.wait_for(timeout=15_000)
+
+                        vue_page.goto(f"{base_url}/app?mode=processing", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="处理工作台").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="全局下一条").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="队列分组").wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/processing/mark-ready" in response.url and response.status == 200
+                        ):
+                            vue_page.get_by_role("button", name="批量标记就绪").first.click()
+                        vue_page.get_by_role("heading", name="刚处理的记录").wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/processing/mark-pending" in response.url and response.status == 200
+                        ):
+                            vue_page.get_by_role("button", name="退回待处理").first.click()
+
                         restored_ids = vue_page.evaluate(
                             """
                             async () => {

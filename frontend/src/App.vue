@@ -11,6 +11,7 @@ import FloatChat from '@/components/FloatChat.vue';
 // 懒加载，避免拖慢 Capture 启动
 const AtlasView = defineAsyncComponent(() => import('@/views/AtlasView.vue'));
 const RecentView = defineAsyncComponent(() => import('@/views/RecentView.vue'));
+const ProcessingView = defineAsyncComponent(() => import('@/views/ProcessingView.vue'));
 const TasksView = defineAsyncComponent(() => import('@/views/TasksView.vue'));
 const MemoriesView = defineAsyncComponent(() => import('@/views/MemoriesView.vue'));
 const DecisionsView = defineAsyncComponent(() => import('@/views/DecisionsView.vue'));
@@ -35,6 +36,7 @@ onMounted(async () => {
       <CaptureView v-if="mode.mode === 'capture'" key="capture" />
       <AtlasView v-else-if="mode.mode === 'atlas'" key="atlas" />
       <RecentView v-else-if="mode.mode === 'recent'" key="recent" />
+      <ProcessingView v-else-if="mode.mode === 'processing'" key="processing" />
       <TasksView v-else-if="mode.mode === 'tasks'" key="tasks" />
       <MemoriesView v-else-if="mode.mode === 'memories'" key="memories" />
       <DecisionsView v-else-if="mode.mode === 'decisions'" key="decisions" />

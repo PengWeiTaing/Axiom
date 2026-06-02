@@ -655,3 +655,6 @@
 - 决策台迁入 Vue 主线：新增 `frontend/src/views/DecisionsView.vue`，顶部模式增加“决策”，页面读取 `/decisions`。
 - 决策台支持快速新增、待回顾/已回顾统计、状态筛选、填写实际结果并标记已回顾；同步修正 `createDecision()` 返回类型和 Cosmos 快速创建/撤销重建中的决策 ID 读取。
 - `scripts/smoke_test_web_app.py` 补充 `/app?mode=decisions` 浏览器链路：创建 smoke 决策、确认列表出现、填写实际结果并确认状态变为“已回顾”。
+- 处理工作台基础版迁入 Vue 主线：新增 `frontend/src/views/ProcessingView.vue`，顶部模式增加“处理”，页面读取 `/processing/backlog`。
+- 处理工作台支持全局下一条、队列分组、分组批量标记就绪、刚处理记录退回待处理，并复用 `ItemDrawer` 打开条目详情。
+- `scripts/smoke_test_web_app.py` 补充 `/app?mode=processing` 浏览器链路：确认处理工作台、全局下一条和队列分组出现，批量标记就绪后从刚处理记录退回待处理。

@@ -22,12 +22,13 @@ frontend/src/
 应用模式：
 
 ```text
-Capture -> Atlas -> 近况 -> 任务 -> 记忆 -> 决策 -> 自动化
+Capture -> Atlas -> 近况 -> 处理 -> 任务 -> 记忆 -> 决策 -> 自动化
 ```
 
 - `CaptureView.vue` 是记录入口。
 - `AtlasView.vue` 是新 Atlas 主实现，包含 3D 全局图和 2D 聚焦图。
 - `RecentView.vue` 是 Vue 主线近况页，读取 `/overview` 展示运行摘要、处理积压、最近记录和自动化产物；已支持积压单条打开、标记就绪和手动完成项退回待处理。
+- `ProcessingView.vue` 是 Vue 主线处理工作台，读取 `/processing/backlog`，支持全局下一条、分组队列、分组批量标记就绪和退回待处理。
 - `TasksView.vue` 是 Vue 主线任务台，读取 `/tasks/today` 和 `/tasks`，支持快速新增、今日/逾期、状态/优先级筛选，以及完成、恢复、取消、安排到今天。
 - `MemoriesView.vue` 是 Vue 主线记忆库，读取 `/memories/stats` 和 `/memories`，支持快速新增、分类/状态筛选、确认和归档。
 - `DecisionsView.vue` 是 Vue 主线决策台，读取 `/decisions`，支持快速新增、状态筛选、填写实际结果并标记已回顾。
@@ -59,9 +60,9 @@ Capture -> Atlas -> 近况 -> 任务 -> 记忆 -> 决策 -> 自动化
 core/static/v2/
 ```
 
-这些产物暂时继续入库，因为 VPS 不要求安装 Node.js。为减少 diff 噪音，Vite 构建使用固定文件名，不再为每次 build 生成一批新哈希文件。
+这些产物暂时继续入库，因为 VPS 不要求安装 Node.js。Vite 构建使用 hash 文件名，避免浏览器或旧页面持有过期 bundle。
 
-固定文件名会带来浏览器旧 bundle 风险，因此后端必须保持：
+hash 文件名仍需要配合服务端缓存策略，因此后端必须保持：
 
 - `/app` shell 使用 `no-store`。
 - `/static/v2/` 使用 `no-cache, must-revalidate`，让浏览器每次校验新版 Vue bundle。

@@ -88,7 +88,7 @@ core/_common.py          # 保留为兼容层，re-export各模块 (~312行)
   - 新功能进入 `frontend/src/`
   - 逐步小块迁移旧功能到新前端（如处理工作台、自动化中心）
   - 迁移完成后删除旧文件
-- **当前迁移进度估测：** ~46%（Capture + Atlas + 近况看板已迁；近况页已具备处理积压单条打开、标记就绪和退回待处理；任务台已迁入 Vue 主线，支持快速新增、今日/逾期、状态/优先级筛选和基础状态动作；记忆库已迁入 Vue 主线，支持快速新增、分类/状态筛选、确认和归档；决策台已迁入 Vue 主线，支持快速新增、状态筛选、填写实际结果并标记已回顾；自动化中心已迁入 Vue 主线，支持任务列表、运行记录、手动触发和详情查看；完整处理工作台仍在旧前端）
+- **当前迁移进度估测：** ~52%（Capture + Atlas + 近况看板已迁；处理工作台已迁入 Vue 主线基础版，支持全局下一条、分组队列、分组批量标记就绪和退回待处理；任务台已迁入 Vue 主线，支持快速新增、今日/逾期、状态/优先级筛选和基础状态动作；记忆库已迁入 Vue 主线，支持快速新增、分类/状态筛选、确认和归档；决策台已迁入 Vue 主线，支持快速新增、状态筛选、填写实际结果并标记已回顾；自动化中心已迁入 Vue 主线，支持任务列表、运行记录、手动触发和详情查看；旧前端仍保留完整编辑器里的“保存并处理同类下一条”等高级处理动作）
 - **预计完全迁移：** 长期，不做一次性硬切
 
 ### DB-006: AI 层仍在工具层
@@ -187,3 +187,4 @@ desktop/src-tauri/gen/
 | DB-005 | 2026-06-02 | 第五阶段：修复 Vue 主线 bundle 缓存风险；`/static/v2/` 改为 revalidate，Vite 构建产物改为 hash 文件名，`/app` 保持 no-store，旧 service worker 明确绕开 `/static/v2/` | `python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`、Browser 验证旧模块缓存不再挡住新页面 |
 | DB-005 | 2026-06-02 | 第六阶段：新增 `MemoriesView.vue`，将记忆库迁入 Vue 主线；顶部模式增加“记忆”，页面覆盖统计、快速新增、分类/状态筛选、确认和归档；同步修正 `/memories/stats` 与 `createMemory()` 的前端类型 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`、Browser 打开 `/app?mode=memories` |
 | DB-005 | 2026-06-02 | 第七阶段：新增 `DecisionsView.vue`，将决策台迁入 Vue 主线；顶部模式增加“决策”，页面覆盖待回顾/已回顾统计、快速新增、状态筛选、填写实际结果并标记已回顾；同步修正 `createDecision()` 返回类型 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` 通过；Browser 实测 `/app?mode=decisions` 无控制台错误 |
+| DB-005 | 2026-06-02 | 第八阶段：新增 `ProcessingView.vue`，将处理工作台基础版迁入 Vue 主线；顶部模式增加“处理”，页面覆盖全局下一条、队列分组、分组批量标记就绪、刚处理记录退回待处理；同步修正主线文档中 hash 构建产物说明 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` 通过；Browser 实测 `/app?mode=processing` 无控制台错误 |
