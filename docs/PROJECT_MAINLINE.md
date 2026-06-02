@@ -19,7 +19,7 @@
 frontend/src/
 ```
 
-应用模式：
+Vue 主应用模式：
 
 ```text
 Capture -> Atlas -> 近况 -> 处理 -> 任务 -> 记忆 -> 决策 -> 自动化
@@ -34,6 +34,13 @@ Capture -> Atlas -> 近况 -> 处理 -> 任务 -> 记忆 -> 决策 -> 自动化
 - `DecisionsView.vue` 是 Vue 主线决策台，读取 `/decisions`，支持快速新增、状态筛选、填写实际结果并标记已回顾。
 - `AutomationView.vue` 是 Vue 主线自动化中心，读取 `/automation/jobs` 和 `/automation/runs`，支持运行日期、手动触发、状态/任务过滤和运行详情。
 - `frontend/src/views/_legacy/AtlasView.vue` 不是新 Atlas，不要在新功能中继续扩展它。
+
+## Learning Board 主线
+
+- `/board` 是 Learning Board 独立前端入口，服务 `frontend/board/` 构建出的 React + tldraw 应用。
+- Board 后端 API 在 `/api/learning/*`，核心代码在 `core/boards/` 与 `core/routes/boards.py`。
+- Board 构建产物输出到 `core/static/v2/board/`，与主 Vue 前端一样暂时入库，保证 VPS 不依赖 Node.js。
+- `ModeSwitcher` 中的 `Board` 会跳转到 `/board`，不在 `frontend/src/App.vue` 内直接渲染 Board。
 
 ## Atlas / Cosmos 主线
 
@@ -60,7 +67,15 @@ Capture -> Atlas -> 近况 -> 处理 -> 任务 -> 记忆 -> 决策 -> 自动化
 core/static/v2/
 ```
 
-这些产物暂时继续入库，因为 VPS 不要求安装 Node.js。Vite 构建使用 hash 文件名，避免浏览器或旧页面持有过期 bundle。
+这些产物暂时继续入库，因为 VPS 不要求安装 Node.js。主 Vue 构建使用 hash 文件名，避免浏览器或旧页面持有过期 bundle。
+
+`frontend/board/` 的构建产物输出到：
+
+```text
+core/static/v2/board/
+```
+
+Board 当前使用固定 `assets/index.js` / `assets/index.css` 文件名，因此 `/board` shell 必须 `no-store`，`/static/v2/board/` assets 必须随 `/static/v2/` 一起 revalidate。
 
 hash 文件名仍需要配合服务端缓存策略，因此后端必须保持：
 

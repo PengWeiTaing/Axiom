@@ -660,3 +660,4 @@
 - `scripts/smoke_test_web_app.py` 补充 `/app?mode=processing` 浏览器链路：确认处理工作台、全局下一条和队列分组出现，批量标记就绪后从刚处理记录退回待处理。
 - Vue `ItemDrawer` 增加处理动作：待处理条目支持“标记就绪”和“完成并打开同类下一条”，手动完成条目支持退回待处理；前端补 `/processing/next` typed endpoint。
 - `scripts/smoke_test_web_app.py` 的 `/app?mode=processing` 链路补充抽屉内“完成并打开同类下一条”验证，覆盖从处理工作台进入详情后的连续处理动作。
+- Learning Board 独立前端接入构建产物：运行 `frontend/board` build，产物输出到 `core/static/v2/board/`；`/board` shell 改为 `no-store`，web smoke 补充 `/board` 已构建与 Board assets revalidate 检查。

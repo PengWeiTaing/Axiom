@@ -224,6 +224,19 @@ def main() -> None:
             service_worker_text = fetch_text(f"{base_url}/sw.js")
             if 'startsWith("/static/v2/")' not in service_worker_text:
                 raise AssertionError("service worker must not cache Vue v2 assets")
+            board_cache_control = fetch_header(f"{base_url}/board", "Cache-Control")
+            if "no-store" not in board_cache_control:
+                raise AssertionError(f"/board Cache-Control should avoid shell caching: {board_cache_control}")
+            board_html = fetch_text(f"{base_url}/board")
+            if "Learning Board 未构建" in board_html:
+                raise AssertionError("/board should serve the built Learning Board shell")
+            if "/static/v2/board/assets/index.js" not in board_html:
+                raise AssertionError("Learning Board shell should reference the built JS bundle")
+            board_asset_cache_control = fetch_header(f"{base_url}/static/v2/board/assets/index.js", "Cache-Control")
+            if "no-cache" not in board_asset_cache_control:
+                raise AssertionError(
+                    f"Learning Board assets should revalidate fixed bundle names: {board_asset_cache_control}"
+                )
 
             note_text = "Playwright smoke note"
             note_source = "web_app_smoke"
