@@ -253,7 +253,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
           } else if (kind === 'decision') {
             const { createDecision: cd } = await import('@/api/endpoints')
             const r = await cd({ title: snap.title, decision: snap.title })
-            if (snap.lifeline_id) await mountEntity('decision', r.id, snap.lifeline_id)
+            if (snap.lifeline_id) await mountEntity('decision', r.decision.id, snap.lifeline_id)
           } else {
             const { addNote } = await import('@/api/endpoints')
             const r = await addNote(snap.title)

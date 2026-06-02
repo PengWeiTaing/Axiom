@@ -710,6 +710,36 @@ def main() -> None:
                             has_text="已确认"
                         ).first.wait_for(timeout=15_000)
 
+                        vue_decision_title = "Vue smoke decision"
+                        vue_page.goto(f"{base_url}/app?mode=decisions", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="决策台").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="快速新增").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="决策列表").wait_for(timeout=15_000)
+                        vue_page.get_by_label("决策标题").fill(vue_decision_title)
+                        vue_page.get_by_label("决策内容").fill("choose the smoke path")
+                        vue_page.get_by_label("决策背景").fill("created by smoke test")
+                        vue_page.get_by_label("预期结果").fill("decision can be reviewed")
+                        with vue_page.expect_response(
+                            lambda response: response.url.endswith("/decisions")
+                            and response.request.method == "POST"
+                            and response.status == 201
+                        ):
+                            vue_page.get_by_role("button", name="添加决策").click()
+                        vue_decision_row = vue_page.locator(".list-panel .decision-row").filter(
+                            has_text=vue_decision_title
+                        ).first
+                        vue_decision_row.wait_for(timeout=15_000)
+                        vue_decision_row.get_by_label("实际结果").fill("reviewed by smoke test")
+                        with vue_page.expect_response(
+                            lambda response: "/decisions/" in response.url
+                            and response.url.endswith("/review")
+                            and response.status == 200
+                        ):
+                            vue_decision_row.get_by_role("button", name="标记已回顾").click()
+                        vue_page.locator(".list-panel .decision-row").filter(has_text=vue_decision_title).filter(
+                            has_text="已回顾"
+                        ).first.wait_for(timeout=15_000)
+
                         vue_page.goto(f"{base_url}/app?mode=automation", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="自动化中心").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="可执行任务").wait_for(timeout=15_000)

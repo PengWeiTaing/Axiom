@@ -54,7 +54,7 @@ async function submit() {
     } else if (kind.value === 'decision') {
       const { createDecision: apiDec } = await import('@/api/endpoints')
       const r = await apiDec({ title: title.value.trim(), decision: decision.value.trim() })
-      entityId = r.id
+      entityId = r.decision.id
     } else {
       const { addNote } = await import('@/api/endpoints')
       const r = await addNote(content.value.trim())

@@ -19,6 +19,7 @@ import type {
   MemoryList,
   MemoryStatsPayload,
   MemoryStatus,
+  DecisionStatus,
   DecisionList,
   TaskList,
   TaskPriority,
@@ -156,7 +157,7 @@ export const createDecision = (data: {
   context?: string;
   reasoning?: string;
   expected_outcome?: string;
-}) => apiRequest<{ id: number; decision: Decision }>('/decisions', { method: 'POST', json: data });
+}) => apiRequest<{ decision: Decision }>('/decisions', { method: 'POST', json: data });
 
 // ---------- 记忆扩展（Atlas 用） ----------
 export const listMemories = (params: {
@@ -181,7 +182,11 @@ export const memoriesStats = () =>
   apiRequest<MemoryStatsPayload>('/memories/stats');
 
 // ---------- 决策扩展 ----------
-export const listDecisions = (params: { status?: 'pending' | 'reviewed'; page?: number } = {}) =>
+export const listDecisions = (params: {
+  status?: DecisionStatus | '';
+  page?: number;
+  page_size?: number;
+} = {}) =>
   apiRequest<DecisionList>('/decisions', { query: params });
 
 // ---------- 报告 ----------
@@ -282,6 +287,11 @@ export const confirmMemory = (id: number) =>
   apiRequest<{ memory: Memory }>(`/memories/${id}/confirm`, { method: 'POST' })
 export const archiveMemory = (id: number) =>
   apiRequest<{ memory: Memory }>(`/memories/${id}/archive`, { method: 'POST' })
+export const reviewDecision = (id: number, actual_outcome: string) =>
+  apiRequest<{ decision: Decision }>(`/decisions/${id}/review`, {
+    method: 'POST',
+    json: { actual_outcome },
+  })
 
 // ---------- Association CRUD ----------
 export const createAssociation = (data: {

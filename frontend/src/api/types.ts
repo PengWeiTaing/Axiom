@@ -64,6 +64,8 @@ export interface Task {
   overdue_days?: number;
 }
 
+export type DecisionStatus = 'pending' | 'reviewed';
+
 export interface Decision {
   id: number;
   title: string;
@@ -72,7 +74,8 @@ export interface Decision {
   reasoning: string | null;
   expected_outcome: string | null;
   actual_outcome: string | null;
-  status: 'pending' | 'reviewed';
+  status: DecisionStatus;
+  status_label?: string;
   created_at: string;
   updated_at: string;
 }

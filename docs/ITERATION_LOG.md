@@ -652,3 +652,6 @@
 - 记忆库迁入 Vue 主线：新增 `frontend/src/views/MemoriesView.vue`，顶部模式增加“记忆”，页面读取 `/memories/stats` 和 `/memories`。
 - 记忆库支持快速新增、总量/候选/确认统计、分类/状态筛选，以及候选记忆确认和归档；同步修正 `createMemory()` 返回类型与 `/memories/stats` 前端类型。
 - `scripts/smoke_test_web_app.py` 补充 `/app?mode=memories` 浏览器链路：创建 smoke 记忆、确认列表出现、点击确认并确认状态变为“已确认”。
+- 决策台迁入 Vue 主线：新增 `frontend/src/views/DecisionsView.vue`，顶部模式增加“决策”，页面读取 `/decisions`。
+- 决策台支持快速新增、待回顾/已回顾统计、状态筛选、填写实际结果并标记已回顾；同步修正 `createDecision()` 返回类型和 Cosmos 快速创建/撤销重建中的决策 ID 读取。
+- `scripts/smoke_test_web_app.py` 补充 `/app?mode=decisions` 浏览器链路：创建 smoke 决策、确认列表出现、填写实际结果并确认状态变为“已回顾”。
