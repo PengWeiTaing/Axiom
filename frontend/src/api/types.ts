@@ -177,6 +177,19 @@ export interface ProcessingNextPayload {
   item: Item | null;
 }
 
+export interface LearningBoardSummary {
+  id: string;
+  title: string;
+  source_type: string;
+  status: string;
+  created_at: string;
+  widget_count: number;
+}
+
+export interface LearningBoardListPayload {
+  boards: LearningBoardSummary[];
+}
+
 export type AutomationRunStatus = 'success' | 'failed' | 'skipped' | 'running' | 'timeout';
 
 export interface AutomationJob {

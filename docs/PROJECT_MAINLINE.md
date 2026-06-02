@@ -39,7 +39,7 @@ Capture -> Atlas -> 近况 -> 处理 -> 任务 -> 记忆 -> 决策 -> 自动化
 
 - `/board` 是 Learning Board 独立前端入口，服务 `frontend/board/` 构建出的 React + tldraw 应用。
 - Board 后端 API 在 `/api/learning/*`，核心代码在 `core/boards/` 与 `core/routes/boards.py`。
-- Board 构建产物输出到 `core/static/v2/board/`，与主 Vue 前端一样暂时入库，保证 VPS 不依赖 Node.js。
+- Board 构建产物输出到 `core/static/board/`，独立于主 Vue 的 `core/static/v2/`，避免 Vue 构建清空 Board 产物；产物暂时入库，保证 VPS 不依赖 Node.js。
 - `ModeSwitcher` 中的 `Board` 会跳转到 `/board`，不在 `frontend/src/App.vue` 内直接渲染 Board。
 
 ## Atlas / Cosmos 主线
@@ -72,15 +72,16 @@ core/static/v2/
 `frontend/board/` 的构建产物输出到：
 
 ```text
-core/static/v2/board/
+core/static/board/
 ```
 
-Board 当前使用固定 `assets/index.js` / `assets/index.css` 文件名，因此 `/board` shell 必须 `no-store`，`/static/v2/board/` assets 必须随 `/static/v2/` 一起 revalidate。
+Board 当前使用固定 `assets/index.js` / `assets/index.css` 文件名，因此 `/board` shell 必须 `no-store`，`/static/board/` assets 必须 revalidate。
 
 hash 文件名仍需要配合服务端缓存策略，因此后端必须保持：
 
 - `/app` shell 使用 `no-store`。
 - `/static/v2/` 使用 `no-cache, must-revalidate`，让浏览器每次校验新版 Vue bundle。
+- `/static/board/` 使用 `no-cache, must-revalidate`，让浏览器每次校验固定文件名的 Board bundle。
 - 旧 `/static/app.js`、`/static/app.css` 仍可长期缓存，仅用于 `/app/legacy`。
 - `/sw.js` 的离线缓存只服务旧 `/app/legacy`，不得缓存 `/static/v2/`。
 

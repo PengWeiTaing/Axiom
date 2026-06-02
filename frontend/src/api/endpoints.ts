@@ -30,6 +30,7 @@ import type {
   ProcessingBacklogPayload,
   ProcessingMarkPayload,
   ProcessingNextPayload,
+  LearningBoardListPayload,
 } from './types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 import type { AtlasGraphPayload } from '@/atlas/types';
@@ -70,6 +71,9 @@ export const getProcessingBacklog = (params: { group_limit?: number } = {}) =>
 
 export const getProcessingNext = (params: { type?: ItemType; exclude_id?: number } = {}) =>
   apiRequest<ProcessingNextPayload>('/processing/next', { query: params });
+
+export const listLearningBoards = () =>
+  apiRequest<LearningBoardListPayload>('/api/learning/boards');
 
 export const getArtifactsSummary = (params: { preview_chars?: number } = {}) =>
   apiRequest<ArtifactsSummaryPayload>('/artifacts/summary', { query: params });

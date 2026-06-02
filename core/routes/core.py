@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import redirect, render_template, render_template_string, send_file
+from flask import make_response, redirect, render_template, render_template_string, send_file
 
 from core._common import (
     AXIOM_ROOT,
@@ -64,7 +64,7 @@ document.getElementById("b").href="javascript:"+encodeURIComponent(
         def board_shell(_subpath: str):
             """React Learning Board 前端入口."""
             static_root = Path(app.static_folder or "").resolve() if app.static_folder else None
-            board_index = static_root / "v2" / "board" / "index.html" if static_root else None
+            board_index = static_root / "board" / "index.html" if static_root else None
             if board_index and board_index.exists():
                 response = send_file(board_index, mimetype="text/html")
                 response.headers["Cache-Control"] = "no-store"
@@ -76,8 +76,9 @@ h1{color:#6ee7d0}code{background:#141921;padding:2px 8px;border-radius:4px}</sty
 <h1>Learning Board 未构建</h1><p>运行 <code>cd frontend/board && npm run build</code></p>
 </body></html>"""
             )
+            response = make_response(response, 404)
             response.headers["Cache-Control"] = "no-store"
-            return response, 404
+            return response
 
         @app.route("/health", methods=["GET"])
         def health_check():

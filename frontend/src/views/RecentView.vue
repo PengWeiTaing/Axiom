@@ -6,8 +6,14 @@
  */
 
 import { computed, onMounted, ref } from 'vue';
-import { getOverview, markProcessingPending, markProcessingReady } from '@/api/endpoints';
-import type { ArtifactSummary, Item, OverviewPayload, ProcessingBacklogGroup } from '@/api/types';
+import { getOverview, listLearningBoards, markProcessingPending, markProcessingReady } from '@/api/endpoints';
+import type {
+  ArtifactSummary,
+  Item,
+  LearningBoardSummary,
+  OverviewPayload,
+  ProcessingBacklogGroup,
+} from '@/api/types';
 import { ApiError } from '@/api/client';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { typeAccent } from '@/composables/useTypeAccent';
@@ -18,10 +24,14 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedItemId = ref<number | null>(null);
 const actionBusyId = ref<number | null>(null);
+const boards = ref<LearningBoardSummary[]>([]);
+const boardError = ref<string | null>(null);
 
 const stats = computed(() => overview.value?.stats ?? null);
 const backlog = computed(() => overview.value?.processing_backlog ?? null);
 const recentItems = computed(() => overview.value?.recent.items ?? []);
+const recentBoards = computed(() => boards.value.slice(0, 3));
+const totalBoardWidgets = computed(() => boards.value.reduce((total, board) => total + board.widget_count, 0));
 
 const metricCards = computed(() => {
   const s = stats.value;
@@ -50,8 +60,14 @@ const artifactCards = computed(() => {
 async function loadOverview() {
   loading.value = true;
   error.value = null;
+  boardError.value = null;
   try {
-    overview.value = await getOverview({ recent_limit: 8, preview_chars: 180 });
+    const [overviewPayload, boardPayload] = await Promise.all([
+      getOverview({ recent_limit: 8, preview_chars: 180 }),
+      listLearningBoards(),
+    ]);
+    overview.value = overviewPayload;
+    boards.value = boardPayload.boards;
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '近况加载失败';
   } finally {
@@ -100,6 +116,24 @@ function processingLabel(item: Item): string {
 function artifactTitle(artifact: ArtifactSummary | null): string {
   if (!artifact) return '';
   return artifact.report_date || artifact.generated_name || artifact.relative_path;
+}
+
+function boardStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    ready: '就绪',
+    draft: '草稿',
+    archived: '归档',
+  };
+  return labels[status] ?? status;
+}
+
+function openBoard(board?: LearningBoardSummary) {
+  if (board) {
+    localStorage.setItem('axiom_board_recent', board.id);
+    window.location.href = `/board/${board.id}`;
+    return;
+  }
+  window.location.href = '/board';
 }
 
 function onChanged(options?: { nextItemId?: number }) {
@@ -240,6 +274,44 @@ onMounted(loadOverview);
         </div>
         <p v-else class="empty-line">暂无自动化产物</p>
       </div>
+    </section>
+
+    <section class="panel board-panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Learning Board</p>
+          <h2>学习白板</h2>
+        </div>
+        <div class="board-summary">
+          <strong>{{ boards.length }}</strong>
+          <span>{{ totalBoardWidgets }} widgets</span>
+        </div>
+      </div>
+
+      <div class="board-layout">
+        <button class="board-launch" type="button" @click="openBoard()">
+          <span>打开白板工作区</span>
+          <small>进入 /board 的 tldraw 画布</small>
+        </button>
+
+        <div v-if="recentBoards.length" class="board-list">
+          <button
+            v-for="board in recentBoards"
+            :key="board.id"
+            class="board-row"
+            type="button"
+            @click="openBoard(board)"
+          >
+            <span>
+              <strong>{{ board.title }}</strong>
+              <small>{{ boardStatusLabel(board.status) }} · {{ board.widget_count }} widgets · {{ formatRelative(board.created_at) }}</small>
+            </span>
+            <span class="board-arrow">打开</span>
+          </button>
+        </div>
+        <p v-else class="empty-line">暂无白板，打开工作区后可创建第一块学习白板</p>
+      </div>
+      <p v-if="boardError" class="board-error">{{ boardError }}</p>
     </section>
 
     <section class="panel recent-panel">
@@ -549,6 +621,114 @@ h2 {
   margin-bottom: var(--s-4);
 }
 
+.board-panel {
+  margin-bottom: var(--s-4);
+}
+
+.board-summary {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.board-summary strong {
+  color: var(--accent-bright);
+  font-family: var(--font-mono);
+  font-size: var(--fs-6);
+  font-weight: 520;
+  line-height: 1;
+}
+
+.board-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: var(--s-3);
+  align-items: stretch;
+}
+
+.board-launch,
+.board-row {
+  min-width: 0;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--text-2);
+  text-align: left;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.board-launch:hover,
+.board-row:hover {
+  border-color: rgba(110, 231, 208, 0.24);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.board-launch {
+  display: grid;
+  align-content: center;
+  gap: var(--s-2);
+  min-height: 116px;
+  padding: var(--s-4);
+}
+
+.board-launch span {
+  color: var(--text-1);
+  font-size: var(--fs-4);
+  font-weight: 540;
+}
+
+.board-launch small,
+.board-row small,
+.board-error {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.board-list {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.board-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 56px;
+  padding: var(--s-3);
+}
+
+.board-row span:first-child {
+  min-width: 0;
+}
+
+.board-row strong,
+.board-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-row strong {
+  color: var(--text-1);
+  font-size: var(--fs-3);
+  font-weight: 520;
+}
+
+.board-arrow {
+  flex: 0 0 auto;
+  color: var(--accent-bright);
+  font-size: var(--fs-2);
+}
+
+.board-error {
+  margin-top: var(--s-2);
+}
+
 .recent-row {
   width: 100%;
   padding: var(--s-3);
@@ -614,7 +794,8 @@ h2 {
   }
 
   .metrics,
-  .content-grid {
+  .content-grid,
+  .board-layout {
     grid-template-columns: 1fr;
   }
 

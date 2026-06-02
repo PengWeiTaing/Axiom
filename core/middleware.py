@@ -91,7 +91,7 @@ def register_middleware(app):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        if request.path.startswith("/static/v2/"):
+        if request.path.startswith("/static/v2/") or request.path.startswith("/static/board/"):
             response.headers["Cache-Control"] = "no-cache, must-revalidate"
         elif request.path.startswith("/static/"):
             response.headers["Cache-Control"] = "public, max-age=86400, immutable"

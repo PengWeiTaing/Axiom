@@ -661,3 +661,4 @@
 - Vue `ItemDrawer` 增加处理动作：待处理条目支持“标记就绪”和“完成并打开同类下一条”，手动完成条目支持退回待处理；前端补 `/processing/next` typed endpoint。
 - `scripts/smoke_test_web_app.py` 的 `/app?mode=processing` 链路补充抽屉内“完成并打开同类下一条”验证，覆盖从处理工作台进入详情后的连续处理动作。
 - Learning Board 独立前端接入构建产物：运行 `frontend/board` build，产物输出到 `core/static/v2/board/`；`/board` shell 改为 `no-store`，web smoke 补充 `/board` 已构建与 Board assets revalidate 检查。
+- Learning Board 与 Vue 构建产物拆分：Board 输出迁到 `core/static/board/`，避免主 Vue 构建清空 `core/static/v2/` 时误删 Board；近况页新增“学习白板”入口面板，读取 `/api/learning/boards` 展示最近白板并跳转 `/board/<id>`；同时补齐 Board 列表鉴权与 smoke 覆盖。

@@ -9,9 +9,9 @@ export default defineConfig(({ command }) => ({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  base: command === 'build' ? '/static/v2/board/' : '/',
+  base: command === 'build' ? '/static/board/' : '/',
   build: {
-    outDir: '../../core/static/v2/board',
+    outDir: '../../core/static/board',
     emptyOutDir: true,
     assetsDir: 'assets',
     sourcemap: false,

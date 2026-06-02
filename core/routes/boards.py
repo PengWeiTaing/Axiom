@@ -206,6 +206,10 @@ def register_routes(app):
 
     @app.route("/api/learning/boards", methods=["GET"])
     def learning_list_boards():
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
         conn = get_db_connection()
         try:
             from core.boards.schema import ensure_board_tables

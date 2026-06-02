@@ -8,6 +8,7 @@ import re
 import sys
 import tempfile
 import threading
+import urllib.error
 import urllib.request
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -52,6 +53,15 @@ def fetch_header(url: str, name: str) -> str:
 def fetch_text(url: str) -> str:
     with urllib.request.urlopen(url, timeout=10) as response:
         return response.read().decode("utf-8")
+
+
+def fetch_status(url: str, headers: dict[str, str] | None = None) -> int:
+    request = urllib.request.Request(url, headers=headers or {})
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status
+    except urllib.error.HTTPError as exc:
+        return exc.code
 
 
 def create_sample_artifact(root: Path) -> None:
@@ -230,13 +240,15 @@ def main() -> None:
             board_html = fetch_text(f"{base_url}/board")
             if "Learning Board 未构建" in board_html:
                 raise AssertionError("/board should serve the built Learning Board shell")
-            if "/static/v2/board/assets/index.js" not in board_html:
+            if "/static/board/assets/index.js" not in board_html:
                 raise AssertionError("Learning Board shell should reference the built JS bundle")
-            board_asset_cache_control = fetch_header(f"{base_url}/static/v2/board/assets/index.js", "Cache-Control")
+            board_asset_cache_control = fetch_header(f"{base_url}/static/board/assets/index.js", "Cache-Control")
             if "no-cache" not in board_asset_cache_control:
                 raise AssertionError(
                     f"Learning Board assets should revalidate fixed bundle names: {board_asset_cache_control}"
                 )
+            if fetch_status(f"{base_url}/api/learning/boards") not in (401, 403):
+                raise AssertionError("Learning Board list endpoint should require X-Axiom-Key")
 
             note_text = "Playwright smoke note"
             note_source = "web_app_smoke"
@@ -628,9 +640,35 @@ def main() -> None:
                     try:
                         vue_page.goto(f"{base_url}/app", wait_until="domcontentloaded")
                         vue_page.evaluate("localStorage.setItem('axiom.key', 'test-key')")
+                        vue_board_title = "Vue smoke learning board"
+                        vue_board_id = vue_page.evaluate(
+                            """
+                            async (title) => {
+                                const response = await fetch("/api/learning/boards", {
+                                    method: "POST",
+                                    headers: {
+                                        "X-Axiom-Key": "test-key",
+                                        "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ title, source_type: "manual", widgets: [], nodes: [] }),
+                                });
+                                if (!response.ok) throw new Error(await response.text());
+                                const payload = await response.json();
+                                return payload.board_id;
+                            }
+                            """,
+                            vue_board_title,
+                        )
                         vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="近况").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="处理积压").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="学习白板").wait_for(timeout=15_000)
+                        vue_page.get_by_text(vue_board_title, exact=False).wait_for(timeout=15_000)
+                        vue_page.get_by_role("button", name="打开白板工作区").wait_for(timeout=15_000)
+                        with vue_page.expect_navigation(url=f"**/board/{vue_board_id}", wait_until="domcontentloaded"):
+                            vue_page.locator(".board-row").filter(has_text=vue_board_title).first.click()
+                        vue_page.get_by_role("heading", name=vue_board_title).first.wait_for(timeout=15_000)
+                        vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-ready" in response.url and response.status == 200
                         ):
@@ -656,17 +694,9 @@ def main() -> None:
                             lambda response: "/processing/mark-ready" in response.url and response.status == 200
                         ):
                             vue_page.get_by_role("button", name="完成并打开同类下一条").click()
-                        vue_page.get_by_role("button", name="完成并打开同类下一条").wait_for(timeout=15_000)
-                        vue_page.wait_for_function(
-                            """
-                            () => {
-                                const closeButton = document.querySelector('button[aria-label="关闭"]');
-                                return closeButton && !closeButton.disabled;
-                            }
-                            """,
-                            timeout=15_000,
-                        )
-                        vue_page.get_by_label("关闭").click()
+                        vue_page.goto(f"{base_url}/app?mode=processing", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="处理工作台").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="队列分组").wait_for(timeout=15_000)
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-ready" in response.url and response.status == 200
                         ):
