@@ -645,3 +645,6 @@
 - 任务台支持快速新增、今日/逾期概览、全部任务状态/优先级筛选，以及完成、恢复、取消、安排到今天；前端 API 增加 `listTasks()`、`cancelTask()`、`rescheduleTask()` 并校正 `createTask()` 返回类型。
 - `scripts/smoke_test_web_app.py` 补充 `/app?mode=tasks` 浏览器链路：创建 smoke 任务、确认列表出现、点击完成并确认状态变为“已完成”。
 - 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`；Browser 尝试打开 `/app?mode=tasks` 时命中旧 bundle 缓存，未作为失败处理，后续可单独处理固定文件名构建的缓存刷新策略。
+- 修复 Vue 主线缓存风险：`core/middleware.py` 将 `/static/v2/` 从旧的 `immutable` 策略改为 `no-cache, must-revalidate`，避免固定文件名的 `index.js` 长时间停留在旧版本。
+- `core/static/sw.js` 明确绕开 `/static/v2/`，保持旧 `/app/legacy` 离线缓存，同时不再把 Vue 主线 bundle 放入旧 PWA cache-first 路径。
+- `scripts/smoke_test_web_app.py` 增加缓存策略断言：`/app` 必须 no-store、`/static/v2/assets/index.js` 必须 no-cache、旧 `/static/app.js` 仍保持 immutable。

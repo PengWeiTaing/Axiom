@@ -33,6 +33,10 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
+    if (requestUrl.pathname.startsWith("/static/v2/")) {
+        return;
+    }
+
     if (
         requestUrl.pathname.startsWith("/overview") ||
         requestUrl.pathname.startsWith("/recent") ||

@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import threading
+import urllib.request
 import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -40,6 +41,16 @@ class LocalServerThread(threading.Thread):
 
 def current_local_date_iso() -> str:
     return datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+
+
+def fetch_header(url: str, name: str) -> str:
+    with urllib.request.urlopen(url, timeout=10) as response:
+        return response.headers.get(name, "")
+
+
+def fetch_text(url: str) -> str:
+    with urllib.request.urlopen(url, timeout=10) as response:
+        return response.read().decode("utf-8")
 
 
 def create_sample_artifact(root: Path) -> None:
@@ -196,6 +207,19 @@ def main() -> None:
             server.start()
 
             base_url = f"http://127.0.0.1:{server.port}"
+            app_cache_control = fetch_header(f"{base_url}/app", "Cache-Control")
+            if "no-store" not in app_cache_control:
+                raise AssertionError(f"/app Cache-Control should avoid shell caching: {app_cache_control}")
+            v2_cache_control = fetch_header(f"{base_url}/static/v2/assets/index.js", "Cache-Control")
+            if "no-cache" not in v2_cache_control:
+                raise AssertionError(f"Vite assets should revalidate fixed filenames: {v2_cache_control}")
+            legacy_cache_control = fetch_header(f"{base_url}/static/app.js", "Cache-Control")
+            if "immutable" not in legacy_cache_control:
+                raise AssertionError(f"legacy static cache policy changed unexpectedly: {legacy_cache_control}")
+            service_worker_text = fetch_text(f"{base_url}/sw.js")
+            if 'startsWith("/static/v2/")' not in service_worker_text:
+                raise AssertionError("service worker must not cache Vue v2 assets")
+
             note_text = "Playwright smoke note"
             note_source = "web_app_smoke"
             updated_note_text = "Playwright smoke note updated"

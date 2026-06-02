@@ -59,6 +59,13 @@ core/static/v2/
 
 这些产物暂时继续入库，因为 VPS 不要求安装 Node.js。为减少 diff 噪音，Vite 构建使用固定文件名，不再为每次 build 生成一批新哈希文件。
 
+固定文件名会带来浏览器旧 bundle 风险，因此后端必须保持：
+
+- `/app` shell 使用 `no-store`。
+- `/static/v2/` 使用 `no-cache, must-revalidate`，让浏览器每次校验新版 Vue bundle。
+- 旧 `/static/app.js`、`/static/app.css` 仍可长期缓存，仅用于 `/app/legacy`。
+- `/sw.js` 的离线缓存只服务旧 `/app/legacy`，不得缓存 `/static/v2/`。
+
 ## 后端边界
 
 `core/receiver.py` 只负责组装 Flask app、注册中间件、注册 routes 和管理端点。
