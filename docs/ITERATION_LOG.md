@@ -625,3 +625,11 @@
 - `/artifacts` 现在识别 `system-status` artifact，自动化运行完成后能回连到生成的快照文件。
 - 新增 `deploy/axiom-daily-system-status.service` 与 `.timer`，后续部署后可启用每日 system status 生成。
 - 本地验证通过：`python scripts/build_system_status.py --root <temp> --date 2026-06-01 --stdout`、`python scripts/run_logged_automation.py --job-id system_status_day --root <temp> --date 2026-06-01 --utc-offset +08:00`、`python -m compileall -q core scripts`、`python scripts/smoke_test_receiver.py`。
+
+## 2026-06-02
+
+- 前端主线继续迁移 DB-005：`frontend/src/views/RecentView.vue` 不再包装旧 `_legacy/AtlasView.vue`，改为 Vue 原生只读近况页。
+- 新近况页读取 `/overview`，展示总记录、待处理、记忆、任务、处理积压、最近记录和自动化产物摘要；最近记录可继续打开 `ItemDrawer`。
+- `frontend/src/api/types.ts` 补充 `/overview`、processing backlog、artifact summary 的前端类型；`frontend/src/api/endpoints.ts` 新增 `getOverview()`、`getProcessingBacklog()`、`getArtifactsSummary()`。
+- `frontend/` 已重新构建到 `core/static/v2/`，保持 VPS 无 Node.js 部署策略。
+- 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`；Playwright 实际打开 `http://127.0.0.1:8765/app?mode=recent` 并确认“近况 / 处理积压 / 自动化产物 / 最近记录”可见。

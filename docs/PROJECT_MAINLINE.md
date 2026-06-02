@@ -1,6 +1,6 @@
 # Axiom 项目主线
 
-更新时间：2026-05-31
+更新时间：2026-06-02
 
 这份文档是当前开发前置事实源。它不替代详细设计文档，只回答一个问题：新功能应该接到哪条主线，哪些东西只是兼容或历史保留。
 
@@ -27,7 +27,7 @@ Capture -> Atlas -> 近况
 
 - `CaptureView.vue` 是记录入口。
 - `AtlasView.vue` 是新 Atlas 主实现，包含 3D 全局图和 2D 聚焦图。
-- `RecentView.vue` 当前仍包装旧驾驶舱，用于保留“近况”数据看板。
+- `RecentView.vue` 是 Vue 主线近况页，读取 `/overview` 展示只读运行摘要、处理积压、最近记录和自动化产物。
 - `frontend/src/views/_legacy/AtlasView.vue` 不是新 Atlas，不要在新功能中继续扩展它。
 
 ## Atlas / Cosmos 主线

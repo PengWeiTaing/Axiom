@@ -166,7 +166,7 @@ flowchart TB
 
 - 主前端 `frontend/src/`（Vue 3 + Vite）+ 旧前端 `core/static/app.js`（~4200 行 vanilla JS）同时维护。
 - 旧前端不再加新功能，只修 bug；新功能一律进入 Vue 3 前端。
-- 处理工作台、自动化中心、记忆/任务/决策面板仍在旧前端，需逐步小块迁移。
+- 近况页只读看板已迁到 Vue 主线；处理工作台、自动化中心、记忆/任务/决策面板仍在旧前端，需逐步小块迁移。
 
 ### AI 层深度不足（P1 — DEBT_BOARD DB-006）
 
@@ -206,7 +206,7 @@ flowchart TB
 ### 第二优先级（P1 — 重要）
 
 - 部署并观察自动生产状态快照（每日 system-status 报告，含 /health /system /stats /metrics 摘要）。
-- 旧前端功能逐步小块迁移到 Vue 3 前端（处理工作台、自动化中心、记忆/任务/决策面板）。
+- 旧前端功能逐步小块迁移到 Vue 3 前端（近况页只读看板已迁；继续迁处理工作台、自动化中心、记忆/任务/决策面板）。
 - AI 层向主动推理过渡：先做 alarm / suggestion 定时主动推送。
 - 改善人类阅读层，让 review / inbox report / action history 更容易消费。
 

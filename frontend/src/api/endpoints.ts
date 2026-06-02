@@ -11,8 +11,11 @@ import type {
   Decision,
   ParseResult,
   Paginated,
+  ArtifactsSummaryPayload,
   MemoryList,
   DecisionList,
+  OverviewPayload,
+  ProcessingBacklogPayload,
 } from './types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 import type { AtlasGraphPayload } from '@/atlas/types';
@@ -44,6 +47,15 @@ export const fetchUrl = (url: string) =>
 // ---------- 检索 ----------
 export const getRecent = (params: { page?: number; type?: string } = {}) =>
   apiRequest<Paginated<Item>>('/recent', { query: params });
+
+export const getOverview = (params: { recent_limit?: number; preview_chars?: number } = {}) =>
+  apiRequest<OverviewPayload>('/overview', { query: params });
+
+export const getProcessingBacklog = (params: { group_limit?: number } = {}) =>
+  apiRequest<ProcessingBacklogPayload>('/processing/backlog', { query: params });
+
+export const getArtifactsSummary = (params: { preview_chars?: number } = {}) =>
+  apiRequest<ArtifactsSummaryPayload>('/artifacts/summary', { query: params });
 
 export const searchAll = (q: string, limit = 20) =>
   apiRequest<{ items: Item[]; memories: Memory[]; tasks: Task[]; decisions: Decision[] }>(
