@@ -637,3 +637,7 @@
 - 前端 API 增加 `markProcessingReady()` / `markProcessingPending()`，与旧前端共用 `/processing/mark-ready` 和 `/processing/mark-pending`。
 - `scripts/smoke_test_web_app.py` 补充 Vue 近况页 mark-ready / mark-pending 浏览器链路，并继续验证旧 Recent 批量处理动作；测试数据显式恢复 pending，避免 Vue 与旧端回归互相串状态。
 - 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`。
+- 自动化中心迁入 Vue 主线：新增 `frontend/src/views/AutomationView.vue`，顶部模式增加“自动化”，页面读取 `/automation/jobs` 和 `/automation/runs`。
+- 自动化页支持运行日期、任务 ready/runtime 状态、手动触发、运行记录任务/状态过滤、运行详情和选中记录重跑；smoke 使用非破坏性的 Inbox 报告任务验证按钮链路，避免污染待处理图片夹具。
+- 前端 API 增加 `getAutomationJobs()`、`getAutomationRuns()`、`runAutomationJob()` 和自动化相关类型；`frontend/` 重新构建到 `core/static/v2/`。
+- 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`；Browser 打开 `http://localhost:8765/app?mode=automation` 确认新版 KeyGate，服务端 bundle 已确认包含 automation 模式。

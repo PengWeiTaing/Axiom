@@ -143,6 +143,63 @@ export interface ProcessingMarkPayload {
   items: Item[];
 }
 
+export type AutomationRunStatus = 'success' | 'failed' | 'skipped' | 'running' | 'timeout';
+
+export interface AutomationJob {
+  id: string;
+  label: string;
+  description: string;
+  artifact_group: string;
+  artifact_window: string | null;
+  artifact_mode: string | null;
+  manual_enabled: boolean;
+  destructive: boolean;
+  default_date: string;
+  ready: boolean;
+  runtime_mode: 'local' | 'mock' | 'openai' | 'missing_key' | string;
+  availability_note: string;
+}
+
+export interface AutomationRun {
+  id: number;
+  job_id: string;
+  job_label: string;
+  manual_enabled: boolean;
+  run_date: string;
+  status: AutomationRunStatus | string;
+  return_code: number | null;
+  message: string;
+  started_at: string;
+  finished_at: string | null;
+  duration_ms: number | null;
+  stdout_tail: string[];
+  stderr_tail: string[];
+  artifact: ArtifactSummary | null;
+}
+
+export interface AutomationJobsPayload {
+  jobs: AutomationJob[];
+  history_jobs: AutomationJob[];
+}
+
+export interface AutomationRunListPayload {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  items: AutomationRun[];
+}
+
+export interface AutomationRunPayload {
+  success?: boolean;
+  job?: AutomationJob;
+  date?: string;
+  run?: AutomationRun | null;
+  artifact?: ArtifactSummary | null;
+  error?: ApiErrorPayload;
+  [key: string]: unknown;
+}
+
 export interface ArtifactSummary {
   group: string;
   relative_path: string;

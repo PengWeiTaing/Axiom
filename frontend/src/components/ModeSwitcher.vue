@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** ModeSwitcher — 全局右上角三模式切换：Capture · Atlas · 近况 */
+/** ModeSwitcher — 全局右上角模式切换 */
 import { computed } from 'vue'
 import { useModeStore, type AppMode } from '@/stores/mode'
 
@@ -9,6 +9,7 @@ const tabs: { key: AppMode; label: string }[] = [
   { key: 'capture', label: 'Capture' },
   { key: 'atlas', label: 'Atlas' },
   { key: 'recent', label: '近况' },
+  { key: 'automation', label: '自动化' },
   { key: 'board', label: 'Board' },
 ]
 

@@ -22,12 +22,13 @@ frontend/src/
 应用模式：
 
 ```text
-Capture -> Atlas -> 近况
+Capture -> Atlas -> 近况 -> 自动化
 ```
 
 - `CaptureView.vue` 是记录入口。
 - `AtlasView.vue` 是新 Atlas 主实现，包含 3D 全局图和 2D 聚焦图。
 - `RecentView.vue` 是 Vue 主线近况页，读取 `/overview` 展示运行摘要、处理积压、最近记录和自动化产物；已支持积压单条打开、标记就绪和手动完成项退回待处理。
+- `AutomationView.vue` 是 Vue 主线自动化中心，读取 `/automation/jobs` 和 `/automation/runs`，支持运行日期、手动触发、状态/任务过滤和运行详情。
 - `frontend/src/views/_legacy/AtlasView.vue` 不是新 Atlas，不要在新功能中继续扩展它。
 
 ## Atlas / Cosmos 主线

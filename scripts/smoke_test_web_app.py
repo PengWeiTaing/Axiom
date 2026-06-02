@@ -626,6 +626,26 @@ def main() -> None:
                         )
                         if len(restored_ids) < 2:
                             raise AssertionError(f"Vue recent action restore missed smoke image ids: {restored_ids}")
+
+                        vue_page.goto(f"{base_url}/app?mode=automation", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="自动化中心").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="可执行任务").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="生成音频自动转写").wait_for(timeout=15_000)
+                        vue_page.locator(".job-card").filter(has_text="生成音频自动转写").locator(
+                            ".job-meta span",
+                            has_text="Mock",
+                        ).wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="运行记录").wait_for(timeout=15_000)
+                        if vue_page.get_by_role("option", name="跳过").count() != 1:
+                            raise AssertionError("Vue automation status filter missing skipped option")
+                        inbox_job_card = vue_page.locator(".job-card").filter(has_text="生成 Inbox 报告")
+                        inbox_job_card.wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/automation/run" in response.url and response.status == 200
+                        ):
+                            inbox_job_card.get_by_role("button", name="运行").click()
+                        vue_page.get_by_text("生成 Inbox 报告 已完成", exact=False).wait_for(timeout=20_000)
+                        vue_page.locator(".run-detail").get_by_text("生成 Inbox 报告", exact=False).wait_for(timeout=15_000)
                     finally:
                         vue_page.close()
 
