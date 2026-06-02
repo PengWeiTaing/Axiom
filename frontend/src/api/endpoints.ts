@@ -16,6 +16,7 @@ import type {
   DecisionList,
   OverviewPayload,
   ProcessingBacklogPayload,
+  ProcessingMarkPayload,
 } from './types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 import type { AtlasGraphPayload } from '@/atlas/types';
@@ -56,6 +57,18 @@ export const getProcessingBacklog = (params: { group_limit?: number } = {}) =>
 
 export const getArtifactsSummary = (params: { preview_chars?: number } = {}) =>
   apiRequest<ArtifactsSummaryPayload>('/artifacts/summary', { query: params });
+
+export const markProcessingReady = (ids: number[]) =>
+  apiRequest<ProcessingMarkPayload>('/processing/mark-ready', {
+    method: 'POST',
+    json: { ids },
+  });
+
+export const markProcessingPending = (ids: number[]) =>
+  apiRequest<ProcessingMarkPayload>('/processing/mark-pending', {
+    method: 'POST',
+    json: { ids },
+  });
 
 export const searchAll = (q: string, limit = 20) =>
   apiRequest<{ items: Item[]; memories: Memory[]; tasks: Task[]; decisions: Decision[] }>(

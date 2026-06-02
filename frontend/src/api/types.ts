@@ -134,6 +134,15 @@ export interface ProcessingBacklogPayload {
   groups: ProcessingBacklogGroup[];
 }
 
+export interface ProcessingMarkPayload {
+  message: string;
+  processing_override: 'ready' | null;
+  count: number;
+  ids: number[];
+  by_type: Record<string, number>;
+  items: Item[];
+}
+
 export interface ArtifactSummary {
   group: string;
   relative_path: string;

@@ -88,7 +88,7 @@ core/_common.py          # 保留为兼容层，re-export各模块 (~312行)
   - 新功能进入 `frontend/src/`
   - 逐步小块迁移旧功能到新前端（如处理工作台、自动化中心）
   - 迁移完成后删除旧文件
-- **当前迁移进度估测：** ~18%（Capture + Atlas + 近况只读看板已迁；处理工作台/自动化中心/记忆/任务/决策面板仍在旧前端）
+- **当前迁移进度估测：** ~22%（Capture + Atlas + 近况看板已迁；近况页已具备处理积压单条打开、标记就绪和退回待处理；完整处理工作台/自动化中心/记忆/任务/决策面板仍在旧前端）
 - **预计完全迁移：** 长期，不做一次性硬切
 
 ### DB-006: AI 层仍在工具层
@@ -181,3 +181,4 @@ desktop/src-tauri/gen/
 | DB-001 | 2026-06-01 | 第二阶段：继续拆出 `core/items.py`、`core/text_extract.py`、`core/audit.py`、`core/vector_search.py`、`core/system_state.py`、`core/http_utils.py`；`_common.py` 降到约 312 行，转为兼容导出层 | `python -m compileall -q core scripts`、`python scripts/smoke_test_receiver.py`、`python scripts/smoke_test_web_app.py`、`python scripts/smoke_test_atlas.py` |
 | DB-001 | 2026-06-01 | 第三阶段：清理所有 `core/routes/*.py` 与 `core/receiver.py` 的 `from core._common import *`，改为显式导入；为老脚本保留 `core.receiver` 的显式兼容出口 | `python -m compileall -q core scripts`、`python scripts/smoke_test_receiver.py`、无 `from core._common import *` 命中 |
 | DB-005 | 2026-06-02 | 第一阶段：`RecentView.vue` 从旧前端包装改为 Vue 原生只读近况页，覆盖运行摘要、处理积压、最近记录和自动化产物摘要 | `npm run type-check`、`npm run build`、`python scripts/smoke_test_web_app.py`、Playwright 打开 `/app?mode=recent` |
+| DB-005 | 2026-06-02 | 第二阶段：Vue 近况页增加处理积压单条打开、标记就绪和手动完成项退回待处理；web smoke 同时覆盖 Vue 动作与旧 Recent 批量处理兼容链路 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` |

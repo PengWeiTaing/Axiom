@@ -582,13 +582,66 @@ def main() -> None:
                     page.locator("#capture-feedback").get_by_text("inbox", exact=False).wait_for(timeout=15_000)
                     wait_for_text(page, "#overview-processing-backlog", "图片待补说明", "overview pending image backlog card")
 
-                    page.fill("#search-query-input", "pending-shot.png")
-                    page.fill("#search-source-input", "web_app_image_pending")
-                    page.select_option("#search-type-input", "image")
-                    page.select_option("#search-processing-state-input", "pending")
-                    page.locator("#search-form button[type='submit']").click()
-                    wait_for_text(page, "#search-results", "pending-shot.png", "pending image search result")
-                    click_first_action(page, "#search-results [data-action='view-item']", "open pending image item")
+                    vue_page = browser.new_page()
+                    try:
+                        vue_page.goto(f"{base_url}/app", wait_until="domcontentloaded")
+                        vue_page.evaluate("localStorage.setItem('axiom.key', 'test-key')")
+                        vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="近况").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="处理积压").wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/processing/mark-ready" in response.url and response.status == 200
+                        ):
+                            vue_page.get_by_role("button", name="标记就绪").first.click()
+                        vue_page.locator(".state-pill.ready").first.wait_for(timeout=15_000)
+                        pending_button = vue_page.get_by_role("button", name="退回待处理").first
+                        pending_button.wait_for(timeout=15_000)
+                        pending_button.scroll_into_view_if_needed(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/processing/mark-pending" in response.url and response.status == 200
+                        ):
+                            pending_button.click()
+                        vue_page.get_by_role("button", name="标记就绪").first.wait_for(timeout=15_000)
+                        restored_ids = vue_page.evaluate(
+                            """
+                            async () => {
+                                const headers = { "X-Axiom-Key": "test-key" };
+                                const response = await fetch("/recent?type=image&sort=newest&page=1&page_size=20", { headers });
+                                if (!response.ok) throw new Error(await response.text());
+                                const payload = await response.json();
+                                const ids = (payload.items || [])
+                                    .filter((item) => ["batch-image.png", "pending-shot.png"].includes(item.original_name))
+                                    .map((item) => item.id);
+                                if (ids.length) {
+                                    const restoreResponse = await fetch("/processing/mark-pending", {
+                                        method: "POST",
+                                        headers: { ...headers, "Content-Type": "application/json" },
+                                        body: JSON.stringify({ ids }),
+                                    });
+                                    if (!restoreResponse.ok) throw new Error(await restoreResponse.text());
+                                }
+                                return ids;
+                            }
+                            """
+                        )
+                        if len(restored_ids) < 2:
+                            raise AssertionError(f"Vue recent action restore missed smoke image ids: {restored_ids}")
+                    finally:
+                        vue_page.close()
+
+                    page.locator("#reset-recent-filters-button").click()
+                    page.select_option("#recent-type-input", "image")
+                    page.fill("#recent-source-input", "web_app_image_pending")
+                    page.select_option("#recent-processing-state-input", "pending")
+                    with page.expect_response(
+                        lambda response: "/recent" in response.url
+                        and "source=web_app_image_pending" in response.url
+                        and response.status == 200
+                    ):
+                        page.locator("#recent-filter-form button[type='submit']").click()
+                    wait_for_text(page, "#recent-list", "pending-shot.png", "pending image recent result")
+                    click_first_action(page, "#recent-list [data-action='view-item']", "open pending image item")
+                    wait_for_text(page, "#viewer-meta", "pending-shot.png", "pending image viewer meta")
                     click_first_action(
                         page,
                         "#viewer-actions [data-action='open-next-pending-item']",
@@ -599,10 +652,10 @@ def main() -> None:
                     close_viewer(page)
                     click_first_action(
                         page,
-                        "#search-batch-actions [data-action='mark-processing-batch-ready']",
-                        "mark pending search batch ready",
+                        "#recent-batch-actions [data-action='mark-processing-batch-ready']",
+                        "mark pending recent batch ready",
                     )
-                    wait_for_text(page, "#search-feedback", "共 0 条结果", "pending search cleared after batch ready")
+                    wait_for_text(page, "#recent-feedback", "共 0 条记录", "pending recent cleared after batch ready")
                     page.locator("#reset-recent-filters-button").click()
                     page.select_option("#recent-type-input", "image")
                     page.select_option("#recent-processing-override-input", "ready")

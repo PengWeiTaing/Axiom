@@ -6,7 +6,7 @@
  */
 
 import { computed, onMounted, ref } from 'vue';
-import { getOverview } from '@/api/endpoints';
+import { getOverview, markProcessingPending, markProcessingReady } from '@/api/endpoints';
 import type { ArtifactSummary, Item, OverviewPayload, ProcessingBacklogGroup } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { formatRelative } from '@/composables/useRelativeTime';
@@ -17,6 +17,7 @@ const overview = ref<OverviewPayload | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedItemId = ref<number | null>(null);
+const actionBusyId = ref<number | null>(null);
 
 const stats = computed(() => overview.value?.stats ?? null);
 const backlog = computed(() => overview.value?.processing_backlog ?? null);
@@ -88,6 +89,14 @@ function groupPreview(group: ProcessingBacklogGroup): string {
   return itemTitle(first);
 }
 
+function groupActionItem(group: ProcessingBacklogGroup): Item | null {
+  return group.next_item || group.items[0] || null;
+}
+
+function processingLabel(item: Item): string {
+  return item.processing_override === 'ready' ? '已就绪' : '待处理';
+}
+
 function artifactTitle(artifact: ArtifactSummary | null): string {
   if (!artifact) return '';
   return artifact.report_date || artifact.generated_name || artifact.relative_path;
@@ -96,6 +105,41 @@ function artifactTitle(artifact: ArtifactSummary | null): string {
 function onChanged() {
   selectedItemId.value = null;
   loadOverview();
+}
+
+function openBacklogItem(group: ProcessingBacklogGroup) {
+  const item = groupActionItem(group);
+  if (!item) return;
+  selectedItemId.value = item.id;
+}
+
+async function markReadyFromGroup(group: ProcessingBacklogGroup) {
+  const item = groupActionItem(group);
+  if (!item || actionBusyId.value) return;
+  actionBusyId.value = item.id;
+  error.value = null;
+  try {
+    await markProcessingReady([item.id]);
+    await loadOverview();
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '标记已就绪失败';
+  } finally {
+    actionBusyId.value = null;
+  }
+}
+
+async function markItemPending(item: Item) {
+  if (actionBusyId.value) return;
+  actionBusyId.value = item.id;
+  error.value = null;
+  try {
+    await markProcessingPending([item.id]);
+    await loadOverview();
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '退回待处理失败';
+  } finally {
+    actionBusyId.value = null;
+  }
 }
 
 onMounted(loadOverview);
@@ -155,6 +199,22 @@ onMounted(loadOverview);
               <p>{{ groupPreview(group) }}</p>
             </div>
             <span class="count-pill">{{ group.count }}</span>
+            <div class="row-actions">
+              <button
+                type="button"
+                :disabled="!groupActionItem(group)"
+                @click="openBacklogItem(group)"
+              >
+                打开
+              </button>
+              <button
+                type="button"
+                :disabled="!groupActionItem(group) || actionBusyId === groupActionItem(group)?.id"
+                @click="markReadyFromGroup(group)"
+              >
+                {{ actionBusyId === groupActionItem(group)?.id ? '处理中' : '标记就绪' }}
+              </button>
+            </div>
           </article>
         </div>
         <p v-else class="empty-line">当前没有待处理项</p>
@@ -194,19 +254,32 @@ onMounted(loadOverview);
       </div>
 
       <div v-if="recentItems.length" class="recent-list">
-        <button
+        <article
           v-for="item in recentItems"
           :key="item.id"
           class="recent-row"
-          type="button"
-          @click="selectedItemId = item.id"
         >
-          <span class="type-dot" :style="{ background: typeAccent(item.type) }" />
-          <div>
-            <strong>{{ itemTitle(item) }}</strong>
-            <small>{{ typeLabel(item.type) }} · {{ item.source || 'unknown' }} · {{ formatRelative(item.created_at) }}</small>
+          <button type="button" class="recent-main" @click="selectedItemId = item.id">
+            <span class="type-dot" :style="{ background: typeAccent(item.type) }" />
+            <div>
+              <strong>{{ itemTitle(item) }}</strong>
+              <small>{{ typeLabel(item.type) }} · {{ item.source || 'unknown' }} · {{ formatRelative(item.created_at) }}</small>
+            </div>
+          </button>
+          <div class="recent-actions">
+            <span class="state-pill" :class="{ ready: item.processing_override === 'ready' }">
+              {{ processingLabel(item) }}
+            </span>
+            <button
+              v-if="item.processing_override === 'ready'"
+              type="button"
+              :disabled="actionBusyId === item.id"
+              @click="markItemPending(item)"
+            >
+              {{ actionBusyId === item.id ? '处理中' : '退回待处理' }}
+            </button>
           </div>
-        </button>
+        </article>
       </div>
       <p v-else class="empty-line">暂无记录</p>
     </section>
@@ -387,14 +460,14 @@ h2 {
 }
 
 .row-title,
-.recent-row {
+.recent-main {
   display: flex;
   align-items: center;
   gap: var(--s-2);
 }
 
 .row-title strong,
-.recent-row strong,
+.recent-main strong,
 .artifact-row strong {
   color: var(--text-1);
   font-size: var(--fs-3);
@@ -428,6 +501,38 @@ h2 {
   font-size: var(--fs-2);
 }
 
+.row-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.row-actions button,
+.recent-actions button {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: var(--fs-2);
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.row-actions button:hover,
+.recent-actions button:hover {
+  border-color: var(--line-2);
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
+.row-actions button:disabled,
+.recent-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .artifact-row {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
@@ -447,7 +552,10 @@ h2 {
 .recent-row {
   width: 100%;
   padding: var(--s-3);
-  text-align: left;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-3);
+  align-items: center;
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
 
@@ -456,16 +564,44 @@ h2 {
   background: var(--surface-2);
 }
 
-.recent-row > div {
+.recent-main {
+  min-width: 0;
+  text-align: left;
+}
+
+.recent-main > div {
   min-width: 0;
 }
 
-.recent-row strong,
-.recent-row small {
+.recent-main strong,
+.recent-main small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.recent-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+
+.state-pill {
+  min-width: 52px;
+  padding: 2px var(--s-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-pill);
+  color: var(--text-4);
+  text-align: center;
+  font-size: var(--fs-2);
+}
+
+.state-pill.ready {
+  border-color: rgba(110, 231, 208, 0.18);
+  color: var(--accent-bright);
+  background: var(--accent-glow);
 }
 
 .empty-line {
@@ -484,6 +620,15 @@ h2 {
 
   .topbar {
     align-items: flex-start;
+  }
+
+  .recent-row {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-actions {
+    justify-content: flex-start;
+    padding-left: calc(7px + var(--s-2));
   }
 }
 </style>

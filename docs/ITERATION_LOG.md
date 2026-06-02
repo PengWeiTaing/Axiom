@@ -633,3 +633,7 @@
 - `frontend/src/api/types.ts` 补充 `/overview`、processing backlog、artifact summary 的前端类型；`frontend/src/api/endpoints.ts` 新增 `getOverview()`、`getProcessingBacklog()`、`getArtifactsSummary()`。
 - `frontend/` 已重新构建到 `core/static/v2/`，保持 VPS 无 Node.js 部署策略。
 - 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`；Playwright 实际打开 `http://127.0.0.1:8765/app?mode=recent` 并确认“近况 / 处理积压 / 自动化产物 / 最近记录”可见。
+- 近况页第二轮迁移：`RecentView.vue` 增加处理积压的“打开 / 标记就绪”操作，最近记录中的手动完成项可“退回待处理”。
+- 前端 API 增加 `markProcessingReady()` / `markProcessingPending()`，与旧前端共用 `/processing/mark-ready` 和 `/processing/mark-pending`。
+- `scripts/smoke_test_web_app.py` 补充 Vue 近况页 mark-ready / mark-pending 浏览器链路，并继续验证旧 Recent 批量处理动作；测试数据显式恢复 pending，避免 Vue 与旧端回归互相串状态。
+- 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`。
