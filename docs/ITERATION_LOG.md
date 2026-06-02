@@ -647,4 +647,8 @@
 - 本地验证通过：`npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py`；Browser 尝试打开 `/app?mode=tasks` 时命中旧 bundle 缓存，未作为失败处理，后续可单独处理固定文件名构建的缓存刷新策略。
 - 修复 Vue 主线缓存风险：`core/middleware.py` 将 `/static/v2/` 从旧的 `immutable` 策略改为 `no-cache, must-revalidate`，避免固定文件名的 `index.js` 长时间停留在旧版本。
 - `core/static/sw.js` 明确绕开 `/static/v2/`，保持旧 `/app/legacy` 离线缓存，同时不再把 Vue 主线 bundle 放入旧 PWA cache-first 路径。
-- `scripts/smoke_test_web_app.py` 增加缓存策略断言：`/app` 必须 no-store、`/static/v2/assets/index.js` 必须 no-cache、旧 `/static/app.js` 仍保持 immutable。
+- `scripts/smoke_test_web_app.py` 增加缓存策略断言：`/app` 必须 no-store、Vue hashed entry 必须 no-cache、旧 `/static/app.js` 仍保持 immutable。
+- Browser 实测发现固定 `index.js` 在长期浏览器会话中仍可能被模块缓存滞留；`frontend/vite.config.ts` 改回 hash 文件名产物，smoke 改为从 `/app` 解析真实 hashed entry 后检查缓存策略。
+- 记忆库迁入 Vue 主线：新增 `frontend/src/views/MemoriesView.vue`，顶部模式增加“记忆”，页面读取 `/memories/stats` 和 `/memories`。
+- 记忆库支持快速新增、总量/候选/确认统计、分类/状态筛选，以及候选记忆确认和归档；同步修正 `createMemory()` 返回类型与 `/memories/stats` 前端类型。
+- `scripts/smoke_test_web_app.py` 补充 `/app?mode=memories` 浏览器链路：创建 smoke 记忆、确认列表出现、点击确认并确认状态变为“已确认”。

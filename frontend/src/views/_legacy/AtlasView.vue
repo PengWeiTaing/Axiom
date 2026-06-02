@@ -71,12 +71,15 @@ const categories = computed(() => {
   if (!stats) return [];
   const total = stats.total || 1;
   return Object.entries(stats.by_category || {})
-    .map(([k, n]) => ({
+    .map(([k, item]) => {
+      const n = item.total || 0;
+      return {
       key: k,
       label: categoryLabel[k] || k,
       n,
       ratio: n / total,
-    }))
+      };
+    })
     .sort((a, b) => b.n - a.n);
 });
 

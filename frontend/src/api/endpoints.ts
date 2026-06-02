@@ -15,7 +15,10 @@ import type {
   AutomationJobsPayload,
   AutomationRunListPayload,
   AutomationRunPayload,
+  MemoryCategory,
   MemoryList,
+  MemoryStatsPayload,
+  MemoryStatus,
   DecisionList,
   TaskList,
   TaskPriority,
@@ -139,10 +142,12 @@ export const completeTask = (id: number) =>
 
 // ---------- 记忆 ----------
 export const createMemory = (data: {
-  category: 'fact' | 'preference' | 'goal' | 'relationship' | 'event';
+  category: MemoryCategory;
   content: string;
   detail?: string;
-}) => apiRequest<{ id: number; memory: Memory }>('/memories', { method: 'POST', json: data });
+  source_item_id?: number;
+  source_text?: string;
+}) => apiRequest<{ memory: Memory }>('/memories', { method: 'POST', json: data });
 
 // ---------- 决策 ----------
 export const createDecision = (data: {
@@ -155,8 +160,8 @@ export const createDecision = (data: {
 
 // ---------- 记忆扩展（Atlas 用） ----------
 export const listMemories = (params: {
-  category?: 'fact' | 'preference' | 'goal' | 'relationship' | 'event';
-  status?: 'candidate' | 'confirmed' | 'archived';
+  category?: MemoryCategory | '';
+  status?: MemoryStatus | '';
   page?: number;
   page_size?: number;
 } = {}) => apiRequest<MemoryList>('/memories', { query: params });
@@ -173,9 +178,7 @@ export const getDecision = (id: number) =>
   apiRequest<{ decision: Decision }>(`/decisions/${id}`)
 
 export const memoriesStats = () =>
-  apiRequest<{ total: number; by_category: Record<string, number>; by_status: Record<string, number> }>(
-    '/memories/stats',
-  );
+  apiRequest<MemoryStatsPayload>('/memories/stats');
 
 // ---------- 决策扩展 ----------
 export const listDecisions = (params: { status?: 'pending' | 'reviewed'; page?: number } = {}) =>
@@ -275,8 +278,10 @@ export const markTaskTodo = (id: number) => apiRequest<{ task: Task }>(`/tasks/$
 export const cancelTask = (id: number) => apiRequest<{ task: Task }>(`/tasks/${id}/cancel`, { method: 'POST' })
 export const rescheduleTask = (id: number, due_date?: string) =>
   apiRequest<{ task: Task }>(`/tasks/${id}/reschedule`, { method: 'POST', json: { due_date } })
-export const confirmMemory = (id: number) => apiRequest(`/memories/${id}/confirm`, { method: 'POST' })
-export const archiveMemory = (id: number) => apiRequest(`/memories/${id}/archive`, { method: 'POST' })
+export const confirmMemory = (id: number) =>
+  apiRequest<{ memory: Memory }>(`/memories/${id}/confirm`, { method: 'POST' })
+export const archiveMemory = (id: number) =>
+  apiRequest<{ memory: Memory }>(`/memories/${id}/archive`, { method: 'POST' })
 
 // ---------- Association CRUD ----------
 export const createAssociation = (data: {

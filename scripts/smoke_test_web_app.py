@@ -4,6 +4,7 @@ import base64
 import io
 import logging
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -210,9 +211,13 @@ def main() -> None:
             app_cache_control = fetch_header(f"{base_url}/app", "Cache-Control")
             if "no-store" not in app_cache_control:
                 raise AssertionError(f"/app Cache-Control should avoid shell caching: {app_cache_control}")
-            v2_cache_control = fetch_header(f"{base_url}/static/v2/assets/index.js", "Cache-Control")
+            app_html = fetch_text(f"{base_url}/app")
+            entry_match = re.search(r'src="(/static/v2/assets/index-[^"]+\.js)"', app_html)
+            if not entry_match:
+                raise AssertionError("Vite shell should reference a hashed entry bundle")
+            v2_cache_control = fetch_header(f"{base_url}{entry_match.group(1)}", "Cache-Control")
             if "no-cache" not in v2_cache_control:
-                raise AssertionError(f"Vite assets should revalidate fixed filenames: {v2_cache_control}")
+                raise AssertionError(f"Vite assets should revalidate hashed entry bundle: {v2_cache_control}")
             legacy_cache_control = fetch_header(f"{base_url}/static/app.js", "Cache-Control")
             if "immutable" not in legacy_cache_control:
                 raise AssertionError(f"legacy static cache policy changed unexpectedly: {legacy_cache_control}")
@@ -676,6 +681,33 @@ def main() -> None:
                             vue_task_row.get_by_role("button", name="完成").click()
                         vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).filter(
                             has_text="已完成"
+                        ).first.wait_for(timeout=15_000)
+
+                        vue_memory_content = "Vue smoke memory"
+                        vue_page.goto(f"{base_url}/app?mode=memories", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="记忆库").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="快速新增").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="记忆列表").wait_for(timeout=15_000)
+                        vue_page.get_by_label("记忆内容").fill(vue_memory_content)
+                        vue_page.get_by_label("记忆详情").fill("created by smoke test")
+                        with vue_page.expect_response(
+                            lambda response: response.url.endswith("/memories")
+                            and response.request.method == "POST"
+                            and response.status == 201
+                        ):
+                            vue_page.get_by_role("button", name="添加记忆").click()
+                        vue_memory_row = vue_page.locator(".list-panel .memory-row").filter(
+                            has_text=vue_memory_content
+                        ).first
+                        vue_memory_row.wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/memories/" in response.url
+                            and response.url.endswith("/confirm")
+                            and response.status == 200
+                        ):
+                            vue_memory_row.get_by_role("button", name="确认").click()
+                        vue_page.locator(".list-panel .memory-row").filter(has_text=vue_memory_content).filter(
+                            has_text="已确认"
                         ).first.wait_for(timeout=15_000)
 
                         vue_page.goto(f"{base_url}/app?mode=automation", wait_until="networkidle")

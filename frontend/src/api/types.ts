@@ -33,6 +33,19 @@ export interface Memory {
   updated_at: string;
 }
 
+export interface MemoryStatsCategory {
+  label: string;
+  total: number;
+  confirmed: number;
+  candidate: number;
+  archived: number;
+}
+
+export interface MemoryStatsPayload {
+  total: number;
+  by_category: Record<string, MemoryStatsCategory>;
+}
+
 export type TaskStatus = 'todo' | 'done' | 'cancelled';
 export type TaskPriority = 'high' | 'medium' | 'low';
 

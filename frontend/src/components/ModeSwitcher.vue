@@ -10,6 +10,7 @@ const tabs: { key: AppMode; label: string }[] = [
   { key: 'atlas', label: 'Atlas' },
   { key: 'recent', label: '近况' },
   { key: 'tasks', label: '任务' },
+  { key: 'memories', label: '记忆' },
   { key: 'automation', label: '自动化' },
   { key: 'board', label: 'Board' },
 ]
@@ -37,7 +38,10 @@ const containerOpacity = computed(() => mode.mode === 'atlas' ? 0.65 : 1)
   z-index: 25;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: var(--s-3);
+  max-width: calc(100vw - var(--s-8));
   font-size: var(--fs-2);
   transition: opacity var(--t-base) var(--ease);
 }

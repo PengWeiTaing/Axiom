@@ -15,7 +15,7 @@ import {
   weeklyReport,
   dailyStats,
 } from '@/api/endpoints';
-import type { Memory, Task, Decision } from '@/api/types';
+import type { Memory, Task, Decision, MemoryStatsPayload } from '@/api/types';
 import { ApiError } from '@/api/client';
 
 export type AtlasNoticeLevel = 'info' | 'warn'
@@ -50,11 +50,7 @@ const CACHE_TTL = 60_000;
 export const useAtlasStore = defineStore('atlas', () => {
   const goals = ref<GoalWithProgress[]>([]);
   const decisions = ref<Decision[]>([]);
-  const memoryStats = ref<{
-    total: number;
-    by_category: Record<string, number>;
-    by_status: Record<string, number>;
-  } | null>(null);
+  const memoryStats = ref<MemoryStatsPayload | null>(null);
   const weekly = ref<WeeklyReportData | null>(null);
   const daily = ref<DailyPoint[]>([]);
 

@@ -50,7 +50,7 @@ async function submit() {
     } else if (kind.value === 'memory') {
       const { createMemory: apiMem } = await import('@/api/endpoints')
       const r = await apiMem({ category: category.value as any, content: content.value.trim() })
-      entityId = r.id
+      entityId = r.memory.id
     } else if (kind.value === 'decision') {
       const { createDecision: apiDec } = await import('@/api/endpoints')
       const r = await apiDec({ title: title.value.trim(), decision: decision.value.trim() })
