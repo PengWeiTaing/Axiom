@@ -861,6 +861,52 @@ def main() -> None:
                         vue_page.locator(".list-panel .memory-row").filter(has_text=vue_memory_content).filter(
                             has_text="已确认"
                         ).first.wait_for(timeout=15_000)
+                        source_memory_content = "Vue smoke sourced memory"
+                        source_item_text = "Vue smoke source item"
+                        vue_page.evaluate(
+                            """
+                            async ({ memoryContent, itemText }) => {
+                                const headers = {
+                                    "X-Axiom-Key": "test-key",
+                                    "Content-Type": "application/json",
+                                };
+                                const itemResponse = await fetch("/add", {
+                                    method: "POST",
+                                    headers,
+                                    body: JSON.stringify({ text: itemText, source: "web_app_source_memory" }),
+                                });
+                                if (!itemResponse.ok) throw new Error(await itemResponse.text());
+                                const itemPayload = await itemResponse.json();
+                                const sourceItemId = itemPayload.item?.id ?? itemPayload.id;
+                                if (!sourceItemId) throw new Error("missing source item id");
+                                const memoryResponse = await fetch("/memories", {
+                                    method: "POST",
+                                    headers,
+                                    body: JSON.stringify({
+                                        category: "fact",
+                                        content: memoryContent,
+                                        detail: "memory linked to source item",
+                                        source_item_id: sourceItemId,
+                                        source_text: itemText,
+                                    }),
+                                });
+                                if (!memoryResponse.ok) throw new Error(await memoryResponse.text());
+                            }
+                            """,
+                            {"memoryContent": source_memory_content, "itemText": source_item_text},
+                        )
+                        vue_page.goto(f"{base_url}/app?mode=memories", wait_until="networkidle")
+                        source_memory_row = vue_page.locator(".list-panel .memory-row").filter(
+                            has_text=source_memory_content
+                        ).first
+                        source_memory_row.wait_for(timeout=15_000)
+                        source_memory_row.get_by_role("button", name="详情").click()
+                        vue_page.locator(".object-panel").get_by_text("源记录", exact=False).wait_for(timeout=15_000)
+                        vue_page.locator(".object-panel .source-card").click()
+                        vue_page.locator(".drawer-panel").get_by_text(source_item_text, exact=False).wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.locator(".drawer-panel").get_by_label("关闭").click()
                         linked_memory_content = "Vue smoke linked memory"
                         linked_task_title = "Vue smoke linked task"
                         vue_page.evaluate(

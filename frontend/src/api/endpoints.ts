@@ -44,10 +44,10 @@ import type { AtlasGraphPayload } from '@/atlas/types';
 
 // ---------- 采集 ----------
 export const addNote = (text: string, source = 'web_app') =>
-  apiRequest<{ id: number; item: Item }>('/add', {
+  apiRequest<{ message: string; item: Item }>('/add', {
     method: 'POST',
     json: { text, source },
-  });
+  }).then((payload) => ({ ...payload, id: payload.item.id }));
 
 export const uploadFile = (file: File, content?: string, source = 'web_app') => {
   const fd = new FormData();

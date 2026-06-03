@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
+import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import {
   archiveMemory,
@@ -29,6 +30,7 @@ const total = ref(0);
 const loading = ref(false);
 const saving = ref(false);
 const busyMemoryId = ref<number | null>(null);
+const selectedItemId = ref<number | null>(null);
 const selectedObject = ref<ObjectTarget | null>(null);
 const error = ref<string | null>(null);
 const feedback = ref<string | null>(null);
@@ -148,6 +150,11 @@ function memoryDetail(memory: Memory): string {
 
 function openMemoryDetail(id: number) {
   selectedObject.value = { kind: 'memory', id };
+}
+
+function openSourceItem(id: number) {
+  selectedObject.value = null;
+  selectedItemId.value = id;
 }
 
 onMounted(refreshAll);
@@ -300,8 +307,10 @@ onMounted(refreshAll);
     <ObjectDrawer
       :target="selectedObject"
       @close="selectedObject = null"
+      @open-item="openSourceItem"
       @open-object="selectedObject = $event"
     />
+    <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="refreshAll" />
   </main>
 </template>
 
