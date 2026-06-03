@@ -802,13 +802,16 @@ def main() -> None:
                         vue_page.locator(".object-panel").get_by_text("created by smoke test", exact=False).wait_for(
                             timeout=15_000
                         )
-                        vue_page.get_by_label("关闭").click()
                         with vue_page.expect_response(
                             lambda response: "/tasks/" in response.url
                             and response.url.endswith("/done")
                             and response.status == 200
                         ):
-                            vue_task_row.get_by_role("button", name="完成").click()
+                            vue_page.locator(".object-panel").get_by_role("button", name="完成").click()
+                        vue_page.locator(".object-panel .feedback-line").filter(
+                            has_text="任务已完成"
+                        ).first.wait_for(timeout=15_000)
+                        vue_page.locator(".object-panel").get_by_label("关闭").click()
                         vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).filter(
                             has_text="已完成"
                         ).first.wait_for(timeout=15_000)

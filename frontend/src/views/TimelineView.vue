@@ -239,6 +239,7 @@ onMounted(() => loadTimeline(true));
     <ObjectDrawer
       :target="selectedObject"
       @close="selectedObject = null"
+      @changed="loadTimeline(true)"
       @open-item="openSourceItem"
       @open-object="selectedObject = $event"
     />

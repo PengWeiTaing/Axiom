@@ -282,6 +282,7 @@ onMounted(() => {
     <ObjectDrawer
       :target="selectedObject"
       @close="selectedObject = null"
+      @changed="runSearch"
       @open-item="openSourceItem"
       @open-object="selectedObject = $event"
     />

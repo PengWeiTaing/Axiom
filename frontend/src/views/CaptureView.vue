@@ -90,6 +90,7 @@ defineExpose({ openSearch: () => (showSearch.value = true) });
     <ObjectDrawer
       :target="selectedObject"
       @close="selectedObject = null"
+      @changed="onChanged"
       @open-item="openSearchItem"
       @open-object="openSearchObject"
     />

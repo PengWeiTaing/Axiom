@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ApiError } from '@/api/client';
-import { getDecision, getMemory, getTask } from '@/api/endpoints';
+import { cancelTask, getDecision, getMemory, getTask, markTaskDone, markTaskTodo } from '@/api/endpoints';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { useModeStore } from '@/stores/mode';
 import type { Decision, MemoryDetail, ObjectKind, ObjectTarget, Task } from '@/api/types';
@@ -11,11 +11,14 @@ const emit = defineEmits<{
   close: [];
   openItem: [id: number];
   openObject: [target: ObjectTarget];
+  changed: [];
 }>();
 
 const mode = useModeStore();
 const loading = ref(false);
+const acting = ref(false);
 const error = ref<string | null>(null);
+const feedback = ref<string | null>(null);
 const task = ref<Task | null>(null);
 const memory = ref<MemoryDetail | null>(null);
 const decision = ref<Decision | null>(null);
@@ -27,6 +30,7 @@ watch(
     memory.value = null;
     decision.value = null;
     error.value = null;
+    feedback.value = null;
     if (!target) return;
 
     loading.value = true;
@@ -100,6 +104,33 @@ function openLinkedTask(id: number) {
   emit('openObject', { kind: 'task', id });
 }
 
+async function updateTask(action: 'done' | 'todo' | 'cancel') {
+  if (!task.value || acting.value) return;
+  acting.value = true;
+  error.value = null;
+  feedback.value = null;
+  try {
+    const id = task.value.id;
+    const payload =
+      action === 'done'
+        ? await markTaskDone(id)
+        : action === 'todo'
+          ? await markTaskTodo(id)
+          : await cancelTask(id);
+    task.value = payload.task;
+    feedback.value = taskActionLabel(action);
+    emit('changed');
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '任务操作失败';
+  } finally {
+    acting.value = false;
+  }
+}
+
+function taskActionLabel(action: 'done' | 'todo' | 'cancel'): string {
+  return { done: '任务已完成', todo: '任务已恢复', cancel: '任务已取消' }[action];
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.target) {
     e.preventDefault();
@@ -127,6 +158,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         </header>
 
         <section class="object-body">
+          <p v-if="feedback" class="feedback-line">{{ feedback }}</p>
           <p v-if="loading" class="empty-line">加载中</p>
           <p v-else-if="error" class="error-line">{{ error }}</p>
 
@@ -193,6 +225,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         </section>
 
         <footer class="object-actions">
+          <template v-if="task">
+            <button
+              v-if="task.status !== 'done'"
+              type="button"
+              :disabled="acting"
+              @click="updateTask('done')"
+            >完成</button>
+            <button
+              v-if="task.status !== 'todo'"
+              type="button"
+              :disabled="acting"
+              @click="updateTask('todo')"
+            >恢复</button>
+            <button
+              v-if="task.status !== 'cancelled'"
+              type="button"
+              :disabled="acting"
+              @click="updateTask('cancel')"
+            >取消</button>
+          </template>
           <button type="button" @click="openWorkspace">打开工作台</button>
         </footer>
       </div>
@@ -301,6 +353,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 .linked-row,
 .meta-grid div,
 .empty-line,
+.feedback-line,
 .error-line {
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
@@ -370,12 +423,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   color: var(--text-3);
 }
 
+.feedback-line {
+  color: var(--accent-bright);
+  border-color: rgba(110, 231, 208, 0.22);
+}
+
 .error-line {
   color: var(--error);
   border-color: rgba(232, 120, 120, 0.22);
 }
 
 .object-actions {
+  display: grid;
+  gap: var(--s-2);
   padding: var(--s-3) var(--s-4);
   border-top: 1px solid var(--line-1);
 }

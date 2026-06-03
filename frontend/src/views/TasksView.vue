@@ -392,6 +392,7 @@ onMounted(refreshAll);
     <ObjectDrawer
       :target="selectedObject"
       @close="selectedObject = null"
+      @changed="refreshAll"
       @open-object="selectedObject = $event"
     />
   </main>
