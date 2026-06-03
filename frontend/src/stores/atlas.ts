@@ -15,7 +15,7 @@ import {
   weeklyReport,
   dailyStats,
 } from '@/api/endpoints';
-import type { Memory, Task, Decision, MemoryStatsPayload } from '@/api/types';
+import type { Memory, MemoryLinkedTask, Decision, MemoryStatsPayload } from '@/api/types';
 import { ApiError } from '@/api/client';
 
 export type AtlasNoticeLevel = 'info' | 'warn'
@@ -27,7 +27,7 @@ export interface AtlasNotice {
 
 export interface GoalWithProgress {
   memory: Memory;
-  linked_tasks: Task[];
+  linked_tasks: MemoryLinkedTask[];
   progress: { total: number; done: number; todo: number };
 }
 
@@ -120,10 +120,18 @@ export const useAtlasStore = defineStore('atlas', () => {
     for (const m of data.memories) {
       try {
         const detail = await getMemory(m.id);
+        const memory = detail.memory;
+        const progress = memory.task_progress;
+        const total = progress?.total ?? 0;
+        const done = progress?.done ?? 0;
         result.push({
-          memory: detail.memory,
-          linked_tasks: detail.linked_tasks,
-          progress: detail.task_progress,
+          memory,
+          linked_tasks: memory.linked_tasks ?? [],
+          progress: {
+            total,
+            done,
+            todo: progress?.todo ?? Math.max(0, total - done),
+          },
         });
       } catch {
         result.push({

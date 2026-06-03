@@ -9,6 +9,7 @@ import type {
   ItemDetail,
   ItemType,
   Memory,
+  MemoryDetail,
   Task,
   Decision,
   ParseResult,
@@ -228,7 +229,7 @@ export const getTask = (id: number) =>
   apiRequest<{ task: Task }>(`/tasks/${id}`)
 
 export const getMemory = (id: number) =>
-  apiRequest<{ memory: Memory; linked_tasks: Task[]; task_progress: { total: number; done: number; todo: number } }>(
+  apiRequest<{ memory: MemoryDetail }>(
     `/memories/${id}`,
   );
 

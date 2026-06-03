@@ -3,10 +3,10 @@ import { computed, onMounted, ref } from 'vue';
 import { searchAll, searchVector } from '@/api/endpoints';
 import { ApiError } from '@/api/client';
 import ItemDrawer from '@/components/ItemDrawer.vue';
+import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { typeAccent } from '@/composables/useTypeAccent';
-import { useModeStore } from '@/stores/mode';
-import type { Decision, Item, Memory, Task } from '@/api/types';
+import type { Decision, Item, Memory, ObjectTarget, Task } from '@/api/types';
 
 type SearchMode = 'all' | 'vector';
 type ResultKind = 'item' | 'task' | 'memory' | 'decision';
@@ -17,14 +17,13 @@ type SearchResult =
   | { kind: 'memory'; data: Memory }
   | { kind: 'decision'; data: Decision };
 
-const mode = useModeStore();
-
 const query = ref('');
 const searchMode = ref<SearchMode>('all');
 const loading = ref(false);
 const error = ref<string | null>(null);
 const hasSearched = ref(false);
 const selectedItemId = ref<number | null>(null);
+const selectedObject = ref<ObjectTarget | null>(null);
 const results = ref<SearchResult[]>([]);
 
 const groupedResults = computed(() => {
@@ -97,9 +96,12 @@ function openResult(result: SearchResult) {
     selectedItemId.value = result.data.id;
     return;
   }
-  if (result.kind === 'task') mode.set('tasks');
-  if (result.kind === 'memory') mode.set('memories');
-  if (result.kind === 'decision') mode.set('decisions');
+  selectedObject.value = { kind: result.kind, id: result.data.id };
+}
+
+function openSourceItem(id: number) {
+  selectedObject.value = null;
+  selectedItemId.value = id;
 }
 
 function resultTitle(result: SearchResult): string {
@@ -277,6 +279,7 @@ onMounted(() => {
     </section>
 
     <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="runSearch" />
+    <ObjectDrawer :target="selectedObject" @close="selectedObject = null" @open-item="openSourceItem" />
   </main>
 </template>
 

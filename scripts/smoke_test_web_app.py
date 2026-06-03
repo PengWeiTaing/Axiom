@@ -796,6 +796,23 @@ def main() -> None:
                         vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).filter(
                             has_text="已完成"
                         ).first.wait_for(timeout=15_000)
+                        vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="搜索").wait_for(timeout=15_000)
+                        vue_page.get_by_label("搜索查询").fill(vue_task_title)
+                        with vue_page.expect_response(
+                            lambda response: "/search/all" in response.url and response.status == 200
+                        ):
+                            vue_page.locator("main").get_by_role("button", name="搜索").click()
+                        vue_page.locator(".result-row").filter(has_text=vue_task_title).first.click()
+                        vue_page.locator(".object-panel").get_by_text("created by smoke test", exact=False).wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_label("关闭").click()
+                        vue_page.goto(f"{base_url}/app?mode=timeline", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="时间流").wait_for(timeout=15_000)
+                        vue_page.locator(".entry-row").filter(has_text=vue_task_title).first.click()
+                        vue_page.locator(".object-panel").get_by_text("已完成", exact=False).wait_for(timeout=15_000)
+                        vue_page.get_by_label("关闭").click()
 
                         vue_memory_content = "Vue smoke memory"
                         vue_page.goto(f"{base_url}/app?mode=memories", wait_until="networkidle")

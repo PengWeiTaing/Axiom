@@ -3,13 +3,12 @@ import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
 import { getTimeline } from '@/api/endpoints';
 import ItemDrawer from '@/components/ItemDrawer.vue';
+import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';
-import { useModeStore } from '@/stores/mode';
-import type { TimelineEntry, TimelineKind, TimelinePayload } from '@/api/types';
+import type { ObjectTarget, TimelineEntry, TimelineKind, TimelinePayload } from '@/api/types';
 
 const PAGE_SIZE = 28;
 
-const mode = useModeStore();
 const entries = ref<TimelineEntry[]>([]);
 const page = ref(1);
 const totalPages = ref(1);
@@ -17,6 +16,7 @@ const total = ref(0);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedItemId = ref<number | null>(null);
+const selectedObject = ref<ObjectTarget | null>(null);
 const selectedKinds = ref<Record<TimelineKind, boolean>>({
   item: true,
   task: true,
@@ -72,9 +72,12 @@ function openEntry(entry: TimelineEntry) {
     selectedItemId.value = entry.id;
     return;
   }
-  if (entry.kind === 'task') mode.set('tasks');
-  if (entry.kind === 'memory') mode.set('memories');
-  if (entry.kind === 'decision') mode.set('decisions');
+  selectedObject.value = { kind: entry.kind, id: entry.id };
+}
+
+function openSourceItem(id: number) {
+  selectedObject.value = null;
+  selectedItemId.value = id;
 }
 
 function kindLabel(kind: TimelineKind): string {
@@ -233,6 +236,7 @@ onMounted(() => loadTimeline(true));
     </section>
 
     <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="loadTimeline(true)" />
+    <ObjectDrawer :target="selectedObject" @close="selectedObject = null" @open-item="openSourceItem" />
   </main>
 </template>
 

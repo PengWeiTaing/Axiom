@@ -44,6 +44,34 @@ export interface Memory {
   updated_at: string;
 }
 
+export type ObjectKind = 'task' | 'memory' | 'decision';
+
+export interface ObjectTarget {
+  kind: ObjectKind;
+  id: number;
+}
+
+export interface MemoryLinkedTask {
+  id: number;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+}
+
+export interface MemorySourceItem {
+  id: number;
+  type: ItemType;
+  type_label: string;
+  snippet: string;
+  created_at: string;
+}
+
+export interface MemoryDetail extends Memory {
+  linked_tasks: MemoryLinkedTask[];
+  task_progress: { total: number; done: number; todo?: number } | null;
+  source_item: MemorySourceItem | null;
+}
+
 export interface MemoryStatsCategory {
   label: string;
   total: number;
