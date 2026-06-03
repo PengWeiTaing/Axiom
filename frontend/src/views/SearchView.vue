@@ -279,7 +279,12 @@ onMounted(() => {
     </section>
 
     <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="runSearch" />
-    <ObjectDrawer :target="selectedObject" @close="selectedObject = null" @open-item="openSourceItem" />
+    <ObjectDrawer
+      :target="selectedObject"
+      @close="selectedObject = null"
+      @open-item="openSourceItem"
+      @open-object="selectedObject = $event"
+    />
   </main>
 </template>
 

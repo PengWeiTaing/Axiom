@@ -236,7 +236,12 @@ onMounted(() => loadTimeline(true));
     </section>
 
     <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="loadTimeline(true)" />
-    <ObjectDrawer :target="selectedObject" @close="selectedObject = null" @open-item="openSourceItem" />
+    <ObjectDrawer
+      :target="selectedObject"
+      @close="selectedObject = null"
+      @open-item="openSourceItem"
+      @open-object="selectedObject = $event"
+    />
   </main>
 </template>
 

@@ -7,7 +7,11 @@ import { useModeStore } from '@/stores/mode';
 import type { Decision, MemoryDetail, ObjectKind, ObjectTarget, Task } from '@/api/types';
 
 const props = defineProps<{ target: ObjectTarget | null }>();
-const emit = defineEmits<{ close: []; openItem: [id: number] }>();
+const emit = defineEmits<{
+  close: [];
+  openItem: [id: number];
+  openObject: [target: ObjectTarget];
+}>();
 
 const mode = useModeStore();
 const loading = ref(false);
@@ -92,6 +96,10 @@ function openWorkspace() {
   emit('close');
 }
 
+function openLinkedTask(id: number) {
+  emit('openObject', { kind: 'task', id });
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.target) {
     e.preventDefault();
@@ -150,10 +158,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
             </button>
             <section v-if="memory.linked_tasks.length" class="linked-list">
               <span>关联任务</span>
-              <article v-for="linked in memory.linked_tasks" :key="linked.id">
+              <button
+                v-for="linked in memory.linked_tasks"
+                :key="linked.id"
+                class="linked-row"
+                type="button"
+                @click="openLinkedTask(linked.id)"
+              >
                 <strong>{{ linked.title }}</strong>
                 <small>{{ taskStatusLabel(linked.status) }} · {{ priorityLabel(linked.priority) }}</small>
-              </article>
+              </button>
             </section>
           </template>
 
@@ -284,7 +298,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 .detail-block,
 .source-card,
-.linked-list article,
+.linked-row,
 .meta-grid div,
 .empty-line,
 .error-line {
@@ -339,9 +353,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   gap: var(--s-2);
 }
 
-.linked-list article {
+.linked-row {
   display: grid;
   gap: var(--s-1);
+  width: 100%;
+  text-align: left;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.linked-row:hover {
+  border-color: rgba(110, 231, 208, 0.25);
+  background: var(--surface-2);
 }
 
 .empty-line {

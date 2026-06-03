@@ -91,6 +91,7 @@ defineExpose({ openSearch: () => (showSearch.value = true) });
       :target="selectedObject"
       @close="selectedObject = null"
       @open-item="openSearchItem"
+      @open-object="openSearchObject"
     />
 
     <SearchOverlayLazy

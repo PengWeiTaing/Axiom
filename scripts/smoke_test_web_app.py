@@ -851,6 +851,57 @@ def main() -> None:
                         vue_page.locator(".list-panel .memory-row").filter(has_text=vue_memory_content).filter(
                             has_text="已确认"
                         ).first.wait_for(timeout=15_000)
+                        linked_memory_content = "Vue smoke linked memory"
+                        linked_task_title = "Vue smoke linked task"
+                        vue_page.evaluate(
+                            """
+                            async ({ memoryContent, taskTitle }) => {
+                                const headers = {
+                                    "X-Axiom-Key": "test-key",
+                                    "Content-Type": "application/json",
+                                };
+                                const memoryResponse = await fetch("/memories", {
+                                    method: "POST",
+                                    headers,
+                                    body: JSON.stringify({
+                                        category: "goal",
+                                        content: memoryContent,
+                                        detail: "memory with linked task",
+                                    }),
+                                });
+                                if (!memoryResponse.ok) throw new Error(await memoryResponse.text());
+                                const memoryPayload = await memoryResponse.json();
+                                const taskResponse = await fetch("/tasks", {
+                                    method: "POST",
+                                    headers,
+                                    body: JSON.stringify({
+                                        title: taskTitle,
+                                        detail: "linked task detail",
+                                        priority: "high",
+                                        memory_id: memoryPayload.memory.id,
+                                    }),
+                                });
+                                if (!taskResponse.ok) throw new Error(await taskResponse.text());
+                                return { memoryId: memoryPayload.memory.id };
+                            }
+                            """,
+                            {"memoryContent": linked_memory_content, "taskTitle": linked_task_title},
+                        )
+                        vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
+                        vue_page.get_by_label("搜索查询").fill(linked_memory_content)
+                        with vue_page.expect_response(
+                            lambda response: "/search/all" in response.url and response.status == 200
+                        ):
+                            vue_page.locator("main").get_by_role("button", name="搜索").click()
+                        vue_page.locator(".result-row").filter(has_text=linked_memory_content).first.click()
+                        vue_page.locator(".object-panel").get_by_text(linked_task_title, exact=False).wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.locator(".object-panel .linked-row").filter(has_text=linked_task_title).first.click()
+                        vue_page.locator(".object-panel").get_by_text("linked task detail", exact=False).wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_label("关闭").click()
 
                         vue_decision_title = "Vue smoke decision"
                         vue_page.goto(f"{base_url}/app?mode=decisions", wait_until="networkidle")
