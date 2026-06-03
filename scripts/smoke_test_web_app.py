@@ -699,6 +699,26 @@ def main() -> None:
                             vue_search_text,
                         )
                         vue_page.goto(f"{base_url}/app", wait_until="networkidle")
+                        vue_file_note = "Vue smart input attachment"
+                        vue_page.locator(".smart-input textarea").fill(vue_file_note)
+                        vue_page.set_input_files(
+                            "#smart-file-input",
+                            {
+                                "name": "vue-smart-input.png",
+                                "mimeType": "image/png",
+                                "buffer": PNG_1X1_BYTES,
+                            },
+                        )
+                        vue_page.locator(".smart-input .chip").filter(
+                            has_text="vue-smart-input.png"
+                        ).wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: response.url.endswith("/upload")
+                            and response.request.method == "POST"
+                            and response.status == 200
+                        ):
+                            vue_page.get_by_label("提交").click()
+                        vue_page.locator(".smart-input").get_by_text("文件", exact=False).wait_for(timeout=15_000)
                         vue_page.locator(".brand .action-btn").click()
                         vue_page.locator(".search-overlay").wait_for(timeout=15_000)
                         with vue_page.expect_response(

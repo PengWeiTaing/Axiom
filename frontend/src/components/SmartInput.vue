@@ -9,7 +9,7 @@
  * 交互：
  *   - 自动 grow（min 2 行，max 12 行）
  *   - Cmd/Ctrl+Enter 提交
- *   - 拖入文件 / 粘贴图片自动收集到附件区
+ *   - 选择附件 / 拖入文件 / 粘贴图片自动收集到附件区
  *   - 提交成功后清空 + 显示 1.5s AI 判定 ghost
  */
 
@@ -25,9 +25,12 @@ const PLACEHOLDERS = [
   '"明天 3 点开会"、"我喜欢深色界面"、"决定换工作"…',
 ];
 
+const FILE_ACCEPT = 'image/*,.pdf,.doc,.docx,audio/*,.aac,.caf,.flac,.m4a,.mp3,.ogg,.wav,.webm';
+
 const text = ref('');
 const files = ref<File[]>([]);
 const textarea = ref<HTMLTextAreaElement | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
 const dragging = ref(false);
 const placeholder = ref(PLACEHOLDERS[0]);
 const ghost = ref<CaptureSuccess | null>(null);
@@ -116,6 +119,17 @@ function onPaste(e: ClipboardEvent) {
   }
 }
 
+function openFilePicker() {
+  fileInput.value?.click();
+}
+
+function onFilePicked(e: Event) {
+  const input = e.target as HTMLInputElement | null;
+  if (!input?.files?.length) return;
+  for (const f of input.files) files.value.push(f);
+  input.value = '';
+}
+
 function removeFile(idx: number) {
   files.value.splice(idx, 1);
 }
@@ -140,6 +154,16 @@ function removeFile(idx: number) {
       @keydown="onKeydown"
       @paste="onPaste"
     />
+    <input
+      id="smart-file-input"
+      ref="fileInput"
+      class="sr-only-file"
+      type="file"
+      multiple
+      :accept="FILE_ACCEPT"
+      :disabled="submitting"
+      @change="onFilePicked"
+    >
 
     <Transition name="fade">
       <div v-if="files.length" class="attachments">
@@ -181,24 +205,46 @@ function removeFile(idx: number) {
         </Transition>
       </div>
 
-      <button
-        class="submit"
-        type="button"
-        :disabled="!canSubmit"
-        @click="submit"
-        aria-label="提交"
-      >
-        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-          <path
-            d="M2 8h12M9 3l5 5-5 5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </button>
+      <div class="bar-actions">
+        <button
+          class="attach"
+          type="button"
+          :disabled="submitting"
+          title="选择附件"
+          aria-label="选择附件"
+          @click="openFilePicker"
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path
+              d="M5.5 8.8l3.8-3.8a2.2 2.2 0 1 1 3.1 3.1l-5 5a3.4 3.4 0 0 1-4.8-4.8l5.4-5.4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.35"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+
+        <button
+          class="submit"
+          type="button"
+          :disabled="!canSubmit"
+          @click="submit"
+          aria-label="提交"
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path
+              d="M2 8h12M9 3l5 5-5 5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -245,6 +291,14 @@ textarea {
 
 textarea::placeholder {
   color: var(--text-4);
+}
+
+.sr-only-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .attachments {
@@ -305,6 +359,13 @@ textarea::placeholder {
   font-size: var(--fs-2);
   flex: 1;
   min-width: 0;
+}
+
+.bar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 0 0 auto;
 }
 
 .hint {
@@ -372,6 +433,7 @@ textarea::placeholder {
   color: var(--surface-0);
 }
 
+.attach,
 .submit {
   width: 32px;
   height: 32px;
@@ -384,12 +446,24 @@ textarea::placeholder {
   transition: all var(--t-fast) var(--ease);
 }
 
+.attach {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.attach:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--line-3);
+  color: var(--text-1);
+}
+
 .submit:hover:not(:disabled) {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--surface-0);
 }
 
+.attach:disabled,
 .submit:disabled {
   opacity: 0.4;
   cursor: not-allowed;

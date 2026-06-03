@@ -57,7 +57,7 @@ export const uploadFile = (file: File, content?: string, source = 'web_app') => 
   return apiRequest<{ id: number; item: Item }>('/upload', {
     method: 'POST',
     formData: fd,
-  });
+  }).then((payload) => ({ ...payload, id: payload.item.id }));
 };
 
 export const fetchUrl = (url: string) =>

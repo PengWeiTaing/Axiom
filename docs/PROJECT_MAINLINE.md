@@ -25,7 +25,7 @@ Vue 主应用模式：
 Capture -> Atlas -> Cosmos -> 近况 -> 处理 -> 搜索 -> 时间 -> 任务 -> 记忆 -> 决策 -> 自动化 -> 系统
 ```
 
-- `CaptureView.vue` 是记录入口。
+- `CaptureView.vue` 是记录入口；`SmartInput.vue` 支持文本、纯 URL、可见附件选择、拖拽文件和粘贴图片。
 - `SearchOverlay.vue` 是 Capture 内的轻量搜索浮层，读取主线搜索 API；点击记录结果打开 `ItemDrawer.vue`，点击任务/记忆/决策结果打开 `ObjectDrawer.vue`。
 - `AtlasView.vue` 是新 Atlas 主实现，包含 3D 全局图和 2D 聚焦图。
 - `CosmosView.vue` 是关系图谱编辑与对象挂载层，保留在 Vue 主线内的 `/app?mode=cosmos`，但不替代 `/atlas` 的 Atlas 主视图。
