@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
-export type AppMode = 'capture' | 'atlas' | 'recent' | 'processing' | 'search' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
+export type AppMode = 'capture' | 'atlas' | 'recent' | 'processing' | 'search' | 'timeline' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
 
-const MODES: AppMode[] = ['capture', 'atlas', 'recent', 'processing', 'search', 'tasks', 'memories', 'decisions', 'automation', 'system', 'board'];
+const MODES: AppMode[] = ['capture', 'atlas', 'recent', 'processing', 'search', 'timeline', 'tasks', 'memories', 'decisions', 'automation', 'system', 'board'];
 
 function isMode(value: string | null): value is AppMode {
   return Boolean(value && MODES.includes(value as AppMode));
@@ -29,6 +29,7 @@ function urlForMode(mode: AppMode): string {
   if (mode === 'decisions') return '/app?mode=decisions';
   if (mode === 'automation') return '/app?mode=automation';
   if (mode === 'system') return '/app?mode=system';
+  if (mode === 'timeline') return '/app?mode=timeline';
   if (mode === 'processing') return '/app?mode=processing';
   if (mode === 'search') return '/app?mode=search';
   if (mode === 'recent') return '/app?mode=recent';

@@ -35,6 +35,8 @@ import type {
   MetricsPayload,
   AuditLogPayload,
   AdminLogsPayload,
+  TimelinePayload,
+  TimelineKind,
 } from './types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 import type { AtlasGraphPayload } from '@/atlas/types';
@@ -127,6 +129,18 @@ export const getAdminLogs = (params: {
   lines?: number;
   level?: string;
 } = {}) => apiRequest<AdminLogsPayload>('/admin/logs', { query: params });
+
+export const getTimeline = (params: {
+  kinds?: TimelineKind[] | string;
+  page?: number;
+  page_size?: number;
+} = {}) => {
+  const query = {
+    ...params,
+    kinds: Array.isArray(params.kinds) ? params.kinds.join(',') : params.kinds,
+  };
+  return apiRequest<TimelinePayload>('/timeline', { query });
+};
 
 export const searchAll = (q: string, limit = 20) =>
   apiRequest<{

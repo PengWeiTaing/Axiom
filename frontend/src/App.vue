@@ -13,6 +13,7 @@ const AtlasView = defineAsyncComponent(() => import('@/views/AtlasView.vue'));
 const RecentView = defineAsyncComponent(() => import('@/views/RecentView.vue'));
 const ProcessingView = defineAsyncComponent(() => import('@/views/ProcessingView.vue'));
 const SearchView = defineAsyncComponent(() => import('@/views/SearchView.vue'));
+const TimelineView = defineAsyncComponent(() => import('@/views/TimelineView.vue'));
 const TasksView = defineAsyncComponent(() => import('@/views/TasksView.vue'));
 const MemoriesView = defineAsyncComponent(() => import('@/views/MemoriesView.vue'));
 const DecisionsView = defineAsyncComponent(() => import('@/views/DecisionsView.vue'));
@@ -40,6 +41,7 @@ onMounted(async () => {
       <RecentView v-else-if="mode.mode === 'recent'" key="recent" />
       <ProcessingView v-else-if="mode.mode === 'processing'" key="processing" />
       <SearchView v-else-if="mode.mode === 'search'" key="search" />
+      <TimelineView v-else-if="mode.mode === 'timeline'" key="timeline" />
       <TasksView v-else-if="mode.mode === 'tasks'" key="tasks" />
       <MemoriesView v-else-if="mode.mode === 'memories'" key="memories" />
       <DecisionsView v-else-if="mode.mode === 'decisions'" key="decisions" />

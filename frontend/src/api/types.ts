@@ -328,6 +328,26 @@ export interface AdminLogsPayload {
   log: string[];
 }
 
+export type TimelineKind = 'item' | 'task' | 'memory' | 'decision';
+
+export interface TimelineEntry {
+  kind: TimelineKind;
+  id: number | null;
+  event: string;
+  occurred_at: string;
+  title: string | null;
+  summary: string | null;
+  meta: Record<string, string | number | boolean>;
+}
+
+export interface TimelinePayload {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  entries: TimelineEntry[];
+}
+
 export interface ArtifactLatestPayload {
   review: {
     daily: ArtifactSummary | null;
