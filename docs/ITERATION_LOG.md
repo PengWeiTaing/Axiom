@@ -673,3 +673,4 @@
 - `ObjectDrawer.vue` 增加任务状态操作：任务详情抽屉内可直接完成、恢复、取消，并通过 `changed` 事件刷新 Capture / 搜索 / 时间流 / 任务 / 记忆 / 决策等父视图；web smoke 和 Playwright MCP 覆盖“任务台 -> 详情抽屉 -> 完成 -> 列表同步已完成”链路。
 - `ObjectDrawer.vue` 增加记忆状态操作：候选记忆可在详情抽屉内直接确认，非归档记忆可直接归档，并通过 `changed` 事件刷新父视图；web smoke 和 Playwright MCP 覆盖“记忆库 -> 详情抽屉 -> 确认 -> 列表同步已确认”链路。
 - `ObjectDrawer.vue` 增加决策回顾操作：待回顾决策可在详情抽屉内填写实际结果并标记已回顾，通过 `changed` 事件刷新父视图；同时将对象抽屉层级提高到 AI 管家浮动按钮之上，避免底部动作被遮挡。
+- `AutomationView.vue` 增加运行产物预览：运行详情可通过已鉴权 API 读取生成的 Markdown 产物，切换运行记录时自动清理旧预览；web smoke 覆盖“运行 Inbox 报告 -> 查看产物 -> 预览非空”链路。

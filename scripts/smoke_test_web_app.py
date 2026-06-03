@@ -1022,6 +1022,12 @@ def main() -> None:
                             inbox_job_card.get_by_role("button", name="运行").click()
                         vue_page.get_by_text("生成 Inbox 报告 已完成", exact=False).wait_for(timeout=20_000)
                         vue_page.locator(".run-detail").get_by_text("生成 Inbox 报告", exact=False).wait_for(timeout=15_000)
+                        vue_page.locator(".run-detail").get_by_role("button", name="查看产物").click()
+                        vue_page.locator(".artifact-preview").get_by_text("产物预览").wait_for(timeout=15_000)
+                        artifact_preview = vue_page.locator(".artifact-preview pre")
+                        artifact_preview.wait_for(timeout=15_000)
+                        if not artifact_preview.inner_text().strip():
+                            raise AssertionError("Vue automation artifact preview should not be empty")
                     finally:
                         vue_page.close()
 

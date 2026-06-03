@@ -35,7 +35,7 @@ Capture -> Atlas -> 近况 -> 处理 -> 搜索 -> 时间 -> 任务 -> 记忆 -> 
 - `TasksView.vue` 是 Vue 主线任务台，读取 `/tasks/today` 和 `/tasks`，支持快速新增、今日/逾期、状态/优先级筛选，以及完成、恢复、取消、安排到今天；列表项可用 `ObjectDrawer.vue` 查看完整任务详情。
 - `MemoriesView.vue` 是 Vue 主线记忆库，读取 `/memories/stats` 和 `/memories`，支持快速新增、分类/状态筛选、确认和归档；列表项可用 `ObjectDrawer.vue` 查看完整记忆详情，记忆来源记录可继续打开 `ItemDrawer.vue`。
 - `DecisionsView.vue` 是 Vue 主线决策台，读取 `/decisions`，支持快速新增、状态筛选、填写实际结果并标记已回顾；列表项可用 `ObjectDrawer.vue` 查看完整决策详情。
-- `AutomationView.vue` 是 Vue 主线自动化中心，读取 `/automation/jobs` 和 `/automation/runs`，支持运行日期、手动触发、状态/任务过滤和运行详情。
+- `AutomationView.vue` 是 Vue 主线自动化中心，读取 `/automation/jobs` 和 `/automation/runs`，支持运行日期、手动触发、状态/任务过滤、运行详情和 Markdown 产物预览。
 - `SystemView.vue` 是 Vue 主线系统治理台，读取 `/system`、`/metrics`、`/audit-log` 和 `/admin/logs`，提供健康分、数据表、完整性、审计和日志尾部的只读诊断视图。
 - `ObjectDrawer.vue` 是 Vue 主线任务/记忆/决策的轻量详情抽屉，供搜索、时间流等跨对象视图复用；任务详情可直接完成/恢复/取消并通知父视图刷新，记忆详情可直接确认/归档，决策详情可填写实际结果并标记已回顾；记忆详情里的关联任务可继续在同一抽屉打开任务详情，记忆来源记录通过 `open-item` 交给 `ItemDrawer.vue` 展示，`ItemDrawer.vue` 继续负责记录详情和处理动作。
 - `frontend/src/views/_legacy/AtlasView.vue` 不是新 Atlas，不要在新功能中继续扩展它。

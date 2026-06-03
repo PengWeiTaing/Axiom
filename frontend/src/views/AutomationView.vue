@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { getAutomationJobs, getAutomationRuns, runAutomationJob } from '@/api/endpoints';
 import type { AutomationJob, AutomationRun, AutomationRunListPayload } from '@/api/types';
-import { ApiError } from '@/api/client';
+import { ApiError, apiRequest } from '@/api/client';
 import { formatRelative } from '@/composables/useRelativeTime';
 
 const RUN_PAGE_SIZE = 8;
@@ -22,6 +22,10 @@ const runDate = ref('');
 const filterJob = ref('');
 const filterStatus = ref('');
 const selectedRun = ref<AutomationRun | null>(null);
+const artifactLoading = ref(false);
+const artifactError = ref<string | null>(null);
+const artifactContent = ref('');
+const artifactForRunId = ref<number | null>(null);
 
 const readyJobs = computed(() => jobs.value.filter((job) => job.ready).length);
 const blockedJobs = computed(() => jobs.value.length - readyJobs.value);
@@ -59,7 +63,7 @@ async function loadRuns(reset = true) {
     runsTotalPages.value = payload.total_pages || 1;
     runsTotal.value = payload.total || 0;
     runs.value = reset ? payload.items : [...runs.value, ...payload.items];
-    if (reset) selectedRun.value = payload.items[0] || null;
+    if (reset) selectRun(payload.items[0] || null);
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '运行记录加载失败';
   } finally {
@@ -82,7 +86,7 @@ async function runJob(job: AutomationJob) {
       ? `${job.label} 已完成：${statusLabel(payload.run.status)}`
       : `${job.label} 已提交`;
     await Promise.all([loadJobs(), loadRuns(true)]);
-    if (payload.run) selectedRun.value = payload.run;
+    if (payload.run) selectRun(payload.run);
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '自动化运行失败';
   } finally {
@@ -136,6 +140,35 @@ function artifactTitle(run: AutomationRun): string {
   const artifact = run.artifact;
   if (!artifact) return '未生成产物';
   return artifact.report_date || artifact.generated_name || artifact.relative_path;
+}
+
+function resetArtifactPreview() {
+  artifactLoading.value = false;
+  artifactError.value = null;
+  artifactContent.value = '';
+  artifactForRunId.value = null;
+}
+
+function selectRun(run: AutomationRun | null) {
+  selectedRun.value = run;
+  resetArtifactPreview();
+}
+
+async function openArtifact(run: AutomationRun) {
+  const fileUrl = run.artifact?.file_url;
+  if (!fileUrl || artifactLoading.value) return;
+  artifactLoading.value = true;
+  artifactError.value = null;
+  artifactContent.value = '';
+  artifactForRunId.value = run.id;
+  try {
+    const response = await apiRequest<Response>(fileUrl);
+    artifactContent.value = await response.text();
+  } catch (err) {
+    artifactError.value = err instanceof ApiError ? err.message : '产物读取失败';
+  } finally {
+    artifactLoading.value = false;
+  }
 }
 
 onMounted(refreshAll);
@@ -241,7 +274,7 @@ onMounted(refreshAll);
             type="button"
             class="run-row"
             :class="{ active: selectedRun?.id === run.id }"
-            @click="selectedRun = run"
+            @click="selectRun(run)"
           >
             <span class="status-dot" :data-status="run.status" />
             <div>
@@ -278,6 +311,21 @@ onMounted(refreshAll);
             <div><dt>返回码</dt><dd>{{ selectedRun.return_code ?? '无' }}</dd></div>
           </dl>
           <pre>{{ previewRun(selectedRun) }}</pre>
+          <div v-if="selectedRun.artifact?.file_url" class="artifact-actions">
+            <button type="button" :disabled="artifactLoading" @click="openArtifact(selectedRun)">
+              {{ artifactLoading && artifactForRunId === selectedRun.id ? '读取中' : '查看产物' }}
+            </button>
+            <small>{{ selectedRun.artifact.relative_path }}</small>
+          </div>
+          <div
+            v-if="artifactForRunId === selectedRun.id && (artifactContent || artifactError || artifactLoading)"
+            class="artifact-preview"
+          >
+            <span>产物预览</span>
+            <p v-if="artifactError" class="error-text">{{ artifactError }}</p>
+            <p v-else-if="artifactLoading" class="empty-line">读取中…</p>
+            <pre v-else>{{ artifactContent }}</pre>
+          </div>
           <button
             v-if="selectedRun.manual_enabled"
             type="button"
@@ -630,6 +678,40 @@ pre {
   line-height: var(--lh-base);
   white-space: pre-wrap;
   padding: var(--s-3);
+}
+
+.artifact-actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.artifact-actions small {
+  color: var(--text-4);
+  font-size: var(--fs-2);
+  overflow-wrap: anywhere;
+}
+
+.artifact-preview {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.artifact-preview span {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.artifact-preview pre {
+  max-height: 360px;
+  color: var(--text-2);
+}
+
+.error-text {
+  color: var(--error);
+  font-size: var(--fs-2);
+  line-height: var(--lh-base);
 }
 
 .empty-line {
