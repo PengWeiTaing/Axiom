@@ -854,13 +854,16 @@ def main() -> None:
                         vue_page.locator(".object-panel").get_by_text("created by smoke test", exact=False).wait_for(
                             timeout=15_000
                         )
-                        vue_page.get_by_label("关闭").click()
                         with vue_page.expect_response(
                             lambda response: "/memories/" in response.url
                             and response.url.endswith("/confirm")
                             and response.status == 200
                         ):
-                            vue_memory_row.get_by_role("button", name="确认").click()
+                            vue_page.locator(".object-panel").get_by_role("button", name="确认").click()
+                        vue_page.locator(".object-panel .feedback-line").filter(
+                            has_text="记忆已确认"
+                        ).first.wait_for(timeout=15_000)
+                        vue_page.locator(".object-panel").get_by_label("关闭").click()
                         vue_page.locator(".list-panel .memory-row").filter(has_text=vue_memory_content).filter(
                             has_text="已确认"
                         ).first.wait_for(timeout=15_000)

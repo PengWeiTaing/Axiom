@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ApiError } from '@/api/client';
-import { cancelTask, getDecision, getMemory, getTask, markTaskDone, markTaskTodo } from '@/api/endpoints';
+import {
+  archiveMemory,
+  cancelTask,
+  confirmMemory,
+  getDecision,
+  getMemory,
+  getTask,
+  markTaskDone,
+  markTaskTodo,
+} from '@/api/endpoints';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { useModeStore } from '@/stores/mode';
 import type { Decision, MemoryDetail, ObjectKind, ObjectTarget, Task } from '@/api/types';
@@ -131,6 +140,27 @@ function taskActionLabel(action: 'done' | 'todo' | 'cancel'): string {
   return { done: '任务已完成', todo: '任务已恢复', cancel: '任务已取消' }[action];
 }
 
+async function updateMemory(action: 'confirm' | 'archive') {
+  if (!memory.value || acting.value) return;
+  acting.value = true;
+  error.value = null;
+  feedback.value = null;
+  try {
+    const payload = action === 'confirm' ? await confirmMemory(memory.value.id) : await archiveMemory(memory.value.id);
+    memory.value = { ...memory.value, ...payload.memory };
+    feedback.value = memoryActionLabel(action);
+    emit('changed');
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '记忆操作失败';
+  } finally {
+    acting.value = false;
+  }
+}
+
+function memoryActionLabel(action: 'confirm' | 'archive'): string {
+  return { confirm: '记忆已确认', archive: '记忆已归档' }[action];
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.target) {
     e.preventDefault();
@@ -244,6 +274,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
               :disabled="acting"
               @click="updateTask('cancel')"
             >取消</button>
+          </template>
+          <template v-if="memory">
+            <button
+              v-if="memory.status === 'candidate'"
+              type="button"
+              :disabled="acting"
+              @click="updateMemory('confirm')"
+            >确认</button>
+            <button
+              v-if="memory.status !== 'archived'"
+              type="button"
+              :disabled="acting"
+              @click="updateMemory('archive')"
+            >归档</button>
           </template>
           <button type="button" @click="openWorkspace">打开工作台</button>
         </footer>
