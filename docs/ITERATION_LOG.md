@@ -676,3 +676,4 @@
 - `AutomationView.vue` 增加运行产物预览：运行详情可通过已鉴权 API 读取生成的 Markdown 产物，切换运行记录时自动清理旧预览；web smoke 覆盖“运行 Inbox 报告 -> 查看产物 -> 预览非空”链路。
 - `RecentView.vue` 增加自动化产物正文预览：产物卡可直接读取 Markdown 正文，复用统一的 `getArtifactContent()` 前端 helper；web smoke 覆盖“近况 -> 日报产物 -> 预览正文”链路。
 - `CosmosView.vue` 接回 Vue 主线入口：顶部模式新增 `Cosmos`，`/app?mode=cosmos` 可进入关系图谱编辑与对象挂载层；web smoke 覆盖 Cosmos 入口、激活 tab 和图谱/空状态渲染，明确 Atlas 主视图与 Cosmos 编辑层边界。
+- `SystemView.vue` 接入数据导出：系统治理页新增“导出数据”按钮，复用后端 `/export` 生成 zip，并在导出后刷新审计日志；web smoke 覆盖 Vue 系统页触发下载并校验 `axiom_export_*.zip` 文件名。

@@ -729,6 +729,13 @@ def main() -> None:
                         vue_page.get_by_role("heading", name="运行状态").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="数据表").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="审计日志").wait_for(timeout=15_000)
+                        with vue_page.expect_download() as export_download_info:
+                            vue_page.get_by_role("button", name="导出数据").click()
+                        export_download = export_download_info.value
+                        export_name = export_download.suggested_filename
+                        if not export_name.startswith("axiom_export_") or not export_name.endswith(".zip"):
+                            raise AssertionError(f"unexpected Vue system export filename: {export_name}")
+                        vue_page.get_by_text("导出已开始", exact=False).wait_for(timeout=15_000)
                         vue_page.goto(f"{base_url}/app?mode=cosmos", wait_until="networkidle")
                         vue_page.locator(".cosmos-view").wait_for(timeout=15_000)
                         vue_page.locator(".mode-tab.active").filter(has_text="Cosmos").wait_for(timeout=15_000)

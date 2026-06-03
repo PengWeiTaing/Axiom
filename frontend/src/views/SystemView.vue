@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
-import { getAdminLogs, getAuditLog, getMetrics, getSystemInfo } from '@/api/endpoints';
+import { exportData, getAdminLogs, getAuditLog, getMetrics, getSystemInfo } from '@/api/endpoints';
 import type { AdminLogsPayload, AuditLogEntry, AuditLogPayload, MetricsPayload, SystemInfoPayload } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
 
@@ -10,8 +10,10 @@ const metrics = ref<MetricsPayload | null>(null);
 const audit = ref<AuditLogPayload | null>(null);
 const logs = ref<AdminLogsPayload | null>(null);
 const loading = ref(false);
+const exporting = ref(false);
 const error = ref<string | null>(null);
 const logError = ref<string | null>(null);
+const exportMessage = ref<string | null>(null);
 const auditTarget = ref('');
 const logLevel = ref('');
 
@@ -70,6 +72,29 @@ async function loadLogs() {
   }
 }
 
+async function handleExport() {
+  exporting.value = true;
+  exportMessage.value = null;
+  error.value = null;
+  try {
+    const { blob, filename } = await exportData();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    exportMessage.value = '导出已开始';
+    await loadAudit();
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '数据导出失败';
+  } finally {
+    exporting.value = false;
+  }
+}
+
 function formatBytes(mb: number): string {
   if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`;
   return `${mb.toFixed(2)} MB`;
@@ -119,14 +144,22 @@ onMounted(refreshAll);
         <p class="eyebrow">System</p>
         <h1>系统治理</h1>
       </div>
-      <button class="refresh-btn" type="button" :disabled="loading" @click="refreshAll">
-        <span>{{ loading ? '刷新中' : '刷新' }}</span>
-      </button>
+      <div class="top-actions">
+        <button class="export-btn" type="button" :disabled="exporting" @click="handleExport">
+          <span>{{ exporting ? '导出中' : '导出数据' }}</span>
+        </button>
+        <button class="refresh-btn" type="button" :disabled="loading" @click="refreshAll">
+          <span>{{ loading ? '刷新中' : '刷新' }}</span>
+        </button>
+      </div>
     </header>
 
     <div v-if="error" class="notice error-row">
       <span>{{ error }}</span>
       <button type="button" @click="refreshAll">重试</button>
+    </div>
+    <div v-if="exportMessage" class="notice success-row">
+      <span>{{ exportMessage }}</span>
     </div>
 
     <section class="health-strip">
@@ -315,7 +348,15 @@ h3 {
   font-size: var(--fs-4);
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+
 .refresh-btn,
+.export-btn,
 .filters button {
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
@@ -325,14 +366,21 @@ h3 {
 }
 
 .refresh-btn:hover:not(:disabled),
+.export-btn:hover:not(:disabled),
 .filters button:hover {
   border-color: rgba(110, 231, 208, 0.25);
   color: var(--text-1);
 }
 
-.refresh-btn:disabled {
+.refresh-btn:disabled,
+.export-btn:disabled {
   color: var(--text-4);
   cursor: default;
+}
+
+.export-btn {
+  border-color: rgba(110, 231, 208, 0.18);
+  color: var(--accent-bright);
 }
 
 .notice,
@@ -355,6 +403,11 @@ h3 {
 .error-row {
   border-color: rgba(232, 120, 120, 0.22);
   color: var(--error);
+}
+
+.success-row {
+  border-color: rgba(110, 231, 208, 0.18);
+  color: var(--accent-bright);
 }
 
 .health-strip {
@@ -529,6 +582,15 @@ select {
   .check-list,
   .table-list {
     grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-direction: column;
+  }
+
+  .top-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

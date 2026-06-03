@@ -136,6 +136,22 @@ export const getAdminLogs = (params: {
   level?: string;
 } = {}) => apiRequest<AdminLogsPayload>('/admin/logs', { query: params });
 
+function filenameFromDisposition(disposition: string | null): string | null {
+  if (!disposition) return null;
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1].replace(/"/g, ''));
+  const plainMatch = disposition.match(/filename="?([^";]+)"?/i);
+  return plainMatch?.[1] || null;
+}
+
+export const exportData = async () => {
+  const response = await apiRequest<Response>('/export', { method: 'POST' });
+  const blob = await response.blob();
+  const filename = filenameFromDisposition(response.headers.get('content-disposition'))
+    || `axiom_export_${new Date().toISOString().slice(0, 10)}.zip`;
+  return { blob, filename };
+};
+
 export const getTimeline = (params: {
   kinds?: TimelineKind[] | string;
   page?: number;
