@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
 import { createDecision, listDecisions, reviewDecision } from '@/api/endpoints';
-import type { Decision, DecisionList, DecisionStatus } from '@/api/types';
+import ObjectDrawer from '@/components/ObjectDrawer.vue';
+import type { Decision, DecisionList, DecisionStatus, ObjectTarget } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
 
 const PAGE_SIZE = 12;
@@ -16,6 +17,7 @@ const reviewedTotal = ref(0);
 const loading = ref(false);
 const saving = ref(false);
 const busyDecisionId = ref<number | null>(null);
+const selectedObject = ref<ObjectTarget | null>(null);
 const error = ref<string | null>(null);
 const feedback = ref<string | null>(null);
 const statusFilter = ref<DecisionStatus | ''>('');
@@ -125,6 +127,10 @@ function decisionSummary(decision: Decision): string {
 
 function contextSummary(decision: Decision): string {
   return compactText(decision.context || decision.expected_outcome, '没有背景或预期结果');
+}
+
+function openDecisionDetail(id: number) {
+  selectedObject.value = { kind: 'decision', id };
 }
 
 onMounted(refreshAll);
@@ -247,6 +253,7 @@ onMounted(refreshAll);
               <p>{{ decisionSummary(item) }}</p>
               <p class="context-line">{{ contextSummary(item) }}</p>
               <div class="decision-meta">
+                <button type="button" @click="openDecisionDetail(item.id)">详情</button>
                 <span>{{ statusLabel(item.status) }}</span>
                 <span>{{ formatRelative(item.updated_at) }}</span>
                 <span v-if="item.actual_outcome">结果：{{ compactText(item.actual_outcome, '') }}</span>
@@ -273,6 +280,12 @@ onMounted(refreshAll);
         </button>
       </section>
     </section>
+
+    <ObjectDrawer
+      :target="selectedObject"
+      @close="selectedObject = null"
+      @open-object="selectedObject = $event"
+    />
   </main>
 </template>
 
@@ -322,6 +335,7 @@ onMounted(refreshAll);
 
 .refresh-btn,
 .primary-action,
+.decision-meta button,
 .review-box button,
 .load-more,
 .notice button {
@@ -515,11 +529,13 @@ button:disabled {
 }
 
 .decision-meta span,
+.decision-meta button,
 .status-dot {
   border-radius: 999px;
 }
 
-.decision-meta span {
+.decision-meta span,
+.decision-meta button {
   padding: 2px var(--s-2);
   background: rgba(255, 255, 255, 0.055);
 }

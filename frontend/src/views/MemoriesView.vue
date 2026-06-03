@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
+import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import {
   archiveMemory,
   confirmMemory,
@@ -14,6 +15,7 @@ import type {
   MemoryList,
   MemoryStatsPayload,
   MemoryStatus,
+  ObjectTarget,
 } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
 
@@ -27,6 +29,7 @@ const total = ref(0);
 const loading = ref(false);
 const saving = ref(false);
 const busyMemoryId = ref<number | null>(null);
+const selectedObject = ref<ObjectTarget | null>(null);
 const error = ref<string | null>(null);
 const feedback = ref<string | null>(null);
 const categoryFilter = ref<MemoryCategory | ''>('');
@@ -141,6 +144,10 @@ function memoryDetail(memory: Memory): string {
   const detail = String(memory.detail || memory.source_text || '').replace(/\s+/g, ' ').trim();
   if (!detail) return '没有补充说明';
   return detail.length > 130 ? `${detail.slice(0, 129)}...` : detail;
+}
+
+function openMemoryDetail(id: number) {
+  selectedObject.value = { kind: 'memory', id };
 }
 
 onMounted(refreshAll);
@@ -267,6 +274,7 @@ onMounted(refreshAll);
               </div>
             </div>
             <div class="memory-actions">
+              <button type="button" @click="openMemoryDetail(memory.id)">详情</button>
               <button
                 v-if="memory.status !== 'confirmed'"
                 type="button"
@@ -288,6 +296,12 @@ onMounted(refreshAll);
         </button>
       </section>
     </section>
+
+    <ObjectDrawer
+      :target="selectedObject"
+      @close="selectedObject = null"
+      @open-object="selectedObject = $event"
+    />
   </main>
 </template>
 

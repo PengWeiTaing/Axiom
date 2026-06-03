@@ -10,7 +10,9 @@ import {
   tasksToday,
 } from '@/api/endpoints';
 import { ApiError } from '@/api/client';
+import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import type { Task, TaskList, TaskPriority, TaskStatus } from '@/api/types';
+import type { ObjectTarget } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
 
 const PAGE_SIZE = 10;
@@ -25,6 +27,7 @@ const loadingToday = ref(false);
 const loadingList = ref(false);
 const saving = ref(false);
 const busyTaskId = ref<number | null>(null);
+const selectedObject = ref<ObjectTarget | null>(null);
 const error = ref<string | null>(null);
 const feedback = ref<string | null>(null);
 const statusFilter = ref<TaskStatus | ''>('');
@@ -170,6 +173,10 @@ function taskDetail(task: Task): string {
   return detail.length > 110 ? `${detail.slice(0, 109)}…` : detail;
 }
 
+function openTaskDetail(id: number) {
+  selectedObject.value = { kind: 'task', id };
+}
+
 onMounted(refreshAll);
 </script>
 
@@ -281,6 +288,7 @@ onMounted(refreshAll);
               </div>
             </div>
             <div class="task-actions">
+              <button type="button" @click="openTaskDetail(task.id)">详情</button>
               <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'done')">完成</button>
               <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'today')">今天做</button>
             </div>
@@ -299,6 +307,7 @@ onMounted(refreshAll);
               </div>
             </div>
             <div class="task-actions">
+              <button type="button" @click="openTaskDetail(task.id)">详情</button>
               <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'done')">完成</button>
               <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'cancel')">取消</button>
             </div>
@@ -352,6 +361,7 @@ onMounted(refreshAll);
             </div>
           </div>
           <div class="task-actions">
+            <button type="button" @click="openTaskDetail(task.id)">详情</button>
             <button
               v-if="task.status !== 'done'"
               type="button"
@@ -378,6 +388,12 @@ onMounted(refreshAll);
         {{ loadingList ? '加载中' : '加载更多' }}
       </button>
     </section>
+
+    <ObjectDrawer
+      :target="selectedObject"
+      @close="selectedObject = null"
+      @open-object="selectedObject = $event"
+    />
   </main>
 </template>
 

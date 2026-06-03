@@ -798,6 +798,11 @@ def main() -> None:
                             vue_page.get_by_role("button", name="添加任务").click()
                         vue_task_row = vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).first
                         vue_task_row.wait_for(timeout=15_000)
+                        vue_task_row.get_by_role("button", name="详情").click()
+                        vue_page.locator(".object-panel").get_by_text("created by smoke test", exact=False).wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_label("关闭").click()
                         with vue_page.expect_response(
                             lambda response: "/tasks/" in response.url
                             and response.url.endswith("/done")
@@ -842,6 +847,11 @@ def main() -> None:
                             has_text=vue_memory_content
                         ).first
                         vue_memory_row.wait_for(timeout=15_000)
+                        vue_memory_row.get_by_role("button", name="详情").click()
+                        vue_page.locator(".object-panel").get_by_text("created by smoke test", exact=False).wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_label("关闭").click()
                         with vue_page.expect_response(
                             lambda response: "/memories/" in response.url
                             and response.url.endswith("/confirm")
@@ -922,6 +932,11 @@ def main() -> None:
                             has_text=vue_decision_title
                         ).first
                         vue_decision_row.wait_for(timeout=15_000)
+                        vue_decision_row.get_by_role("button", name="详情").click()
+                        vue_page.locator(".object-panel").get_by_text("choose the smoke path", exact=False).wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_label("关闭").click()
                         vue_decision_row.get_by_label("实际结果").fill("reviewed by smoke test")
                         with vue_page.expect_response(
                             lambda response: "/decisions/" in response.url

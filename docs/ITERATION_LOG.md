@@ -668,3 +668,4 @@
 - Vue 主线新增 `ObjectDrawer.vue` 轻量对象详情抽屉：搜索与时间流中的任务/记忆/决策不再只能跳转工作台，可在当前上下文侧滑查看详情；同时修正 `getMemory()` 前端类型与 Atlas store 读取后端实际返回结构的偏差。
 - Capture 内 `SearchOverlay.vue` 接回主线详情体验：浮层搜索结果现在可点击，记录打开 `ItemDrawer`，任务/记忆/决策打开 `ObjectDrawer`；web smoke 补充 Capture 搜索浮层打开记录详情验证。
 - `ObjectDrawer.vue` 增加记忆关联任务跳转：记忆详情中的关联任务从静态列表改为可点击行，可在搜索、时间流和 Capture 搜索浮层里继续打开任务详情；web smoke 和 Playwright MCP 均覆盖“搜索记忆 -> 打开记忆抽屉 -> 点击关联任务 -> 进入任务详情”链路。
+- 任务台、记忆库、决策台接入 `ObjectDrawer.vue`：核心工作台列表新增“详情”入口，能在当前上下文侧滑查看任务/记忆/决策完整内容；web smoke 和 Playwright MCP 覆盖三类工作台详情入口。
