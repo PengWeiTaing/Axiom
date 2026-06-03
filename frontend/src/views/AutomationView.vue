@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { getAutomationJobs, getAutomationRuns, runAutomationJob } from '@/api/endpoints';
+import { getArtifactContent, getAutomationJobs, getAutomationRuns, runAutomationJob } from '@/api/endpoints';
 import type { AutomationJob, AutomationRun, AutomationRunListPayload } from '@/api/types';
-import { ApiError, apiRequest } from '@/api/client';
+import { ApiError } from '@/api/client';
 import { formatRelative } from '@/composables/useRelativeTime';
 
 const RUN_PAGE_SIZE = 8;
@@ -162,8 +162,7 @@ async function openArtifact(run: AutomationRun) {
   artifactContent.value = '';
   artifactForRunId.value = run.id;
   try {
-    const response = await apiRequest<Response>(fileUrl);
-    artifactContent.value = await response.text();
+    artifactContent.value = await getArtifactContent(fileUrl);
   } catch (err) {
     artifactError.value = err instanceof ApiError ? err.message : '产物读取失败';
   } finally {

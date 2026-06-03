@@ -85,6 +85,11 @@ export const listLearningBoards = () =>
 export const getArtifactsSummary = (params: { preview_chars?: number } = {}) =>
   apiRequest<ArtifactsSummaryPayload>('/artifacts/summary', { query: params });
 
+export const getArtifactContent = async (fileUrl: string) => {
+  const response = await apiRequest<Response>(fileUrl);
+  return response.text();
+};
+
 export const markProcessingReady = (ids: number[]) =>
   apiRequest<ProcessingMarkPayload>('/processing/mark-ready', {
     method: 'POST',

@@ -28,7 +28,7 @@ Capture -> Atlas -> 近况 -> 处理 -> 搜索 -> 时间 -> 任务 -> 记忆 -> 
 - `CaptureView.vue` 是记录入口。
 - `SearchOverlay.vue` 是 Capture 内的轻量搜索浮层，读取主线搜索 API；点击记录结果打开 `ItemDrawer.vue`，点击任务/记忆/决策结果打开 `ObjectDrawer.vue`。
 - `AtlasView.vue` 是新 Atlas 主实现，包含 3D 全局图和 2D 聚焦图。
-- `RecentView.vue` 是 Vue 主线近况页，读取 `/overview` 展示运行摘要、处理积压、最近记录和自动化产物；已支持积压单条打开、标记就绪和手动完成项退回待处理。
+- `RecentView.vue` 是 Vue 主线近况页，读取 `/overview` 展示运行摘要、处理积压、最近记录和自动化产物；已支持积压单条打开、标记就绪、手动完成项退回待处理和 Markdown 产物预览。
 - `ProcessingView.vue` 是 Vue 主线处理工作台，读取 `/processing/backlog`，支持全局下一条、分组队列、分组批量标记就绪和退回待处理；条目详情复用 `ItemDrawer.vue`，支持标记就绪、退回待处理、完成并打开同类下一条。
 - `SearchView.vue` 是 Vue 主线搜索工作台，读取 `/search/all` 与 `/search/vector`，支持关键词/语义切换、跨记录/任务/记忆/决策分组展示；记录结果可打开 `ItemDrawer.vue`，任务/记忆/决策结果可打开 `ObjectDrawer.vue`。
 - `TimelineView.vue` 是 Vue 主线时间流，读取 `/timeline`，把记录/任务/记忆/决策的创建与状态变更合成统一活动视图，支持按对象类型筛选；记录事件可打开 `ItemDrawer.vue`，任务/记忆/决策事件可打开 `ObjectDrawer.vue`。

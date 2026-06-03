@@ -662,6 +662,18 @@ def main() -> None:
                         vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="近况").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="处理积压").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="自动化产物").wait_for(timeout=15_000)
+                        daily_artifact_row = vue_page.locator(".artifact-row").filter(has_text="日报").first
+                        daily_artifact_row.wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/artifacts/file/" in response.url and response.status == 200
+                        ):
+                            daily_artifact_row.get_by_role("button", name="预览").click()
+                        vue_page.locator(".recent-artifact-preview").get_by_text("产物预览").wait_for(timeout=15_000)
+                        vue_page.locator(".recent-artifact-preview").get_by_text(
+                            "Summary line for the browser smoke test.",
+                            exact=False,
+                        ).wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="学习白板").wait_for(timeout=15_000)
                         vue_page.get_by_text(vue_board_title, exact=False).wait_for(timeout=15_000)
                         vue_page.get_by_role("button", name="打开白板工作区").wait_for(timeout=15_000)

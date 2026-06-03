@@ -6,7 +6,13 @@
  */
 
 import { computed, onMounted, ref } from 'vue';
-import { getOverview, listLearningBoards, markProcessingPending, markProcessingReady } from '@/api/endpoints';
+import {
+  getArtifactContent,
+  getOverview,
+  listLearningBoards,
+  markProcessingPending,
+  markProcessingReady,
+} from '@/api/endpoints';
 import type {
   ArtifactSummary,
   Item,
@@ -26,6 +32,11 @@ const selectedItemId = ref<number | null>(null);
 const actionBusyId = ref<number | null>(null);
 const boards = ref<LearningBoardSummary[]>([]);
 const boardError = ref<string | null>(null);
+const artifactPreviewKey = ref<string | null>(null);
+const artifactPreviewTitle = ref('');
+const artifactPreviewContent = ref('');
+const artifactPreviewError = ref<string | null>(null);
+const artifactPreviewLoading = ref(false);
 
 const stats = computed(() => overview.value?.stats ?? null);
 const backlog = computed(() => overview.value?.processing_backlog ?? null);
@@ -116,6 +127,26 @@ function processingLabel(item: Item): string {
 function artifactTitle(artifact: ArtifactSummary | null): string {
   if (!artifact) return '';
   return artifact.report_date || artifact.generated_name || artifact.relative_path;
+}
+
+function artifactKey(label: string, artifact: ArtifactSummary | null | undefined): string {
+  return `${label}:${artifact?.relative_path || ''}`;
+}
+
+async function openArtifactPreview(label: string, artifact: ArtifactSummary | null | undefined) {
+  if (!artifact?.file_url || artifactPreviewLoading.value) return;
+  artifactPreviewKey.value = artifactKey(label, artifact);
+  artifactPreviewTitle.value = `${label} · ${artifactTitle(artifact)}`;
+  artifactPreviewContent.value = '';
+  artifactPreviewError.value = null;
+  artifactPreviewLoading.value = true;
+  try {
+    artifactPreviewContent.value = await getArtifactContent(artifact.file_url);
+  } catch (err) {
+    artifactPreviewError.value = err instanceof ApiError ? err.message : '产物读取失败';
+  } finally {
+    artifactPreviewLoading.value = false;
+  }
 }
 
 function boardStatusLabel(status: string): string {
@@ -270,9 +301,28 @@ onMounted(loadOverview);
               <strong>{{ artifactTitle(entry.artifact) }}</strong>
               <p>{{ compactText(entry.artifact?.preview, 96) || '无预览' }}</p>
             </div>
+            <button
+              type="button"
+              :disabled="!entry.artifact?.file_url || artifactPreviewLoading"
+              @click="openArtifactPreview(entry.label, entry.artifact)"
+            >
+              {{ artifactPreviewLoading && artifactPreviewKey === artifactKey(entry.label, entry.artifact) ? '读取中' : '预览' }}
+            </button>
           </article>
         </div>
-        <p v-else class="empty-line">暂无自动化产物</p>
+        <div
+          v-if="artifactPreviewKey && (artifactPreviewLoading || artifactPreviewContent || artifactPreviewError)"
+          class="recent-artifact-preview"
+        >
+          <div>
+            <span>产物预览</span>
+            <strong>{{ artifactPreviewTitle }}</strong>
+          </div>
+          <p v-if="artifactPreviewError" class="artifact-error">{{ artifactPreviewError }}</p>
+          <p v-else-if="artifactPreviewLoading" class="empty-line">读取中…</p>
+          <pre v-else>{{ artifactPreviewContent }}</pre>
+        </div>
+        <p v-if="!artifactCards.length" class="empty-line">暂无自动化产物</p>
       </div>
     </section>
 
@@ -607,14 +657,77 @@ h2 {
 
 .artifact-row {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   gap: var(--s-3);
+  align-items: center;
   padding: var(--s-3);
 }
 
 .artifact-row > span {
   color: var(--text-4);
   font-size: var(--fs-2);
+}
+
+.artifact-row button {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.artifact-row button:hover:not(:disabled) {
+  border-color: var(--line-2);
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
+.artifact-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.recent-artifact-preview {
+  display: grid;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line-1);
+}
+
+.recent-artifact-preview span,
+.artifact-error {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.recent-artifact-preview strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-1);
+  font-size: var(--fs-3);
+  font-weight: 520;
+}
+
+.recent-artifact-preview pre {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-0);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  line-height: var(--lh-base);
+  white-space: pre-wrap;
+  padding: var(--s-3);
+}
+
+.artifact-error {
+  color: var(--error);
 }
 
 .recent-panel {
@@ -804,6 +917,10 @@ h2 {
   }
 
   .recent-row {
+    grid-template-columns: 1fr;
+  }
+
+  .artifact-row {
     grid-template-columns: 1fr;
   }
 
