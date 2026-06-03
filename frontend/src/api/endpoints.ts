@@ -107,10 +107,21 @@ export const runAutomationJob = (job: string, date?: string) =>
   });
 
 export const searchAll = (q: string, limit = 20) =>
-  apiRequest<{ items: Item[]; memories: Memory[]; tasks: Task[]; decisions: Decision[] }>(
-    '/search/all',
-    { query: { q, limit } },
-  );
+  apiRequest<{
+    items?: Item[];
+    memories?: Memory[];
+    tasks?: Task[];
+    decisions?: Decision[];
+    results?: { items?: Item[]; memories?: Memory[]; tasks?: Task[]; decisions?: Decision[] };
+  }>('/search/all', { query: { q, limit } }).then((payload) => {
+    const results = payload.results ?? payload;
+    return {
+      items: results.items ?? [],
+      memories: results.memories ?? [],
+      tasks: results.tasks ?? [],
+      decisions: results.decisions ?? [],
+    };
+  });
 
 export const searchVector = (q: string, limit = 20) =>
   apiRequest<{ items: Array<Item & { relevance: number }> }>('/search/vector', {

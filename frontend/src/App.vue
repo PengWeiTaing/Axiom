@@ -12,6 +12,7 @@ import FloatChat from '@/components/FloatChat.vue';
 const AtlasView = defineAsyncComponent(() => import('@/views/AtlasView.vue'));
 const RecentView = defineAsyncComponent(() => import('@/views/RecentView.vue'));
 const ProcessingView = defineAsyncComponent(() => import('@/views/ProcessingView.vue'));
+const SearchView = defineAsyncComponent(() => import('@/views/SearchView.vue'));
 const TasksView = defineAsyncComponent(() => import('@/views/TasksView.vue'));
 const MemoriesView = defineAsyncComponent(() => import('@/views/MemoriesView.vue'));
 const DecisionsView = defineAsyncComponent(() => import('@/views/DecisionsView.vue'));
@@ -37,6 +38,7 @@ onMounted(async () => {
       <AtlasView v-else-if="mode.mode === 'atlas'" key="atlas" />
       <RecentView v-else-if="mode.mode === 'recent'" key="recent" />
       <ProcessingView v-else-if="mode.mode === 'processing'" key="processing" />
+      <SearchView v-else-if="mode.mode === 'search'" key="search" />
       <TasksView v-else-if="mode.mode === 'tasks'" key="tasks" />
       <MemoriesView v-else-if="mode.mode === 'memories'" key="memories" />
       <DecisionsView v-else-if="mode.mode === 'decisions'" key="decisions" />

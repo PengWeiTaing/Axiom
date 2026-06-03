@@ -669,6 +669,35 @@ def main() -> None:
                             vue_page.locator(".board-row").filter(has_text=vue_board_title).first.click()
                         vue_page.get_by_role("heading", name=vue_board_title).first.wait_for(timeout=15_000)
                         vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
+                        vue_search_text = "Vue smoke search target"
+                        vue_page.evaluate(
+                            """
+                            async (text) => {
+                                const response = await fetch("/add", {
+                                    method: "POST",
+                                    headers: {
+                                        "X-Axiom-Key": "test-key",
+                                        "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ text, source: "vue_search_smoke" }),
+                                });
+                                if (!response.ok) throw new Error(await response.text());
+                            }
+                            """,
+                            vue_search_text,
+                        )
+                        vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="搜索").wait_for(timeout=15_000)
+                        vue_page.get_by_label("搜索查询").fill(vue_search_text)
+                        with vue_page.expect_response(
+                            lambda response: "/search/all" in response.url and response.status == 200
+                        ):
+                            vue_page.locator("main").get_by_role("button", name="搜索").click()
+                        vue_page.locator(".result-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
+                        vue_page.locator(".result-row").filter(has_text=vue_search_text).first.click()
+                        vue_page.locator(".drawer-panel").get_by_text(vue_search_text, exact=False).wait_for(timeout=15_000)
+                        vue_page.get_by_label("关闭").click()
+                        vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-ready" in response.url and response.status == 200
                         ):

@@ -10,6 +10,7 @@ const tabs: { key: AppMode; label: string }[] = [
   { key: 'atlas', label: 'Atlas' },
   { key: 'recent', label: '近况' },
   { key: 'processing', label: '处理' },
+  { key: 'search', label: '搜索' },
   { key: 'tasks', label: '任务' },
   { key: 'memories', label: '记忆' },
   { key: 'decisions', label: '决策' },
