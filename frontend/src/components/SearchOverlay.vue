@@ -13,11 +13,11 @@
 
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { searchAll, searchVector } from '@/api/endpoints';
-import type { Item, Memory, Task, Decision } from '@/api/types';
+import type { Item, Memory, Task, Decision, ObjectTarget } from '@/api/types';
 import { ApiError } from '@/api/client';
 
 const props = defineProps<{ open: boolean }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; openItem: [id: number]; openObject: [target: ObjectTarget] }>();
 
 const query = ref('');
 const mode = ref<'all' | 'vector'>('all');
@@ -116,6 +116,15 @@ function resultSummary(r: Result): string {
 function kindLabel(kind: Result['kind']): string {
   return { item: '记录', task: '任务', memory: '记忆', decision: '决策' }[kind];
 }
+
+function openResult(result: Result) {
+  if (result.kind === 'item') {
+    emit('openItem', result.data.id);
+  } else {
+    emit('openObject', { kind: result.kind, id: result.data.id });
+  }
+  emit('close');
+}
 </script>
 
 <template>
@@ -151,9 +160,11 @@ function kindLabel(kind: Result['kind']): string {
           </div>
           <div v-else-if="!results.length" class="status dim">没有匹配</div>
           <ul v-else class="results">
-            <li v-for="(r, i) in results" :key="i" class="result">
-              <span class="result-kind mono">{{ kindLabel(r.kind) }}</span>
-              <span class="result-text">{{ resultSummary(r) }}</span>
+            <li v-for="(r, i) in results" :key="i">
+              <button class="result" type="button" @click="openResult(r)">
+                <span class="result-kind mono">{{ kindLabel(r.kind) }}</span>
+                <span class="result-text">{{ resultSummary(r) }}</span>
+              </button>
             </li>
           </ul>
         </div>
@@ -267,8 +278,12 @@ function kindLabel(kind: Result['kind']): string {
   display: flex;
   align-items: center;
   gap: var(--s-3);
+  width: 100%;
   padding: var(--s-2) var(--s-4);
+  border: 0;
+  background: transparent;
   cursor: pointer;
+  text-align: left;
   transition: background var(--t-fast) var(--ease);
 }
 

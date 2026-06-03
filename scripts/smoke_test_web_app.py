@@ -686,6 +686,17 @@ def main() -> None:
                             """,
                             vue_search_text,
                         )
+                        vue_page.goto(f"{base_url}/app", wait_until="networkidle")
+                        vue_page.locator(".brand .action-btn").click()
+                        vue_page.locator(".search-overlay").wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/search/all" in response.url and response.status == 200
+                        ):
+                            vue_page.locator(".search-overlay input").fill(vue_search_text)
+                            vue_page.wait_for_timeout(260)
+                        vue_page.locator(".search-overlay .result").filter(has_text=vue_search_text).first.click()
+                        vue_page.locator(".drawer-panel").get_by_text(vue_search_text, exact=False).wait_for(timeout=15_000)
+                        vue_page.get_by_label("关闭").click()
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="搜索").wait_for(timeout=15_000)
                         vue_page.get_by_label("搜索查询").fill(vue_search_text)

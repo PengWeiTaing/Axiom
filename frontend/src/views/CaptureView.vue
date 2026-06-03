@@ -13,15 +13,28 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import SmartInput from '@/components/SmartInput.vue';
 import Timeline from '@/components/Timeline.vue';
 import ItemDrawer from '@/components/ItemDrawer.vue';
+import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { useTimelineStore } from '@/stores/timeline';
+import type { ObjectTarget } from '@/api/types';
 const showSearch = ref(false);
 const timeline = useTimelineStore();
 const selectedId = ref<number | null>(null);
+const selectedObject = ref<ObjectTarget | null>(null);
 
 function onChanged(options?: { nextItemId?: number }) {
   selectedId.value = options?.nextItemId ?? null;
   timeline.reset();
   timeline.loadInitial();
+}
+
+function openSearchItem(id: number) {
+  selectedObject.value = null;
+  selectedId.value = id;
+}
+
+function openSearchObject(target: ObjectTarget) {
+  selectedId.value = null;
+  selectedObject.value = target;
 }
 
 function onKey(e: KeyboardEvent) {
@@ -74,8 +87,18 @@ defineExpose({ openSearch: () => (showSearch.value = true) });
       @close="selectedId = null"
       @changed="onChanged"
     />
+    <ObjectDrawer
+      :target="selectedObject"
+      @close="selectedObject = null"
+      @open-item="openSearchItem"
+    />
 
-    <SearchOverlayLazy :open="showSearch" @close="showSearch = false" />
+    <SearchOverlayLazy
+      :open="showSearch"
+      @close="showSearch = false"
+      @open-item="openSearchItem"
+      @open-object="openSearchObject"
+    />
   </div>
 </template>
 

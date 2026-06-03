@@ -666,3 +666,4 @@
 - Vue 主线新增 `SystemView.vue` 系统治理台：顶部模式增加“系统”，页面读取 `/system`、`/metrics`、`/audit-log` 和 `/admin/logs`，展示健康分、数据表、完整性、最近审计和日志尾部；web smoke 补充 `/app?mode=system` 页面加载验证。
 - Vue 主线新增 `TimelineView.vue` 时间流：顶部模式增加“时间”，页面读取 `/timeline`，统一展示记录/任务/记忆/决策的创建与状态变更，支持按对象类型筛选；web smoke 补充新建记录在 `/app?mode=timeline` 可见的验证。
 - Vue 主线新增 `ObjectDrawer.vue` 轻量对象详情抽屉：搜索与时间流中的任务/记忆/决策不再只能跳转工作台，可在当前上下文侧滑查看详情；同时修正 `getMemory()` 前端类型与 Atlas store 读取后端实际返回结构的偏差。
+- Capture 内 `SearchOverlay.vue` 接回主线详情体验：浮层搜索结果现在可点击，记录打开 `ItemDrawer`，任务/记忆/决策打开 `ObjectDrawer`；web smoke 补充 Capture 搜索浮层打开记录详情验证。
