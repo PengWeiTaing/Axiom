@@ -259,6 +259,75 @@ export interface ArtifactSummary {
   preview?: string;
 }
 
+export interface SystemMigration {
+  version: number;
+  name: string;
+  applied_at: string;
+}
+
+export interface SystemInfoPayload {
+  db_size_bytes: number;
+  db_size_mb: number;
+  inbox_files: number;
+  archive_files: number;
+  fts_index_entries: number;
+  last_backup: string | null;
+  backup_age_hours: number | null;
+  backup_ok: boolean;
+  tables: Record<string, number>;
+  migrations: SystemMigration[];
+  log_size_bytes: number;
+  log_size_mb: number;
+  integrity: {
+    ok: boolean;
+    orphan_memories: number;
+    orphan_tasks: number;
+    empty_content_items: number;
+  };
+  health_score: number;
+  growth: {
+    items_per_day: number;
+    db_mb_per_100_items: number;
+  };
+}
+
+export interface MetricsPayload {
+  uptime: number | string;
+  requests: number;
+  errors: number;
+  error_rate: number;
+  slow_requests: number;
+  rate_limited_ips: number;
+  latency_ms: {
+    p50: number;
+    p95: number;
+    p99: number;
+  };
+  top_endpoints: Array<{ path: string; count: number }>;
+}
+
+export interface AuditLogEntry {
+  id: number;
+  action: string;
+  target_type: string;
+  target_id: number | null;
+  detail: string | null;
+  created_at: string;
+}
+
+export interface AuditLogPayload {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  entries: AuditLogEntry[];
+}
+
+export interface AdminLogsPayload {
+  lines: number;
+  log: string[];
+}
+
 export interface ArtifactLatestPayload {
   review: {
     daily: ArtifactSummary | null;

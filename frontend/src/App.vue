@@ -17,6 +17,7 @@ const TasksView = defineAsyncComponent(() => import('@/views/TasksView.vue'));
 const MemoriesView = defineAsyncComponent(() => import('@/views/MemoriesView.vue'));
 const DecisionsView = defineAsyncComponent(() => import('@/views/DecisionsView.vue'));
 const AutomationView = defineAsyncComponent(() => import('@/views/AutomationView.vue'));
+const SystemView = defineAsyncComponent(() => import('@/views/SystemView.vue'));
 
 const auth = useAuthStore();
 const mode = useModeStore();
@@ -43,6 +44,7 @@ onMounted(async () => {
       <MemoriesView v-else-if="mode.mode === 'memories'" key="memories" />
       <DecisionsView v-else-if="mode.mode === 'decisions'" key="decisions" />
       <AutomationView v-else-if="mode.mode === 'automation'" key="automation" />
+      <SystemView v-else-if="mode.mode === 'system'" key="system" />
       <RecentView v-else key="fallback-recent" />
     </Transition>
     <QuickCapture />

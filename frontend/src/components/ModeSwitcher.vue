@@ -15,6 +15,7 @@ const tabs: { key: AppMode; label: string }[] = [
   { key: 'memories', label: '记忆' },
   { key: 'decisions', label: '决策' },
   { key: 'automation', label: '自动化' },
+  { key: 'system', label: '系统' },
   { key: 'board', label: 'Board' },
 ]
 

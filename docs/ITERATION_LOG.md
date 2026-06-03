@@ -663,3 +663,4 @@
 - Learning Board 独立前端接入构建产物：运行 `frontend/board` build，产物输出到 `core/static/v2/board/`；`/board` shell 改为 `no-store`，web smoke 补充 `/board` 已构建与 Board assets revalidate 检查。
 - Learning Board 与 Vue 构建产物拆分：Board 输出迁到 `core/static/board/`，避免主 Vue 构建清空 `core/static/v2/` 时误删 Board；近况页新增“学习白板”入口面板，读取 `/api/learning/boards` 展示最近白板并跳转 `/board/<id>`；同时补齐 Board 列表鉴权与 smoke 覆盖。
 - Vue 主线新增 `SearchView.vue` 搜索工作台：顶部模式增加“搜索”，页面支持关键词/语义切换、跨记录/任务/记忆/决策分组展示，记录结果可直接打开 `ItemDrawer`；web smoke 补充 `/app?mode=search` 查询和详情打开验证。
+- Vue 主线新增 `SystemView.vue` 系统治理台：顶部模式增加“系统”，页面读取 `/system`、`/metrics`、`/audit-log` 和 `/admin/logs`，展示健康分、数据表、完整性、最近审计和日志尾部；web smoke 补充 `/app?mode=system` 页面加载验证。

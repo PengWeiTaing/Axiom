@@ -1,6 +1,6 @@
 # Axiom 项目主线
 
-更新时间：2026-06-02
+更新时间：2026-06-03
 
 这份文档是当前开发前置事实源。它不替代详细设计文档，只回答一个问题：新功能应该接到哪条主线，哪些东西只是兼容或历史保留。
 
@@ -22,7 +22,7 @@ frontend/src/
 Vue 主应用模式：
 
 ```text
-Capture -> Atlas -> 近况 -> 处理 -> 搜索 -> 任务 -> 记忆 -> 决策 -> 自动化
+Capture -> Atlas -> 近况 -> 处理 -> 搜索 -> 任务 -> 记忆 -> 决策 -> 自动化 -> 系统
 ```
 
 - `CaptureView.vue` 是记录入口。
@@ -34,6 +34,7 @@ Capture -> Atlas -> 近况 -> 处理 -> 搜索 -> 任务 -> 记忆 -> 决策 -> 
 - `MemoriesView.vue` 是 Vue 主线记忆库，读取 `/memories/stats` 和 `/memories`，支持快速新增、分类/状态筛选、确认和归档。
 - `DecisionsView.vue` 是 Vue 主线决策台，读取 `/decisions`，支持快速新增、状态筛选、填写实际结果并标记已回顾。
 - `AutomationView.vue` 是 Vue 主线自动化中心，读取 `/automation/jobs` 和 `/automation/runs`，支持运行日期、手动触发、状态/任务过滤和运行详情。
+- `SystemView.vue` 是 Vue 主线系统治理台，读取 `/system`、`/metrics`、`/audit-log` 和 `/admin/logs`，提供健康分、数据表、完整性、审计和日志尾部的只读诊断视图。
 - `frontend/src/views/_legacy/AtlasView.vue` 不是新 Atlas，不要在新功能中继续扩展它。
 
 ## Learning Board 主线

@@ -697,6 +697,11 @@ def main() -> None:
                         vue_page.locator(".result-row").filter(has_text=vue_search_text).first.click()
                         vue_page.locator(".drawer-panel").get_by_text(vue_search_text, exact=False).wait_for(timeout=15_000)
                         vue_page.get_by_label("关闭").click()
+                        vue_page.goto(f"{base_url}/app?mode=system", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="系统治理").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="运行状态").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="数据表").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="审计日志").wait_for(timeout=15_000)
                         vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-ready" in response.url and response.status == 200

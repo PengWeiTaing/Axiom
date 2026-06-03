@@ -31,6 +31,10 @@ import type {
   ProcessingMarkPayload,
   ProcessingNextPayload,
   LearningBoardListPayload,
+  SystemInfoPayload,
+  MetricsPayload,
+  AuditLogPayload,
+  AdminLogsPayload,
 } from './types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 import type { AtlasGraphPayload } from '@/atlas/types';
@@ -105,6 +109,24 @@ export const runAutomationJob = (job: string, date?: string) =>
     method: 'POST',
     json: { job, date },
   });
+
+export const getSystemInfo = () =>
+  apiRequest<SystemInfoPayload>('/system');
+
+export const getMetrics = () =>
+  apiRequest<MetricsPayload>('/metrics');
+
+export const getAuditLog = (params: {
+  page?: number;
+  page_size?: number;
+  action?: string;
+  target_type?: string;
+} = {}) => apiRequest<AuditLogPayload>('/audit-log', { query: params });
+
+export const getAdminLogs = (params: {
+  lines?: number;
+  level?: string;
+} = {}) => apiRequest<AdminLogsPayload>('/admin/logs', { query: params });
 
 export const searchAll = (q: string, limit = 20) =>
   apiRequest<{
