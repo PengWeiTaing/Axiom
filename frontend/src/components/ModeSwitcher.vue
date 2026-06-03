@@ -8,6 +8,7 @@ const mode = useModeStore()
 const tabs: { key: AppMode; label: string }[] = [
   { key: 'capture', label: 'Capture' },
   { key: 'atlas', label: 'Atlas' },
+  { key: 'cosmos', label: 'Cosmos' },
   { key: 'recent', label: '近况' },
   { key: 'processing', label: '处理' },
   { key: 'search', label: '搜索' },
@@ -45,8 +46,8 @@ const containerOpacity = computed(() => mode.mode === 'atlas' ? 0.65 : 1)
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: var(--s-3);
-  max-width: calc(100vw - var(--s-8));
+  gap: var(--s-2);
+  max-width: min(760px, calc(100vw - 320px));
   font-size: var(--fs-2);
   transition: opacity var(--t-base) var(--ease);
 }
@@ -56,7 +57,7 @@ const containerOpacity = computed(() => mode.mode === 'atlas' ? 0.65 : 1)
 }
 
 .mode-tab {
-  padding: var(--s-2) var(--s-3);
+  padding: 6px var(--s-2);
   background: none;
   border: none;
   color: var(--text-3);
@@ -97,5 +98,27 @@ const containerOpacity = computed(() => mode.mode === 'atlas' ? 0.65 : 1)
   border-radius: 1px;
   opacity: 0;
   transition: opacity var(--t-base) var(--ease);
+}
+
+@media (max-width: 760px) {
+  .mode-switcher {
+    top: auto;
+    right: var(--s-3);
+    bottom: var(--s-3);
+    left: var(--s-3);
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    max-width: none;
+    overflow-x: auto;
+    padding: var(--s-2);
+    background: color-mix(in srgb, var(--bg-1) 88%, transparent);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-2);
+    backdrop-filter: blur(12px);
+  }
+
+  .mode-tab {
+    flex: 0 0 auto;
+  }
 }
 </style>

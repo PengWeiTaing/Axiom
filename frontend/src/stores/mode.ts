@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
-export type AppMode = 'capture' | 'atlas' | 'recent' | 'processing' | 'search' | 'timeline' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
+export type AppMode = 'capture' | 'atlas' | 'cosmos' | 'recent' | 'processing' | 'search' | 'timeline' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
 
-const MODES: AppMode[] = ['capture', 'atlas', 'recent', 'processing', 'search', 'timeline', 'tasks', 'memories', 'decisions', 'automation', 'system', 'board'];
+const MODES: AppMode[] = ['capture', 'atlas', 'cosmos', 'recent', 'processing', 'search', 'timeline', 'tasks', 'memories', 'decisions', 'automation', 'system', 'board'];
 
 function isMode(value: string | null): value is AppMode {
   return Boolean(value && MODES.includes(value as AppMode));
@@ -24,6 +24,7 @@ function urlForMode(mode: AppMode): string {
     const recent = localStorage.getItem('axiom_board_recent');
     return recent ? `/board/${recent}` : '/board';
   }
+  if (mode === 'cosmos') return '/app?mode=cosmos';
   if (mode === 'tasks') return '/app?mode=tasks';
   if (mode === 'memories') return '/app?mode=memories';
   if (mode === 'decisions') return '/app?mode=decisions';

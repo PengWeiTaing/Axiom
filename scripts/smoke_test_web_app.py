@@ -729,6 +729,16 @@ def main() -> None:
                         vue_page.get_by_role("heading", name="运行状态").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="数据表").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="审计日志").wait_for(timeout=15_000)
+                        vue_page.goto(f"{base_url}/app?mode=cosmos", wait_until="networkidle")
+                        vue_page.locator(".cosmos-view").wait_for(timeout=15_000)
+                        vue_page.locator(".mode-tab.active").filter(has_text="Cosmos").wait_for(timeout=15_000)
+                        vue_page.wait_for_function(
+                            """
+                            () => document.querySelector(".cosmos-canvas")
+                              || document.querySelector(".overlay-state .state-text")
+                            """,
+                            timeout=15_000,
+                        )
                         vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-ready" in response.url and response.status == 200

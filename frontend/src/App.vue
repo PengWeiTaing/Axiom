@@ -10,6 +10,7 @@ import FloatChat from '@/components/FloatChat.vue';
 
 // 懒加载，避免拖慢 Capture 启动
 const AtlasView = defineAsyncComponent(() => import('@/views/AtlasView.vue'));
+const CosmosView = defineAsyncComponent(() => import('@/views/CosmosView.vue'));
 const RecentView = defineAsyncComponent(() => import('@/views/RecentView.vue'));
 const ProcessingView = defineAsyncComponent(() => import('@/views/ProcessingView.vue'));
 const SearchView = defineAsyncComponent(() => import('@/views/SearchView.vue'));
@@ -38,6 +39,7 @@ onMounted(async () => {
     <Transition name="mode" mode="out-in">
       <CaptureView v-if="mode.mode === 'capture'" key="capture" />
       <AtlasView v-else-if="mode.mode === 'atlas'" key="atlas" />
+      <CosmosView v-else-if="mode.mode === 'cosmos'" key="cosmos" />
       <RecentView v-else-if="mode.mode === 'recent'" key="recent" />
       <ProcessingView v-else-if="mode.mode === 'processing'" key="processing" />
       <SearchView v-else-if="mode.mode === 'search'" key="search" />

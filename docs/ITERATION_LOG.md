@@ -675,3 +675,4 @@
 - `ObjectDrawer.vue` 增加决策回顾操作：待回顾决策可在详情抽屉内填写实际结果并标记已回顾，通过 `changed` 事件刷新父视图；同时将对象抽屉层级提高到 AI 管家浮动按钮之上，避免底部动作被遮挡。
 - `AutomationView.vue` 增加运行产物预览：运行详情可通过已鉴权 API 读取生成的 Markdown 产物，切换运行记录时自动清理旧预览；web smoke 覆盖“运行 Inbox 报告 -> 查看产物 -> 预览非空”链路。
 - `RecentView.vue` 增加自动化产物正文预览：产物卡可直接读取 Markdown 正文，复用统一的 `getArtifactContent()` 前端 helper；web smoke 覆盖“近况 -> 日报产物 -> 预览正文”链路。
+- `CosmosView.vue` 接回 Vue 主线入口：顶部模式新增 `Cosmos`，`/app?mode=cosmos` 可进入关系图谱编辑与对象挂载层；web smoke 覆盖 Cosmos 入口、激活 tab 和图谱/空状态渲染，明确 Atlas 主视图与 Cosmos 编辑层边界。
