@@ -672,3 +672,4 @@
 - 记忆库来源记录下钻补齐：`MemoriesView.vue` 接入 `ObjectDrawer` 的 `open-item` 事件，记忆详情里的源记录可继续打开 `ItemDrawer`；`addNote()` 归一化 `/add` 的真实返回结构，保留 `id` 兼容快速创建与 Cosmos 写入；web smoke 与 Playwright MCP 覆盖“记忆详情 -> 源记录 -> 记录抽屉”链路。
 - `ObjectDrawer.vue` 增加任务状态操作：任务详情抽屉内可直接完成、恢复、取消，并通过 `changed` 事件刷新 Capture / 搜索 / 时间流 / 任务 / 记忆 / 决策等父视图；web smoke 和 Playwright MCP 覆盖“任务台 -> 详情抽屉 -> 完成 -> 列表同步已完成”链路。
 - `ObjectDrawer.vue` 增加记忆状态操作：候选记忆可在详情抽屉内直接确认，非归档记忆可直接归档，并通过 `changed` 事件刷新父视图；web smoke 和 Playwright MCP 覆盖“记忆库 -> 详情抽屉 -> 确认 -> 列表同步已确认”链路。
+- `ObjectDrawer.vue` 增加决策回顾操作：待回顾决策可在详情抽屉内填写实际结果并标记已回顾，通过 `changed` 事件刷新父视图；同时将对象抽屉层级提高到 AI 管家浮动按钮之上，避免底部动作被遮挡。

@@ -10,6 +10,7 @@ import {
   getTask,
   markTaskDone,
   markTaskTodo,
+  reviewDecision,
 } from '@/api/endpoints';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { useModeStore } from '@/stores/mode';
@@ -31,6 +32,7 @@ const feedback = ref<string | null>(null);
 const task = ref<Task | null>(null);
 const memory = ref<MemoryDetail | null>(null);
 const decision = ref<Decision | null>(null);
+const decisionReviewDraft = ref('');
 
 watch(
   () => props.target,
@@ -38,6 +40,7 @@ watch(
     task.value = null;
     memory.value = null;
     decision.value = null;
+    decisionReviewDraft.value = '';
     error.value = null;
     feedback.value = null;
     if (!target) return;
@@ -50,6 +53,7 @@ watch(
         memory.value = (await getMemory(target.id)).memory;
       } else {
         decision.value = (await getDecision(target.id)).decision;
+        decisionReviewDraft.value = decision.value.actual_outcome || '';
       }
     } catch (err) {
       error.value = err instanceof ApiError ? err.message : '对象加载失败';
@@ -161,6 +165,26 @@ function memoryActionLabel(action: 'confirm' | 'archive'): string {
   return { confirm: '记忆已确认', archive: '记忆已归档' }[action];
 }
 
+async function submitDecisionReview() {
+  if (!decision.value || acting.value) return;
+  const actualOutcome = decisionReviewDraft.value.trim();
+  if (!actualOutcome) return;
+  acting.value = true;
+  error.value = null;
+  feedback.value = null;
+  try {
+    const payload = await reviewDecision(decision.value.id, actualOutcome);
+    decision.value = payload.decision;
+    decisionReviewDraft.value = payload.decision.actual_outcome || actualOutcome;
+    feedback.value = '决策已回顾';
+    emit('changed');
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '决策回顾失败';
+  } finally {
+    acting.value = false;
+  }
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.target) {
     e.preventDefault();
@@ -251,6 +275,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
               <p v-if="decision.expected_outcome">预期：{{ decision.expected_outcome }}</p>
               <p v-if="decision.actual_outcome">实际：{{ decision.actual_outcome }}</p>
             </article>
+            <article v-if="decision.status === 'pending'" class="detail-block review-block">
+              <span>回顾</span>
+              <textarea
+                v-model="decisionReviewDraft"
+                aria-label="实际结果"
+                rows="4"
+                placeholder="实际发生了什么，是否符合预期"
+              />
+            </article>
           </template>
         </section>
 
@@ -289,6 +322,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
               @click="updateMemory('archive')"
             >归档</button>
           </template>
+          <template v-if="decision?.status === 'pending'">
+            <button
+              type="button"
+              :disabled="acting || !decisionReviewDraft.trim()"
+              @click="submitDecisionReview"
+            >标记已回顾</button>
+          </template>
           <button type="button" @click="openWorkspace">打开工作台</button>
         </footer>
       </div>
@@ -300,7 +340,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 .object-drawer {
   position: fixed;
   inset: 0;
-  z-index: 52;
+  z-index: 76;
   background: rgba(7, 9, 13, 0.35);
   backdrop-filter: blur(4px);
 }
@@ -420,6 +460,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   line-height: var(--lh-base);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.review-block textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: rgba(7, 10, 15, 0.52);
+  color: var(--text-1);
+  font: inherit;
+  line-height: var(--lh-base);
+  padding: var(--s-3);
+}
+
+.review-block textarea:focus {
+  border-color: rgba(110, 231, 208, 0.28);
+  outline: none;
 }
 
 .meta-grid {

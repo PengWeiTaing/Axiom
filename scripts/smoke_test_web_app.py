@@ -988,14 +988,17 @@ def main() -> None:
                         vue_page.locator(".object-panel").get_by_text("choose the smoke path", exact=False).wait_for(
                             timeout=15_000
                         )
-                        vue_page.get_by_label("关闭").click()
-                        vue_decision_row.get_by_label("实际结果").fill("reviewed by smoke test")
+                        vue_page.locator(".object-panel").get_by_label("实际结果").fill("reviewed by smoke test")
                         with vue_page.expect_response(
                             lambda response: "/decisions/" in response.url
                             and response.url.endswith("/review")
                             and response.status == 200
                         ):
-                            vue_decision_row.get_by_role("button", name="标记已回顾").click()
+                            vue_page.locator(".object-panel").get_by_role("button", name="标记已回顾").click()
+                        vue_page.locator(".object-panel .feedback-line").filter(
+                            has_text="决策已回顾"
+                        ).first.wait_for(timeout=15_000)
+                        vue_page.locator(".object-panel").get_by_label("关闭").click()
                         vue_page.locator(".list-panel .decision-row").filter(has_text=vue_decision_title).filter(
                             has_text="已回顾"
                         ).first.wait_for(timeout=15_000)
