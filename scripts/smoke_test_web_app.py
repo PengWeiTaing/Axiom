@@ -769,7 +769,17 @@ def main() -> None:
                         vue_page.goto(f"{base_url}/app?mode=timeline", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="时间流").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="活动").wait_for(timeout=15_000)
-                        vue_page.locator(".entry-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
+                        timeline_item_row = vue_page.locator(".entry-row").filter(has_text=vue_search_text).first
+                        timeline_item_row.wait_for(timeout=15_000)
+                        timeline_item_row.click()
+                        vue_page.locator(".event-panel").get_by_text(vue_search_text, exact=False).first.wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.locator(".event-panel").get_by_role("button", name="打开详情").click()
+                        vue_page.locator(".drawer-panel").get_by_text(vue_search_text, exact=False).wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_label("关闭").click()
                         with vue_page.expect_response(
                             lambda response: "/timeline" in response.url
                             and "date_from=" in response.url
@@ -946,6 +956,10 @@ def main() -> None:
                         vue_page.goto(f"{base_url}/app?mode=timeline", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="时间流").wait_for(timeout=15_000)
                         vue_page.locator(".entry-row").filter(has_text=vue_task_title).first.click()
+                        vue_page.locator(".event-panel").get_by_text(vue_task_title, exact=False).first.wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.locator(".event-panel").get_by_role("button", name="打开详情").click()
                         vue_page.locator(".object-panel").get_by_text("已完成", exact=False).wait_for(timeout=15_000)
                         vue_page.get_by_label("关闭").click()
 

@@ -17,6 +17,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedItemId = ref<number | null>(null);
 const selectedObject = ref<ObjectTarget | null>(null);
+const selectedEntry = ref<TimelineEntry | null>(null);
 const dateFrom = ref('');
 const dateTo = ref('');
 const selectedKinds = ref<Record<TimelineKind, boolean>>({
@@ -34,6 +35,7 @@ const enabledKinds = computed(() =>
 
 const canLoadMore = computed(() => page.value < totalPages.value);
 const dateFilterActive = computed(() => Boolean(dateFrom.value || dateTo.value));
+const activeEntry = computed(() => selectedEntry.value || entries.value[0] || null);
 
 const counts = computed(() => {
   const next: Record<TimelineKind, number> = { item: 0, task: 0, memory: 0, decision: 0 };
@@ -57,9 +59,17 @@ async function loadTimeline(reset = true) {
     totalPages.value = payload.total_pages || 1;
     total.value = payload.total || 0;
     entries.value = reset ? payload.entries : [...entries.value, ...payload.entries];
+    if (reset || !selectedEntry.value) {
+      selectedEntry.value = entries.value[0] || null;
+    } else if (!entries.value.some((entry) => entryKey(entry) === entryKey(selectedEntry.value as TimelineEntry))) {
+      selectedEntry.value = entries.value[0] || null;
+    }
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '时间流加载失败';
-    if (reset) entries.value = [];
+    if (reset) {
+      entries.value = [];
+      selectedEntry.value = null;
+    }
   } finally {
     loading.value = false;
   }
@@ -88,11 +98,21 @@ function clearDateWindow() {
 
 function openEntry(entry: TimelineEntry) {
   if (!entry.id) return;
+  selectedEntry.value = entry;
   if (entry.kind === 'item') {
     selectedItemId.value = entry.id;
     return;
   }
   selectedObject.value = { kind: entry.kind, id: entry.id };
+}
+
+function selectEntry(entry: TimelineEntry) {
+  selectedEntry.value = entry;
+}
+
+function openSelectedEntry() {
+  if (!activeEntry.value) return;
+  openEntry(activeEntry.value);
 }
 
 function openSourceItem(id: number) {
@@ -127,6 +147,10 @@ function entrySummary(entry: TimelineEntry): string {
   return text || '没有可读摘要';
 }
 
+function entryKey(entry: TimelineEntry): string {
+  return `${entry.kind}-${entry.id}-${entry.event}-${entry.occurred_at}`;
+}
+
 function metaText(entry: TimelineEntry): string {
   const pairs = Object.entries(entry.meta || {})
     .filter(([, value]) => value !== '' && value !== null && value !== undefined)
@@ -155,6 +179,13 @@ function kindAccent(kind: TimelineKind): string {
     memory: 'var(--accent)',
     decision: 'var(--warm)',
   }[kind];
+}
+
+function fullTime(value: string): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
 }
 
 function toDateInputValue(value: Date): string {
@@ -233,6 +264,36 @@ onMounted(() => loadTimeline(true));
             <button type="button" :disabled="!dateFilterActive" @click="clearDateWindow">全部时间</button>
           </div>
         </div>
+
+        <div class="event-panel" aria-label="时间事件详情">
+          <template v-if="activeEntry">
+            <p class="eyebrow">Selected</p>
+            <h3>{{ entryTitle(activeEntry) }}</h3>
+            <dl>
+              <div>
+                <dt>类型</dt>
+                <dd>{{ kindLabel(activeEntry.kind) }}</dd>
+              </div>
+              <div>
+                <dt>事件</dt>
+                <dd>{{ eventLabel(activeEntry.event) }}</dd>
+              </div>
+              <div>
+                <dt>时间</dt>
+                <dd>{{ fullTime(activeEntry.occurred_at) }}</dd>
+              </div>
+              <div v-if="metaText(activeEntry)">
+                <dt>属性</dt>
+                <dd>{{ metaText(activeEntry) }}</dd>
+              </div>
+            </dl>
+            <p>{{ entrySummary(activeEntry) }}</p>
+            <button class="primary-action" type="button" :disabled="!activeEntry.id" @click="openSelectedEntry">
+              打开详情
+            </button>
+          </template>
+          <p v-else class="empty-line compact">选择一条事件查看详情</p>
+        </div>
       </aside>
 
       <section class="panel activity-panel">
@@ -254,11 +315,13 @@ onMounted(() => loadTimeline(true));
         <div v-else class="entry-list">
           <button
             v-for="entry in entries"
-            :key="`${entry.kind}-${entry.id}-${entry.event}-${entry.occurred_at}`"
+            :key="entryKey(entry)"
             class="entry-row"
             type="button"
+            :class="{ active: activeEntry ? entryKey(entry) === entryKey(activeEntry) : false }"
             :style="{ '--kind-accent': kindAccent(entry.kind) }"
-            @click="openEntry(entry)"
+            :aria-pressed="activeEntry ? entryKey(entry) === entryKey(activeEntry) : false"
+            @click="selectEntry(entry)"
           >
             <span class="entry-dot" />
             <span class="entry-copy">
@@ -326,7 +389,8 @@ h2 {
 .kind-list button,
 .date-actions button,
 .entry-row,
-.load-more {
+.load-more,
+.primary-action {
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 
@@ -487,6 +551,75 @@ h2 {
   opacity: 0.55;
 }
 
+.event-panel {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line-1);
+}
+
+.event-panel h3 {
+  color: var(--text-1);
+  font-size: var(--fs-4);
+  font-weight: 560;
+  line-height: var(--lh-snug);
+  overflow-wrap: anywhere;
+}
+
+.event-panel dl {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+}
+
+.event-panel dl div {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: var(--s-2);
+  align-items: start;
+}
+
+.event-panel dt {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.event-panel dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-2);
+  overflow-wrap: anywhere;
+}
+
+.event-panel p:not(.eyebrow) {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-3);
+  line-height: var(--lh-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.primary-action {
+  min-height: 36px;
+  border: 1px solid rgba(110, 231, 208, 0.24);
+  border-radius: var(--r-2);
+  background: rgba(110, 231, 208, 0.08);
+  color: var(--accent-bright);
+}
+
+.primary-action:hover:not(:disabled) {
+  border-color: rgba(110, 231, 208, 0.38);
+  background: rgba(110, 231, 208, 0.12);
+  color: var(--text-1);
+}
+
+.primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .notice,
 .empty-line {
   margin-top: var(--s-4);
@@ -507,6 +640,11 @@ h2 {
 .error-row {
   border-color: rgba(232, 120, 120, 0.22);
   color: var(--error);
+}
+
+.compact {
+  margin-top: 0;
+  padding: var(--s-3);
 }
 
 .entry-list {
@@ -531,6 +669,13 @@ h2 {
 .entry-row:hover {
   border-color: color-mix(in srgb, var(--kind-accent) 28%, transparent);
   background: var(--surface-2);
+}
+
+.entry-row.active {
+  border-color: color-mix(in srgb, var(--kind-accent) 42%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--kind-accent) 10%, transparent), transparent 54%),
+    var(--surface-2);
 }
 
 .entry-dot {
