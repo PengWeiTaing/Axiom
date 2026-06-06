@@ -17,6 +17,8 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedItemId = ref<number | null>(null);
 const selectedObject = ref<ObjectTarget | null>(null);
+const dateFrom = ref('');
+const dateTo = ref('');
 const selectedKinds = ref<Record<TimelineKind, boolean>>({
   item: true,
   task: true,
@@ -31,6 +33,7 @@ const enabledKinds = computed(() =>
 );
 
 const canLoadMore = computed(() => page.value < totalPages.value);
+const dateFilterActive = computed(() => Boolean(dateFrom.value || dateTo.value));
 
 const counts = computed(() => {
   const next: Record<TimelineKind, number> = { item: 0, task: 0, memory: 0, decision: 0 };
@@ -45,6 +48,8 @@ async function loadTimeline(reset = true) {
     const nextPage = reset ? 1 : page.value + 1;
     const payload: TimelinePayload = await getTimeline({
       kinds: enabledKinds.value,
+      date_from: dateFrom.value,
+      date_to: dateTo.value,
       page: nextPage,
       page_size: PAGE_SIZE,
     });
@@ -63,6 +68,21 @@ async function loadTimeline(reset = true) {
 function toggleKind(kind: TimelineKind) {
   selectedKinds.value[kind] = !selectedKinds.value[kind];
   if (!enabledKinds.value.length) selectedKinds.value[kind] = true;
+  loadTimeline(true);
+}
+
+function setDateWindow(days: number) {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - days + 1);
+  dateFrom.value = toDateInputValue(start);
+  dateTo.value = toDateInputValue(end);
+  loadTimeline(true);
+}
+
+function clearDateWindow() {
+  dateFrom.value = '';
+  dateTo.value = '';
   loadTimeline(true);
 }
 
@@ -137,6 +157,10 @@ function kindAccent(kind: TimelineKind): string {
   }[kind];
 }
 
+function toDateInputValue(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
 onMounted(() => loadTimeline(true));
 </script>
 
@@ -191,6 +215,23 @@ onMounted(() => loadTimeline(true));
             <span />
             {{ kindLabel(kind) }}
           </button>
+        </div>
+        <div class="date-panel">
+          <div>
+            <label>
+              <span>起始日期</span>
+              <input v-model="dateFrom" aria-label="起始日期" type="date" @change="loadTimeline(true)" />
+            </label>
+            <label>
+              <span>结束日期</span>
+              <input v-model="dateTo" aria-label="结束日期" type="date" @change="loadTimeline(true)" />
+            </label>
+          </div>
+          <div class="date-actions">
+            <button type="button" @click="setDateWindow(7)">近 7 天</button>
+            <button type="button" @click="setDateWindow(30)">近 30 天</button>
+            <button type="button" :disabled="!dateFilterActive" @click="clearDateWindow">全部时间</button>
+          </div>
         </div>
       </aside>
 
@@ -283,6 +324,7 @@ h2 {
 
 .refresh-btn,
 .kind-list button,
+.date-actions button,
 .entry-row,
 .load-more {
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
@@ -386,6 +428,63 @@ h2 {
   border-radius: 50%;
   background: var(--kind-accent);
   box-shadow: 0 0 12px color-mix(in srgb, var(--kind-accent) 45%, transparent);
+}
+
+.date-panel {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line-1);
+}
+
+.date-panel > div:first-child {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.date-panel label {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.date-panel label span {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.date-panel input {
+  width: 100%;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--text-1);
+  padding: var(--s-3);
+}
+
+.date-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s-2);
+}
+
+.date-actions button {
+  min-height: 34px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--text-3);
+}
+
+.date-actions button:hover:not(:disabled) {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.date-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .notice,

@@ -683,3 +683,5 @@
 - `SearchView.vue` 补齐记录处理工作流：关键词搜索支持记录类型、来源、处理状态、处理覆盖筛选，并可对当前记录结果批量标记就绪或退回待处理。
 - `/search/all` 的记录结果改为复用标准 item payload，支持记录筛选参数并返回处理状态/覆盖状态，方便 Vue 搜索页承接旧前端处理流。
 - `scripts/smoke_test_web_app.py` 补充 Vue 搜索页“图片待处理 -> 批量标记就绪 -> 手动完成筛选 -> 批量退回待处理”的浏览器链路。
+- `TimelineView.vue` 增加日期窗口筛选：支持起始/结束日期、近 7 天和近 30 天快捷范围；`/timeline` 后端同步支持 `date_from/date_to`，同时过滤创建事件和状态变更事件。
+- `scripts/smoke_test_web_app.py` 补充 Vue 时间流“近 7 天”筛选的浏览器链路，确认新建记录仍在窗口内可见。

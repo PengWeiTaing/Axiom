@@ -154,6 +154,8 @@ export const exportData = async () => {
 
 export const getTimeline = (params: {
   kinds?: TimelineKind[] | string;
+  date_from?: string;
+  date_to?: string;
   page?: number;
   page_size?: number;
 } = {}) => {

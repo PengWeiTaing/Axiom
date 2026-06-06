@@ -770,6 +770,14 @@ def main() -> None:
                         vue_page.get_by_role("heading", name="时间流").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="活动").wait_for(timeout=15_000)
                         vue_page.locator(".entry-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/timeline" in response.url
+                            and "date_from=" in response.url
+                            and "date_to=" in response.url
+                            and response.status == 200
+                        ):
+                            vue_page.get_by_role("button", name="近 7 天").click()
+                        vue_page.locator(".entry-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
                         vue_page.goto(f"{base_url}/app?mode=system", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="系统治理").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="运行状态").wait_for(timeout=15_000)

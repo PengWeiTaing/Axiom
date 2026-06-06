@@ -1,6 +1,7 @@
 """Browse routes: recent, search, stats, overview."""
 import json
 import sqlite3
+from datetime import date
 
 from flask import request
 
@@ -370,6 +371,14 @@ def register_routes(app):
                 if k not in allowed:
                     return error_response(400, "invalid_kinds", f"kinds 含非法值: {k}")
 
+            date_from = request.args.get("date_from", "").strip()
+            date_to = request.args.get("date_to", "").strip()
+            try:
+                date_from_bound = parse_timeline_date_bound(date_from, "date_from", end=False)
+                date_to_bound = parse_timeline_date_bound(date_to, "date_to", end=True)
+            except ValueError as exc:
+                return error_response(400, "invalid_date_filter", str(exc))
+
             conn = get_db_connection()
             try:
                 unions = []
@@ -459,18 +468,25 @@ def register_routes(app):
                     return ok_response({"page": page, "page_size": page_size,
                                         "total": 0, "total_pages": 0, "entries": []})
 
-                # Total count (each subquery returns COUNT(*), sum them)
-                count_sql = "SELECT SUM(cnt) FROM (" + " UNION ALL ".join(
-                    q.replace("SELECT COUNT(*)", "SELECT COUNT(*) AS cnt") for q in count_unions
-                ) + ")"
-                total = conn.execute(count_sql, count_params).fetchone()[0] or 0
-
-                # Data query
                 union_sql = " UNION ALL ".join(unions)
+                timeline_conditions = []
+                timeline_params = []
+                if date_from_bound:
+                    timeline_conditions.append("occurred_at >= ?")
+                    timeline_params.append(date_from_bound)
+                if date_to_bound:
+                    timeline_conditions.append("occurred_at <= ?")
+                    timeline_params.append(date_to_bound)
+                timeline_filter_sql = join_conditions(timeline_conditions, "WHERE")
+
+                count_sql = f"SELECT COUNT(*) FROM ({union_sql}) AS timeline_union {timeline_filter_sql}"
+                total = conn.execute(count_sql, params + timeline_params).fetchone()[0] or 0
+
                 offset = (page - 1) * page_size
                 sql = (f"SELECT * FROM ({union_sql}) AS timeline_union "
+                       f"{timeline_filter_sql} "
                        f"ORDER BY occurred_at DESC LIMIT ? OFFSET ?")
-                rows = conn.execute(sql, params + [page_size, offset]).fetchall()
+                rows = conn.execute(sql, params + timeline_params + [page_size, offset]).fetchall()
             except sqlite3.Error:
                 logger.exception("timeline query failed")
                 return error_response(500, "database_read_failed", "数据库查询失败")
@@ -496,6 +512,18 @@ def register_routes(app):
 
             return ok_response({
                 "page": page, "page_size": page_size,
+                "date_from": date_from or None,
+                "date_to": date_to or None,
                 "total": total, "total_pages": total_pages, "entries": entries,
             })
+
+
+def parse_timeline_date_bound(value: str, field_name: str, *, end: bool) -> str | None:
+    if not value:
+        return None
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} 必须是 YYYY-MM-DD") from exc
+    return f"{parsed.isoformat()}T{'23:59:59' if end else '00:00:00'}"
     

@@ -371,6 +371,8 @@ export interface TimelineEntry {
 export interface TimelinePayload {
   page: number;
   page_size: number;
+  date_from?: string | null;
+  date_to?: string | null;
   total: number;
   total_pages: number;
   entries: TimelineEntry[];
