@@ -208,3 +208,4 @@ desktop/src-tauri/gen/
 | DB-005 | 2026-06-03 | 第二十六阶段：`SystemView.vue` 接入治理数据导出；系统治理页可直接调用 `/export` 下载 zip，导出后刷新审计日志，减少旧前端治理操作依赖 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` 通过 |
 | DB-005 | 2026-06-03 | 第二十七阶段：`SmartInput.vue` 增强 Vue 采集入口；单一捕获框新增可见附件选择按钮，保留拖拽/粘贴附件，并将 `/upload` 返回归一化为顶层 `id` | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` 通过 |
 | DB-005 | 2026-06-06 | 第二十八阶段：`ItemDrawer.vue` 文件预览改为鉴权 blob 加载；图片/音频/PDF 使用 object URL 预览，文件记录详情新增下载动作，减少旧前端 viewer 依赖 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` 通过 |
+| DB-005 | 2026-06-06 | 第二十九阶段：`ItemDrawer.vue` 增加轻量编辑模式；记录详情可直接编辑来源、正文/说明/抽取正文/转写文本，并支持保存后打开同类下一条待处理，继续减少旧前端编辑器依赖 | `npm run type-check`、`npm run build`、`python -m compileall -q core scripts`、`python scripts/smoke_test_web_app.py` 通过 |

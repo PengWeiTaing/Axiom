@@ -10,6 +10,7 @@ import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import {
   getItem,
   getItemFile,
+  updateItem,
   archiveItem,
   restoreItem,
   deleteItem,
@@ -36,6 +37,10 @@ const error = ref<string | null>(null)
 const fileError = ref<string | null>(null)
 const detail = ref<ItemDetail | null>(null)
 const fileObjectUrl = ref<string | null>(null)
+const editing = ref(false)
+const editSource = ref('')
+const editBody = ref('')
+const editFeedback = ref<string | null>(null)
 
 // 删除二次确认
 const deleteConfirm = ref(false)
@@ -45,13 +50,18 @@ watch(() => props.itemId, async (id) => {
   if (id === null) {
     detail.value = null
     error.value = null
+    editing.value = false
+    editFeedback.value = null
     return
   }
   loading.value = true
   error.value = null
+  editing.value = false
+  editFeedback.value = null
   try {
     const data = await getItem(id)
     detail.value = data.item
+    resetEditForm(data.item)
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '加载失败'
   } finally {
@@ -73,6 +83,16 @@ const typeLabel = computed(() => {
   return map[detail.value?.type ?? ''] ?? 'ITEM'
 })
 
+const editBodyLabel = computed(() => {
+  const map: Record<string, string> = {
+    text: '正文',
+    image: '说明',
+    document: '抽取正文',
+    audio: '转写文本',
+  }
+  return map[detail.value?.type ?? ''] ?? '内容'
+})
+
 function hasBody(): boolean {
   if (!detail.value) return false
   const t = detail.value.type
@@ -89,6 +109,121 @@ function releaseFileObjectUrl() {
   if (!fileObjectUrl.value) return
   URL.revokeObjectURL(fileObjectUrl.value)
   fileObjectUrl.value = null
+}
+
+function getEditableBody(item: ItemDetail): string {
+  if (item.type === 'document') return item.derived_text ?? item.derived_text_preview ?? ''
+  if (item.type === 'audio') return item.transcript_text ?? ''
+  return item.content ?? ''
+}
+
+function resetEditForm(item: ItemDetail) {
+  editSource.value = item.source ?? ''
+  editBody.value = getEditableBody(item)
+}
+
+function startEdit() {
+  if (!detail.value) return
+  resetEditForm(detail.value)
+  editFeedback.value = null
+  editing.value = true
+}
+
+function cancelEdit() {
+  if (detail.value) resetEditForm(detail.value)
+  editFeedback.value = null
+  editing.value = false
+}
+
+function buildEditPayload(item: ItemDetail) {
+  const payload: {
+    content?: string
+    source?: string
+    derived_text?: string
+    transcript_text?: string
+  } = {}
+  if (editSource.value.trim() !== item.source) {
+    payload.source = editSource.value.trim()
+  }
+
+  const nextBody = editBody.value
+  if (item.type === 'document') {
+    if (nextBody !== (item.derived_text ?? item.derived_text_preview ?? '')) {
+      payload.derived_text = nextBody
+    }
+  } else if (item.type === 'audio') {
+    if (nextBody !== (item.transcript_text ?? '')) {
+      payload.transcript_text = nextBody
+    }
+  } else if (nextBody !== (item.content ?? '')) {
+    payload.content = nextBody
+  }
+  return payload
+}
+
+async function doSaveEdit(openNext = false) {
+  if (!detail.value) return
+  const current = detail.value
+  const payload = buildEditPayload(current)
+  if (!Object.keys(payload).length) {
+    editFeedback.value = '没有检测到变化'
+    if (openNext) {
+      acting.value = true
+      error.value = null
+      try {
+        const next = await getProcessingNext({ type: current.type, exclude_id: current.id })
+        if (next.item) {
+          const nextData = await getItem(next.item.id)
+          detail.value = nextData.item
+          resetEditForm(nextData.item)
+          editing.value = true
+          emit('changed', { nextItemId: nextData.item.id })
+          editFeedback.value = '没有检测到变化，已打开同类下一条'
+        } else {
+          editFeedback.value = '没有检测到变化，同类待处理已清空'
+        }
+      } catch (err) {
+        error.value = err instanceof ApiError ? err.message : '打开下一条失败'
+      } finally {
+        acting.value = false
+      }
+    } else {
+      editing.value = false
+    }
+    return
+  }
+
+  acting.value = true
+  error.value = null
+  editFeedback.value = null
+  try {
+    await updateItem(current.id, payload)
+    const data = await getItem(current.id)
+    detail.value = data.item
+    resetEditForm(data.item)
+    editing.value = false
+    emit('changed')
+
+    if (openNext) {
+      const next = await getProcessingNext({ type: current.type, exclude_id: current.id })
+      if (next.item) {
+        const nextData = await getItem(next.item.id)
+        detail.value = nextData.item
+        resetEditForm(nextData.item)
+        editing.value = true
+        emit('changed', { nextItemId: nextData.item.id })
+        editFeedback.value = '已保存，并打开同类下一条'
+      } else {
+        editFeedback.value = '已保存，同类待处理已清空'
+      }
+    } else {
+      editFeedback.value = '已保存'
+    }
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '保存失败'
+  } finally {
+    acting.value = false
+  }
 }
 
 watch(() => detail.value?.file_url ?? null, async (fileUrl) => {
@@ -140,6 +275,7 @@ async function doMarkReady() {
     await markProcessingReady([detail.value.id])
     const data = await getItem(detail.value.id)
     detail.value = data.item
+    resetEditForm(data.item)
     emit('changed')
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '标记就绪失败'
@@ -156,6 +292,7 @@ async function doMarkPending() {
     await markProcessingPending([detail.value.id])
     const data = await getItem(detail.value.id)
     detail.value = data.item
+    resetEditForm(data.item)
     emit('changed')
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '退回待处理失败'
@@ -175,6 +312,7 @@ async function doReadyAndNext() {
     if (next.item) {
       const data = await getItem(next.item.id)
       detail.value = data.item
+      resetEditForm(data.item)
       emit('changed', { nextItemId: data.item.id })
     } else {
       detail.value = null
@@ -282,59 +420,80 @@ onBeforeUnmount(() => {
 
           <!-- 内容 -->
           <template v-else-if="detail">
-            <!-- text -->
-            <template v-if="detail.type === 'text'">
-              <p class="content-text">{{ detail.content }}</p>
-            </template>
-
-            <!-- image -->
-            <template v-else-if="detail.type === 'image'">
-              <img
-                v-if="fileObjectUrl"
-                :src="fileObjectUrl"
-                :alt="detail.original_name ?? ''"
-                class="preview-img"
-              />
-              <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
-              <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
-              <p v-if="detail.content" class="content-text">{{ detail.content }}</p>
-            </template>
-
-            <!-- document -->
-            <template v-else-if="detail.type === 'document'">
-              <p v-if="detail.content" class="content-text">{{ detail.content }}</p>
-              <iframe
-                v-if="canPreviewPdf"
-                :src="fileObjectUrl ?? undefined"
-                :title="detail.original_name || `document-${detail.id}`"
-                class="file-frame"
-              />
-              <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
-              <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
-              <template v-if="detail.derived_text || detail.derived_text_preview">
-                <p class="content-text">{{ detail.derived_text || detail.derived_text_preview }}</p>
-              </template>
-              <p v-if="!detail.content && !detail.derived_text && !detail.derived_text_preview" class="no-body">
-                {{ detail.original_name || '无可读正文' }}
+            <form v-if="editing" class="edit-form" @submit.prevent="doSaveEdit(false)">
+              <label class="edit-field">
+                <span>来源</span>
+                <input v-model="editSource" :disabled="acting" aria-label="记录来源" />
+              </label>
+              <label class="edit-field">
+                <span>{{ editBodyLabel }}</span>
+                <textarea
+                  v-model="editBody"
+                  :disabled="acting"
+                  :aria-label="editBodyLabel"
+                  rows="12"
+                />
+              </label>
+              <p class="edit-hint">
+                文本记录保存正文；图片保存说明；文档保存抽取正文；音频保存转写文本。
               </p>
-            </template>
+            </form>
 
-            <!-- audio -->
-            <template v-else-if="detail.type === 'audio'">
-              <audio
-                v-if="fileObjectUrl"
-                :src="fileObjectUrl"
-                controls
-                preload="none"
-                class="audio-player"
-              />
-              <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
-              <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
-              <p v-if="detail.transcript_text" class="content-text">{{ detail.transcript_text }}</p>
-            </template>
+            <template v-else>
+              <!-- text -->
+              <template v-if="detail.type === 'text'">
+                <p class="content-text">{{ detail.content }}</p>
+              </template>
 
-            <!-- 无内容兜底 -->
-            <p v-if="!hasBody()" class="no-body">无可读内容</p>
+              <!-- image -->
+              <template v-else-if="detail.type === 'image'">
+                <img
+                  v-if="fileObjectUrl"
+                  :src="fileObjectUrl"
+                  :alt="detail.original_name ?? ''"
+                  class="preview-img"
+                />
+                <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
+                <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
+                <p v-if="detail.content" class="content-text">{{ detail.content }}</p>
+              </template>
+
+              <!-- document -->
+              <template v-else-if="detail.type === 'document'">
+                <p v-if="detail.content" class="content-text">{{ detail.content }}</p>
+                <iframe
+                  v-if="canPreviewPdf"
+                  :src="fileObjectUrl ?? undefined"
+                  :title="detail.original_name || `document-${detail.id}`"
+                  class="file-frame"
+                />
+                <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
+                <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
+                <template v-if="detail.derived_text || detail.derived_text_preview">
+                  <p class="content-text">{{ detail.derived_text || detail.derived_text_preview }}</p>
+                </template>
+                <p v-if="!detail.content && !detail.derived_text && !detail.derived_text_preview" class="no-body">
+                  {{ detail.original_name || '无可读正文' }}
+                </p>
+              </template>
+
+              <!-- audio -->
+              <template v-else-if="detail.type === 'audio'">
+                <audio
+                  v-if="fileObjectUrl"
+                  :src="fileObjectUrl"
+                  controls
+                  preload="none"
+                  class="audio-player"
+                />
+                <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
+                <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
+                <p v-if="detail.transcript_text" class="content-text">{{ detail.transcript_text }}</p>
+              </template>
+
+              <!-- 无内容兜底 -->
+              <p v-if="!hasBody()" class="no-body">无可读内容</p>
+            </template>
           </template>
         </div>
 
@@ -361,11 +520,48 @@ onBeforeUnmount(() => {
 
         <!-- Error -->
         <p v-if="error" class="drawer-error">{{ error }}</p>
+        <p v-if="editFeedback" class="drawer-feedback">{{ editFeedback }}</p>
 
         <!-- Actions -->
         <div v-if="detail" class="drawer-actions">
+          <template v-if="editing">
+            <button
+              class="action-btn primary-btn"
+              type="button"
+              :disabled="acting"
+              @click="doSaveEdit(false)"
+            >
+              保存
+            </button>
+            <button
+              v-if="isPending"
+              class="action-btn archive-btn"
+              type="button"
+              :disabled="acting"
+              @click="doSaveEdit(true)"
+            >
+              保存并打开同类下一条
+            </button>
+            <button
+              class="action-btn archive-btn"
+              type="button"
+              :disabled="acting"
+              @click="cancelEdit"
+            >
+              取消
+            </button>
+          </template>
           <button
-            v-if="isPending"
+            v-else
+            class="action-btn archive-btn"
+            type="button"
+            :disabled="acting"
+            @click="startEdit"
+          >
+            编辑
+          </button>
+          <button
+            v-if="!editing && isPending"
             class="action-btn primary-btn"
             type="button"
             :disabled="acting"
@@ -374,7 +570,7 @@ onBeforeUnmount(() => {
             完成并打开同类下一条
           </button>
           <button
-            v-if="isPending"
+            v-if="!editing && isPending"
             class="action-btn archive-btn"
             type="button"
             :disabled="acting"
@@ -383,7 +579,7 @@ onBeforeUnmount(() => {
             标记就绪
           </button>
           <button
-            v-if="isOverridden"
+            v-if="!editing && isOverridden"
             class="action-btn archive-btn"
             type="button"
             :disabled="acting"
@@ -392,7 +588,7 @@ onBeforeUnmount(() => {
             退回待处理
           </button>
           <button
-            v-if="detail.file_url"
+            v-if="!editing && detail.file_url"
             class="action-btn archive-btn"
             type="button"
             :disabled="acting || fileLoading"
@@ -401,6 +597,7 @@ onBeforeUnmount(() => {
             下载文件
           </button>
           <button
+            v-if="!editing"
             class="action-btn archive-btn"
             type="button"
             :disabled="acting"
@@ -409,6 +606,7 @@ onBeforeUnmount(() => {
             {{ isInbox ? '归档' : '恢复' }}
           </button>
           <button
+            v-if="!editing"
             class="action-btn delete-btn"
             type="button"
             :disabled="acting"
@@ -531,6 +729,46 @@ onBeforeUnmount(() => {
   word-break: break-word;
 }
 
+.edit-form {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.edit-field {
+  display: grid;
+  gap: var(--s-2);
+  font-size: var(--fs-2);
+  color: var(--text-3);
+}
+
+.edit-field input,
+.edit-field textarea {
+  width: 100%;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--text-1);
+  font: inherit;
+}
+
+.edit-field input {
+  height: 36px;
+  padding: 0 var(--s-3);
+}
+
+.edit-field textarea {
+  min-height: 260px;
+  padding: var(--s-3);
+  line-height: var(--lh-base);
+  resize: vertical;
+}
+
+.edit-hint {
+  margin: 0;
+  font-size: var(--fs-2);
+  color: var(--text-4);
+}
+
 .no-body {
   font-size: var(--fs-3);
   color: var(--text-4);
@@ -605,6 +843,12 @@ onBeforeUnmount(() => {
   padding: var(--s-2) var(--s-4);
   font-size: var(--fs-2);
   color: var(--error);
+}
+
+.drawer-feedback {
+  padding: var(--s-2) var(--s-4);
+  font-size: var(--fs-2);
+  color: var(--accent-bright);
 }
 
 /* Actions */

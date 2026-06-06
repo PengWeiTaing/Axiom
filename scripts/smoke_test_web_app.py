@@ -755,6 +755,16 @@ def main() -> None:
                         vue_page.locator(".result-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
                         vue_page.locator(".result-row").filter(has_text=vue_search_text).first.click()
                         vue_page.locator(".drawer-panel").get_by_text(vue_search_text, exact=False).wait_for(timeout=15_000)
+                        vue_updated_text = "Vue smoke search target edited"
+                        vue_page.locator(".drawer-panel").get_by_role("button", name="编辑").click()
+                        vue_page.locator(".drawer-panel").get_by_label("正文").fill(vue_updated_text)
+                        with vue_page.expect_response(
+                            lambda response: "/item/" in response.url
+                            and response.url.endswith("/update")
+                            and response.status == 200
+                        ):
+                            vue_page.locator(".drawer-panel").get_by_role("button", name="保存").click()
+                        vue_page.locator(".drawer-panel").get_by_text(vue_updated_text, exact=False).wait_for(timeout=15_000)
                         vue_page.get_by_label("关闭").click()
                         vue_page.goto(f"{base_url}/app?mode=timeline", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="时间流").wait_for(timeout=15_000)
