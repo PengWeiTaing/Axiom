@@ -716,9 +716,25 @@ def main() -> None:
                             lambda response: response.url.endswith("/upload")
                             and response.request.method == "POST"
                             and response.status == 200
-                        ):
+                        ) as vue_upload_info:
                             vue_page.get_by_label("提交").click()
+                        vue_upload_payload = vue_upload_info.value.json()
+                        vue_file_item_id = vue_upload_payload["item"]["id"]
                         vue_page.locator(".smart-input").get_by_text("文件", exact=False).wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: response.url.endswith(f"/file/{vue_file_item_id}")
+                            and response.status == 200
+                        ):
+                            vue_page.locator(".timeline .entry").filter(has_text=vue_file_note).first.click()
+                        vue_page.locator(".drawer-panel img.preview-img").wait_for(timeout=15_000)
+                        with vue_page.expect_download() as vue_file_download_info:
+                            vue_page.get_by_role("button", name="下载文件").click()
+                        vue_file_download = vue_file_download_info.value
+                        if vue_file_download.suggested_filename != "vue-smart-input.png":
+                            raise AssertionError(
+                                f"unexpected Vue item download filename: {vue_file_download.suggested_filename}"
+                            )
+                        vue_page.get_by_label("关闭").click()
                         vue_page.locator(".brand .action-btn").click()
                         vue_page.locator(".search-overlay").wait_for(timeout=15_000)
                         with vue_page.expect_response(

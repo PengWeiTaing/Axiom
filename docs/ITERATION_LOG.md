@@ -678,3 +678,4 @@
 - `CosmosView.vue` 接回 Vue 主线入口：顶部模式新增 `Cosmos`，`/app?mode=cosmos` 可进入关系图谱编辑与对象挂载层；web smoke 覆盖 Cosmos 入口、激活 tab 和图谱/空状态渲染，明确 Atlas 主视图与 Cosmos 编辑层边界。
 - `SystemView.vue` 接入数据导出：系统治理页新增“导出数据”按钮，复用后端 `/export` 生成 zip，并在导出后刷新审计日志；web smoke 覆盖 Vue 系统页触发下载并校验 `axiom_export_*.zip` 文件名。
 - `SmartInput.vue` 增强文件采集入口：在保持单一捕获框的前提下新增可见附件按钮，`/upload` 返回结构在前端归一化为顶层 `id`；web smoke 覆盖 Vue 采集页选择 PNG 附件并提交到 `/upload`。
+- `ItemDrawer.vue` 改为鉴权读取文件预览：图片、音频和 PDF 不再直接裸用 `/file/<id>`，而是通过前端 API 拉取 blob 后生成 object URL，并新增“下载文件”动作；web smoke 覆盖 Vue 上传图片后从时间流打开详情、预览图片并下载原文件。

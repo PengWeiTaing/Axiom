@@ -7,7 +7,16 @@
  */
 
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
-import { getItem, archiveItem, restoreItem, deleteItem, getProcessingNext, markProcessingPending, markProcessingReady } from '@/api/endpoints'
+import {
+  getItem,
+  getItemFile,
+  archiveItem,
+  restoreItem,
+  deleteItem,
+  getProcessingNext,
+  markProcessingPending,
+  markProcessingReady,
+} from '@/api/endpoints'
 import { typeAccent } from '@/composables/useTypeAccent'
 import { humanSize } from '@/composables/useHumanSize'
 import { formatRelative } from '@/composables/useRelativeTime'
@@ -22,8 +31,11 @@ const nowDate = computed(() => new Date(now.value))
 
 const loading = ref(false)
 const acting = ref(false)
+const fileLoading = ref(false)
 const error = ref<string | null>(null)
+const fileError = ref<string | null>(null)
 const detail = ref<ItemDetail | null>(null)
+const fileObjectUrl = ref<string | null>(null)
 
 // 删除二次确认
 const deleteConfirm = ref(false)
@@ -50,6 +62,11 @@ watch(() => props.itemId, async (id) => {
 const isInbox = computed(() => detail.value?.storage !== 'archive')
 const isPending = computed(() => detail.value?.processing_state === 'pending')
 const isOverridden = computed(() => Boolean(detail.value?.processing_is_overridden))
+const canPreviewPdf = computed(() =>
+  detail.value?.type === 'document'
+  && Boolean(fileObjectUrl.value)
+  && (detail.value.mime_type === 'application/pdf' || detail.value.original_name?.toLowerCase().endsWith('.pdf')),
+)
 
 const typeLabel = computed(() => {
   const map: Record<string, string> = { text: 'TEXT', image: 'IMAGE', document: 'DOC', audio: 'AUDIO' }
@@ -60,11 +77,42 @@ function hasBody(): boolean {
   if (!detail.value) return false
   const t = detail.value.type
   if (t === 'text') return !!detail.value.content
-  if (t === 'image') return true
+  if (t === 'image') return !!(fileObjectUrl.value || detail.value.content || fileError.value)
   if (t === 'document') return !!(detail.value.content || detail.value.derived_text || detail.value.derived_text_preview)
-  if (t === 'audio') return true
+    || canPreviewPdf.value
+    || !!fileError.value
+  if (t === 'audio') return !!(fileObjectUrl.value || detail.value.transcript_text || fileError.value)
   return false
 }
+
+function releaseFileObjectUrl() {
+  if (!fileObjectUrl.value) return
+  URL.revokeObjectURL(fileObjectUrl.value)
+  fileObjectUrl.value = null
+}
+
+watch(() => detail.value?.file_url ?? null, async (fileUrl) => {
+  releaseFileObjectUrl()
+  fileError.value = null
+  if (!fileUrl) return
+
+  fileLoading.value = true
+  try {
+    const blob = await getItemFile(fileUrl)
+    const objectUrl = URL.createObjectURL(blob)
+    if (detail.value?.file_url !== fileUrl) {
+      URL.revokeObjectURL(objectUrl)
+      return
+    }
+    fileObjectUrl.value = objectUrl
+  } catch (err) {
+    fileError.value = err instanceof ApiError ? err.message : '文件读取失败'
+  } finally {
+    if (detail.value?.file_url === fileUrl) {
+      fileLoading.value = false
+    }
+  }
+})
 
 async function doArchive() {
   if (!detail.value) return
@@ -163,6 +211,31 @@ async function doDelete() {
   }
 }
 
+async function doDownloadFile() {
+  if (!detail.value?.file_url) return
+  acting.value = true
+  error.value = null
+  try {
+    let objectUrl = fileObjectUrl.value
+    if (!objectUrl) {
+      const blob = await getItemFile(detail.value.file_url)
+      const temporaryObjectUrl = URL.createObjectURL(blob)
+      objectUrl = temporaryObjectUrl
+      window.setTimeout(() => URL.revokeObjectURL(temporaryObjectUrl), 0)
+    }
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = detail.value.original_name || `item-${detail.value.id}`
+    document.body.append(link)
+    link.click()
+    link.remove()
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '文件下载失败'
+  } finally {
+    acting.value = false
+  }
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.itemId !== null) {
     e.preventDefault()
@@ -174,6 +247,7 @@ onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
   if (deleteTimer) clearTimeout(deleteTimer)
+  releaseFileObjectUrl()
 })
 </script>
 
@@ -216,17 +290,27 @@ onBeforeUnmount(() => {
             <!-- image -->
             <template v-else-if="detail.type === 'image'">
               <img
-                v-if="detail.file_url"
-                :src="detail.file_url"
+                v-if="fileObjectUrl"
+                :src="fileObjectUrl"
                 :alt="detail.original_name ?? ''"
                 class="preview-img"
               />
+              <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
+              <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
               <p v-if="detail.content" class="content-text">{{ detail.content }}</p>
             </template>
 
             <!-- document -->
             <template v-else-if="detail.type === 'document'">
               <p v-if="detail.content" class="content-text">{{ detail.content }}</p>
+              <iframe
+                v-if="canPreviewPdf"
+                :src="fileObjectUrl ?? undefined"
+                :title="detail.original_name || `document-${detail.id}`"
+                class="file-frame"
+              />
+              <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
+              <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
               <template v-if="detail.derived_text || detail.derived_text_preview">
                 <p class="content-text">{{ detail.derived_text || detail.derived_text_preview }}</p>
               </template>
@@ -238,12 +322,14 @@ onBeforeUnmount(() => {
             <!-- audio -->
             <template v-else-if="detail.type === 'audio'">
               <audio
-                v-if="detail.file_url"
-                :src="detail.file_url"
+                v-if="fileObjectUrl"
+                :src="fileObjectUrl"
                 controls
                 preload="none"
                 class="audio-player"
               />
+              <p v-else-if="fileLoading" class="file-state">文件读取中…</p>
+              <p v-else-if="fileError" class="file-state error-state">{{ fileError }}</p>
               <p v-if="detail.transcript_text" class="content-text">{{ detail.transcript_text }}</p>
             </template>
 
@@ -304,6 +390,15 @@ onBeforeUnmount(() => {
             @click="doMarkPending"
           >
             退回待处理
+          </button>
+          <button
+            v-if="detail.file_url"
+            class="action-btn archive-btn"
+            type="button"
+            :disabled="acting || fileLoading"
+            @click="doDownloadFile"
+          >
+            下载文件
           </button>
           <button
             class="action-btn archive-btn"
@@ -445,6 +540,25 @@ onBeforeUnmount(() => {
   max-width: 100%;
   border-radius: var(--r-2);
   margin-bottom: var(--s-3);
+}
+
+.file-frame {
+  width: 100%;
+  min-height: 360px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  margin: var(--s-3) 0;
+}
+
+.file-state {
+  font-size: var(--fs-3);
+  color: var(--text-4);
+  margin-bottom: var(--s-3);
+}
+
+.error-state {
+  color: var(--error);
 }
 
 .audio-player {

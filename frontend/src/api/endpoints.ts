@@ -289,6 +289,11 @@ export const dailyStats = (days = 30) =>
 export const getItem = (id: number) =>
   apiRequest<{ item: ItemDetail }>(`/item/${id}`);
 
+export const getItemFile = async (fileUrl: string) => {
+  const response = await apiRequest<Response>(fileUrl);
+  return response.blob();
+};
+
 export const updateItem = (id: number, data: {
   content?: string
   source?: string
