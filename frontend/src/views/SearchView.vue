@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { searchAll, searchVector } from '@/api/endpoints';
+import { markProcessingPending, markProcessingReady, searchAll, searchVector } from '@/api/endpoints';
 import { ApiError } from '@/api/client';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { typeAccent } from '@/composables/useTypeAccent';
-import type { Decision, Item, Memory, ObjectTarget, Task } from '@/api/types';
+import type { Decision, Item, ItemType, Memory, ObjectTarget, Task } from '@/api/types';
 
 type SearchMode = 'all' | 'vector';
 type ResultKind = 'item' | 'task' | 'memory' | 'decision';
+type ProcessingStateFilter = '' | 'ready' | 'pending';
+type ProcessingOverrideFilter = '' | 'ready';
+type ItemSearchResult = Extract<SearchResult, { kind: 'item' }>;
 
 type SearchResult =
   | { kind: 'item'; data: Item; relevance?: number }
@@ -19,8 +22,14 @@ type SearchResult =
 
 const query = ref('');
 const searchMode = ref<SearchMode>('all');
+const itemTypeFilter = ref<ItemType | ''>('');
+const sourceFilter = ref('');
+const processingStateFilter = ref<ProcessingStateFilter>('');
+const processingOverrideFilter = ref<ProcessingOverrideFilter>('');
 const loading = ref(false);
 const error = ref<string | null>(null);
+const feedback = ref<string | null>(null);
+const actionBusy = ref<'ready' | 'pending' | null>(null);
 const hasSearched = ref(false);
 const selectedItemId = ref<number | null>(null);
 const selectedObject = ref<ObjectTarget | null>(null);
@@ -47,6 +56,19 @@ const resultCounts = computed(() => ({
 }));
 
 const totalCount = computed(() => results.value.length);
+const itemResults = computed(() => groupedResults.value.item as ItemSearchResult[]);
+const pendingItemIds = computed(() => itemResults.value
+  .filter((result) => result.data.processing_state === 'pending')
+  .map((result) => result.data.id));
+const overriddenReadyItemIds = computed(() => itemResults.value
+  .filter((result) => result.data.processing_override === 'ready' || result.data.processing_is_overridden)
+  .map((result) => result.data.id));
+const recordFiltersActive = computed(() => Boolean(
+  itemTypeFilter.value
+  || sourceFilter.value.trim()
+  || processingStateFilter.value
+  || processingOverrideFilter.value,
+));
 
 const groups = computed(() => [
   { kind: 'item' as const, label: '记录', items: groupedResults.value.item },
@@ -55,11 +77,13 @@ const groups = computed(() => [
   { kind: 'decision' as const, label: '决策', items: groupedResults.value.decision },
 ].filter((group) => group.items.length > 0));
 
-async function runSearch() {
+async function runSearch(options: { clearFeedback?: boolean } = {}) {
+  const clearFeedback = options.clearFeedback ?? true;
   const q = query.value.trim();
   if (!q || loading.value) return;
   loading.value = true;
   error.value = null;
+  if (clearFeedback) feedback.value = null;
   hasSearched.value = true;
   try {
     if (searchMode.value === 'vector') {
@@ -71,7 +95,12 @@ async function runSearch() {
       }));
       return;
     }
-    const payload = await searchAll(q, 18);
+    const payload = await searchAll(q, 18, {
+      type: itemTypeFilter.value,
+      source: sourceFilter.value.trim(),
+      processing_state: processingStateFilter.value,
+      processing_override: processingOverrideFilter.value,
+    });
     results.value = [
       ...payload.items.map((item) => ({ kind: 'item' as const, data: item })),
       ...payload.tasks.map((task) => ({ kind: 'task' as const, data: task })),
@@ -84,6 +113,14 @@ async function runSearch() {
   } finally {
     loading.value = false;
   }
+}
+
+function resetFilters() {
+  itemTypeFilter.value = '';
+  sourceFilter.value = '';
+  processingStateFilter.value = '';
+  processingOverrideFilter.value = '';
+  if (query.value.trim()) runSearch();
 }
 
 function selectMode(next: SearchMode) {
@@ -128,6 +165,40 @@ function resultMeta(result: SearchResult): string {
   return `${decisionStatusLabel(result.data.status)} · ${formatRelative(result.data.created_at)}`;
 }
 
+async function markVisibleReady() {
+  const ids = pendingItemIds.value;
+  if (!ids.length || actionBusy.value) return;
+  actionBusy.value = 'ready';
+  error.value = null;
+  feedback.value = null;
+  try {
+    const payload = await markProcessingReady(ids);
+    feedback.value = `已标记 ${payload.count} 条记录为就绪`;
+    await runSearch({ clearFeedback: false });
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '批量标记就绪失败';
+  } finally {
+    actionBusy.value = null;
+  }
+}
+
+async function markVisiblePending() {
+  const ids = overriddenReadyItemIds.value;
+  if (!ids.length || actionBusy.value) return;
+  actionBusy.value = 'pending';
+  error.value = null;
+  feedback.value = null;
+  try {
+    const payload = await markProcessingPending(ids);
+    feedback.value = `已退回 ${payload.count} 条记录到待处理`;
+    await runSearch({ clearFeedback: false });
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '批量退回待处理失败';
+  } finally {
+    actionBusy.value = null;
+  }
+}
+
 function itemTitle(item: Item): string {
   return item.original_name || item.content || item.derived_text || item.transcript_text || `记录 #${item.id}`;
 }
@@ -146,6 +217,10 @@ function itemTypeLabel(type: Item['type']): string {
     audio: '音频',
   };
   return labels[type];
+}
+
+function itemProcessingLabel(item: Item): string {
+  return item.processing_note || item.processing_label || (item.processing_state === 'pending' ? '待处理' : '已就绪');
 }
 
 function taskStatusLabel(status: Task['status']): string {
@@ -191,14 +266,14 @@ onMounted(() => {
         <p class="eyebrow">Search</p>
         <h1>搜索</h1>
       </div>
-      <button class="refresh-btn" type="button" :disabled="loading || !query.trim()" @click="runSearch">
+      <button class="refresh-btn" type="button" :disabled="loading || !query.trim()" @click="runSearch()">
         <span>{{ loading ? '搜索中' : '搜索' }}</span>
       </button>
     </header>
 
     <section class="search-shell">
       <aside class="panel query-panel">
-        <form class="query-form" @submit.prevent="runSearch">
+        <form class="query-form" @submit.prevent="runSearch()">
           <label>
             <span>查询</span>
             <input
@@ -217,6 +292,52 @@ onMounted(() => {
               语义
             </button>
           </div>
+          <div class="filter-grid" aria-label="记录筛选">
+            <label>
+              <span>记录类型</span>
+              <select v-model="itemTypeFilter" aria-label="记录类型" :disabled="searchMode === 'vector'">
+                <option value="">全部</option>
+                <option value="text">文本</option>
+                <option value="image">图片</option>
+                <option value="document">文档</option>
+                <option value="audio">音频</option>
+              </select>
+            </label>
+            <label>
+              <span>处理状态</span>
+              <select v-model="processingStateFilter" aria-label="处理状态" :disabled="searchMode === 'vector'">
+                <option value="">全部</option>
+                <option value="pending">待处理</option>
+                <option value="ready">已就绪</option>
+              </select>
+            </label>
+            <label>
+              <span>处理覆盖</span>
+              <select v-model="processingOverrideFilter" aria-label="处理覆盖" :disabled="searchMode === 'vector'">
+                <option value="">全部</option>
+                <option value="ready">手动完成</option>
+              </select>
+            </label>
+            <label>
+              <span>来源</span>
+              <input
+                v-model="sourceFilter"
+                aria-label="来源"
+                type="text"
+                autocomplete="off"
+                :disabled="searchMode === 'vector'"
+                placeholder="source"
+              />
+            </label>
+          </div>
+          <button
+            class="reset-filter-btn"
+            type="button"
+            :disabled="!recordFiltersActive || loading"
+            @click="resetFilters"
+          >
+            重置记录筛选
+          </button>
         </form>
 
         <div class="metrics" aria-label="搜索结果统计">
@@ -244,15 +365,36 @@ onMounted(() => {
           <span class="result-mode">{{ searchMode === 'all' ? '关键词' : '语义' }}</span>
         </div>
 
+        <div v-if="feedback" class="notice feedback-row">{{ feedback }}</div>
         <div v-if="error" class="notice error-row">
           <span>{{ error }}</span>
-          <button type="button" @click="runSearch">重试</button>
+          <button type="button" @click="runSearch()">重试</button>
         </div>
         <div v-else-if="loading" class="empty-state">搜索中</div>
         <div v-else-if="!hasSearched" class="empty-state">等待查询</div>
         <div v-else-if="!results.length" class="empty-state">没有匹配</div>
 
         <div v-else class="result-groups">
+          <div v-if="searchMode === 'all' && itemResults.length" class="batch-actions">
+            <div>
+              <strong>{{ itemResults.length }} 条记录</strong>
+              <span>{{ recordFiltersActive ? '记录筛选已启用' : '可继续细化筛选后批量处理' }}</span>
+            </div>
+            <button
+              type="button"
+              :disabled="!pendingItemIds.length || actionBusy === 'ready'"
+              @click="markVisibleReady"
+            >
+              {{ actionBusy === 'ready' ? '处理中' : `标记待处理为就绪 (${pendingItemIds.length})` }}
+            </button>
+            <button
+              type="button"
+              :disabled="!overriddenReadyItemIds.length || actionBusy === 'pending'"
+              @click="markVisiblePending"
+            >
+              {{ actionBusy === 'pending' ? '处理中' : `退回手动完成 (${overriddenReadyItemIds.length})` }}
+            </button>
+          </div>
           <section v-for="group in groups" :key="group.kind" class="result-group">
             <header>
               <h3>{{ group.label }}</h3>
@@ -271,14 +413,23 @@ onMounted(() => {
                 <strong>{{ resultTitle(result) }}</strong>
                 <small>{{ resultSummary(result) }}</small>
               </span>
-              <span class="result-meta">{{ resultMeta(result) }}</span>
+              <span class="result-meta">
+                <span
+                  v-if="result.kind === 'item'"
+                  class="state-chip"
+                  :class="{ pending: result.data.processing_state === 'pending' }"
+                >
+                  {{ itemProcessingLabel(result.data) }}
+                </span>
+                {{ resultMeta(result) }}
+              </span>
             </button>
           </section>
         </div>
       </section>
     </section>
 
-    <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="runSearch" />
+    <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="runSearch()" />
     <ObjectDrawer
       :target="selectedObject"
       @close="selectedObject = null"
@@ -327,7 +478,9 @@ h3 {
 
 .refresh-btn,
 .mode-pills button,
-.result-row {
+.result-row,
+.reset-filter-btn,
+.batch-actions button {
   transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 
@@ -386,13 +539,18 @@ label span {
   font-size: var(--fs-2);
 }
 
-input {
+input,
+select {
   width: 100%;
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--text-1);
   padding: var(--s-3);
+}
+
+select {
+  min-height: 40px;
 }
 
 input::placeholder {
@@ -418,6 +576,32 @@ input::placeholder {
   border-color: rgba(110, 231, 208, 0.24);
   color: var(--text-1);
   background: var(--surface-2);
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+
+.reset-filter-btn {
+  min-height: 34px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--text-3);
+}
+
+.reset-filter-btn:hover:not(:disabled) {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.reset-filter-btn:disabled,
+.batch-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .metrics {
@@ -488,10 +672,61 @@ input::placeholder {
   color: var(--error);
 }
 
+.feedback-row {
+  border-color: rgba(110, 231, 208, 0.18);
+  color: var(--accent-bright);
+}
+
 .result-groups {
   display: grid;
   gap: var(--s-5);
   margin-top: var(--s-4);
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  padding: var(--s-3);
+}
+
+.batch-actions > div {
+  min-width: min(220px, 100%);
+  margin-right: auto;
+}
+
+.batch-actions strong,
+.batch-actions span {
+  display: block;
+}
+
+.batch-actions strong {
+  color: var(--text-1);
+  font-weight: 520;
+}
+
+.batch-actions span {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.batch-actions button {
+  min-height: 30px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--text-3);
+  padding: 0 var(--s-3);
+}
+
+.batch-actions button:hover:not(:disabled) {
+  border-color: var(--line-2);
+  background: var(--surface-3);
+  color: var(--text-1);
 }
 
 .result-group {
@@ -548,6 +783,24 @@ input::placeholder {
   font-size: var(--fs-3);
 }
 
+.state-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  margin-right: var(--s-2);
+  padding: 0 var(--s-2);
+  border: 1px solid rgba(110, 231, 208, 0.16);
+  border-radius: var(--r-pill);
+  color: var(--accent-bright);
+  background: var(--accent-glow);
+}
+
+.state-chip.pending {
+  border-color: rgba(232, 174, 120, 0.22);
+  color: var(--warm);
+  background: rgba(232, 174, 120, 0.06);
+}
+
 @media (max-width: 820px) {
   .search-view {
     width: min(100vw - var(--s-4), 640px);
@@ -555,6 +808,10 @@ input::placeholder {
   }
 
   .search-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,6 +1,6 @@
 # Axiom 项目主线
 
-更新时间：2026-06-03
+更新时间：2026-06-06
 
 这份文档是当前开发前置事实源。它不替代详细设计文档，只回答一个问题：新功能应该接到哪条主线，哪些东西只是兼容或历史保留。
 
@@ -31,7 +31,7 @@ Capture -> Atlas -> Cosmos -> 近况 -> 处理 -> 搜索 -> 时间 -> 任务 -> 
 - `CosmosView.vue` 是关系图谱编辑与对象挂载层，保留在 Vue 主线内的 `/app?mode=cosmos`，但不替代 `/atlas` 的 Atlas 主视图。
 - `RecentView.vue` 是 Vue 主线近况页，读取 `/overview` 展示运行摘要、处理积压、最近记录和自动化产物；已支持积压单条打开、标记就绪、手动完成项退回待处理和 Markdown 产物预览。
 - `ProcessingView.vue` 是 Vue 主线处理工作台，读取 `/processing/backlog`，支持全局下一条、分组队列、分组批量标记就绪和退回待处理；条目详情复用 `ItemDrawer.vue`，支持标记就绪、退回待处理、完成并打开同类下一条。
-- `SearchView.vue` 是 Vue 主线搜索工作台，读取 `/search/all` 与 `/search/vector`，支持关键词/语义切换、跨记录/任务/记忆/决策分组展示；记录结果可打开 `ItemDrawer.vue`，任务/记忆/决策结果可打开 `ObjectDrawer.vue`。
+- `SearchView.vue` 是 Vue 主线搜索工作台，读取 `/search/all` 与 `/search/vector`，支持关键词/语义切换、跨记录/任务/记忆/决策分组展示；关键词模式下支持记录类型、来源、处理状态、处理覆盖筛选，并可对当前记录结果批量标记就绪或退回待处理；记录结果可打开 `ItemDrawer.vue`，任务/记忆/决策结果可打开 `ObjectDrawer.vue`。
 - `TimelineView.vue` 是 Vue 主线时间流，读取 `/timeline`，把记录/任务/记忆/决策的创建与状态变更合成统一活动视图，支持按对象类型筛选；记录事件可打开 `ItemDrawer.vue`，任务/记忆/决策事件可打开 `ObjectDrawer.vue`。
 - `TasksView.vue` 是 Vue 主线任务台，读取 `/tasks/today` 和 `/tasks`，支持快速新增、今日/逾期、状态/优先级筛选，以及完成、恢复、取消、安排到今天；列表项可用 `ObjectDrawer.vue` 查看完整任务详情。
 - `MemoriesView.vue` 是 Vue 主线记忆库，读取 `/memories/stats` 和 `/memories`，支持快速新增、分类/状态筛选、确认和归档；列表项可用 `ObjectDrawer.vue` 查看完整记忆详情，记忆来源记录可继续打开 `ItemDrawer.vue`。

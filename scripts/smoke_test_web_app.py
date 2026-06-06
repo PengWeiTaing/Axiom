@@ -856,6 +856,39 @@ def main() -> None:
                         if len(restored_ids) < 2:
                             raise AssertionError(f"Vue recent action restore missed smoke image ids: {restored_ids}")
 
+                        vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
+                        vue_page.get_by_role("heading", name="搜索").wait_for(timeout=15_000)
+                        vue_page.get_by_label("搜索查询").fill("pending-shot.png")
+                        vue_page.get_by_label("记录类型").select_option("image")
+                        vue_page.get_by_label("处理状态").select_option("pending")
+                        with vue_page.expect_response(
+                            lambda response: "/search/all" in response.url
+                            and "type=image" in response.url
+                            and "processing_state=pending" in response.url
+                            and response.status == 200
+                        ):
+                            vue_page.locator("main").get_by_role("button", name="搜索").click()
+                        vue_page.locator(".result-row").filter(has_text="pending-shot.png").first.wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/processing/mark-ready" in response.url and response.status == 200
+                        ):
+                            vue_page.get_by_role("button", name=re.compile(r"标记待处理为就绪")).click()
+                        vue_page.get_by_text("已标记", exact=False).wait_for(timeout=15_000)
+                        vue_page.get_by_label("处理状态").select_option("")
+                        vue_page.get_by_label("处理覆盖").select_option("ready")
+                        with vue_page.expect_response(
+                            lambda response: "/search/all" in response.url
+                            and "processing_override=ready" in response.url
+                            and response.status == 200
+                        ):
+                            vue_page.locator("main").get_by_role("button", name="搜索").click()
+                        vue_page.locator(".result-row").filter(has_text="pending-shot.png").first.wait_for(timeout=15_000)
+                        with vue_page.expect_response(
+                            lambda response: "/processing/mark-pending" in response.url and response.status == 200
+                        ):
+                            vue_page.get_by_role("button", name=re.compile(r"退回手动完成")).click()
+                        vue_page.get_by_text("已退回", exact=False).wait_for(timeout=15_000)
+
                         vue_task_title = "Vue smoke task"
                         today = datetime.now().date().isoformat()
                         vue_page.goto(f"{base_url}/app?mode=tasks", wait_until="networkidle")

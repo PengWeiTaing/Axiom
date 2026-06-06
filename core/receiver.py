@@ -29,6 +29,8 @@ from core._common import (  # noqa: E402
     escape_fts_query, escape_like,
     write_audit_log, fts_delete_item, fts_backfill,
     parse_positive_int, local_date_now, resolve_run_date_value, utc_now, build_item_payload, row_to_item,
+    build_item_filter_conditions, join_conditions,
+    read_item_type_filter, read_processing_override_filter, read_processing_state_filter, read_source_filter,
     vector_search, rebuild_all_vectors,
     learn_user_patterns, get_preference,
     execute_logged_automation_job,
@@ -471,13 +473,40 @@ def search_all():
     q = request.args.get("q","").strip()
     if not q: return error_response(400, "empty_query", "q 不能为空")
     limit = parse_positive_int(request.args.get("limit"), "limit", 20)
+    try:
+        item_type = read_item_type_filter()
+        source = read_source_filter()
+        processing_state = read_processing_state_filter()
+        processing_override = read_processing_override_filter()
+    except ValueError as exc:
+        return error_response(400, "invalid_filter", str(exc))
     results = {"items":[],"memories":[],"tasks":[],"decisions":[]}
     conn = get_db_connection()
     try:
         fts_q = escape_fts_query(q)
         if fts_q != '""':
-            rows = conn.execute("SELECT items.id, items.type, items.content, items.created_at, -rank AS score FROM items_fts JOIN items ON items_fts.rowid = items.id WHERE items_fts MATCH ? ORDER BY rank LIMIT ?",(fts_q,limit)).fetchall()
-            results["items"] = [{"id":r["id"],"type":r["type"],"content":(r["content"]or"")[:200],"created_at":r["created_at"],"score":r["score"]} for r in rows]
+            item_conditions, item_params = build_item_filter_conditions(
+                item_type,
+                None,
+                source,
+                None,
+                None,
+                processing_state,
+                processing_override,
+            )
+            item_filter_sql = join_conditions(item_conditions, "AND")
+            rows = conn.execute(
+                f"""
+                SELECT {ITEM_JOIN_SELECT_FIELDS}, -rank AS score
+                FROM items_fts
+                JOIN items ON items_fts.rowid = items.id
+                WHERE items_fts MATCH ? {item_filter_sql}
+                ORDER BY rank
+                LIMIT ?
+                """,
+                (fts_q, *item_params, limit),
+            ).fetchall()
+            results["items"] = [row_to_item(row, include_score=True) for row in rows]
         like = f"%{escape_like(q)}%"
         for r in conn.execute("SELECT id,category,content,status,created_at FROM memories WHERE content LIKE ? ESCAPE '\\' OR detail LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",(like,like,limit)).fetchall():
             results["memories"].append({"id":r["id"],"category":r["category"],"content":r["content"],"status":r["status"],"created_at":r["created_at"]})

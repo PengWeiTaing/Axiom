@@ -164,14 +164,19 @@ export const getTimeline = (params: {
   return apiRequest<TimelinePayload>('/timeline', { query });
 };
 
-export const searchAll = (q: string, limit = 20) =>
+export const searchAll = (q: string, limit = 20, filters: {
+  type?: ItemType | '';
+  source?: string;
+  processing_state?: 'ready' | 'pending' | '';
+  processing_override?: 'ready' | '';
+} = {}) =>
   apiRequest<{
     items?: Item[];
     memories?: Memory[];
     tasks?: Task[];
     decisions?: Decision[];
     results?: { items?: Item[]; memories?: Memory[]; tasks?: Task[]; decisions?: Decision[] };
-  }>('/search/all', { query: { q, limit } }).then((payload) => {
+  }>('/search/all', { query: { q, limit, ...filters } }).then((payload) => {
     const results = payload.results ?? payload;
     return {
       items: results.items ?? [],
