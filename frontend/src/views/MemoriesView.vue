@@ -19,6 +19,7 @@ import type {
   ObjectTarget,
 } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
+import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
 
 const PAGE_SIZE = 12;
 
@@ -105,13 +106,10 @@ function resetMemoryFilters() {
 }
 
 function syncMemoryListUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('mode', 'memories');
-  if (categoryFilter.value) url.searchParams.set('category', categoryFilter.value);
-  else url.searchParams.delete('category');
-  if (statusFilter.value) url.searchParams.set('status', statusFilter.value);
-  else url.searchParams.delete('status');
-  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+  replaceRouteQuery('memories', {
+    category: categoryFilter.value,
+    status: statusFilter.value,
+  });
 }
 
 async function submitMemory() {
@@ -186,7 +184,7 @@ function openSourceItem(id: number) {
 }
 
 onMounted(() => {
-  const params = new URLSearchParams(window.location.search);
+  const params = currentRouteParams();
   const initialCategory = params.get('category');
   const initialStatus = params.get('status');
   if (

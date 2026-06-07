@@ -14,6 +14,7 @@ import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import type { Task, TaskList, TaskPriority, TaskStatus } from '@/api/types';
 import type { ObjectTarget } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
+import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
 
 const PAGE_SIZE = 10;
 
@@ -102,13 +103,10 @@ function resetTaskFilters() {
 }
 
 function syncTaskListUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('mode', 'tasks');
-  if (statusFilter.value) url.searchParams.set('status', statusFilter.value);
-  else url.searchParams.delete('status');
-  if (priorityFilter.value) url.searchParams.set('priority', priorityFilter.value);
-  else url.searchParams.delete('priority');
-  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+  replaceRouteQuery('tasks', {
+    status: statusFilter.value,
+    priority: priorityFilter.value,
+  });
 }
 
 async function submitTask() {
@@ -206,7 +204,7 @@ function openTaskDetail(id: number) {
 }
 
 onMounted(() => {
-  const params = new URLSearchParams(window.location.search);
+  const params = currentRouteParams();
   const initialStatus = params.get('status');
   const initialPriority = params.get('priority');
   if (initialStatus === 'todo' || initialStatus === 'done' || initialStatus === 'cancelled') {
