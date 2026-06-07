@@ -486,18 +486,6 @@ h3 {
   margin: 0 0 var(--s-4);
 }
 
-.filter-summary button {
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-  color: var(--text-3);
-}
-
-.filter-summary button:hover:not(:disabled) {
-  border-color: var(--line-2);
-  color: var(--text-1);
-}
-
 .health-strip {
   display: grid;
   grid-template-columns: 1.2fr repeat(4, 1fr);

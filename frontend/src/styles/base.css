@@ -112,6 +112,12 @@ a:hover {
 
 .filter-summary {
   --filter-summary-accent: var(--accent);
+  --filter-summary-button-border: var(--line-1);
+  --filter-summary-button-bg: var(--surface-1);
+  --filter-summary-button-color: var(--text-3);
+  --filter-summary-button-hover-border: var(--line-2);
+  --filter-summary-button-hover-bg: var(--filter-summary-button-bg);
+  --filter-summary-button-hover-color: var(--text-1);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -132,8 +138,20 @@ a:hover {
 
 .filter-summary button {
   min-height: 28px;
+  border: 1px solid var(--filter-summary-button-border);
+  border-radius: var(--r-2);
+  background: var(--filter-summary-button-bg);
+  color: var(--filter-summary-button-color);
+  cursor: pointer;
   padding: 0 var(--s-3);
   font-size: var(--fs-1);
+  transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+
+.filter-summary button:hover:not(:disabled) {
+  border-color: var(--filter-summary-button-hover-border);
+  background: var(--filter-summary-button-hover-bg);
+  color: var(--filter-summary-button-hover-color);
 }
 
 /* 进出场动效统一 */

@@ -375,8 +375,7 @@ onMounted(() => {
 .decision-meta button,
 .review-box button,
 .load-more,
-.notice button,
-.filter-summary button {
+.notice button {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -519,6 +518,11 @@ button:disabled {
 
 .filter-summary {
   --filter-summary-accent: rgb(205, 160, 101);
+  --filter-summary-button-border: rgba(255, 255, 255, 0.12);
+  --filter-summary-button-bg: rgba(255, 255, 255, 0.06);
+  --filter-summary-button-color: var(--text-1);
+  --filter-summary-button-hover-border: rgba(255, 255, 255, 0.22);
+  --filter-summary-button-hover-bg: rgba(255, 255, 255, 0.10);
   margin: calc(-1 * var(--s-2)) 0 var(--s-4);
 }
 
