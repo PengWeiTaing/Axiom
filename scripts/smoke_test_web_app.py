@@ -1191,6 +1191,24 @@ def main() -> None:
                         vue_page.locator(".list-panel .decision-row").filter(has_text=vue_decision_title).filter(
                             has_text="已回顾"
                         ).first.wait_for(timeout=15_000)
+                        vue_page.goto(
+                            f"{base_url}/app?mode=decisions&status=reviewed",
+                            wait_until="networkidle",
+                        )
+                        if vue_page.get_by_label("决策状态筛选").input_value() != "reviewed":
+                            raise AssertionError("Vue decision status filter was not restored from URL")
+                        vue_page.locator(".filter-summary").get_by_text("已回顾", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".list-panel .decision-row").filter(has_text=vue_decision_title).first.wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_role("button", name="重置筛选").click()
+                        vue_page.wait_for_function(
+                            """() => {
+                                const params = new URL(window.location.href).searchParams;
+                                return !params.has("status");
+                            }""",
+                            timeout=15_000,
+                        )
 
                         vue_page.goto(f"{base_url}/app?mode=automation", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="自动化中心").wait_for(timeout=15_000)

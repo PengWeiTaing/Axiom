@@ -30,6 +30,12 @@ const draft = ref({
 });
 
 const canLoadMore = computed(() => page.value < totalPages.value);
+const decisionFiltersActive = computed(() => Boolean(statusFilter.value));
+const activeDecisionFilterChips = computed(() => {
+  const chips: string[] = [];
+  if (statusFilter.value) chips.push(statusLabel(statusFilter.value));
+  return chips;
+});
 
 async function loadMetrics() {
   const [pending, reviewed] = await Promise.all([
@@ -43,6 +49,7 @@ async function loadMetrics() {
 async function loadDecisionList(reset = true) {
   loading.value = true;
   error.value = null;
+  if (reset) syncDecisionListUrl();
   try {
     const nextPage = reset ? 1 : page.value + 1;
     const payload: DecisionList = await listDecisions({
@@ -63,6 +70,23 @@ async function loadDecisionList(reset = true) {
 
 async function refreshAll() {
   await Promise.all([loadMetrics(), loadDecisionList(true)]);
+}
+
+function applyDecisionFilters() {
+  loadDecisionList(true);
+}
+
+function resetDecisionFilters() {
+  statusFilter.value = '';
+  loadDecisionList(true);
+}
+
+function syncDecisionListUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', 'decisions');
+  if (statusFilter.value) url.searchParams.set('status', statusFilter.value);
+  else url.searchParams.delete('status');
+  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
 }
 
 async function submitDecision() {
@@ -133,7 +157,14 @@ function openDecisionDetail(id: number) {
   selectedObject.value = { kind: 'decision', id };
 }
 
-onMounted(refreshAll);
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search);
+  const initialStatus = params.get('status');
+  if (initialStatus === 'pending' || initialStatus === 'reviewed') {
+    statusFilter.value = initialStatus;
+  }
+  refreshAll();
+});
 </script>
 
 <template>
@@ -236,13 +267,18 @@ onMounted(refreshAll);
           <div class="filters">
             <label>
               <span>状态</span>
-              <select v-model="statusFilter" aria-label="决策状态筛选" @change="loadDecisionList(true)">
+              <select v-model="statusFilter" aria-label="决策状态筛选" @change="applyDecisionFilters">
                 <option value="">全部</option>
                 <option value="pending">待回顾</option>
                 <option value="reviewed">已回顾</option>
               </select>
             </label>
           </div>
+        </div>
+
+        <div v-if="decisionFiltersActive" class="filter-summary" aria-label="当前决策筛选">
+          <span v-for="chip in activeDecisionFilterChips" :key="chip">{{ chip }}</span>
+          <button type="button" :disabled="loading" @click="resetDecisionFilters">重置筛选</button>
         </div>
 
         <div v-if="decisions.length" class="decision-list">
@@ -339,7 +375,8 @@ onMounted(refreshAll);
 .decision-meta button,
 .review-box button,
 .load-more,
-.notice button {
+.notice button,
+.filter-summary button {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -478,6 +515,32 @@ button:disabled {
 .review-box textarea {
   resize: vertical;
   padding: var(--s-3);
+}
+
+.filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+}
+
+.filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(205, 160, 101, 0.22);
+  border-radius: 999px;
+  background: rgba(205, 160, 101, 0.09);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-2);
+}
+
+.filter-summary button {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  font-size: var(--fs-1);
 }
 
 .decision-list {
