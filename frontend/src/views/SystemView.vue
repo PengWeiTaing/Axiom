@@ -4,6 +4,7 @@ import { ApiError } from '@/api/client';
 import { exportData, getAdminLogs, getAuditLog, getMetrics, getSystemInfo } from '@/api/endpoints';
 import type { AdminLogsPayload, AuditLogEntry, AuditLogPayload, MetricsPayload, SystemInfoPayload } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
+import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
 
 const system = ref<SystemInfoPayload | null>(null);
 const metrics = ref<MetricsPayload | null>(null);
@@ -174,13 +175,10 @@ function logLevelLabel(value: string): string {
 }
 
 function syncSystemUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('mode', 'system');
-  if (auditTarget.value) url.searchParams.set('audit', auditTarget.value);
-  else url.searchParams.delete('audit');
-  if (logLevel.value) url.searchParams.set('level', logLevel.value);
-  else url.searchParams.delete('level');
-  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+  replaceRouteQuery('system', {
+    audit: auditTarget.value,
+    level: logLevel.value,
+  });
 }
 
 function isAuditTarget(value: string | null): value is AuditTarget {
@@ -192,7 +190,7 @@ function isLogLevel(value: string | null): value is LogLevel {
 }
 
 function restoreSystemFiltersFromUrl() {
-  const params = new URLSearchParams(window.location.search);
+  const params = currentRouteParams();
   const initialAudit = params.get('audit');
   const initialLevel = params.get('level');
   if (isAuditTarget(initialAudit)) auditTarget.value = initialAudit;
