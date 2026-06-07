@@ -691,3 +691,5 @@
 - `scripts/smoke_test_web_app.py` 补充 Vue 搜索页 URL 同步与 URL 参数恢复的浏览器链路。
 - `TasksView.vue` 增加任务列表筛选 URL 同步：状态/优先级筛选会写入地址栏并支持从 URL 恢复；全部任务区增加当前筛选摘要和重置筛选入口。
 - `scripts/smoke_test_web_app.py` 补充 Vue 任务台 `status/priority` URL 恢复与重置筛选的浏览器链路。
+- `MemoriesView.vue` 增加记忆列表筛选 URL 同步：分类/状态筛选会写入地址栏并支持从 URL 恢复；记忆列表区增加当前筛选摘要和重置筛选入口。
+- `scripts/smoke_test_web_app.py` 补充 Vue 记忆库 `category/status` URL 恢复与重置筛选的浏览器链路。

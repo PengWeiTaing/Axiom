@@ -1035,6 +1035,27 @@ def main() -> None:
                         vue_page.locator(".list-panel .memory-row").filter(has_text=vue_memory_content).filter(
                             has_text="已确认"
                         ).first.wait_for(timeout=15_000)
+                        vue_page.goto(
+                            f"{base_url}/app?mode=memories&category=fact&status=confirmed",
+                            wait_until="networkidle",
+                        )
+                        if vue_page.get_by_label("记忆分类筛选").input_value() != "fact":
+                            raise AssertionError("Vue memory category filter was not restored from URL")
+                        if vue_page.get_by_label("记忆状态筛选").input_value() != "confirmed":
+                            raise AssertionError("Vue memory status filter was not restored from URL")
+                        vue_page.locator(".filter-summary").get_by_text("事实", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".filter-summary").get_by_text("已确认", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".list-panel .memory-row").filter(has_text=vue_memory_content).first.wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_role("button", name="重置筛选").click()
+                        vue_page.wait_for_function(
+                            """() => {
+                                const params = new URL(window.location.href).searchParams;
+                                return !params.has("category") && !params.has("status");
+                            }""",
+                            timeout=15_000,
+                        )
                         source_memory_content = "Vue smoke sourced memory"
                         source_item_text = "Vue smoke source item"
                         vue_page.evaluate(

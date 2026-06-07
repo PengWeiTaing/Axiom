@@ -34,7 +34,7 @@ Capture -> Atlas -> Cosmos -> 近况 -> 处理 -> 搜索 -> 时间 -> 任务 -> 
 - `SearchView.vue` 是 Vue 主线搜索工作台，读取 `/search/all` 与 `/search/vector`，支持关键词/语义切换、跨记录/任务/记忆/决策分组展示；关键词模式下支持记录类型、来源、处理状态、处理覆盖筛选，并可对当前记录结果批量标记就绪或退回待处理；搜索词、模式和记录筛选会同步到 URL，方便刷新、分享和调试；记录结果可打开 `ItemDrawer.vue`，任务/记忆/决策结果可打开 `ObjectDrawer.vue`。
 - `TimelineView.vue` 是 Vue 主线时间流，读取 `/timeline`，把记录/任务/记忆/决策的创建与状态变更合成统一活动视图，支持按对象类型和日期窗口筛选；选中事件后在侧栏展示事件详情，记录事件可继续打开 `ItemDrawer.vue`，任务/记忆/决策事件可继续打开 `ObjectDrawer.vue`。
 - `TasksView.vue` 是 Vue 主线任务台，读取 `/tasks/today` 和 `/tasks`，支持快速新增、今日/逾期、状态/优先级筛选，以及完成、恢复、取消、安排到今天；任务列表筛选会同步到 URL，并支持从 URL 恢复筛选状态；列表项可用 `ObjectDrawer.vue` 查看完整任务详情。
-- `MemoriesView.vue` 是 Vue 主线记忆库，读取 `/memories/stats` 和 `/memories`，支持快速新增、分类/状态筛选、确认和归档；列表项可用 `ObjectDrawer.vue` 查看完整记忆详情，记忆来源记录可继续打开 `ItemDrawer.vue`。
+- `MemoriesView.vue` 是 Vue 主线记忆库，读取 `/memories/stats` 和 `/memories`，支持快速新增、分类/状态筛选、确认和归档；记忆列表筛选会同步到 URL，并支持从 URL 恢复筛选状态；列表项可用 `ObjectDrawer.vue` 查看完整记忆详情，记忆来源记录可继续打开 `ItemDrawer.vue`。
 - `DecisionsView.vue` 是 Vue 主线决策台，读取 `/decisions`，支持快速新增、状态筛选、填写实际结果并标记已回顾；列表项可用 `ObjectDrawer.vue` 查看完整决策详情。
 - `AutomationView.vue` 是 Vue 主线自动化中心，读取 `/automation/jobs` 和 `/automation/runs`，支持运行日期、手动触发、状态/任务过滤、运行详情和 Markdown 产物预览。
 - `SystemView.vue` 是 Vue 主线系统治理台，读取 `/system`、`/metrics`、`/audit-log` 和 `/admin/logs`，提供健康分、数据表、完整性、审计、日志尾部和数据导出。

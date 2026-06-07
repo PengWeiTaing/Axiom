@@ -47,6 +47,13 @@ const categoryStats = computed(() => stats.value?.by_category || {});
 const candidateCount = computed(() => sumStatus('candidate'));
 const confirmedCount = computed(() => sumStatus('confirmed'));
 const archivedCount = computed(() => sumStatus('archived'));
+const memoryFiltersActive = computed(() => Boolean(categoryFilter.value || statusFilter.value));
+const activeMemoryFilterChips = computed(() => {
+  const chips: string[] = [];
+  if (categoryFilter.value) chips.push(categoryLabel(categoryFilter.value));
+  if (statusFilter.value) chips.push(statusLabel(statusFilter.value));
+  return chips;
+});
 
 const categories: Array<{ key: MemoryCategory; label: string }> = [
   { key: 'fact', label: '事实' },
@@ -63,6 +70,7 @@ async function loadStats() {
 async function loadMemoryList(reset = true) {
   loading.value = true;
   error.value = null;
+  if (reset) syncMemoryListUrl();
   try {
     const nextPage = reset ? 1 : page.value + 1;
     const payload: MemoryList = await listMemories({
@@ -84,6 +92,26 @@ async function loadMemoryList(reset = true) {
 
 async function refreshAll() {
   await Promise.all([loadStats(), loadMemoryList(true)]);
+}
+
+function applyMemoryFilters() {
+  loadMemoryList(true);
+}
+
+function resetMemoryFilters() {
+  categoryFilter.value = '';
+  statusFilter.value = '';
+  loadMemoryList(true);
+}
+
+function syncMemoryListUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', 'memories');
+  if (categoryFilter.value) url.searchParams.set('category', categoryFilter.value);
+  else url.searchParams.delete('category');
+  if (statusFilter.value) url.searchParams.set('status', statusFilter.value);
+  else url.searchParams.delete('status');
+  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
 }
 
 async function submitMemory() {
@@ -157,7 +185,24 @@ function openSourceItem(id: number) {
   selectedItemId.value = id;
 }
 
-onMounted(refreshAll);
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search);
+  const initialCategory = params.get('category');
+  const initialStatus = params.get('status');
+  if (
+    initialCategory === 'fact' ||
+    initialCategory === 'preference' ||
+    initialCategory === 'goal' ||
+    initialCategory === 'relationship' ||
+    initialCategory === 'event'
+  ) {
+    categoryFilter.value = initialCategory;
+  }
+  if (initialStatus === 'candidate' || initialStatus === 'confirmed' || initialStatus === 'archived') {
+    statusFilter.value = initialStatus;
+  }
+  refreshAll();
+});
 </script>
 
 <template>
@@ -249,7 +294,7 @@ onMounted(refreshAll);
           <div class="filters">
             <label>
               <span>分类</span>
-              <select v-model="categoryFilter" aria-label="记忆分类筛选" @change="loadMemoryList(true)">
+              <select v-model="categoryFilter" aria-label="记忆分类筛选" @change="applyMemoryFilters">
                 <option value="">全部</option>
                 <option v-for="category in categories" :key="category.key" :value="category.key">
                   {{ category.label }}
@@ -258,7 +303,7 @@ onMounted(refreshAll);
             </label>
             <label>
               <span>状态</span>
-              <select v-model="statusFilter" aria-label="记忆状态筛选" @change="loadMemoryList(true)">
+              <select v-model="statusFilter" aria-label="记忆状态筛选" @change="applyMemoryFilters">
                 <option value="">全部</option>
                 <option value="candidate">候选</option>
                 <option value="confirmed">已确认</option>
@@ -266,6 +311,11 @@ onMounted(refreshAll);
               </select>
             </label>
           </div>
+        </div>
+
+        <div v-if="memoryFiltersActive" class="filter-summary" aria-label="当前记忆筛选">
+          <span v-for="chip in activeMemoryFilterChips" :key="chip">{{ chip }}</span>
+          <button type="button" :disabled="loading" @click="resetMemoryFilters">重置筛选</button>
         </div>
 
         <div v-if="memories.length" class="memory-list">
@@ -363,7 +413,8 @@ onMounted(refreshAll);
 .primary-action,
 .memory-actions button,
 .load-more,
-.notice button {
+.notice button,
+.filter-summary button {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -500,6 +551,32 @@ button:disabled {
 
 .filters {
   gap: var(--s-3);
+}
+
+.filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+}
+
+.filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(141, 164, 198, 0.20);
+  border-radius: 999px;
+  background: rgba(141, 164, 198, 0.09);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-2);
+}
+
+.filter-summary button {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  font-size: var(--fs-1);
 }
 
 .memory-list {
