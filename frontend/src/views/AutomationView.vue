@@ -4,6 +4,7 @@ import { getArtifactContent, getAutomationJobs, getAutomationRuns, runAutomation
 import type { AutomationJob, AutomationRun, AutomationRunListPayload, AutomationRunStatus } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { formatRelative } from '@/composables/useRelativeTime';
+import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
 
 const RUN_PAGE_SIZE = 8;
 
@@ -94,13 +95,10 @@ function resetRunFilters() {
 }
 
 function syncRunListUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('mode', 'automation');
-  if (filterJob.value) url.searchParams.set('job', filterJob.value);
-  else url.searchParams.delete('job');
-  if (filterStatus.value) url.searchParams.set('status', filterStatus.value);
-  else url.searchParams.delete('status');
-  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+  replaceRouteQuery('automation', {
+    job: filterJob.value,
+    status: filterStatus.value,
+  });
 }
 
 async function runJob(job: AutomationJob) {
@@ -207,7 +205,7 @@ async function openArtifact(run: AutomationRun) {
 }
 
 onMounted(() => {
-  const params = new URLSearchParams(window.location.search);
+  const params = currentRouteParams();
   const initialJob = params.get('job');
   const initialStatus = params.get('status');
   if (initialJob) filterJob.value = initialJob;

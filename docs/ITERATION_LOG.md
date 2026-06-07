@@ -703,3 +703,4 @@
 - `scripts/smoke_test_web_app.py` 补充 Vue 系统治理 `audit/level` URL 恢复与重置筛选的浏览器链路。
 - `frontend/src/styles/base.css` 抽出筛选摘要 chip 的通用样式，任务/记忆/决策/自动化/时间流/系统治理视图只保留局部间距和色相变量，减少后续筛选 UI 的重复样式维护。
 - `frontend/src/styles/base.css` 继续抽出筛选摘要重置按钮的通用样式和 hover 变量，任务/记忆/决策仅保留局部按钮色值覆盖，时间流/系统治理移除重复按钮规则。
+- 新增 `frontend/src/composables/useRouteQuery.ts`，抽出 URL 查询参数读取与 `replaceState` 同步 helper；决策台和自动化中心先迁入该 helper，开始收敛各视图手写 URL 筛选同步逻辑。

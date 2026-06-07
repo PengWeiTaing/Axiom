@@ -5,6 +5,7 @@ import { createDecision, listDecisions, reviewDecision } from '@/api/endpoints';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import type { Decision, DecisionList, DecisionStatus, ObjectTarget } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
+import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
 
 const PAGE_SIZE = 12;
 
@@ -82,11 +83,7 @@ function resetDecisionFilters() {
 }
 
 function syncDecisionListUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('mode', 'decisions');
-  if (statusFilter.value) url.searchParams.set('status', statusFilter.value);
-  else url.searchParams.delete('status');
-  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+  replaceRouteQuery('decisions', { status: statusFilter.value });
 }
 
 async function submitDecision() {
@@ -158,7 +155,7 @@ function openDecisionDetail(id: number) {
 }
 
 onMounted(() => {
-  const params = new URLSearchParams(window.location.search);
+  const params = currentRouteParams();
   const initialStatus = params.get('status');
   if (initialStatus === 'pending' || initialStatus === 'reviewed') {
     statusFilter.value = initialStatus;
