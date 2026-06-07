@@ -69,6 +69,15 @@ const recordFiltersActive = computed(() => Boolean(
   || processingStateFilter.value
   || processingOverrideFilter.value,
 ));
+const activeFilterChips = computed(() => {
+  const chips: string[] = [];
+  if (searchMode.value === 'vector') chips.push('语义搜索');
+  if (itemTypeFilter.value) chips.push(`类型 ${itemTypeLabel(itemTypeFilter.value)}`);
+  if (processingStateFilter.value) chips.push(`状态 ${processingStateFilter.value === 'pending' ? '待处理' : '已就绪'}`);
+  if (processingOverrideFilter.value) chips.push('手动完成');
+  if (sourceFilter.value.trim()) chips.push(`来源 ${sourceFilter.value.trim()}`);
+  return chips;
+});
 
 const groups = computed(() => [
   { kind: 'item' as const, label: '记录', items: groupedResults.value.item },
@@ -85,6 +94,7 @@ async function runSearch(options: { clearFeedback?: boolean } = {}) {
   error.value = null;
   if (clearFeedback) feedback.value = null;
   hasSearched.value = true;
+  syncSearchUrl(q);
   try {
     if (searchMode.value === 'vector') {
       const payload = await searchVector(q, 24);
@@ -126,6 +136,29 @@ function resetFilters() {
 function selectMode(next: SearchMode) {
   searchMode.value = next;
   if (query.value.trim()) runSearch();
+}
+
+function syncSearchUrl(q: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', 'search');
+  url.searchParams.set('q', q);
+  if (searchMode.value === 'vector') {
+    url.searchParams.set('search_mode', 'vector');
+  } else {
+    url.searchParams.delete('search_mode');
+  }
+
+  const filters: Array<[string, string]> = [
+    ['type', itemTypeFilter.value],
+    ['source', sourceFilter.value.trim()],
+    ['processing_state', processingStateFilter.value],
+    ['processing_override', processingOverrideFilter.value],
+  ];
+  for (const [key, value] of filters) {
+    if (searchMode.value === 'all' && value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  }
+  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
 }
 
 function openResult(result: SearchResult) {
@@ -251,7 +284,25 @@ function resultAccent(result: SearchResult): string {
 }
 
 onMounted(() => {
-  const initial = new URLSearchParams(window.location.search).get('q');
+  const params = new URLSearchParams(window.location.search);
+  const initialMode = params.get('search_mode');
+  const initialType = params.get('type');
+  const initialProcessingState = params.get('processing_state');
+  const initialProcessingOverride = params.get('processing_override');
+
+  searchMode.value = initialMode === 'vector' ? 'vector' : 'all';
+  if (['text', 'image', 'document', 'audio'].includes(initialType || '')) {
+    itemTypeFilter.value = initialType as ItemType;
+  }
+  if (initialProcessingState === 'pending' || initialProcessingState === 'ready') {
+    processingStateFilter.value = initialProcessingState;
+  }
+  if (initialProcessingOverride === 'ready') {
+    processingOverrideFilter.value = initialProcessingOverride;
+  }
+  sourceFilter.value = params.get('source') || '';
+
+  const initial = params.get('q');
   if (initial) {
     query.value = initial;
     runSearch();
@@ -338,6 +389,9 @@ onMounted(() => {
           >
             重置记录筛选
           </button>
+          <div v-if="activeFilterChips.length" class="active-filters" aria-label="当前搜索条件">
+            <span v-for="chip in activeFilterChips" :key="chip">{{ chip }}</span>
+          </div>
         </form>
 
         <div class="metrics" aria-label="搜索结果统计">
@@ -602,6 +656,26 @@ input::placeholder {
 .batch-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.active-filters span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  max-width: 100%;
+  border: 1px solid rgba(110, 231, 208, 0.16);
+  border-radius: var(--r-pill);
+  background: var(--accent-glow);
+  color: var(--text-2);
+  font-size: var(--fs-2);
+  padding: 0 var(--s-2);
+  overflow-wrap: anywhere;
 }
 
 .metrics {

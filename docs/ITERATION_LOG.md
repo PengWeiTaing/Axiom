@@ -687,3 +687,5 @@
 - `scripts/smoke_test_web_app.py` 补充 Vue 时间流“近 7 天”筛选的浏览器链路，确认新建记录仍在窗口内可见。
 - `TimelineView.vue` 增加事件选中详情面板：点击时间事件先在侧栏保留上下文与元数据，再通过“打开详情”进入记录或对象抽屉，避免长时间流浏览时丢失上下文。
 - `scripts/smoke_test_web_app.py` 同步覆盖 Vue 时间流“选中事件 -> 详情面板 -> 打开详情”的记录与任务链路。
+- `SearchView.vue` 增加搜索状态 URL 同步：查询词、关键词/语义模式和记录筛选会写入地址栏，并支持从 URL 恢复查询条件；侧栏增加当前搜索条件摘要。
+- `scripts/smoke_test_web_app.py` 补充 Vue 搜索页 URL 同步与 URL 参数恢复的浏览器链路。

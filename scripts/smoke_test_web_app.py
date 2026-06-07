@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -752,6 +753,22 @@ def main() -> None:
                             lambda response: "/search/all" in response.url and response.status == 200
                         ):
                             vue_page.locator("main").get_by_role("button", name="搜索").click()
+                        vue_page.wait_for_function(
+                            """() => new URL(window.location.href).searchParams.get("q") === "Vue smoke search target" """,
+                            timeout=15_000,
+                        )
+                        vue_page.locator(".result-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
+                        encoded_vue_search = urllib.parse.quote(vue_search_text)
+                        vue_page.goto(
+                            f"{base_url}/app?mode=search&q={encoded_vue_search}&type=text&source=vue_search_smoke",
+                            wait_until="networkidle",
+                        )
+                        if vue_page.get_by_label("搜索查询").input_value() != vue_search_text:
+                            raise AssertionError("Vue search query was not restored from URL")
+                        if vue_page.get_by_label("来源").input_value() != "vue_search_smoke":
+                            raise AssertionError("Vue search source filter was not restored from URL")
+                        vue_page.get_by_text("类型 文本", exact=True).wait_for(timeout=15_000)
+                        vue_page.get_by_text("来源 vue_search_smoke", exact=True).wait_for(timeout=15_000)
                         vue_page.locator(".result-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
                         vue_page.locator(".result-row").filter(has_text=vue_search_text).first.click()
                         vue_page.locator(".drawer-panel").get_by_text(vue_search_text, exact=False).wait_for(timeout=15_000)
