@@ -647,29 +647,8 @@ button:disabled {
 }
 
 .filter-summary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--s-2);
+  --filter-summary-accent: rgb(109, 181, 168);
   margin: calc(-1 * var(--s-2)) 0 var(--s-4);
-}
-
-.filter-summary span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  border: 1px solid rgba(109, 181, 168, 0.18);
-  border-radius: 999px;
-  background: rgba(109, 181, 168, 0.08);
-  color: var(--text-2);
-  font-size: var(--fs-1);
-  padding: 0 var(--s-2);
-}
-
-.filter-summary button {
-  min-height: 28px;
-  padding: 0 var(--s-3);
-  font-size: var(--fs-1);
 }
 
 .task-stack,

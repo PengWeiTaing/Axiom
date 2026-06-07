@@ -610,35 +610,16 @@ h2 {
 }
 
 .filter-summary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--s-2);
   margin-top: var(--s-4);
   padding-top: var(--s-4);
   border-top: 1px solid var(--line-1);
 }
 
-.filter-summary span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  border: 1px solid rgba(110, 231, 208, 0.20);
-  border-radius: var(--r-pill);
-  background: rgba(110, 231, 208, 0.08);
-  color: var(--text-2);
-  font-size: var(--fs-1);
-  padding: 0 var(--s-2);
-}
-
 .filter-summary button {
-  min-height: 28px;
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
   color: var(--text-3);
-  font-size: var(--fs-1);
-  padding: 0 var(--s-3);
 }
 
 .filter-summary button:hover:not(:disabled) {

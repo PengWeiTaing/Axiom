@@ -627,29 +627,7 @@ select {
 }
 
 .filter-summary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--s-2);
   margin: calc(-1 * var(--s-1)) 0 var(--s-3);
-}
-
-.filter-summary span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  border: 1px solid rgba(110, 231, 208, 0.20);
-  border-radius: var(--r-pill);
-  background: rgba(110, 231, 208, 0.08);
-  color: var(--text-2);
-  font-size: var(--fs-1);
-  padding: 0 var(--s-2);
-}
-
-.filter-summary button {
-  min-height: 28px;
-  padding: 0 var(--s-3);
-  font-size: var(--fs-1);
 }
 
 .run-row {

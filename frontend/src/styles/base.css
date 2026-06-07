@@ -110,6 +110,32 @@ a:hover {
 .muted { color: var(--text-3); }
 .dim   { color: var(--text-4); }
 
+.filter-summary {
+  --filter-summary-accent: var(--accent);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid color-mix(in srgb, var(--filter-summary-accent) 22%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--filter-summary-accent) 9%, transparent);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-2);
+}
+
+.filter-summary button {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  font-size: var(--fs-1);
+}
+
 /* 进出场动效统一 */
 .fade-enter-active,
 .fade-leave-active {
