@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { getArtifactContent, getAutomationJobs, getAutomationRuns, runAutomationJob } from '@/api/endpoints';
-import type { AutomationJob, AutomationRun, AutomationRunListPayload } from '@/api/types';
+import type { AutomationJob, AutomationRun, AutomationRunListPayload, AutomationRunStatus } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { formatRelative } from '@/composables/useRelativeTime';
 
@@ -30,6 +30,13 @@ const artifactForRunId = ref<number | null>(null);
 const readyJobs = computed(() => jobs.value.filter((job) => job.ready).length);
 const blockedJobs = computed(() => jobs.value.length - readyJobs.value);
 const canLoadMore = computed(() => runsPage.value < runsTotalPages.value);
+const runFiltersActive = computed(() => Boolean(filterJob.value || filterStatus.value));
+const activeRunFilterChips = computed(() => {
+  const chips: string[] = [];
+  if (filterJob.value) chips.push(historyJobLabel(filterJob.value));
+  if (filterStatus.value) chips.push(statusLabel(filterStatus.value));
+  return chips;
+});
 
 async function loadJobs() {
   loadingJobs.value = true;
@@ -51,6 +58,7 @@ async function loadJobs() {
 async function loadRuns(reset = true) {
   loadingRuns.value = true;
   error.value = null;
+  if (reset) syncRunListUrl();
   try {
     const nextPage = reset ? 1 : runsPage.value + 1;
     const payload: AutomationRunListPayload = await getAutomationRuns({
@@ -73,6 +81,26 @@ async function loadRuns(reset = true) {
 
 async function refreshAll() {
   await Promise.all([loadJobs(), loadRuns(true)]);
+}
+
+function applyRunFilters() {
+  loadRuns(true);
+}
+
+function resetRunFilters() {
+  filterJob.value = '';
+  filterStatus.value = '';
+  loadRuns(true);
+}
+
+function syncRunListUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', 'automation');
+  if (filterJob.value) url.searchParams.set('job', filterJob.value);
+  else url.searchParams.delete('job');
+  if (filterStatus.value) url.searchParams.set('status', filterStatus.value);
+  else url.searchParams.delete('status');
+  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
 }
 
 async function runJob(job: AutomationJob) {
@@ -110,6 +138,14 @@ function statusLabel(status: string): string {
     timeout: '超时',
   };
   return labels[status] || status;
+}
+
+function isRunStatus(value: string | null): value is AutomationRunStatus {
+  return value === 'success' || value === 'failed' || value === 'skipped' || value === 'running' || value === 'timeout';
+}
+
+function historyJobLabel(jobId: string): string {
+  return historyJobs.value.find((job) => job.id === jobId)?.label || jobs.value.find((job) => job.id === jobId)?.label || jobId;
 }
 
 function runtimeLabel(job: AutomationJob): string {
@@ -170,7 +206,14 @@ async function openArtifact(run: AutomationRun) {
   }
 }
 
-onMounted(refreshAll);
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search);
+  const initialJob = params.get('job');
+  const initialStatus = params.get('status');
+  if (initialJob) filterJob.value = initialJob;
+  if (isRunStatus(initialStatus)) filterStatus.value = initialStatus;
+  refreshAll();
+});
 </script>
 
 <template>
@@ -252,19 +295,26 @@ onMounted(refreshAll);
           </div>
         </div>
 
-        <form class="filters" @submit.prevent="loadRuns(true)">
-          <select v-model="filterJob">
+        <form class="filters" @submit.prevent="applyRunFilters">
+          <select v-model="filterJob" aria-label="自动化任务筛选">
             <option value="">全部任务</option>
             <option v-for="job in historyJobs" :key="job.id" :value="job.id">{{ job.label }}</option>
           </select>
-          <select v-model="filterStatus">
+          <select v-model="filterStatus" aria-label="自动化状态筛选">
             <option value="">全部状态</option>
             <option value="success">成功</option>
             <option value="failed">失败</option>
             <option value="skipped">跳过</option>
+            <option value="running">运行中</option>
+            <option value="timeout">超时</option>
           </select>
           <button type="submit" :disabled="loadingRuns">筛选</button>
         </form>
+
+        <div v-if="runFiltersActive" class="filter-summary" aria-label="当前自动化筛选">
+          <span v-for="chip in activeRunFilterChips" :key="chip">{{ chip }}</span>
+          <button type="button" :disabled="loadingRuns" @click="resetRunFilters">重置筛选</button>
+        </div>
 
         <div v-if="runs.length" class="run-list">
           <button
@@ -574,6 +624,32 @@ select {
   grid-template-columns: minmax(0, 1fr) minmax(110px, 0.5fr) auto;
   gap: var(--s-2);
   margin-bottom: var(--s-3);
+}
+
+.filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: calc(-1 * var(--s-1)) 0 var(--s-3);
+}
+
+.filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(110, 231, 208, 0.20);
+  border-radius: var(--r-pill);
+  background: rgba(110, 231, 208, 0.08);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-2);
+}
+
+.filter-summary button {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  font-size: var(--fs-1);
 }
 
 .run-row {

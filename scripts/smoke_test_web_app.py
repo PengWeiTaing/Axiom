@@ -1235,6 +1235,22 @@ def main() -> None:
                         artifact_preview.wait_for(timeout=15_000)
                         if not artifact_preview.inner_text().strip():
                             raise AssertionError("Vue automation artifact preview should not be empty")
+                        vue_page.goto(
+                            f"{base_url}/app?mode=automation&status=success",
+                            wait_until="networkidle",
+                        )
+                        if vue_page.get_by_label("自动化状态筛选").input_value() != "success":
+                            raise AssertionError("Vue automation status filter was not restored from URL")
+                        vue_page.locator(".filter-summary").get_by_text("成功", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".run-row").filter(has_text="生成 Inbox 报告").first.wait_for(timeout=15_000)
+                        vue_page.get_by_role("button", name="重置筛选").click()
+                        vue_page.wait_for_function(
+                            """() => {
+                                const params = new URL(window.location.href).searchParams;
+                                return !params.has("job") && !params.has("status");
+                            }""",
+                            timeout=15_000,
+                        )
                     finally:
                         vue_page.close()
 
