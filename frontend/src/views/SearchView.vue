@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';
+import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
 import { typeAccent } from '@/composables/useTypeAccent';
 import type { Decision, Item, ItemType, Memory, ObjectTarget, Task } from '@/api/types';
 
@@ -139,26 +140,15 @@ function selectMode(next: SearchMode) {
 }
 
 function syncSearchUrl(q: string) {
-  const url = new URL(window.location.href);
-  url.searchParams.set('mode', 'search');
-  url.searchParams.set('q', q);
-  if (searchMode.value === 'vector') {
-    url.searchParams.set('search_mode', 'vector');
-  } else {
-    url.searchParams.delete('search_mode');
-  }
-
-  const filters: Array<[string, string]> = [
-    ['type', itemTypeFilter.value],
-    ['source', sourceFilter.value.trim()],
-    ['processing_state', processingStateFilter.value],
-    ['processing_override', processingOverrideFilter.value],
-  ];
-  for (const [key, value] of filters) {
-    if (searchMode.value === 'all' && value) url.searchParams.set(key, value);
-    else url.searchParams.delete(key);
-  }
-  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+  const canUseRecordFilters = searchMode.value === 'all';
+  replaceRouteQuery('search', {
+    q,
+    search_mode: searchMode.value === 'vector' ? 'vector' : '',
+    type: canUseRecordFilters ? itemTypeFilter.value : '',
+    source: canUseRecordFilters ? sourceFilter.value.trim() : '',
+    processing_state: canUseRecordFilters ? processingStateFilter.value : '',
+    processing_override: canUseRecordFilters ? processingOverrideFilter.value : '',
+  });
 }
 
 function openResult(result: SearchResult) {
@@ -284,7 +274,7 @@ function resultAccent(result: SearchResult): string {
 }
 
 onMounted(() => {
-  const params = new URLSearchParams(window.location.search);
+  const params = currentRouteParams();
   const initialMode = params.get('search_mode');
   const initialType = params.get('type');
   const initialProcessingState = params.get('processing_state');
