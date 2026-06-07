@@ -805,6 +805,36 @@ def main() -> None:
                         ):
                             vue_page.get_by_role("button", name="近 7 天").click()
                         vue_page.locator(".entry-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
+                        timeline_today = datetime.now().date().isoformat()
+                        vue_page.goto(
+                            f"{base_url}/app?mode=timeline&kind=item&date_from={timeline_today}&date_to={timeline_today}",
+                            wait_until="networkidle",
+                        )
+                        timeline_kind_list = vue_page.locator(".kind-list")
+                        if (
+                            timeline_kind_list.get_by_role("button", name="记录").get_attribute("aria-pressed")
+                            != "true"
+                        ):
+                            raise AssertionError("Vue timeline item kind was not restored from URL")
+                        if (
+                            timeline_kind_list.get_by_role("button", name="任务").get_attribute("aria-pressed")
+                            != "false"
+                        ):
+                            raise AssertionError("Vue timeline task kind should be disabled from URL filter")
+                        if vue_page.get_by_label("起始日期").input_value() != timeline_today:
+                            raise AssertionError("Vue timeline date_from was not restored from URL")
+                        if vue_page.get_by_label("结束日期").input_value() != timeline_today:
+                            raise AssertionError("Vue timeline date_to was not restored from URL")
+                        vue_page.locator(".filter-summary").get_by_text("类型 记录", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".entry-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
+                        vue_page.get_by_role("button", name="重置筛选").click()
+                        vue_page.wait_for_function(
+                            """() => {
+                                const params = new URL(window.location.href).searchParams;
+                                return !params.has("kind") && !params.has("date_from") && !params.has("date_to");
+                            }""",
+                            timeout=15_000,
+                        )
                         vue_page.goto(f"{base_url}/app?mode=system", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="系统治理").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="运行状态").wait_for(timeout=15_000)

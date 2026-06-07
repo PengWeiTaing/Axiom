@@ -36,6 +36,18 @@ const enabledKinds = computed(() =>
 const canLoadMore = computed(() => page.value < totalPages.value);
 const dateFilterActive = computed(() => Boolean(dateFrom.value || dateTo.value));
 const activeEntry = computed(() => selectedEntry.value || entries.value[0] || null);
+const allKinds: TimelineKind[] = ['item', 'task', 'memory', 'decision'];
+
+const timelineFiltersActive = computed(() => dateFilterActive.value || enabledKinds.value.length < allKinds.length);
+const activeTimelineFilterChips = computed(() => {
+  const chips: string[] = [];
+  if (enabledKinds.value.length < allKinds.length) {
+    chips.push(`类型 ${enabledKinds.value.map(kindLabel).join('、')}`);
+  }
+  if (dateFrom.value) chips.push(`起始 ${dateFrom.value}`);
+  if (dateTo.value) chips.push(`结束 ${dateTo.value}`);
+  return chips;
+});
 
 const counts = computed(() => {
   const next: Record<TimelineKind, number> = { item: 0, task: 0, memory: 0, decision: 0 };
@@ -46,6 +58,7 @@ const counts = computed(() => {
 async function loadTimeline(reset = true) {
   loading.value = true;
   error.value = null;
+  if (reset) syncTimelineUrl();
   try {
     const nextPage = reset ? 1 : page.value + 1;
     const payload: TimelinePayload = await getTimeline({
@@ -91,6 +104,13 @@ function setDateWindow(days: number) {
 }
 
 function clearDateWindow() {
+  dateFrom.value = '';
+  dateTo.value = '';
+  loadTimeline(true);
+}
+
+function resetTimelineFilters() {
+  for (const kind of allKinds) selectedKinds.value[kind] = true;
   dateFrom.value = '';
   dateTo.value = '';
   loadTimeline(true);
@@ -192,7 +212,39 @@ function toDateInputValue(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-onMounted(() => loadTimeline(true));
+function syncTimelineUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', 'timeline');
+  if (enabledKinds.value.length < allKinds.length) url.searchParams.set('kind', enabledKinds.value.join(','));
+  else url.searchParams.delete('kind');
+  if (dateFrom.value) url.searchParams.set('date_from', dateFrom.value);
+  else url.searchParams.delete('date_from');
+  if (dateTo.value) url.searchParams.set('date_to', dateTo.value);
+  else url.searchParams.delete('date_to');
+  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+}
+
+function isTimelineKind(value: string): value is TimelineKind {
+  return allKinds.includes(value as TimelineKind);
+}
+
+function restoreTimelineFiltersFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const kinds = (params.get('kind') || '')
+    .split(',')
+    .map((kind) => kind.trim())
+    .filter(isTimelineKind);
+  if (kinds.length) {
+    for (const kind of allKinds) selectedKinds.value[kind] = kinds.includes(kind);
+  }
+  dateFrom.value = params.get('date_from') || '';
+  dateTo.value = params.get('date_to') || '';
+}
+
+onMounted(() => {
+  restoreTimelineFiltersFromUrl();
+  loadTimeline(true);
+});
 </script>
 
 <template>
@@ -241,6 +293,7 @@ onMounted(() => loadTimeline(true));
             type="button"
             :class="{ active: selectedKinds[kind] }"
             :style="{ '--kind-accent': kindAccent(kind) }"
+            :aria-pressed="selectedKinds[kind]"
             @click="toggleKind(kind)"
           >
             <span />
@@ -263,6 +316,11 @@ onMounted(() => loadTimeline(true));
             <button type="button" @click="setDateWindow(30)">近 30 天</button>
             <button type="button" :disabled="!dateFilterActive" @click="clearDateWindow">全部时间</button>
           </div>
+        </div>
+
+        <div v-if="timelineFiltersActive" class="filter-summary" aria-label="当前时间流筛选">
+          <span v-for="chip in activeTimelineFilterChips" :key="chip">{{ chip }}</span>
+          <button type="button" :disabled="loading" @click="resetTimelineFilters">重置筛选</button>
         </div>
 
         <div class="event-panel" aria-label="时间事件详情">
@@ -549,6 +607,43 @@ h2 {
 .date-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line-1);
+}
+
+.filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(110, 231, 208, 0.20);
+  border-radius: var(--r-pill);
+  background: rgba(110, 231, 208, 0.08);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-2);
+}
+
+.filter-summary button {
+  min-height: 28px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--text-3);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-3);
+}
+
+.filter-summary button:hover:not(:disabled) {
+  border-color: var(--line-2);
+  color: var(--text-1);
 }
 
 .event-panel {

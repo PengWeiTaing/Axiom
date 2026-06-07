@@ -697,3 +697,5 @@
 - `scripts/smoke_test_web_app.py` 补充 Vue 决策台 `status` URL 恢复与重置筛选的浏览器链路。
 - `AutomationView.vue` 增加运行记录筛选 URL 同步：任务/状态筛选会写入地址栏并支持从 URL 恢复；运行记录区增加当前筛选摘要和重置筛选入口。
 - `scripts/smoke_test_web_app.py` 补充 Vue 自动化中心 `status` URL 恢复与重置筛选的浏览器链路。
+- `TimelineView.vue` 增加时间流筛选 URL 同步：对象类型、起始日期、结束日期会写入地址栏并支持从 URL 恢复；侧栏增加当前筛选摘要和重置筛选入口。
+- `scripts/smoke_test_web_app.py` 补充 Vue 时间流 `kind/date_from/date_to` URL 恢复与重置筛选的浏览器链路。
