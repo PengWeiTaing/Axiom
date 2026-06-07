@@ -5,6 +5,7 @@ import { getTimeline } from '@/api/endpoints';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';
+import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
 import type { ObjectTarget, TimelineEntry, TimelineKind, TimelinePayload } from '@/api/types';
 
 const PAGE_SIZE = 28;
@@ -213,15 +214,11 @@ function toDateInputValue(value: Date): string {
 }
 
 function syncTimelineUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('mode', 'timeline');
-  if (enabledKinds.value.length < allKinds.length) url.searchParams.set('kind', enabledKinds.value.join(','));
-  else url.searchParams.delete('kind');
-  if (dateFrom.value) url.searchParams.set('date_from', dateFrom.value);
-  else url.searchParams.delete('date_from');
-  if (dateTo.value) url.searchParams.set('date_to', dateTo.value);
-  else url.searchParams.delete('date_to');
-  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+  replaceRouteQuery('timeline', {
+    kind: enabledKinds.value.length < allKinds.length ? enabledKinds.value.join(',') : '',
+    date_from: dateFrom.value,
+    date_to: dateTo.value,
+  });
 }
 
 function isTimelineKind(value: string): value is TimelineKind {
@@ -229,7 +226,7 @@ function isTimelineKind(value: string): value is TimelineKind {
 }
 
 function restoreTimelineFiltersFromUrl() {
-  const params = new URLSearchParams(window.location.search);
+  const params = currentRouteParams();
   const kinds = (params.get('kind') || '')
     .split(',')
     .map((kind) => kind.trim())
