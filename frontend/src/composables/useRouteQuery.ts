@@ -4,6 +4,14 @@ export function currentRouteParams(): URLSearchParams {
   return new URLSearchParams(window.location.search);
 }
 
+export function currentRoutePathname(): string {
+  return window.location.pathname;
+}
+
+export function currentRoutePathWithSearch(): string {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
 export function replaceRouteQuery(mode: string, values: Record<string, QueryValue>) {
   const url = new URL(window.location.href);
   url.searchParams.set('mode', mode);

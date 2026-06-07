@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { currentRouteParams, currentRoutePathname, currentRoutePathWithSearch } from '@/composables/useRouteQuery';
 
 export type AppMode = 'capture' | 'atlas' | 'cosmos' | 'recent' | 'processing' | 'search' | 'timeline' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
 
@@ -11,10 +12,10 @@ function isMode(value: string | null): value is AppMode {
 
 function modeFromLocation(): AppMode {
   if (typeof window === 'undefined') return 'capture';
-  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  const path = currentRoutePathname().replace(/\/+$/, '') || '/';
   if (path === '/atlas') return 'atlas';
   if (path.startsWith('/board')) return 'board';
-  const requested = new URLSearchParams(window.location.search).get('mode');
+  const requested = currentRouteParams().get('mode');
   return isMode(requested) ? requested : 'capture';
 }
 
@@ -49,7 +50,7 @@ export const useModeStore = defineStore('mode', () => {
       return;
     }
     const next = urlForMode(m);
-    const current = `${window.location.pathname}${window.location.search}`;
+    const current = currentRoutePathWithSearch();
     if (current !== next) window.history.pushState({}, '', next);
   }
 
