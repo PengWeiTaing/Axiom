@@ -840,6 +840,24 @@ def main() -> None:
                         vue_page.get_by_role("heading", name="运行状态").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="数据表").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="审计日志").wait_for(timeout=15_000)
+                        vue_page.goto(
+                            f"{base_url}/app?mode=system&audit=system&level=info",
+                            wait_until="networkidle",
+                        )
+                        if vue_page.get_by_label("审计对象筛选").input_value() != "system":
+                            raise AssertionError("Vue system audit filter was not restored from URL")
+                        if vue_page.get_by_label("日志等级筛选").input_value() != "info":
+                            raise AssertionError("Vue system log level was not restored from URL")
+                        vue_page.locator(".filter-summary").get_by_text("审计 系统", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".filter-summary").get_by_text("日志 INFO", exact=True).wait_for(timeout=15_000)
+                        vue_page.get_by_role("button", name="重置筛选").click()
+                        vue_page.wait_for_function(
+                            """() => {
+                                const params = new URL(window.location.href).searchParams;
+                                return !params.has("audit") && !params.has("level");
+                            }""",
+                            timeout=15_000,
+                        )
                         with vue_page.expect_download() as export_download_info:
                             vue_page.get_by_role("button", name="导出数据").click()
                         export_download = export_download_info.value

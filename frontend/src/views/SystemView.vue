@@ -17,6 +17,9 @@ const exportMessage = ref<string | null>(null);
 const auditTarget = ref('');
 const logLevel = ref('');
 
+type AuditTarget = 'item' | 'task' | 'memory' | 'decision' | 'system';
+type LogLevel = 'info' | 'warning' | 'error';
+
 const tableRows = computed(() => {
   const tables = system.value?.tables || {};
   return Object.entries(tables)
@@ -26,6 +29,13 @@ const tableRows = computed(() => {
 
 const latestMigrations = computed(() => (system.value?.migrations || []).slice(-5).reverse());
 const auditEntries = computed<AuditLogEntry[]>(() => audit.value?.entries || []);
+const systemFiltersActive = computed(() => Boolean(auditTarget.value || logLevel.value));
+const activeSystemFilterChips = computed(() => {
+  const chips: string[] = [];
+  if (auditTarget.value) chips.push(`审计 ${auditTargetLabel(auditTarget.value)}`);
+  if (logLevel.value) chips.push(`日志 ${logLevelLabel(logLevel.value)}`);
+  return chips;
+});
 const healthLevel = computed(() => {
   const score = system.value?.health_score ?? 0;
   if (score >= 75) return 'good';
@@ -36,6 +46,7 @@ const healthLevel = computed(() => {
 async function refreshAll() {
   loading.value = true;
   error.value = null;
+  syncSystemUrl();
   try {
     const [systemPayload, metricsPayload, auditPayload] = await Promise.all([
       getSystemInfo(),
@@ -55,6 +66,7 @@ async function refreshAll() {
 
 async function loadAudit() {
   error.value = null;
+  syncSystemUrl();
   try {
     audit.value = await getAuditLog({ page: 1, page_size: 12, target_type: auditTarget.value || undefined });
   } catch (err) {
@@ -64,6 +76,7 @@ async function loadAudit() {
 
 async function loadLogs() {
   logError.value = null;
+  syncSystemUrl();
   try {
     logs.value = await getAdminLogs({ lines: 16, level: logLevel.value || undefined });
   } catch (err) {
@@ -93,6 +106,12 @@ async function handleExport() {
   } finally {
     exporting.value = false;
   }
+}
+
+async function resetSystemFilters() {
+  auditTarget.value = '';
+  logLevel.value = '';
+  await Promise.all([loadAudit(), loadLogs()]);
 }
 
 function formatBytes(mb: number): string {
@@ -134,7 +153,56 @@ function actionLabel(action: string): string {
   return labels[action] || action;
 }
 
-onMounted(refreshAll);
+function auditTargetLabel(value: string): string {
+  const labels: Record<AuditTarget, string> = {
+    item: '记录',
+    task: '任务',
+    memory: '记忆',
+    decision: '决策',
+    system: '系统',
+  };
+  return labels[value as AuditTarget] || value;
+}
+
+function logLevelLabel(value: string): string {
+  const labels: Record<LogLevel, string> = {
+    info: 'INFO',
+    warning: 'WARNING',
+    error: 'ERROR',
+  };
+  return labels[value as LogLevel] || value.toUpperCase();
+}
+
+function syncSystemUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', 'system');
+  if (auditTarget.value) url.searchParams.set('audit', auditTarget.value);
+  else url.searchParams.delete('audit');
+  if (logLevel.value) url.searchParams.set('level', logLevel.value);
+  else url.searchParams.delete('level');
+  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+}
+
+function isAuditTarget(value: string | null): value is AuditTarget {
+  return value === 'item' || value === 'task' || value === 'memory' || value === 'decision' || value === 'system';
+}
+
+function isLogLevel(value: string | null): value is LogLevel {
+  return value === 'info' || value === 'warning' || value === 'error';
+}
+
+function restoreSystemFiltersFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const initialAudit = params.get('audit');
+  const initialLevel = params.get('level');
+  if (isAuditTarget(initialAudit)) auditTarget.value = initialAudit;
+  if (isLogLevel(initialLevel)) logLevel.value = initialLevel;
+}
+
+onMounted(() => {
+  restoreSystemFiltersFromUrl();
+  refreshAll();
+});
 </script>
 
 <template>
@@ -160,6 +228,10 @@ onMounted(refreshAll);
     </div>
     <div v-if="exportMessage" class="notice success-row">
       <span>{{ exportMessage }}</span>
+    </div>
+    <div v-if="systemFiltersActive" class="filter-summary" aria-label="当前系统筛选">
+      <span v-for="chip in activeSystemFilterChips" :key="chip">{{ chip }}</span>
+      <button type="button" :disabled="loading" @click="resetSystemFilters">重置筛选</button>
     </div>
 
     <section class="health-strip">
@@ -259,7 +331,7 @@ onMounted(refreshAll);
         </div>
 
         <form class="filters" @submit.prevent="loadAudit">
-          <select v-model="auditTarget">
+          <select v-model="auditTarget" aria-label="审计对象筛选">
             <option value="">全部对象</option>
             <option value="item">记录</option>
             <option value="task">任务</option>
@@ -291,7 +363,7 @@ onMounted(refreshAll);
         </div>
 
         <form class="filters" @submit.prevent="loadLogs">
-          <select v-model="logLevel">
+          <select v-model="logLevel" aria-label="日志等级筛选">
             <option value="">全部级别</option>
             <option value="info">INFO</option>
             <option value="warning">WARNING</option>
@@ -408,6 +480,41 @@ h3 {
 .success-row {
   border-color: rgba(110, 231, 208, 0.18);
   color: var(--accent-bright);
+}
+
+.filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-4);
+}
+
+.filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(110, 231, 208, 0.20);
+  border-radius: var(--r-pill);
+  background: rgba(110, 231, 208, 0.08);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-2);
+}
+
+.filter-summary button {
+  min-height: 28px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+  color: var(--text-3);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-3);
+}
+
+.filter-summary button:hover:not(:disabled) {
+  border-color: var(--line-2);
+  color: var(--text-1);
 }
 
 .health-strip {
