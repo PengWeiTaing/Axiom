@@ -689,3 +689,5 @@
 - `scripts/smoke_test_web_app.py` 同步覆盖 Vue 时间流“选中事件 -> 详情面板 -> 打开详情”的记录与任务链路。
 - `SearchView.vue` 增加搜索状态 URL 同步：查询词、关键词/语义模式和记录筛选会写入地址栏，并支持从 URL 恢复查询条件；侧栏增加当前搜索条件摘要。
 - `scripts/smoke_test_web_app.py` 补充 Vue 搜索页 URL 同步与 URL 参数恢复的浏览器链路。
+- `TasksView.vue` 增加任务列表筛选 URL 同步：状态/优先级筛选会写入地址栏并支持从 URL 恢复；全部任务区增加当前筛选摘要和重置筛选入口。
+- `scripts/smoke_test_web_app.py` 补充 Vue 任务台 `status/priority` URL 恢复与重置筛选的浏览器链路。

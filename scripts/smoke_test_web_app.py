@@ -958,6 +958,27 @@ def main() -> None:
                         vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).filter(
                             has_text="已完成"
                         ).first.wait_for(timeout=15_000)
+                        vue_page.goto(
+                            f"{base_url}/app?mode=tasks&status=done&priority=medium",
+                            wait_until="networkidle",
+                        )
+                        if vue_page.get_by_label("任务状态筛选").input_value() != "done":
+                            raise AssertionError("Vue task status filter was not restored from URL")
+                        if vue_page.get_by_label("优先级筛选").input_value() != "medium":
+                            raise AssertionError("Vue task priority filter was not restored from URL")
+                        vue_page.locator(".filter-summary").get_by_text("已完成", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".filter-summary").get_by_text("中优先级", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).first.wait_for(
+                            timeout=15_000
+                        )
+                        vue_page.get_by_role("button", name="重置筛选").click()
+                        vue_page.wait_for_function(
+                            """() => {
+                                const params = new URL(window.location.href).searchParams;
+                                return !params.has("status") && !params.has("priority");
+                            }""",
+                            timeout=15_000,
+                        )
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="搜索").wait_for(timeout=15_000)
                         vue_page.get_by_label("搜索查询").fill(vue_task_title)

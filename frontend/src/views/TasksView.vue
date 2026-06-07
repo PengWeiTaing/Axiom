@@ -42,6 +42,13 @@ const draft = ref({
 const canLoadMore = computed(() => page.value < totalPages.value);
 const todoCount = computed(() => tasks.value.filter((task) => task.status === 'todo').length);
 const doneCount = computed(() => tasks.value.filter((task) => task.status === 'done').length);
+const taskFiltersActive = computed(() => Boolean(statusFilter.value || priorityFilter.value));
+const activeTaskFilterChips = computed(() => {
+  const chips: string[] = [];
+  if (statusFilter.value) chips.push(`${statusLabel(statusFilter.value)}`);
+  if (priorityFilter.value) chips.push(`${priorityLabel(priorityFilter.value)}优先级`);
+  return chips;
+});
 
 async function loadToday() {
   loadingToday.value = true;
@@ -60,6 +67,7 @@ async function loadToday() {
 async function loadTaskList(reset = true) {
   loadingList.value = true;
   error.value = null;
+  if (reset) syncTaskListUrl();
   try {
     const nextPage = reset ? 1 : page.value + 1;
     const payload: TaskList = await listTasks({
@@ -81,6 +89,26 @@ async function loadTaskList(reset = true) {
 
 async function refreshAll() {
   await Promise.all([loadToday(), loadTaskList(true)]);
+}
+
+function applyTaskFilters() {
+  loadTaskList(true);
+}
+
+function resetTaskFilters() {
+  statusFilter.value = '';
+  priorityFilter.value = '';
+  loadTaskList(true);
+}
+
+function syncTaskListUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', 'tasks');
+  if (statusFilter.value) url.searchParams.set('status', statusFilter.value);
+  else url.searchParams.delete('status');
+  if (priorityFilter.value) url.searchParams.set('priority', priorityFilter.value);
+  else url.searchParams.delete('priority');
+  window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
 }
 
 async function submitTask() {
@@ -177,7 +205,18 @@ function openTaskDetail(id: number) {
   selectedObject.value = { kind: 'task', id };
 }
 
-onMounted(refreshAll);
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search);
+  const initialStatus = params.get('status');
+  const initialPriority = params.get('priority');
+  if (initialStatus === 'todo' || initialStatus === 'done' || initialStatus === 'cancelled') {
+    statusFilter.value = initialStatus;
+  }
+  if (initialPriority === 'high' || initialPriority === 'medium' || initialPriority === 'low') {
+    priorityFilter.value = initialPriority;
+  }
+  refreshAll();
+});
 </script>
 
 <template>
@@ -328,7 +367,7 @@ onMounted(refreshAll);
         <div class="filters">
           <label>
             <span>状态</span>
-            <select v-model="statusFilter" aria-label="任务状态筛选" @change="loadTaskList(true)">
+            <select v-model="statusFilter" aria-label="任务状态筛选" @change="applyTaskFilters">
               <option value="">全部</option>
               <option value="todo">待办</option>
               <option value="done">已完成</option>
@@ -337,7 +376,7 @@ onMounted(refreshAll);
           </label>
           <label>
             <span>优先级</span>
-            <select v-model="priorityFilter" aria-label="优先级筛选" @change="loadTaskList(true)">
+            <select v-model="priorityFilter" aria-label="优先级筛选" @change="applyTaskFilters">
               <option value="">全部</option>
               <option value="high">高</option>
               <option value="medium">中</option>
@@ -345,6 +384,11 @@ onMounted(refreshAll);
             </select>
           </label>
         </div>
+      </div>
+
+      <div v-if="taskFiltersActive" class="filter-summary" aria-label="当前任务筛选">
+        <span v-for="chip in activeTaskFilterChips" :key="chip">{{ chip }}</span>
+        <button type="button" :disabled="loadingList" @click="resetTaskFilters">重置筛选</button>
       </div>
 
       <div v-if="tasks.length" class="task-list">
@@ -448,7 +492,8 @@ onMounted(refreshAll);
 .primary-action,
 .task-actions button,
 .load-more,
-.notice button {
+.notice button,
+.filter-summary button {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -599,6 +644,32 @@ button:disabled {
 .form-row label,
 .filters label {
   flex: 1;
+}
+
+.filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+}
+
+.filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(109, 181, 168, 0.18);
+  border-radius: 999px;
+  background: rgba(109, 181, 168, 0.08);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  padding: 0 var(--s-2);
+}
+
+.filter-summary button {
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  font-size: var(--fs-1);
 }
 
 .task-stack,
