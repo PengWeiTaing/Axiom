@@ -11,10 +11,11 @@
  *   - 可切到 /search/vector（语义）
  */
 
-import { ref, watch, onBeforeUnmount, nextTick } from 'vue';
+import { ref, watch, nextTick } from 'vue';
 import { searchAll, searchVector } from '@/api/endpoints';
 import type { Item, Memory, Task, Decision, ObjectTarget } from '@/api/types';
 import { useWindowEventListener } from '@/composables/useEventListener';
+import { useTimeout } from '@/composables/useTimeout';
 import { ApiError } from '@/api/client';
 
 const props = defineProps<{ open: boolean }>();
@@ -33,8 +34,8 @@ type Result =
   | { kind: 'decision'; data: Decision };
 
 const results = ref<Result[]>([]);
-let debounce: number | undefined;
 let aborter: AbortController | null = null;
+const debounce = useTimeout();
 
 watch(() => props.open, async (open) => {
   if (open) {
@@ -48,13 +49,13 @@ watch(() => props.open, async (open) => {
 });
 
 watch(query, () => {
-  if (debounce) clearTimeout(debounce);
+  debounce.clear();
   if (!query.value.trim()) {
     results.value = [];
     error.value = null;
     return;
   }
-  debounce = window.setTimeout(run, 220);
+  debounce.schedule(run, 220);
 });
 
 watch(mode, () => {
@@ -90,10 +91,6 @@ async function run() {
 }
 
 useWindowEventListener('keydown', onKey);
-
-onBeforeUnmount(() => {
-  if (debounce) clearTimeout(debounce);
-});
 
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.open) {

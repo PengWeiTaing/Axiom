@@ -724,3 +724,5 @@
 - 新增 `frontend/src/composables/useDownload.ts`，集中已有 URL 与 Blob 下载触发逻辑；ItemDrawer 文件下载和 SystemView 数据导出不再各自手写临时 `<a>` 标签。
 - ItemDrawer 的无预览文件下载路径改用 `downloadBlob`，临时 object URL 的创建与释放也收敛到下载 helper 内部。
 - 新增 `frontend/src/composables/useTimeout.ts`，先迁入 QuickCapture 的成功 toast 定时器，避免组件内重复手写 timeout 清理样板。
+- SearchOverlay 的搜索 debounce 迁入 `useTimeout`，保留输入停顿 220ms 搜索行为，同时移除组件内手写 timeout 卸载清理。
+- `smoke_test_web_app.py` 的 Vue 时间流 URL 恢复校验改用测试记录自身 `created_at` 日期，避免午夜或 UTC/本地日期交界时误判。

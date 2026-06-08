@@ -683,7 +683,7 @@ def main() -> None:
                         vue_page.get_by_role("heading", name=vue_board_title).first.wait_for(timeout=15_000)
                         vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         vue_search_text = "Vue smoke search target"
-                        vue_page.evaluate(
+                        vue_search_payload = vue_page.evaluate(
                             """
                             async (text) => {
                                 const response = await fetch("/add", {
@@ -695,10 +695,13 @@ def main() -> None:
                                     body: JSON.stringify({ text, source: "vue_search_smoke" }),
                                 });
                                 if (!response.ok) throw new Error(await response.text());
+                                return response.json();
                             }
                             """,
                             vue_search_text,
                         )
+                        vue_search_created_at = vue_search_payload["item"].get("created_at", "")
+                        vue_search_date = vue_search_created_at[:10] or current_local_date_iso()
                         vue_page.goto(f"{base_url}/app", wait_until="networkidle")
                         vue_file_note = "Vue smart input attachment"
                         vue_page.locator(".smart-input textarea").fill(vue_file_note)
@@ -805,9 +808,8 @@ def main() -> None:
                         ):
                             vue_page.get_by_role("button", name="近 7 天").click()
                         vue_page.locator(".entry-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
-                        timeline_today = datetime.now().date().isoformat()
                         vue_page.goto(
-                            f"{base_url}/app?mode=timeline&kind=item&date_from={timeline_today}&date_to={timeline_today}",
+                            f"{base_url}/app?mode=timeline&kind=item&date_from={vue_search_date}&date_to={vue_search_date}",
                             wait_until="networkidle",
                         )
                         timeline_kind_list = vue_page.locator(".kind-list")
@@ -821,9 +823,9 @@ def main() -> None:
                             != "false"
                         ):
                             raise AssertionError("Vue timeline task kind should be disabled from URL filter")
-                        if vue_page.get_by_label("起始日期").input_value() != timeline_today:
+                        if vue_page.get_by_label("起始日期").input_value() != vue_search_date:
                             raise AssertionError("Vue timeline date_from was not restored from URL")
-                        if vue_page.get_by_label("结束日期").input_value() != timeline_today:
+                        if vue_page.get_by_label("结束日期").input_value() != vue_search_date:
                             raise AssertionError("Vue timeline date_to was not restored from URL")
                         vue_page.locator(".filter-summary").get_by_text("类型 记录", exact=True).wait_for(timeout=15_000)
                         vue_page.locator(".entry-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
