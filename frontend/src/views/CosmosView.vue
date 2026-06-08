@@ -7,8 +7,9 @@ import type { PathHighlight3D } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
 import type { CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
-import { RADII } from '@/cosmos/layout'
+import { RADII, computeFocusLayout } from '@/cosmos/layout'
 import * as THREE from 'three'
+import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import Breadcrumb from '@/components/cosmos/Breadcrumb.vue'
 import LifelinePanel from '@/components/LifelinePanel.vue'
 import NodeDetailCard from '@/components/cosmos/NodeDetailCard.vue'
@@ -317,7 +318,6 @@ let lineSetResolution: ((w: number, h: number) => void) | null = null
 async function start() {
   if (!store.data || !canvasRef.value) return
   const OrbitControls = (await import('three/examples/jsm/controls/OrbitControls.js')).OrbitControls
-  const { CSS2DRenderer } = await import('three/examples/jsm/renderers/CSS2DRenderer.js')
 
   sceneObjs = await initScene(canvasRef.value, store.data)
   controls = new OrbitControls(sceneObjs.camera, sceneObjs.renderer.domElement)
@@ -350,7 +350,6 @@ async function start() {
     const cnt = countMap.get(n.id) || 0
     div.textContent = String(cnt)
     div.style.cssText = 'font-size:9px;color:var(--text-4);font-family:var(--font-mono);text-align:center;'
-    const { CSS2DObject } = await import('three/examples/jsm/renderers/CSS2DRenderer.js')
     const label = new CSS2DObject(div)
     label.position.copy(n.position.clone().add(new THREE.Vector3(0, -0.07, 0)))
     sceneObjs.scene.add(label)
@@ -1006,8 +1005,6 @@ async function onStateChange() {
     const camPos = dir.clone().multiplyScalar(dist)
     tweenCamera(sceneObjs.camera, controls, camPos, n.position, s.kind === 'node_focus' ? 35 : 55, 800)
 
-    // 星座布局
-    const { computeFocusLayout } = await import('@/cosmos/layout')
     const { targets, constellationIds } = computeFocusLayout(
       nodes,
       targetId,
