@@ -729,3 +729,4 @@
 - Cosmos/Atlas 的导出弹窗改用 `downloadBlob`，导出 JSON/Markdown 时不再单独手写 Blob URL 与临时 `<a>` 标签。
 - Cosmos 图例栏的自动淡出 timer 迁入 `useTimeout`，图例 hover/过滤变化后的淡出逻辑不再手写卸载清理。
 - `smoke_test_web_app.py` 在 Vue Recent/Processing 的“退回待处理”流程中先等待按钮启用再点击，减少 mark-ready 后 UI 刷新竞争导致的误报。
+- ItemDrawer 的删除二次确认 timer 迁入 `useTimeout`，确认态自动恢复与组件卸载清理继续收敛到统一定时器 helper。

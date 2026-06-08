@@ -23,6 +23,7 @@ import { useWindowEventListener } from '@/composables/useEventListener'
 import { humanSize } from '@/composables/useHumanSize'
 import { formatRelative } from '@/composables/useRelativeTime'
 import { downloadBlob, triggerDownloadUrl } from '@/composables/useDownload'
+import { useTimeout } from '@/composables/useTimeout'
 import { ApiError } from '@/api/client'
 import type { ItemDetail } from '@/api/types'
 
@@ -46,7 +47,7 @@ const editFeedback = ref<string | null>(null)
 
 // 删除二次确认
 const deleteConfirm = ref(false)
-let deleteTimer: number | undefined
+const deleteTimer = useTimeout()
 
 watch(() => props.itemId, async (id) => {
   if (id === null) {
@@ -332,12 +333,12 @@ async function doDelete() {
   if (!detail.value) return
   if (!deleteConfirm.value) {
     deleteConfirm.value = true
-    deleteTimer = window.setTimeout(() => {
+    deleteTimer.schedule(() => {
       deleteConfirm.value = false
     }, 2000)
     return
   }
-  if (deleteTimer) clearTimeout(deleteTimer)
+  deleteTimer.clear()
   deleteConfirm.value = false
   acting.value = true
   error.value = null
@@ -380,7 +381,6 @@ function onKey(e: KeyboardEvent) {
 useWindowEventListener('keydown', onKey)
 
 onBeforeUnmount(() => {
-  if (deleteTimer) clearTimeout(deleteTimer)
   releaseFileObjectUrl()
 })
 </script>
