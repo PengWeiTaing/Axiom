@@ -128,12 +128,14 @@ a:hover {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
+  max-width: 100%;
   border: 1px solid color-mix(in srgb, var(--filter-summary-accent) 22%, transparent);
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--filter-summary-accent) 9%, transparent);
   color: var(--text-2);
   font-size: var(--fs-1);
   padding: 0 var(--s-2);
+  overflow-wrap: anywhere;
 }
 
 .filter-summary button {

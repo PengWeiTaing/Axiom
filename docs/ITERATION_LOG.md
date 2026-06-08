@@ -709,3 +709,4 @@
 - `TimelineView.vue` 迁入 `useRouteQuery` helper，时间流的对象类型与日期窗口 URL 同步复用统一路由查询工具。
 - `SearchView.vue` 迁入 `useRouteQuery` helper，搜索页的查询词、搜索模式和记录筛选 URL 同步完成统一收敛。
 - `mode.ts` 改用 `useRouteQuery` 暴露的当前路径/查询 helper，入口模式解析与导航比较不再分散读取 `window.location.search`。
+- `SearchView.vue` 的搜索条件 chip 迁入全局 `filter-summary` 样式，并在通用 chip 中补充长文本换行保护，减少筛选摘要样式分叉。

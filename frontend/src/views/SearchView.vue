@@ -379,7 +379,7 @@ onMounted(() => {
           >
             重置记录筛选
           </button>
-          <div v-if="activeFilterChips.length" class="active-filters" aria-label="当前搜索条件">
+          <div v-if="activeFilterChips.length" class="filter-summary" aria-label="当前搜索条件">
             <span v-for="chip in activeFilterChips" :key="chip">{{ chip }}</span>
           </div>
         </form>
@@ -648,24 +648,8 @@ input::placeholder {
   opacity: 0.55;
 }
 
-.active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-2);
-}
-
-.active-filters span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  max-width: 100%;
-  border: 1px solid rgba(110, 231, 208, 0.16);
-  border-radius: var(--r-pill);
-  background: var(--accent-glow);
-  color: var(--text-2);
-  font-size: var(--fs-2);
-  padding: 0 var(--s-2);
-  overflow-wrap: anywhere;
+.filter-summary {
+  --filter-summary-accent: var(--accent-bright);
 }
 
 .metrics {
