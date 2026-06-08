@@ -13,6 +13,7 @@ import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
 import { useTimelineStore } from '@/stores/timeline';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { typeAccent } from '@/composables/useTypeAccent';
+import { useInterval } from '@/composables/useInterval';
 import type { Item } from '@/api/types';
 
 defineEmits<{ select: [id: number] }>();
@@ -22,7 +23,7 @@ const sentinel = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
 
 const now = ref(Date.now());
-let ticker: number | undefined;
+const ticker = useInterval();
 
 onMounted(() => {
   store.loadInitial();
@@ -35,14 +36,13 @@ onMounted(() => {
   if (sentinel.value) observer.observe(sentinel.value);
 
   // 每 30s 重算一次相对时间
-  ticker = window.setInterval(() => {
+  ticker.start(() => {
     now.value = Date.now();
   }, 30000);
 });
 
 onBeforeUnmount(() => {
   observer?.disconnect();
-  if (ticker) clearInterval(ticker);
 });
 
 function summary(item: Item): string {
