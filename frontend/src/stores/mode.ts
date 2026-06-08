@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { readStoredValue } from '@/composables/useLocalStorage';
 import { currentRouteParams, currentRoutePathname, currentRoutePathWithSearch } from '@/composables/useRouteQuery';
 
 export type AppMode = 'capture' | 'atlas' | 'cosmos' | 'recent' | 'processing' | 'search' | 'timeline' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
@@ -22,7 +23,7 @@ function modeFromLocation(): AppMode {
 function urlForMode(mode: AppMode): string {
   if (mode === 'atlas') return '/atlas';
   if (mode === 'board') {
-    const recent = localStorage.getItem('axiom_board_recent');
+    const recent = readStoredValue('axiom_board_recent', '');
     return recent ? `/board/${recent}` : '/board';
   }
   if (mode === 'cosmos') return '/app?mode=cosmos';

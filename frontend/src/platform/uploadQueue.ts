@@ -1,3 +1,5 @@
+import { readStoredJson, writeStoredJson } from '@/composables/useLocalStorage';
+
 export interface QueuedRequest {
   id: string;
   url: string;
@@ -26,37 +28,19 @@ export function setFetchImpl(fn: typeof fetch): void {
 }
 
 function loadQueue(): QueuedRequest[] {
-  try {
-    const raw = localStorage.getItem(QUEUE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  return readStoredJson<QueuedRequest[]>(QUEUE_KEY, []);
 }
 
 function saveQueue(queue: QueuedRequest[]): void {
-  try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-  } catch {
-    // ignore
-  }
+  writeStoredJson(QUEUE_KEY, queue);
 }
 
 function loadDeadLetters(): DeadLetter[] {
-  try {
-    const raw = localStorage.getItem(DEAD_LETTER_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  return readStoredJson<DeadLetter[]>(DEAD_LETTER_KEY, []);
 }
 
 function saveDeadLetters(letters: DeadLetter[]): void {
-  try {
-    localStorage.setItem(DEAD_LETTER_KEY, JSON.stringify(letters));
-  } catch {
-    // ignore
-  }
+  writeStoredJson(DEAD_LETTER_KEY, letters);
 }
 
 function generateId(): string {

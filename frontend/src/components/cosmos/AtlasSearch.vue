@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
+import { readStoredJson, removeStoredValue, writeStoredJson } from '@/composables/useLocalStorage'
 
 interface SearchResult {
   id: string
@@ -14,10 +15,10 @@ const LS_KEY = 'atlas_recent_searches'
 const MAX_RECENT = 5
 
 function loadRecent(): string[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
+  return readStoredJson<string[]>(LS_KEY, [])
 }
 function saveRecent(terms: string[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(terms))
+  writeStoredJson(LS_KEY, terms)
 }
 
 const recentSearches = ref<string[]>(loadRecent())
@@ -33,7 +34,7 @@ function addRecent(term: string) {
 }
 
 function clearRecent() {
-  localStorage.removeItem(LS_KEY)
+  removeStoredValue(LS_KEY)
   recentSearches.value = []
 }
 

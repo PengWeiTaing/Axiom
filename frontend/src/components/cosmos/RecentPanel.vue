@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { readStoredJson, removeStoredValue } from '@/composables/useLocalStorage'
 
 interface RecentEntry {
   entityId: string; title: string; kind: string
@@ -9,7 +10,7 @@ interface RecentEntry {
 const LS_KEY = 'axiom_recent_entities'
 
 function load(): RecentEntry[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
+  return readStoredJson<RecentEntry[]>(LS_KEY, [])
 }
 
 const items = ref<RecentEntry[]>(load())
@@ -29,7 +30,7 @@ function focus(id: string) {
 }
 
 function clearAll() {
-  localStorage.removeItem(LS_KEY)
+  removeStoredValue(LS_KEY)
   items.value = []
 }
 </script>

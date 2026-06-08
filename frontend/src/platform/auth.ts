@@ -1,3 +1,5 @@
+import { readStoredValue, removeStoredValue, writeStoredValue } from '@/composables/useLocalStorage';
+
 export interface TokenStore {
   getToken(): string | null;
   setToken(token: string): void;
@@ -8,27 +10,15 @@ export interface TokenStore {
 const STORAGE_KEY = 'axiom.key';
 
 function read(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
+  return readStoredValue(STORAGE_KEY, '') || null;
 }
 
 function write(token: string): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, token);
-  } catch {
-    // storage full or unavailable — silently ignore
-  }
+  writeStoredValue(STORAGE_KEY, token);
 }
 
 function remove(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // ignore
-  }
+  removeStoredValue(STORAGE_KEY);
 }
 
 export const tokenStore: TokenStore = {

@@ -29,6 +29,7 @@ import ExportDialog from '@/components/cosmos/ExportDialog.vue'
 import RecentPanel from '@/components/cosmos/RecentPanel.vue'
 import ImportDialog from '@/components/cosmos/ImportDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
+import { readStoredJson, writeStoredJson } from '@/composables/useLocalStorage'
 
 const store = useCosmosStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -55,21 +56,27 @@ const showImport = ref(false)
 
 const LS_RECENT = 'axiom_recent_entities'
 
+interface RecentEntityEntry {
+  entityId: string
+  title: string
+  kind: string
+  lifelineId: string
+  lifelineName: string
+  visitedAt: number
+}
+
 function recordRecentVisit(entityId: string) {
   const ent = store.data?.entities.find(e => e.id === entityId)
   if (!ent) return
   const ll = store.data?.lifelines.find(l => l.id === ent.lifeline_id)
-  const entry = {
+  const entry: RecentEntityEntry = {
     entityId, title: ent.title, kind: ent.kind,
     lifelineId: ent.lifeline_id, lifelineName: ll?.name || '', visitedAt: Date.now(),
   }
-  try {
-    const raw = localStorage.getItem(LS_RECENT) || '[]'
-    const list: Array<typeof entry> = JSON.parse(raw)
-    const filtered = list.filter(e => e.entityId !== entityId)
-    filtered.unshift(entry)
-    localStorage.setItem(LS_RECENT, JSON.stringify(filtered.slice(0, 10)))
-  } catch { /* ignore */ }
+  const list = readStoredJson<RecentEntityEntry[]>(LS_RECENT, [])
+  const filtered = list.filter(e => e.entityId !== entityId)
+  filtered.unshift(entry)
+  writeStoredJson(LS_RECENT, filtered.slice(0, 10))
 }
 
 const pendingAssocCount = computed(() => {

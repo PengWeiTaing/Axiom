@@ -7,6 +7,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { streamRequest, ApiError } from '@/api/client';
+import { readStoredJson, writeStoredJson } from '@/composables/useLocalStorage';
 
 const STORAGE_KEY = 'axiom.chat.history';
 const MAX_HISTORY = 50;
@@ -31,23 +32,13 @@ export const useChatStore = defineStore('chat', () => {
   const empty = computed(() => messages.value.length === 0);
 
   function load(): Message[] {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.slice(-MAX_HISTORY) : [];
-    } catch {
-      return [];
-    }
+    const parsed = readStoredJson<unknown>(STORAGE_KEY, []);
+    return Array.isArray(parsed) ? parsed.slice(-MAX_HISTORY) as Message[] : [];
   }
 
   function persist() {
-    try {
-      const trimmed = messages.value.slice(-MAX_HISTORY);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-    } catch {
-      // 存储空间满了忽略，不影响主流程
-    }
+    const trimmed = messages.value.slice(-MAX_HISTORY);
+    writeStoredJson(STORAGE_KEY, trimmed);
   }
 
   function clear() {

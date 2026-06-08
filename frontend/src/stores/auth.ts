@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { setKeyGetter, apiRequest, ApiError } from '@/api/client';
+import { readStoredValue, removeStoredValue, writeStoredValue } from '@/composables/useLocalStorage';
 
 const STORAGE_KEY = 'axiom.key';
 
 export const useAuthStore = defineStore('auth', () => {
-  const key = ref<string>(localStorage.getItem(STORAGE_KEY) ?? '');
+  const key = ref<string>(readStoredValue(STORAGE_KEY, ''));
   const verified = ref<boolean>(false);
   const verifying = ref<boolean>(false);
   const lastError = ref<string | null>(null);
@@ -38,9 +39,9 @@ export const useAuthStore = defineStore('auth', () => {
   function setKey(value: string) {
     key.value = value.trim();
     if (key.value) {
-      localStorage.setItem(STORAGE_KEY, key.value);
+      writeStoredValue(STORAGE_KEY, key.value);
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      removeStoredValue(STORAGE_KEY);
     }
     verified.value = false;
   }
