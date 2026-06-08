@@ -13,17 +13,18 @@
  *   - 提交成功显示 1.2s 的 AI 判定 toast，然后消失
  */
 
-import { ref, onBeforeUnmount, nextTick, watch } from 'vue';
+import { ref, nextTick, watch } from 'vue';
 import { useWindowEventListener } from '@/composables/useEventListener';
 import { useSmartCapture, type CaptureSuccess } from '@/composables/useSmartCapture';
+import { useTimeout } from '@/composables/useTimeout';
 
 const open = ref(false);
 const text = ref('');
 const textarea = ref<HTMLTextAreaElement | null>(null);
 const toast = ref<CaptureSuccess | null>(null);
-let toastTimer: number | undefined;
 
 const { capture, submitting, lastError } = useSmartCapture();
+const toastTimer = useTimeout();
 
 function isTextLikeElement(el: EventTarget | null): boolean {
   if (!el || !(el instanceof HTMLElement)) return false;
@@ -93,17 +94,12 @@ function onKeydown(e: KeyboardEvent) {
 
 function showToast(result: CaptureSuccess) {
   toast.value = result;
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => {
+  toastTimer.schedule(() => {
     toast.value = null;
   }, 1500);
 }
 
 useWindowEventListener('keydown', onKey);
-
-onBeforeUnmount(() => {
-  if (toastTimer) clearTimeout(toastTimer);
-});
 
 defineExpose({ show, close });
 </script>
