@@ -722,3 +722,4 @@
 - CosmosView 取消对 `CSS2DRenderer` 与 `computeFocusLayout` 的重复动态 import，统一使用静态引用以清理 Vite 动态/静态混用 warning。
 - AtlasView 的 canvas pointer/click 交互改为统一注册 stop 函数并在 teardown 中集中解绑，和 Cosmos 的 3D 事件生命周期保持一致。
 - 新增 `frontend/src/composables/useDownload.ts`，集中已有 URL 与 Blob 下载触发逻辑；ItemDrawer 文件下载和 SystemView 数据导出不再各自手写临时 `<a>` 标签。
+- ItemDrawer 的无预览文件下载路径改用 `downloadBlob`，临时 object URL 的创建与释放也收敛到下载 helper 内部。
