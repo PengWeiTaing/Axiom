@@ -535,8 +535,6 @@ async function start() {
     contextMenu.value = { x: e.clientX, y: e.clientY, target: { id, kind, title, layer } }
   })
 
-  window.addEventListener('keydown', onKey)
-
   // 快捷键提示：3s 后淡出，鼠标移入 HUD 重新显示
   hintTimer = window.setTimeout(() => { hintVisible.value = false; hintDismissed.value = true }, 3000)
 
@@ -1015,6 +1013,7 @@ watch(() => store.state.kind, () => {
 })
 
 useWindowEventListener('resize', onResize)
+useWindowEventListener('keydown', onKey)
 useEventListener(() => hudRef.value, 'mouseenter', onHudMouseEnter)
 
 onMounted(async () => {
@@ -1026,7 +1025,6 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(animFrame)
   sceneObjs?.dispose()
   controls?.dispose()
-  window.removeEventListener('keydown', onKey)
   if (labelGroup) { labelGroup.dispose(); labelGroup = null }
   if (labelRenderer?.domElement) { labelRenderer.domElement.remove() }
   if (hintTimer) clearTimeout(hintTimer)
