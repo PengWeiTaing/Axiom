@@ -885,6 +885,12 @@ def main() -> None:
                         vue_page.locator(".state-pill.ready").first.wait_for(timeout=15_000)
                         pending_button = vue_page.get_by_role("button", name="退回待处理").first
                         pending_button.wait_for(timeout=15_000)
+                        vue_page.wait_for_function(
+                            """() => Array.from(document.querySelectorAll("button"))
+                                .some((button) => button.textContent?.trim() === "退回待处理" && !button.disabled)""",
+                            timeout=15_000,
+                        )
+                        pending_button = vue_page.get_by_role("button", name="退回待处理").first
                         pending_button.scroll_into_view_if_needed(timeout=15_000)
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-pending" in response.url and response.status == 200
@@ -911,6 +917,11 @@ def main() -> None:
                         ):
                             vue_page.get_by_role("button", name="批量标记就绪").first.click()
                         vue_page.get_by_role("heading", name="刚处理的记录").wait_for(timeout=15_000)
+                        vue_page.wait_for_function(
+                            """() => Array.from(document.querySelectorAll("button"))
+                                .some((button) => button.textContent?.trim() === "退回待处理" && !button.disabled)""",
+                            timeout=15_000,
+                        )
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-pending" in response.url and response.status == 200
                         ):

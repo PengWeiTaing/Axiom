@@ -727,3 +727,5 @@
 - SearchOverlay 的搜索 debounce 迁入 `useTimeout`，保留输入停顿 220ms 搜索行为，同时移除组件内手写 timeout 卸载清理。
 - `smoke_test_web_app.py` 的 Vue 时间流 URL 恢复校验改用测试记录自身 `created_at` 日期，避免午夜或 UTC/本地日期交界时误判。
 - Cosmos/Atlas 的导出弹窗改用 `downloadBlob`，导出 JSON/Markdown 时不再单独手写 Blob URL 与临时 `<a>` 标签。
+- Cosmos 图例栏的自动淡出 timer 迁入 `useTimeout`，图例 hover/过滤变化后的淡出逻辑不再手写卸载清理。
+- `smoke_test_web_app.py` 在 Vue Recent/Processing 的“退回待处理”流程中先等待按钮启用再点击，减少 mark-ready 后 UI 刷新竞争导致的误报。

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
+import { useTimeout } from '@/composables/useTimeout'
 
 export interface AssocFilter29 {
   types: { causal: boolean; co_occurrence: boolean; tension: boolean; derived_from: boolean; manual: boolean }
@@ -17,16 +18,14 @@ const emit = defineEmits<{
 
 const faded = ref(false)
 const hovering = ref(false)
-let fadeTimer: number | undefined
+const fadeTimer = useTimeout()
 
 function resetFade() {
   faded.value = false
-  if (fadeTimer) clearTimeout(fadeTimer)
-  fadeTimer = window.setTimeout(() => { if (!hovering.value) faded.value = true }, 5000)
+  fadeTimer.schedule(() => { if (!hovering.value) faded.value = true }, 5000)
 }
 
 onMounted(() => resetFade())
-onBeforeUnmount(() => { if (fadeTimer) clearTimeout(fadeTimer) })
 
 watch(() => props.showAssoc, () => resetFade())
 
