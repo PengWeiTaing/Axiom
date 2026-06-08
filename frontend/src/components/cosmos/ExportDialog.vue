@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
+import { downloadBlob } from '@/composables/useDownload'
 
 const store = useCosmosStore()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -61,9 +62,7 @@ function doExport(format: 'json' | 'markdown') {
     filename = `axiom-export-${now}.md`; mime = 'text/markdown'
   }
   const blob = new Blob([content], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
+  downloadBlob(blob, filename)
   emit('close')
 }
 </script>
