@@ -716,3 +716,4 @@
 - Cosmos 的 AssociationEditDialog、ConfirmDialog、ContextMenu、QuickCreateDialog、ShortcutPanel 改用 `useDocumentEventListener` 管理键盘/外部点击监听，继续减少弹窗层的手写 add/remove 样板。
 - AtlasView 与 CosmosView 的窗口 resize 监听迁入 `useWindowEventListener`，视图 teardown 更专注于 three/canvas 资源释放。
 - CosmosView 用 Vue refs 替代 `.cosmos-view` / `.cosmos-hud` 的 `document.querySelector`，HUD mouseenter 提示恢复逻辑改由 `useEventListener` 统一清理。
+- 新增 `frontend/src/composables/useBrowserHistory.ts`，集中浏览器路径跳转、history push/replace 和 popstate 监听；`mode` store 与路由 query helper 不再直接散落调用这些浏览器 API。

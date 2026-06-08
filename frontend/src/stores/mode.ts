@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { navigateToPath, pathForRecentBoard } from '@/composables/useAppNavigation';
+import { listenToBrowserPopState, pushBrowserPath } from '@/composables/useBrowserHistory';
 import { currentRouteParams, currentRoutePathname, currentRoutePathWithSearch } from '@/composables/useRouteQuery';
 
 export type AppMode = 'capture' | 'atlas' | 'cosmos' | 'recent' | 'processing' | 'search' | 'timeline' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
@@ -49,7 +50,7 @@ export const useModeStore = defineStore('mode', () => {
     }
     const next = urlForMode(m);
     const current = currentRoutePathWithSearch();
-    if (current !== next) window.history.pushState({}, '', next);
+    if (current !== next) pushBrowserPath(next);
   }
 
   function syncFromLocation() {
@@ -58,7 +59,7 @@ export const useModeStore = defineStore('mode', () => {
 
   function bindHistory() {
     if (listening || typeof window === 'undefined') return;
-    window.addEventListener('popstate', syncFromLocation);
+    listenToBrowserPopState(syncFromLocation);
     listening = true;
   }
 

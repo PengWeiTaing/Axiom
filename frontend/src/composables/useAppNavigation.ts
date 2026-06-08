@@ -1,10 +1,10 @@
 import { readStoredValue, writeStoredValue } from '@/composables/useLocalStorage';
+import { assignBrowserPath } from '@/composables/useBrowserHistory';
 
 const RECENT_BOARD_KEY = 'axiom_board_recent';
 
 export function navigateToPath(path: string): void {
-  if (typeof window === 'undefined') return;
-  window.location.href = path;
+  assignBrowserPath(path);
 }
 
 export function pathForBoard(boardId?: string): string {

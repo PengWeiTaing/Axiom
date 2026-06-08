@@ -1,3 +1,5 @@
+import { currentBrowserHref, replaceBrowserPath } from '@/composables/useBrowserHistory';
+
 type QueryValue = string | number | boolean | null | undefined;
 
 export function currentRouteParams(): URLSearchParams {
@@ -13,7 +15,8 @@ export function currentRoutePathWithSearch(): string {
 }
 
 export function replaceRouteQuery(mode: string, values: Record<string, QueryValue>) {
-  const url = new URL(window.location.href);
+  if (typeof window === 'undefined') return;
+  const url = new URL(currentBrowserHref());
   url.searchParams.set('mode', mode);
   for (const [key, value] of Object.entries(values)) {
     if (value === '' || value === null || value === undefined || value === false) {
@@ -23,5 +26,5 @@ export function replaceRouteQuery(mode: string, values: Record<string, QueryValu
     }
   }
   const search = url.searchParams.toString();
-  window.history.replaceState(null, '', `${url.pathname}${search ? `?${search}` : ''}${url.hash}`);
+  replaceBrowserPath(`${url.pathname}${search ? `?${search}` : ''}${url.hash}`);
 }
