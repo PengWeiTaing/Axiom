@@ -6,7 +6,7 @@
  * 支持看全文、图片/文档/音频预览、metadata、归档/恢复/删除。
  */
 
-import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, computed, onBeforeUnmount } from 'vue'
 import {
   getItem,
   getItemFile,
@@ -19,6 +19,7 @@ import {
   markProcessingReady,
 } from '@/api/endpoints'
 import { typeAccent } from '@/composables/useTypeAccent'
+import { useWindowEventListener } from '@/composables/useEventListener'
 import { humanSize } from '@/composables/useHumanSize'
 import { formatRelative } from '@/composables/useRelativeTime'
 import { ApiError } from '@/api/client'
@@ -381,9 +382,9 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKey))
+useWindowEventListener('keydown', onKey)
+
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKey)
   if (deleteTimer) clearTimeout(deleteTimer)
   releaseFileObjectUrl()
 })

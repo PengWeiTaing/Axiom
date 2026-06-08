@@ -8,8 +8,9 @@
  * - 历史 localStorage 持久化
  */
 
-import { ref, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, nextTick, watch } from 'vue';
 import { useChatStore } from '@/stores/chat';
+import { useWindowEventListener } from '@/composables/useEventListener';
 import { renderMarkdown } from '@/composables/useMarkdown';
 
 const chat = useChatStore();
@@ -47,13 +48,7 @@ function scrollToBottom() {
   el.scrollTop = el.scrollHeight;
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', onKey);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKey);
-});
+useWindowEventListener('keydown', onKey);
 
 function onKey(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {

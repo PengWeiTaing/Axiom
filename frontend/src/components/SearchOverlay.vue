@@ -11,9 +11,10 @@
  *   - 可切到 /search/vector（语义）
  */
 
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, watch, onBeforeUnmount, nextTick } from 'vue';
 import { searchAll, searchVector } from '@/api/endpoints';
 import type { Item, Memory, Task, Decision, ObjectTarget } from '@/api/types';
+import { useWindowEventListener } from '@/composables/useEventListener';
 import { ApiError } from '@/api/client';
 
 const props = defineProps<{ open: boolean }>();
@@ -88,12 +89,9 @@ async function run() {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', onKey);
-});
+useWindowEventListener('keydown', onKey);
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKey);
   if (debounce) clearTimeout(debounce);
 });
 

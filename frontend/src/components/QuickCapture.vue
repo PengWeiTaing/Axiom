@@ -13,7 +13,8 @@
  *   - 提交成功显示 1.2s 的 AI 判定 toast，然后消失
  */
 
-import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import { ref, onBeforeUnmount, nextTick, watch } from 'vue';
+import { useWindowEventListener } from '@/composables/useEventListener';
 import { useSmartCapture, type CaptureSuccess } from '@/composables/useSmartCapture';
 
 const open = ref(false);
@@ -98,9 +99,9 @@ function showToast(result: CaptureSuccess) {
   }, 1500);
 }
 
-onMounted(() => window.addEventListener('keydown', onKey));
+useWindowEventListener('keydown', onKey);
+
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKey);
   if (toastTimer) clearTimeout(toastTimer);
 });
 

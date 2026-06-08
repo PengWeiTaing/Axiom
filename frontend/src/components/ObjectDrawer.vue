@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ApiError } from '@/api/client';
 import {
   archiveMemory,
@@ -13,6 +13,7 @@ import {
   reviewDecision,
 } from '@/api/endpoints';
 import { formatRelative } from '@/composables/useRelativeTime';
+import { useWindowEventListener } from '@/composables/useEventListener';
 import { useModeStore } from '@/stores/mode';
 import type { Decision, MemoryDetail, ObjectKind, ObjectTarget, Task } from '@/api/types';
 
@@ -192,8 +193,7 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKey));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
+useWindowEventListener('keydown', onKey);
 </script>
 
 <template>

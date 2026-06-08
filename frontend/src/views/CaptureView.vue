@@ -9,12 +9,13 @@
  * 浮层：SearchOverlay / QuickCapture / FloatChat 在 App.vue 里挂全局
  */
 
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref } from 'vue';
 import SmartInput from '@/components/SmartInput.vue';
 import Timeline from '@/components/Timeline.vue';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { useTimelineStore } from '@/stores/timeline';
+import { useWindowEventListener } from '@/composables/useEventListener';
 import type { ObjectTarget } from '@/api/types';
 const showSearch = ref(false);
 const timeline = useTimelineStore();
@@ -51,8 +52,7 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKey));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
+useWindowEventListener('keydown', onKey);
 
 defineExpose({ openSearch: () => (showSearch.value = true) });
 </script>
