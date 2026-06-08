@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed } from 'vue'
+import { useDocumentEventListener } from '@/composables/useEventListener'
 import { useCosmosStore } from '@/stores/cosmos'
 
 export interface ContextMenuTarget {
@@ -109,15 +110,8 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('close')
 }
 
-onMounted(() => {
-  document.addEventListener('pointerdown', onPointerDown, true)
-  document.addEventListener('keydown', onKeydown)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onPointerDown, true)
-  document.removeEventListener('keydown', onKeydown)
-})
+useDocumentEventListener('pointerdown', onPointerDown, true)
+useDocumentEventListener('keydown', onKeydown)
 </script>
 
 <template>

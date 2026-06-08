@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive } from 'vue'
+import { useDocumentEventListener } from '@/composables/useEventListener'
 
 export interface AssocEvidence {
   type: string
@@ -90,12 +91,7 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('cancel')
 }
 
-onMounted(() => {
-  document.addEventListener('keydown', onKeydown)
-})
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', onKeydown)
-})
+useDocumentEventListener('keydown', onKeydown)
 </script>
 
 <template>

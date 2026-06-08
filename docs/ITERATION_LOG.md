@@ -713,3 +713,4 @@
 - 新增 `frontend/src/composables/useLocalStorage.ts`，统一本地存储的字符串/JSON 读写与容错；Atlas 搜索历史、最近访问、白板 recent id、auth key、上传队列和聊天历史不再直接分散调用 `localStorage.getItem/setItem/removeItem`。
 - 新增 `frontend/src/composables/useAppNavigation.ts`，集中白板路径、最近白板入口和整页跳转逻辑；`mode.ts` 与 `RecentView.vue` 不再各自手写白板 `window.location.href` 跳转。
 - 新增 `frontend/src/composables/useEventListener.ts`，集中窗口/文档事件监听的挂载与卸载；Capture、QuickCapture、FloatChat、SearchOverlay、ItemDrawer、ObjectDrawer 的窗口级键盘快捷键不再重复手写生命周期监听样板。
+- Cosmos 的 AssociationEditDialog、ConfirmDialog、ContextMenu、QuickCreateDialog、ShortcutPanel 改用 `useDocumentEventListener` 管理键盘/外部点击监听，继续减少弹窗层的手写 add/remove 样板。

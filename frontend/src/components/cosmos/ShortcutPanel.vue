@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
+import { useDocumentEventListener } from '@/composables/useEventListener'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 
@@ -7,8 +7,7 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === '?' || e.key === 'Escape') emit('close')
 }
 
-onMounted(() => { document.addEventListener('keydown', onKeydown) })
-onBeforeUnmount(() => { document.removeEventListener('keydown', onKeydown) })
+useDocumentEventListener('keydown', onKeydown)
 </script>
 
 <template>
