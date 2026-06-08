@@ -23,7 +23,7 @@ import type {
 import { ApiError } from '@/api/client';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { typeAccent } from '@/composables/useTypeAccent';
-import { writeStoredValue } from '@/composables/useLocalStorage';
+import { navigateToBoard } from '@/composables/useAppNavigation';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 
 const overview = ref<OverviewPayload | null>(null);
@@ -160,12 +160,7 @@ function boardStatusLabel(status: string): string {
 }
 
 function openBoard(board?: LearningBoardSummary) {
-  if (board) {
-    writeStoredValue('axiom_board_recent', board.id);
-    window.location.href = `/board/${board.id}`;
-    return;
-  }
-  window.location.href = '/board';
+  navigateToBoard(board?.id);
 }
 
 function onChanged(options?: { nextItemId?: number }) {
