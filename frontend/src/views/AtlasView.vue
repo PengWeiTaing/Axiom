@@ -32,6 +32,7 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useAtlasGraphStore } from '@/stores/atlasGraph'
+import { useWindowEventListener } from '@/composables/useEventListener'
 import type { AtlasEdge, AtlasNode } from '@/atlas/types'
 
 interface LocalNode {
@@ -94,6 +95,8 @@ onMounted(async () => {
 onUnmounted(() => {
   teardownScene()
 })
+
+useWindowEventListener('resize', onResize)
 
 watch(
   () => [
@@ -439,7 +442,6 @@ function initScene() {
   raycaster = new Raycaster()
   renderer.domElement.addEventListener('pointermove', onPointerMove)
   renderer.domElement.addEventListener('click', onPointerClick)
-  window.addEventListener('resize', onResize)
 
   addSceneLights()
   addGlobalGrid()
@@ -471,7 +473,6 @@ function addGlobalGrid() {
 
 function teardownScene() {
   cancelAnimationFrame(animationFrame)
-  window.removeEventListener('resize', onResize)
   if (renderer) {
     renderer.domElement.removeEventListener('pointermove', onPointerMove)
     renderer.domElement.removeEventListener('click', onPointerClick)

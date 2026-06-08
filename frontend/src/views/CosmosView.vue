@@ -29,6 +29,7 @@ import ExportDialog from '@/components/cosmos/ExportDialog.vue'
 import RecentPanel from '@/components/cosmos/RecentPanel.vue'
 import ImportDialog from '@/components/cosmos/ImportDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
+import { useWindowEventListener } from '@/composables/useEventListener'
 import { readStoredJson, writeStoredJson } from '@/composables/useLocalStorage'
 
 const store = useCosmosStore()
@@ -353,8 +354,6 @@ async function start() {
   }
 
   lineSetResolution = sceneObjs.setResolution
-
-  window.addEventListener('resize', onResize)
 
   const raycaster = new Three.Raycaster()
   const mouse = new Three.Vector2()
@@ -1013,6 +1012,8 @@ watch(() => store.state.kind, () => {
   hintTimer = window.setTimeout(() => { hintVisible.value = false; hintDismissed.value = true }, 3000)
 })
 
+useWindowEventListener('resize', onResize)
+
 onMounted(async () => {
   await store.load()
   if (store.data) await start()
@@ -1023,7 +1024,6 @@ onBeforeUnmount(() => {
   sceneObjs?.dispose()
   controls?.dispose()
   window.removeEventListener('keydown', onKey)
-  window.removeEventListener('resize', onResize)
   if (labelGroup) { labelGroup.dispose(); labelGroup = null }
   if (labelRenderer?.domElement) { labelRenderer.domElement.remove() }
   if (hintTimer) clearTimeout(hintTimer)

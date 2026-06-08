@@ -714,3 +714,4 @@
 - 新增 `frontend/src/composables/useAppNavigation.ts`，集中白板路径、最近白板入口和整页跳转逻辑；`mode.ts` 与 `RecentView.vue` 不再各自手写白板 `window.location.href` 跳转。
 - 新增 `frontend/src/composables/useEventListener.ts`，集中窗口/文档事件监听的挂载与卸载；Capture、QuickCapture、FloatChat、SearchOverlay、ItemDrawer、ObjectDrawer 的窗口级键盘快捷键不再重复手写生命周期监听样板。
 - Cosmos 的 AssociationEditDialog、ConfirmDialog、ContextMenu、QuickCreateDialog、ShortcutPanel 改用 `useDocumentEventListener` 管理键盘/外部点击监听，继续减少弹窗层的手写 add/remove 样板。
+- AtlasView 与 CosmosView 的窗口 resize 监听迁入 `useWindowEventListener`，视图 teardown 更专注于 three/canvas 资源释放。
