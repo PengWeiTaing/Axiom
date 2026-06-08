@@ -718,3 +718,4 @@
 - CosmosView 用 Vue refs 替代 `.cosmos-view` / `.cosmos-hud` 的 `document.querySelector`，HUD mouseenter 提示恢复逻辑改由 `useEventListener` 统一清理。
 - 新增 `frontend/src/composables/useBrowserHistory.ts`，集中浏览器路径跳转、history push/replace 和 popstate 监听；`mode` store 与路由 query helper 不再直接散落调用这些浏览器 API。
 - CosmosView 的全局键盘快捷键监听迁入 `useWindowEventListener`，移除 start/teardown 中手写的 `window.addEventListener/removeEventListener`。
+- CosmosView 的 canvas click/move/contextmenu 交互拆成命名 handler，并通过统一解绑列表管理，避免匿名监听随 3D 初始化散落。

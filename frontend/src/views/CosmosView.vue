@@ -42,6 +42,9 @@ let controls: any = null
 let animFrame = 0
 let assocLines: { line: any; data: any; fromNode: LayoutNode; toNode: LayoutNode; arrow?: any }[] = []
 let tooltipText = ''
+const canvasRaycaster = new THREE.Raycaster()
+const canvasMouse = new THREE.Vector2()
+let stopCanvasListeners: Array<() => void> = []
 
 // Search
 const showSearch = ref(false)
@@ -313,7 +316,6 @@ let lineSetResolution: ((w: number, h: number) => void) | null = null
 
 async function start() {
   if (!store.data || !canvasRef.value) return
-  const Three = await import('three')
   const OrbitControls = (await import('three/examples/jsm/controls/OrbitControls.js')).OrbitControls
   const { CSS2DRenderer } = await import('three/examples/jsm/renderers/CSS2DRenderer.js')
 
@@ -357,188 +359,208 @@ async function start() {
 
   lineSetResolution = sceneObjs.setResolution
 
-  const raycaster = new Three.Raycaster()
-  const mouse = new Three.Vector2()
-
-  canvasRef.value.addEventListener('click', (e: MouseEvent) => {
-    if (!sceneObjs) return
-    mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
-    mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
-    raycaster.setFromCamera(mouse, sceneObjs.camera)
-
-    // -1. 路径查找目标选择模式
-    if (pathFindingFrom.value) {
-      const hits__ = raycaster.intersectObjects(sceneObjs.pickables)
-      if (hits__.length > 0) {
-        const obj__ = hits__[0].object as THREE.Mesh
-        if (obj__.userData.layer === 3) {
-          onPathTargetClick(obj__.userData.id as string)
-          return
-        }
-      }
-      clearPathMode()
-      return
-    }
-
-    // 0. 选择目标模式（关联创建）
-    if (store.selectingTarget) {
-      const hits_ = raycaster.intersectObjects(sceneObjs.pickables)
-      if (hits_.length > 0) {
-        const obj_ = hits_[0].object as THREE.Mesh
-        if (obj_.userData.layer === 3 && obj_.userData.id !== store.selectingTarget.fromId) {
-          const toTitle = store.data?.entities.find(en => en.id === obj_.userData.id)?.title || ''
-          store.openEditAssoc({
-            id: '', from: store.selectingTarget.fromId, fromTitle: store.selectingTarget.fromTitle,
-            to: obj_.userData.id as string, toTitle: toTitle,
-            relation_type: 'manual', confidence: 0.7, status: 'accepted', evidence: []
-          })
-          store.cancelSelecting()
-          return
-        }
-      }
-      // 点击空白或自身 → 退出选择模式
-      store.cancelSelecting()
-      return
-    }
-
-    // 1. 先检测关联线（仅在 relation_reveal 模式下）
-    if (store.state.kind === 'relation_reveal' && assocLines.length > 0) {
-      const lineHits = raycaster.intersectObjects(assocLines.map(l => l.line))
-      if (lineHits.length > 0) {
-        const hitLine = lineHits[0].object
-        const al = assocLines.find(a => a.line === hitLine)
-        if (al) {
-          if (store.selectedAssocId === al.data.id) {
-            store.selectAssociation(null)
-          } else {
-            store.selectAssociation(al.data.id)
-          }
-          return
-        }
-      }
-    }
-
-    // 2. 再检测节点
-    const hits = raycaster.intersectObjects(sceneObjs.pickables)
-    if (hits.length === 0) {
-      store.selectAssociation(null)
-      if (store.state.kind === 'node_focus' || store.state.kind === 'relation_reveal') {
-        const eid = (store.state as any).entity_id as string
-        const ent = store.data?.entities.find(e => e.id === eid)
-        const lid = ent?.lifeline_id
-        if (lid) {
-          store.transition({ kind: 'region_zoom', lifeline_id: lid } as any)
-        } else {
-          store.transition({ kind: 'global_overview' })
-        }
-      } else if (store.state.kind === 'region_zoom') {
-        store.transition({ kind: 'global_overview' })
-      }
-      return
-    }
-    store.selectAssociation(null)
-    const obj = hits[0].object
-    const layer = obj.userData.layer as number
-    const id = obj.userData.id as string
-    const kind = obj.userData.kind as string
-    const s = store.state
-
-    if (s.kind === 'global_overview' && layer === 1) {
-      store.transition({ kind: 'region_zoom', lifeline_id: id })
-    } else if (s.kind === 'region_zoom' && (layer === 2 || layer === 3)) {
-      store.transition({ kind: 'node_focus', entity_kind: (kind || 'lifeline') as any, entity_id: id })
-    } else if (s.kind === 'node_focus') {
-      store.transition({ kind: 'node_focus', entity_kind: (kind || 'lifeline') as any, entity_id: id })
-    } else if (s.kind === 'relation_reveal') {
-      clearAssoc()
-      store.transition({ kind: 'node_focus', entity_kind: (kind || 'lifeline') as any, entity_id: id })
-    }
-  })
-
-  canvasRef.value.addEventListener('mousemove', (e: MouseEvent) => {
-    if (!sceneObjs) return
-    mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
-    mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
-    raycaster.setFromCamera(mouse, sceneObjs.camera)
-
-    // 0. 节点 hover 检测（所有状态下）
-    const nodeHits = raycaster.intersectObjects(sceneObjs.pickables)
-    if (nodeHits.length > 0) {
-      const hm = nodeHits[0].object as THREE.Mesh
-      if (hm !== hoveredNode) {
-        resetHover()
-        hoveredNode = hm
-        applyHover(hm)
-      }
-      canvasRef.value!.style.cursor = store.selectingTarget ? 'crosshair' : 'pointer'
-    } else {
-      resetHover()
-      canvasRef.value!.style.cursor = store.selectingTarget ? 'crosshair' : ''
-    }
-
-    // 1. 关联线 hover（relation_reveal 下）
-    if (store.state.kind !== 'relation_reveal') return
-    const lineHits = raycaster.intersectObjects(sceneObjs.lines.concat(assocLines.map(l => l.line)))
-    if (lineHits.length > 0 && assocLines.some(al => al.line === lineHits[0].object)) {
-      const al = assocLines.find(al => al.line === lineHits[0].object)
-      if (al) {
-        tooltipText = al.data.evidence?.[0]?.excerpt || ''
-        if (al.line !== hoveredAssocLine) {
-          resetLineHover()
-          hoveredAssocLine = al.line
-          applyLineHover(al)
-        }
-      }
-    } else {
-      tooltipText = ''
-      resetLineHover()
-    }
-  })
-
-  // 右键上下文菜单
-  canvasRef.value.addEventListener('contextmenu', (e: MouseEvent) => {
-    e.preventDefault()
-    if (!sceneObjs || !store.data) return
-
-    mouse.x = (e.offsetX / canvasRef.value!.clientWidth) * 2 - 1
-    mouse.y = -(e.offsetY / canvasRef.value!.clientHeight) * 2 + 1
-    raycaster.setFromCamera(mouse, sceneObjs.camera)
-
-    const hits = raycaster.intersectObjects(sceneObjs.pickables)
-    if (hits.length === 0) {
-      const s2k = (store.state as any).kind as string
-      if (s2k === 'global_overview' || s2k === 'region_zoom') {
-        openQuickCreate()
-      }
-      contextMenu.value = null
-      return
-    }
-    // 不在 global_overview 下为节点弹出菜单
-    if (store.state.kind === 'global_overview') { contextMenu.value = null; return }
-
-    const obj = hits[0].object
-    const id = obj.userData.id as string
-    const kind = obj.userData.kind as string
-    const layer = obj.userData.layer as number
-    // 仅 R1/R2 lifeline 和 R3 entity 弹出菜单（R0 root 不弹）
-    if (layer < 1 || layer > 3) { contextMenu.value = null; return }
-
-    let title = ''
-    if (layer <= 2) {
-      const ll = store.data.lifelines.find(l => l.id === id)
-      title = ll?.name || id
-    } else {
-      const ent = store.data.entities.find(en => en.id === id)
-      title = ent?.title || id
-    }
-
-    contextMenu.value = { x: e.clientX, y: e.clientY, target: { id, kind, title, layer } }
-  })
+  attachCanvasListeners()
 
   // 快捷键提示：3s 后淡出，鼠标移入 HUD 重新显示
   hintTimer = window.setTimeout(() => { hintVisible.value = false; hintDismissed.value = true }, 3000)
 
   animate()
+}
+
+function listenToCanvas<K extends keyof HTMLElementEventMap>(
+  type: K,
+  listener: (event: HTMLElementEventMap[K]) => void,
+): () => void {
+  const canvas = canvasRef.value
+  if (!canvas) return () => {}
+  canvas.addEventListener(type, listener as EventListener)
+  return () => canvas.removeEventListener(type, listener as EventListener)
+}
+
+function attachCanvasListeners() {
+  if (stopCanvasListeners.length > 0) return
+  stopCanvasListeners = [
+    listenToCanvas('click', onCanvasClick),
+    listenToCanvas('mousemove', onCanvasMouseMove),
+    listenToCanvas('contextmenu', onCanvasContextMenu),
+  ]
+}
+
+function stopCanvasEventListeners() {
+  stopCanvasListeners.forEach(stop => stop())
+  stopCanvasListeners = []
+}
+
+function updateCanvasRay(e: MouseEvent): boolean {
+  if (!sceneObjs || !canvasRef.value) return false
+  canvasMouse.x = (e.offsetX / canvasRef.value.clientWidth) * 2 - 1
+  canvasMouse.y = -(e.offsetY / canvasRef.value.clientHeight) * 2 + 1
+  canvasRaycaster.setFromCamera(canvasMouse, sceneObjs.camera)
+  return true
+}
+
+function onCanvasClick(e: MouseEvent) {
+  if (!updateCanvasRay(e) || !sceneObjs) return
+
+  // -1. 路径查找目标选择模式
+  if (pathFindingFrom.value) {
+    const hits__ = canvasRaycaster.intersectObjects(sceneObjs.pickables)
+    if (hits__.length > 0) {
+      const obj__ = hits__[0].object as THREE.Mesh
+      if (obj__.userData.layer === 3) {
+        onPathTargetClick(obj__.userData.id as string)
+        return
+      }
+    }
+    clearPathMode()
+    return
+  }
+
+  // 0. 选择目标模式（关联创建）
+  if (store.selectingTarget) {
+    const hits_ = canvasRaycaster.intersectObjects(sceneObjs.pickables)
+    if (hits_.length > 0) {
+      const obj_ = hits_[0].object as THREE.Mesh
+      if (obj_.userData.layer === 3 && obj_.userData.id !== store.selectingTarget.fromId) {
+        const toTitle = store.data?.entities.find(en => en.id === obj_.userData.id)?.title || ''
+        store.openEditAssoc({
+          id: '', from: store.selectingTarget.fromId, fromTitle: store.selectingTarget.fromTitle,
+          to: obj_.userData.id as string, toTitle: toTitle,
+          relation_type: 'manual', confidence: 0.7, status: 'accepted', evidence: []
+        })
+        store.cancelSelecting()
+        return
+      }
+    }
+    // 点击空白或自身 → 退出选择模式
+    store.cancelSelecting()
+    return
+  }
+
+  // 1. 先检测关联线（仅在 relation_reveal 模式下）
+  if (store.state.kind === 'relation_reveal' && assocLines.length > 0) {
+    const lineHits = canvasRaycaster.intersectObjects(assocLines.map(l => l.line))
+    if (lineHits.length > 0) {
+      const hitLine = lineHits[0].object
+      const al = assocLines.find(a => a.line === hitLine)
+      if (al) {
+        if (store.selectedAssocId === al.data.id) {
+          store.selectAssociation(null)
+        } else {
+          store.selectAssociation(al.data.id)
+        }
+        return
+      }
+    }
+  }
+
+  // 2. 再检测节点
+  const hits = canvasRaycaster.intersectObjects(sceneObjs.pickables)
+  if (hits.length === 0) {
+    store.selectAssociation(null)
+    if (store.state.kind === 'node_focus' || store.state.kind === 'relation_reveal') {
+      const eid = (store.state as any).entity_id as string
+      const ent = store.data?.entities.find(e => e.id === eid)
+      const lid = ent?.lifeline_id
+      if (lid) {
+        store.transition({ kind: 'region_zoom', lifeline_id: lid } as any)
+      } else {
+        store.transition({ kind: 'global_overview' })
+      }
+    } else if (store.state.kind === 'region_zoom') {
+      store.transition({ kind: 'global_overview' })
+    }
+    return
+  }
+  store.selectAssociation(null)
+  const obj = hits[0].object
+  const layer = obj.userData.layer as number
+  const id = obj.userData.id as string
+  const kind = obj.userData.kind as string
+  const s = store.state
+
+  if (s.kind === 'global_overview' && layer === 1) {
+    store.transition({ kind: 'region_zoom', lifeline_id: id })
+  } else if (s.kind === 'region_zoom' && (layer === 2 || layer === 3)) {
+    store.transition({ kind: 'node_focus', entity_kind: (kind || 'lifeline') as any, entity_id: id })
+  } else if (s.kind === 'node_focus') {
+    store.transition({ kind: 'node_focus', entity_kind: (kind || 'lifeline') as any, entity_id: id })
+  } else if (s.kind === 'relation_reveal') {
+    clearAssoc()
+    store.transition({ kind: 'node_focus', entity_kind: (kind || 'lifeline') as any, entity_id: id })
+  }
+}
+
+function onCanvasMouseMove(e: MouseEvent) {
+  if (!updateCanvasRay(e) || !sceneObjs || !canvasRef.value) return
+
+  // 0. 节点 hover 检测（所有状态下）
+  const nodeHits = canvasRaycaster.intersectObjects(sceneObjs.pickables)
+  if (nodeHits.length > 0) {
+    const hm = nodeHits[0].object as THREE.Mesh
+    if (hm !== hoveredNode) {
+      resetHover()
+      hoveredNode = hm
+      applyHover(hm)
+    }
+    canvasRef.value.style.cursor = store.selectingTarget ? 'crosshair' : 'pointer'
+  } else {
+    resetHover()
+    canvasRef.value.style.cursor = store.selectingTarget ? 'crosshair' : ''
+  }
+
+  // 1. 关联线 hover（relation_reveal 下）
+  if (store.state.kind !== 'relation_reveal') return
+  const lineHits = canvasRaycaster.intersectObjects(sceneObjs.lines.concat(assocLines.map(l => l.line)))
+  if (lineHits.length > 0 && assocLines.some(al => al.line === lineHits[0].object)) {
+    const al = assocLines.find(al => al.line === lineHits[0].object)
+    if (al) {
+      tooltipText = al.data.evidence?.[0]?.excerpt || ''
+      if (al.line !== hoveredAssocLine) {
+        resetLineHover()
+        hoveredAssocLine = al.line
+        applyLineHover(al)
+      }
+    }
+  } else {
+    tooltipText = ''
+    resetLineHover()
+  }
+}
+
+function onCanvasContextMenu(e: MouseEvent) {
+  e.preventDefault()
+  if (!updateCanvasRay(e) || !sceneObjs || !store.data) return
+
+  const hits = canvasRaycaster.intersectObjects(sceneObjs.pickables)
+  if (hits.length === 0) {
+    const s2k = (store.state as any).kind as string
+    if (s2k === 'global_overview' || s2k === 'region_zoom') {
+      openQuickCreate()
+    }
+    contextMenu.value = null
+    return
+  }
+  // 不在 global_overview 下为节点弹出菜单
+  if (store.state.kind === 'global_overview') { contextMenu.value = null; return }
+
+  const obj = hits[0].object
+  const id = obj.userData.id as string
+  const kind = obj.userData.kind as string
+  const layer = obj.userData.layer as number
+  // 仅 R1/R2 lifeline 和 R3 entity 弹出菜单（R0 root 不弹）
+  if (layer < 1 || layer > 3) { contextMenu.value = null; return }
+
+  let title = ''
+  if (layer <= 2) {
+    const ll = store.data.lifelines.find(l => l.id === id)
+    title = ll?.name || id
+  } else {
+    const ent = store.data.entities.find(en => en.id === id)
+    title = ent?.title || id
+  }
+
+  contextMenu.value = { x: e.clientX, y: e.clientY, target: { id, kind, title, layer } }
 }
 
 function onHudMouseEnter() {
@@ -1022,6 +1044,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopCanvasEventListeners()
   cancelAnimationFrame(animFrame)
   sceneObjs?.dispose()
   controls?.dispose()
