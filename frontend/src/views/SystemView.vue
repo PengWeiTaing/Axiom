@@ -5,6 +5,7 @@ import { exportData, getAdminLogs, getAuditLog, getMetrics, getSystemInfo } from
 import type { AdminLogsPayload, AuditLogEntry, AuditLogPayload, MetricsPayload, SystemInfoPayload } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
+import { downloadBlob } from '@/composables/useDownload';
 
 const system = ref<SystemInfoPayload | null>(null);
 const metrics = ref<MetricsPayload | null>(null);
@@ -92,14 +93,7 @@ async function handleExport() {
   error.value = null;
   try {
     const { blob, filename } = await exportData();
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = filename;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    downloadBlob(blob, filename);
     exportMessage.value = '导出已开始';
     await loadAudit();
   } catch (err) {

@@ -22,6 +22,7 @@ import { typeAccent } from '@/composables/useTypeAccent'
 import { useWindowEventListener } from '@/composables/useEventListener'
 import { humanSize } from '@/composables/useHumanSize'
 import { formatRelative } from '@/composables/useRelativeTime'
+import { triggerDownloadUrl } from '@/composables/useDownload'
 import { ApiError } from '@/api/client'
 import type { ItemDetail } from '@/api/types'
 
@@ -362,12 +363,7 @@ async function doDownloadFile() {
       objectUrl = temporaryObjectUrl
       window.setTimeout(() => URL.revokeObjectURL(temporaryObjectUrl), 0)
     }
-    const link = document.createElement('a')
-    link.href = objectUrl
-    link.download = detail.value.original_name || `item-${detail.value.id}`
-    document.body.append(link)
-    link.click()
-    link.remove()
+    triggerDownloadUrl(objectUrl, detail.value.original_name || `item-${detail.value.id}`)
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '文件下载失败'
   } finally {
