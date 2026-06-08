@@ -715,3 +715,4 @@
 - 新增 `frontend/src/composables/useEventListener.ts`，集中窗口/文档事件监听的挂载与卸载；Capture、QuickCapture、FloatChat、SearchOverlay、ItemDrawer、ObjectDrawer 的窗口级键盘快捷键不再重复手写生命周期监听样板。
 - Cosmos 的 AssociationEditDialog、ConfirmDialog、ContextMenu、QuickCreateDialog、ShortcutPanel 改用 `useDocumentEventListener` 管理键盘/外部点击监听，继续减少弹窗层的手写 add/remove 样板。
 - AtlasView 与 CosmosView 的窗口 resize 监听迁入 `useWindowEventListener`，视图 teardown 更专注于 three/canvas 资源释放。
+- CosmosView 用 Vue refs 替代 `.cosmos-view` / `.cosmos-hud` 的 `document.querySelector`，HUD mouseenter 提示恢复逻辑改由 `useEventListener` 统一清理。

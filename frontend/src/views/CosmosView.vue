@@ -29,10 +29,12 @@ import ExportDialog from '@/components/cosmos/ExportDialog.vue'
 import RecentPanel from '@/components/cosmos/RecentPanel.vue'
 import ImportDialog from '@/components/cosmos/ImportDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
-import { useWindowEventListener } from '@/composables/useEventListener'
+import { useEventListener, useWindowEventListener } from '@/composables/useEventListener'
 import { readStoredJson, writeStoredJson } from '@/composables/useLocalStorage'
 
 const store = useCosmosStore()
+const cosmosViewRef = ref<HTMLElement | null>(null)
+const hudRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 let sceneObjs: Awaited<ReturnType<typeof initScene>> | null = null
@@ -328,7 +330,7 @@ async function start() {
   labelRenderer.domElement.style.position = 'absolute'
   labelRenderer.domElement.style.top = '0'
   labelRenderer.domElement.style.pointerEvents = 'none'
-  document.querySelector('.cosmos-view')?.appendChild(labelRenderer.domElement)
+  cosmosViewRef.value?.appendChild(labelRenderer.domElement)
 
   const { createLabelGroup } = await import('@/cosmos/labels')
   labelGroup = createLabelGroup()
@@ -536,14 +538,14 @@ async function start() {
   window.addEventListener('keydown', onKey)
 
   // 快捷键提示：3s 后淡出，鼠标移入 HUD 重新显示
-  const hudEl = document.querySelector('.cosmos-hud')
-  hudEl?.addEventListener('mouseenter', () => {
-    hintVisible.value = true
-    if (hintTimer) clearTimeout(hintTimer)
-  })
   hintTimer = window.setTimeout(() => { hintVisible.value = false; hintDismissed.value = true }, 3000)
 
   animate()
+}
+
+function onHudMouseEnter() {
+  hintVisible.value = true
+  if (hintTimer) clearTimeout(hintTimer)
 }
 
 function onPanelFocusLifeline(lifelineId: string) {
@@ -1013,6 +1015,7 @@ watch(() => store.state.kind, () => {
 })
 
 useWindowEventListener('resize', onResize)
+useEventListener(() => hudRef.value, 'mouseenter', onHudMouseEnter)
 
 onMounted(async () => {
   await store.load()
@@ -1031,8 +1034,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="cosmos-view">
-    <div class="cosmos-hud">
+  <div ref="cosmosViewRef" class="cosmos-view">
+    <div ref="hudRef" class="cosmos-hud">
       <Breadcrumb :state="store.state" @nav="(s: CosmosState) => store.transition(s)" />
       <button
         v-if="store.state.kind !== 'global_overview'"
