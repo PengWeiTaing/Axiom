@@ -85,6 +85,7 @@ const energyNodeSprites = new Map<string, Sprite>()
 let haloTexture: CanvasTexture | null = null
 let dotTexture: CanvasTexture | null = null
 let energyDotTexture: CanvasTexture | null = null
+const stopCanvasListeners: Array<() => void> = []
 
 onMounted(async () => {
   await store.load()
@@ -440,8 +441,8 @@ function initScene() {
   controls.maxDistance = 780
 
   raycaster = new Raycaster()
-  renderer.domElement.addEventListener('pointermove', onPointerMove)
-  renderer.domElement.addEventListener('click', onPointerClick)
+  listenCanvasEvent('pointermove', onPointerMove)
+  listenCanvasEvent('click', onPointerClick)
 
   addSceneLights()
   addGlobalGrid()
@@ -473,10 +474,7 @@ function addGlobalGrid() {
 
 function teardownScene() {
   cancelAnimationFrame(animationFrame)
-  if (renderer) {
-    renderer.domElement.removeEventListener('pointermove', onPointerMove)
-    renderer.domElement.removeEventListener('click', onPointerClick)
-  }
+  stopCanvasEventListeners()
   controls?.dispose()
   if (graphGroup) disposeObject(graphGroup)
   renderer?.dispose()
@@ -496,6 +494,22 @@ function teardownScene() {
   nodeObjects.clear()
   nodePositions.clear()
   energyNodeSprites.clear()
+}
+
+function listenCanvasEvent<K extends keyof HTMLElementEventMap>(
+  type: K,
+  listener: (event: HTMLElementEventMap[K]) => void,
+) {
+  const canvas = renderer?.domElement
+  if (!canvas) return
+  canvas.addEventListener(type, listener as EventListener)
+  stopCanvasListeners.push(() => canvas.removeEventListener(type, listener as EventListener))
+}
+
+function stopCanvasEventListeners() {
+  while (stopCanvasListeners.length) {
+    stopCanvasListeners.pop()?.()
+  }
 }
 
 function disposeObject(object: Object3D) {

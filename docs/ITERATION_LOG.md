@@ -720,3 +720,4 @@
 - CosmosView 的全局键盘快捷键监听迁入 `useWindowEventListener`，移除 start/teardown 中手写的 `window.addEventListener/removeEventListener`。
 - CosmosView 的 canvas click/move/contextmenu 交互拆成命名 handler，并通过统一解绑列表管理，避免匿名监听随 3D 初始化散落。
 - CosmosView 取消对 `CSS2DRenderer` 与 `computeFocusLayout` 的重复动态 import，统一使用静态引用以清理 Vite 动态/静态混用 warning。
+- AtlasView 的 canvas pointer/click 交互改为统一注册 stop 函数并在 teardown 中集中解绑，和 Cosmos 的 3D 事件生命周期保持一致。
