@@ -13,9 +13,11 @@
  *   - 提交成功后清空 + 显示 1.5s AI 判定 ghost
  */
 
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useSmartCapture, type CaptureSuccess } from '@/composables/useSmartCapture';
 import { humanSize } from '@/composables/useHumanSize';
+import { useInterval } from '@/composables/useInterval';
+import { useTimeout } from '@/composables/useTimeout';
 
 const PLACEHOLDERS = [
   '记一句…',
@@ -39,22 +41,17 @@ const { capture, submitting, lastError, acceptLifeline } = useSmartCapture();
 
 const canSubmit = computed(() => (text.value.trim().length > 0 || files.value.length > 0) && !submitting.value);
 
-let placeholderTimer: number | undefined;
-let ghostTimer: number | undefined;
+const placeholderTimer = useInterval();
+const ghostTimer = useTimeout();
 
 onMounted(() => {
   // 占位符 8s 轮换一次，让空状态有呼吸感但不打扰
   let idx = 0;
-  placeholderTimer = window.setInterval(() => {
+  placeholderTimer.start(() => {
     idx = (idx + 1) % PLACEHOLDERS.length;
     placeholder.value = PLACEHOLDERS[idx];
   }, 8000);
   textarea.value?.focus();
-});
-
-onBeforeUnmount(() => {
-  if (placeholderTimer) clearInterval(placeholderTimer);
-  if (ghostTimer) clearTimeout(ghostTimer);
 });
 
 function autoGrow() {
@@ -89,8 +86,7 @@ async function submit() {
 
 function showGhost(result: CaptureSuccess) {
   ghost.value = result;
-  if (ghostTimer) clearTimeout(ghostTimer);
-  ghostTimer = window.setTimeout(() => {
+  ghostTimer.schedule(() => {
     ghost.value = null;
   }, 1800);
 }

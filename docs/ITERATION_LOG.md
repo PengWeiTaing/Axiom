@@ -731,3 +731,4 @@
 - `smoke_test_web_app.py` 在 Vue Recent/Processing 的“退回待处理”流程中先等待按钮启用再点击，减少 mark-ready 后 UI 刷新竞争导致的误报。
 - ItemDrawer 的删除二次确认 timer 迁入 `useTimeout`，确认态自动恢复与组件卸载清理继续收敛到统一定时器 helper。
 - 新增 `frontend/src/composables/useInterval.ts`，先迁入 Timeline 的 30 秒相对时间刷新 ticker，继续减少组件内手写 interval 清理样板。
+- SmartInput 的占位符轮换 interval 与提交成功 ghost timeout 分别迁入 `useInterval` / `useTimeout`，捕获入口不再手写定时器卸载清理。
