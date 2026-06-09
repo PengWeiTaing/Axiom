@@ -32,7 +32,7 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useAtlasGraphStore } from '@/stores/atlasGraph'
-import { useWindowEventListener } from '@/composables/useEventListener'
+import { listenToElementEvent, useWindowEventListener } from '@/composables/useEventListener'
 import type { AtlasEdge, AtlasNode } from '@/atlas/types'
 
 interface LocalNode {
@@ -502,8 +502,7 @@ function listenCanvasEvent<K extends keyof HTMLElementEventMap>(
 ) {
   const canvas = renderer?.domElement
   if (!canvas) return
-  canvas.addEventListener(type, listener as EventListener)
-  stopCanvasListeners.push(() => canvas.removeEventListener(type, listener as EventListener))
+  stopCanvasListeners.push(listenToElementEvent(canvas, type, listener))
 }
 
 function stopCanvasEventListeners() {

@@ -30,7 +30,7 @@ import ExportDialog from '@/components/cosmos/ExportDialog.vue'
 import RecentPanel from '@/components/cosmos/RecentPanel.vue'
 import ImportDialog from '@/components/cosmos/ImportDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
-import { useEventListener, useWindowEventListener } from '@/composables/useEventListener'
+import { listenToElementEvent, useEventListener, useWindowEventListener } from '@/composables/useEventListener'
 import { readStoredJson, writeStoredJson } from '@/composables/useLocalStorage'
 import { useTimeout } from '@/composables/useTimeout'
 
@@ -370,10 +370,7 @@ function listenToCanvas<K extends keyof HTMLElementEventMap>(
   type: K,
   listener: (event: HTMLElementEventMap[K]) => void,
 ): () => void {
-  const canvas = canvasRef.value
-  if (!canvas) return () => {}
-  canvas.addEventListener(type, listener as EventListener)
-  return () => canvas.removeEventListener(type, listener as EventListener)
+  return listenToElementEvent(canvasRef.value, type, listener)
 }
 
 function attachCanvasListeners() {
