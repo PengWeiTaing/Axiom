@@ -1,5 +1,6 @@
 import { tokenStore } from './auth';
 import { enqueue } from './uploadQueue';
+import { buildQueryString, type QueryValue } from '@/utils/query';
 
 export class ApiClientError extends Error {
   code: string;
@@ -15,7 +16,7 @@ export class ApiClientError extends Error {
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  query?: Record<string, string | number | undefined | null>;
+  query?: Record<string, QueryValue>;
   json?: unknown;
   formData?: FormData;
   signal?: AbortSignal;
@@ -34,14 +35,7 @@ export function getBaseUrl(): string {
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
   const full = baseUrl + path;
-  if (!query) return full;
-
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(query)) {
-    if (v === undefined || v === null || v === '') continue;
-    params.append(k, String(v));
-  }
-  const qs = params.toString();
+  const qs = buildQueryString(query);
   return qs ? `${full}?${qs}` : full;
 }
 

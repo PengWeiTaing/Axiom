@@ -9,6 +9,7 @@
  */
 
 import type { ApiErrorPayload } from './types';
+import { buildQueryString, type QueryValue } from '@/utils/query';
 
 export class ApiError extends Error {
   code: string;
@@ -30,7 +31,7 @@ export function setKeyGetter(fn: () => string | null) {
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  query?: Record<string, string | number | undefined | null>;
+  query?: Record<string, QueryValue>;
   json?: unknown;
   formData?: FormData;
   signal?: AbortSignal;
@@ -99,14 +100,8 @@ export async function apiRequest<T = unknown>(
   return data as T;
 }
 
-function buildUrl(path: string, query?: Record<string, string | number | undefined | null>): string {
-  if (!query) return path;
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(query)) {
-    if (v === undefined || v === null || v === '') continue;
-    params.append(k, String(v));
-  }
-  const qs = params.toString();
+function buildUrl(path: string, query?: Record<string, QueryValue>): string {
+  const qs = buildQueryString(query);
   return qs ? `${path}?${qs}` : path;
 }
 
