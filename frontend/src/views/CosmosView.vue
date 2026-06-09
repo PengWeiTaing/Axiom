@@ -32,6 +32,7 @@ import ImportDialog from '@/components/cosmos/ImportDialog.vue'
 import type { LabelGroup } from '@/cosmos/labels'
 import { useEventListener, useWindowEventListener } from '@/composables/useEventListener'
 import { readStoredJson, writeStoredJson } from '@/composables/useLocalStorage'
+import { useTimeout } from '@/composables/useTimeout'
 
 const store = useCosmosStore()
 const cosmosViewRef = ref<HTMLElement | null>(null)
@@ -51,7 +52,7 @@ let stopCanvasListeners: Array<() => void> = []
 const showSearch = ref(false)
 const showShortcuts = ref(false)
 const copiedToast = ref(false)
-let toastTimer: number | undefined
+const toastTimer = useTimeout()
 
 // Quick create
 const quickCreateVisible = ref(false)
@@ -113,7 +114,7 @@ const nodeDetailRef = ref<InstanceType<typeof NodeDetailCard> | null>(null)
 // Shortcuts hint
 const hintVisible = ref(true)
 const hintDismissed = ref(false)
-let hintTimer: number | undefined
+const hintTimer = useTimeout()
 
 // Hover
 let hoveredNode: THREE.Mesh | null = null
@@ -281,8 +282,7 @@ function onPathFocusEntity(entityId: string) {
 
 function showCopiedToast() {
   copiedToast.value = true
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = window.setTimeout(() => { copiedToast.value = false }, 1500)
+  toastTimer.schedule(() => { copiedToast.value = false }, 1500)
 }
 
 function onContextCopyTitle(target: ContextMenuTarget) {
@@ -361,7 +361,7 @@ async function start() {
   attachCanvasListeners()
 
   // 快捷键提示：3s 后淡出，鼠标移入 HUD 重新显示
-  hintTimer = window.setTimeout(() => { hintVisible.value = false; hintDismissed.value = true }, 3000)
+  scheduleHintFade()
 
   animate()
 }
@@ -564,7 +564,14 @@ function onCanvasContextMenu(e: MouseEvent) {
 
 function onHudMouseEnter() {
   hintVisible.value = true
-  if (hintTimer) clearTimeout(hintTimer)
+  hintTimer.clear()
+}
+
+function scheduleHintFade() {
+  hintTimer.schedule(() => {
+    hintVisible.value = false
+    hintDismissed.value = true
+  }, 3000)
 }
 
 function onPanelFocusLifeline(lifelineId: string) {
@@ -1027,8 +1034,7 @@ watch(() => store.state, (s) => {
 watch(() => store.state.kind, () => {
   hintVisible.value = true
   hintDismissed.value = false
-  if (hintTimer) clearTimeout(hintTimer)
-  hintTimer = window.setTimeout(() => { hintVisible.value = false; hintDismissed.value = true }, 3000)
+  scheduleHintFade()
 })
 
 useWindowEventListener('resize', onResize)
@@ -1047,7 +1053,7 @@ onBeforeUnmount(() => {
   controls?.dispose()
   if (labelGroup) { labelGroup.dispose(); labelGroup = null }
   if (labelRenderer?.domElement) { labelRenderer.domElement.remove() }
-  if (hintTimer) clearTimeout(hintTimer)
+  hintTimer.clear()
 })
 </script>
 

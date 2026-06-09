@@ -732,3 +732,4 @@
 - ItemDrawer 的删除二次确认 timer 迁入 `useTimeout`，确认态自动恢复与组件卸载清理继续收敛到统一定时器 helper。
 - 新增 `frontend/src/composables/useInterval.ts`，先迁入 Timeline 的 30 秒相对时间刷新 ticker，继续减少组件内手写 interval 清理样板。
 - SmartInput 的占位符轮换 interval 与提交成功 ghost timeout 分别迁入 `useInterval` / `useTimeout`，捕获入口不再手写定时器卸载清理。
+- CosmosView 的复制成功 toast 与 HUD 快捷键提示淡出 timer 迁入 `useTimeout`，3D 主视图剩余手写 timeout 清理继续收敛。
