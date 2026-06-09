@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
 import { downloadBlob } from '@/composables/useDownload'
+import { isoTimestamp, todayIsoDate } from '@/utils/date'
 
 const store = useCosmosStore()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -17,7 +18,7 @@ function relLabel(rt: string): string {
 
 function buildMarkdownExport(data: NonNullable<typeof store.data>): string {
   const lines: string[] = []
-  const now = new Date().toISOString().slice(0, 10)
+  const now = todayIsoDate()
   lines.push(`# Axiom Atlas 导出 — ${now}`, '', '## 概览', '')
 
   const byKind = { task: 0, memory: 0, decision: 0, item: 0 }
@@ -52,10 +53,10 @@ function buildMarkdownExport(data: NonNullable<typeof store.data>): string {
 
 function doExport(format: 'json' | 'markdown') {
   if (!store.data) return
-  const now = new Date().toISOString().slice(0, 10)
+  const now = todayIsoDate()
   let content: string; let filename: string; let mime: string
   if (format === 'json') {
-    content = JSON.stringify({ exported_at: new Date().toISOString(), schema_version: store.data.schema_version, root: store.data.root, lifelines: store.data.lifelines, entities: store.data.entities, associations: store.data.associations }, null, 2)
+    content = JSON.stringify({ exported_at: isoTimestamp(), schema_version: store.data.schema_version, root: store.data.root, lifelines: store.data.lifelines, entities: store.data.entities, associations: store.data.associations }, null, 2)
     filename = `axiom-export-${now}.json`; mime = 'application/json'
   } else {
     content = buildMarkdownExport(store.data)
