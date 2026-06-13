@@ -17,6 +17,7 @@ import type { Item, Memory, Task, Decision, ObjectTarget } from '@/api/types';
 import { useWindowEventListener } from '@/composables/useEventListener';
 import { useTimeout } from '@/composables/useTimeout';
 import { ApiError } from '@/api/client';
+import { isAbortError } from '@/utils/http';
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: []; openItem: [id: number]; openObject: [target: ObjectTarget] }>();
@@ -82,7 +83,7 @@ async function run() {
       ];
     }
   } catch (err) {
-    if ((err as Error).name === 'AbortError') return;
+    if (isAbortError(err)) return;
     error.value = err instanceof ApiError ? err.message : '搜索失败';
     results.value = [];
   } finally {

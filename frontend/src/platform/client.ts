@@ -1,5 +1,6 @@
 import { tokenStore } from './auth';
 import { enqueue } from './uploadQueue';
+import { applyJsonBody, isAbortError, isJsonResponse } from '@/utils/http';
 import { buildQueryString, type QueryValue } from '@/utils/query';
 
 export class ApiClientError extends Error {
@@ -60,8 +61,7 @@ export async function apiRequest<T = unknown>(
   if (formData) {
     body = formData;
   } else if (json !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    body = JSON.stringify(json);
+    body = applyJsonBody(headers, json);
   }
 
   const isWriteMethod = method === 'POST' || method === 'PUT' || method === 'PATCH';
@@ -70,7 +70,7 @@ export async function apiRequest<T = unknown>(
   try {
     resp = await fetch(url, { method, headers, body, signal });
   } catch (err) {
-    if ((err as Error).name === 'AbortError') throw err;
+    if (isAbortError(err)) throw err;
 
     if (isWriteMethod && json !== undefined) {
       enqueue({
@@ -84,9 +84,7 @@ export async function apiRequest<T = unknown>(
     throw new ApiClientError('network', '网络错误', 0);
   }
 
-  const contentType = resp.headers.get('content-type') || '';
-
-  if (!contentType.includes('application/json')) {
+  if (!isJsonResponse(resp)) {
     if (!resp.ok) {
       throw new ApiClientError('http_' + resp.status, resp.statusText, resp.status);
     }

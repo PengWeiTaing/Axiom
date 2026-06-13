@@ -8,6 +8,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { streamRequest, ApiError } from '@/api/client';
 import { readStoredJson, writeStoredJson } from '@/composables/useLocalStorage';
+import { isAbortError } from '@/utils/http';
 
 const STORAGE_KEY = 'axiom.chat.history';
 const MAX_HISTORY = 50;
@@ -100,7 +101,7 @@ export const useChatStore = defineStore('chat', () => {
       replyMsg.pending = false;
       if (!replyMsg.content) replyMsg.content = '(空回复)';
     } catch (err) {
-      if ((err as Error).name === 'AbortError') {
+      if (isAbortError(err)) {
         // 已经在 cancel 里处理过
         return;
       }

@@ -9,6 +9,7 @@
  */
 
 import type { ApiErrorPayload } from './types';
+import { applyJsonBody, isAbortError, isJsonResponse } from '@/utils/http';
 import { buildQueryString, type QueryValue } from '@/utils/query';
 
 export class ApiError extends Error {
@@ -60,22 +61,19 @@ export async function apiRequest<T = unknown>(
   if (formData) {
     body = formData;
   } else if (json !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    body = JSON.stringify(json);
+    body = applyJsonBody(headers, json);
   }
 
   let resp: Response;
   try {
     resp = await fetch(url, { method, headers, body, signal });
   } catch (err) {
-    if ((err as Error).name === 'AbortError') throw err;
+    if (isAbortError(err)) throw err;
     throw new ApiError('network', '网络错误', 0);
   }
 
-  const contentType = resp.headers.get('content-type') || '';
-
   // 文件下载等非 JSON 响应
-  if (!contentType.includes('application/json')) {
+  if (!isJsonResponse(resp)) {
     if (!resp.ok) {
       throw new ApiError('http_' + resp.status, resp.statusText, resp.status);
     }
