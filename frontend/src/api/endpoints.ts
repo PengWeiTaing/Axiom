@@ -41,6 +41,7 @@ import type {
 } from './types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 import type { AtlasGraphPayload } from '@/atlas/types';
+import { todayIsoDate } from '@/utils/date';
 
 // ---------- 采集 ----------
 export const addNote = (text: string, source = 'web_app') =>
@@ -148,7 +149,7 @@ export const exportData = async () => {
   const response = await apiRequest<Response>('/export', { method: 'POST' });
   const blob = await response.blob();
   const filename = filenameFromDisposition(response.headers.get('content-disposition'))
-    || `axiom_export_${new Date().toISOString().slice(0, 10)}.zip`;
+    || `axiom_export_${todayIsoDate()}.zip`;
   return { blob, filename };
 };
 

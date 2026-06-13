@@ -736,3 +736,4 @@
 - `useEventListener` 补充手动 stop 型 `listenToElementEvent`，Atlas/Cosmos 的 canvas click/move/contextmenu 监听复用同一注册/解绑 helper。
 - 新增 `frontend/src/utils/query.ts`，主 API client 与 platform API client 复用 `buildQueryString`，请求 query 拼装不再维护两份过滤空值逻辑。
 - 新增 `frontend/src/utils/date.ts`，Cosmos/Atlas 导出弹窗复用 ISO 日期/时间戳 helper，导出文件名和 JSON 元信息不再手写 `new Date().toISOString()` 切片。
+- `exportData` 的 ZIP 兜底文件名与 Timeline 日期窗口/完整时间展示迁入 `frontend/src/utils/date.ts`，前端日期格式化入口继续收敛。

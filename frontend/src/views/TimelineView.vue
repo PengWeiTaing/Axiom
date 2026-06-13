@@ -6,6 +6,7 @@ import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
+import { formatZhDateTime, isoDate } from '@/utils/date';
 import type { ObjectTarget, TimelineEntry, TimelineKind, TimelinePayload } from '@/api/types';
 
 const PAGE_SIZE = 28;
@@ -204,13 +205,11 @@ function kindAccent(kind: TimelineKind): string {
 
 function fullTime(value: string): string {
   if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('zh-CN', { hour12: false });
+  return formatZhDateTime(value);
 }
 
 function toDateInputValue(value: Date): string {
-  return value.toISOString().slice(0, 10);
+  return isoDate(value);
 }
 
 function syncTimelineUrl() {
