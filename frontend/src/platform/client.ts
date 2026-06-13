@@ -1,7 +1,7 @@
 import { tokenStore } from './auth';
 import { enqueue } from './uploadQueue';
-import { applyJsonBody, isAbortError, isJsonResponse } from '@/utils/http';
 import { buildQueryString, type QueryValue } from '@/utils/query';
+import { executeRequest } from '@/utils/request';
 
 export class ApiClientError extends Error {
   code: string;
@@ -44,7 +44,7 @@ export async function apiRequest<T = unknown>(
   path: string,
   opts: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', query, json, formData, signal, skipAuth = false } = opts;
+  const { method = 'GET', query, json, skipAuth = false, ...requestOpts } = opts;
 
   const url = buildUrl(path, query);
   const headers: Record<string, string> = {};
@@ -57,54 +57,23 @@ export async function apiRequest<T = unknown>(
     headers['X-Axiom-Key'] = key;
   }
 
-  let body: BodyInit | undefined;
-  if (formData) {
-    body = formData;
-  } else if (json !== undefined) {
-    body = applyJsonBody(headers, json);
-  }
-
   const isWriteMethod = method === 'POST' || method === 'PUT' || method === 'PATCH';
 
-  let resp: Response;
-  try {
-    resp = await fetch(url, { method, headers, body, signal });
-  } catch (err) {
-    if (isAbortError(err)) throw err;
-
-    if (isWriteMethod && json !== undefined) {
+  return executeRequest<T, ApiClientError>({
+    ...requestOpts,
+    method,
+    json,
+    url,
+    headers,
+    createError: (code, message, status) => new ApiClientError(code, message, status),
+    onNetworkFailure: (context) => {
+      if (!isWriteMethod || json === undefined) return;
       enqueue({
-        url,
+        url: context.url,
         method: method as 'POST' | 'PUT' | 'PATCH',
         body: json,
-        headers,
+        headers: context.headers,
       });
-    }
-
-    throw new ApiClientError('network', '网络错误', 0);
-  }
-
-  if (!isJsonResponse(resp)) {
-    if (!resp.ok) {
-      throw new ApiClientError('http_' + resp.status, resp.statusText, resp.status);
-    }
-    return resp as unknown as T;
-  }
-
-  const data = await resp.json();
-
-  if (!resp.ok || data?.ok === false) {
-    const err = data?.error ?? {
-      code: 'unknown',
-      message: `请求失败 (${resp.status})`,
-    };
-    throw new ApiClientError(err.code, err.message, resp.status);
-  }
-
-  if (data && typeof data === 'object' && 'ok' in data) {
-    const { ok: _ok, ...rest } = data as Record<string, unknown>;
-    return rest as T;
-  }
-
-  return data as T;
+    },
+  });
 }

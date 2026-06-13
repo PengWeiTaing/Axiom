@@ -738,3 +738,4 @@
 - 新增 `frontend/src/utils/date.ts`，Cosmos/Atlas 导出弹窗复用 ISO 日期/时间戳 helper，导出文件名和 JSON 元信息不再手写 `new Date().toISOString()` 切片。
 - `exportData` 的 ZIP 兜底文件名与 Timeline 日期窗口/完整时间展示迁入 `frontend/src/utils/date.ts`，前端日期格式化入口继续收敛。
 - 新增 `frontend/src/utils/http.ts`，主 API client 与 platform API client 复用 AbortError 判断、JSON 响应判断和 JSON body 组装 helper，同时保留各自鉴权与离线队列语义。
+- 新增 `frontend/src/utils/request.ts`，把 fetch 执行、非 JSON 响应、后端 `{ok,error}` payload 解析和 `ok` 剥离集中到共享 executor；主 API client 与 platform client 只保留鉴权、错误类型和离线队列差异。

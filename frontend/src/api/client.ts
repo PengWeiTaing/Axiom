@@ -8,9 +8,9 @@
  * - SSE 流式单独一个 streamRequest
  */
 
-import type { ApiErrorPayload } from './types';
-import { applyJsonBody, isAbortError, isJsonResponse } from '@/utils/http';
+import { applyJsonBody } from '@/utils/http';
 import { buildQueryString, type QueryValue } from '@/utils/query';
+import { executeRequest } from '@/utils/request';
 
 export class ApiError extends Error {
   code: string;
@@ -44,7 +44,7 @@ export async function apiRequest<T = unknown>(
   path: string,
   opts: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', query, json, formData, signal, skipAuth = false } = opts;
+  const { query, skipAuth = false, ...requestOpts } = opts;
 
   const url = buildUrl(path, query);
   const headers: Record<string, string> = {};
@@ -57,45 +57,12 @@ export async function apiRequest<T = unknown>(
     headers['X-Axiom-Key'] = key;
   }
 
-  let body: BodyInit | undefined;
-  if (formData) {
-    body = formData;
-  } else if (json !== undefined) {
-    body = applyJsonBody(headers, json);
-  }
-
-  let resp: Response;
-  try {
-    resp = await fetch(url, { method, headers, body, signal });
-  } catch (err) {
-    if (isAbortError(err)) throw err;
-    throw new ApiError('network', '网络错误', 0);
-  }
-
-  // 文件下载等非 JSON 响应
-  if (!isJsonResponse(resp)) {
-    if (!resp.ok) {
-      throw new ApiError('http_' + resp.status, resp.statusText, resp.status);
-    }
-    return resp as unknown as T;
-  }
-
-  const data = await resp.json();
-
-  if (!resp.ok || data?.ok === false) {
-    const err: ApiErrorPayload = data?.error ?? {
-      code: 'unknown',
-      message: `请求失败 (${resp.status})`,
-    };
-    throw new ApiError(err.code, err.message, resp.status);
-  }
-
-  // 后端 ok 响应是 {ok: true, ...payload}；把 ok 剥掉
-  if (data && typeof data === 'object' && 'ok' in data) {
-    const { ok: _ok, ...rest } = data as Record<string, unknown>;
-    return rest as T;
-  }
-  return data as T;
+  return executeRequest<T, ApiError>({
+    ...requestOpts,
+    url,
+    headers,
+    createError: (code, message, status) => new ApiError(code, message, status),
+  });
 }
 
 function buildUrl(path: string, query?: Record<string, QueryValue>): string {
@@ -115,15 +82,15 @@ export async function streamRequest(
 ): Promise<void> {
   const key = keyGetter();
   if (!key) throw new ApiError('no_key', '未配置 Axiom key', 401);
+  const headers: Record<string, string> = {
+    'X-Axiom-Key': key,
+    Accept: 'text/event-stream',
+  };
 
   const resp = await fetch(path, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Axiom-Key': key,
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify(json),
+    headers,
+    body: applyJsonBody(headers, json),
     signal,
   });
 
