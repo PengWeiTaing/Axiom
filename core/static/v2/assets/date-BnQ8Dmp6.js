@@ -1,0 +1,1 @@
+function n(t=new Date){return new Date(t).toISOString()}function a(t=new Date){return n(t).slice(0,10)}function i(){return a()}function r(t){const e=t instanceof Date?t:new Date(t);return Number.isNaN(e.getTime())?String(t):e.toLocaleString("zh-CN",{hour12:!1})}export{n as a,r as f,a as i,i as t};

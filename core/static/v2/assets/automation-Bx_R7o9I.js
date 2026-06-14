@@ -1,0 +1,1 @@
+import{e as t}from"./index-B0-T4HF0.js";const s=()=>t("/automation/jobs"),u=(o={})=>t("/automation/runs",{query:o}),m=(o,a)=>t("/automation/run",{method:"POST",json:{job:o,date:a}});export{u as a,s as g,m as r};
