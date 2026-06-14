@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import { useCosmosStore } from '@/stores/cosmos'
+import { useObjectDetail } from '@/composables/useObjectDetail'
 import type { CosmosEntity, CosmosAssociation } from '@/cosmos/types'
 
 const store = useCosmosStore()
@@ -12,47 +13,18 @@ const entity = computed<CosmosEntity | null>(() => {
   return store.data?.entities.find(e => e.id === eid) ?? null
 })
 
-// Detail loading
-const detail = ref<Record<string, unknown> | null>(null)
-const detailLoading = ref(false)
-const detailError = ref(false)
-
-async function loadDetail() {
-  if (!entity.value) return
-  const eid = entity.value.id
-  const cached = store.entityDetailCache.get(eid)
-  if (cached) { detail.value = cached; return }
-
-  detailLoading.value = true
-  detailError.value = false
-  try {
-    const parts = eid.split(':')
-    const kind = parts[0]
-    const rawId = parseInt(parts.slice(1).join(':'), 10)
-    let data: Record<string, unknown> = {}
-    if (kind === 'task') {
-      const { getTask } = await import('@/api/knowledge')
-      const r = await getTask(rawId); data = (r as any).task || r
-    } else if (kind === 'memory') {
-      const { getMemory: apiGet } = await import('@/api/knowledge')
-      const r = await apiGet(rawId); data = (r as any).memory || r
-    } else if (kind === 'decision') {
-      const { getDecision } = await import('@/api/knowledge')
-      const r = await getDecision(rawId); data = (r as any).decision || r
-    } else if (kind === 'item') {
-      const { getItem } = await import('@/api/records')
-      const r = await getItem(rawId); data = (r as any).item || r
-    }
-    detail.value = data
-    store.entityDetailCache.set(eid, data)
-  } catch {
-    detailError.value = true
-  } finally {
-    detailLoading.value = false
-  }
-}
-
-watch(() => entity.value?.id, () => { detail.value = null; loadDetail() }, { immediate: true })
+const {
+  detail,
+  detailLoading,
+  detailError,
+  loadDetail,
+  saveObjectField,
+  toggleTaskDone,
+  confirmOrArchiveMemory,
+} = useObjectDetail(entity, {
+  cache: store.entityDetailCache,
+  afterEntityChanged: () => store.reload(),
+})
 
 // Inline title editing (existing)
 const editingTitle = ref(false)
@@ -100,15 +72,8 @@ async function saveField() {
   if (!entity.value || !editingField.value || !detail.value) return
   const fn = editingField.value
   const newVal = fieldValue.value.trim()
-  if (newVal === String(detail.value[fn] || '')) { editingField.value = null; return }
-  const parts = entity.value.id.split(':')
-  const kind = parts[0]
-  const rawId = parseInt(parts.slice(1).join(':'), 10)
   try {
-    const { updateEntityField } = await import('@/api/cosmos')
-    await updateEntityField(kind, rawId, { [fn]: newVal })
-    detail.value = { ...detail.value, [fn]: newVal }
-    store.entityDetailCache.set(entity.value.id, detail.value)
+    await saveObjectField(fn, newVal)
   } catch {
     // stay in edit mode on failure
   }
@@ -120,47 +85,6 @@ function onFieldKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') { e.stopPropagation(); cancelField() }
   else if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) { e.stopPropagation(); saveField() }
   else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && e.target instanceof HTMLTextAreaElement) { e.stopPropagation(); saveField() }
-}
-
-// Quick actions
-async function toggleTaskDone() {
-  if (!entity.value || !detail.value) return
-  const parts = entity.value.id.split(':')
-  const rawId = parseInt(parts.slice(1).join(':'), 10)
-  const curStatus = detail.value.status as string
-  try {
-    if (curStatus === 'todo') {
-      const { markTaskDone } = await import('@/api/knowledge')
-      await markTaskDone(rawId)
-      detail.value = { ...detail.value, status: 'done' }
-    } else {
-      const { markTaskTodo } = await import('@/api/knowledge')
-      await markTaskTodo(rawId)
-      detail.value = { ...detail.value, status: 'todo' }
-    }
-    store.entityDetailCache.set(entity.value.id, detail.value)
-    await store.reload()
-  } catch { await store.reload() }
-}
-
-async function confirmOrArchiveMemory() {
-  if (!entity.value || !detail.value) return
-  const parts = entity.value.id.split(':')
-  const rawId = parseInt(parts.slice(1).join(':'), 10)
-  const curStatus = detail.value.status as string
-  try {
-    if (curStatus === 'candidate') {
-      const { confirmMemory } = await import('@/api/knowledge')
-      await confirmMemory(rawId)
-      detail.value = { ...detail.value, status: 'confirmed' }
-    } else {
-      const { archiveMemory: apiArch } = await import('@/api/knowledge')
-      await apiArch(rawId)
-      detail.value = { ...detail.value, status: 'archived' }
-    }
-    store.entityDetailCache.set(entity.value.id, detail.value)
-    await store.reload()
-  } catch { await store.reload() }
 }
 
 // Emits

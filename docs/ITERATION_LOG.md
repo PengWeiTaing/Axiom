@@ -7,6 +7,7 @@
 - 前端调用方从 `@/api/endpoints` 兼容导出层迁移到领域 API 模块：`records` / `search` / `knowledge` / `system` / `automation` / `cosmos`。
 - 保留 `frontend/src/api/endpoints.ts` 作为旧代码兼容 barrel，新代码不再直接依赖它。
 - 新增 `scripts/check_frontend_api_imports.py`，用于阻止 `frontend/src` 重新引入 `@/api/endpoints`。
+- 抽出 `frontend/src/composables/useObjectDetail.ts`，把 Cosmos 节点详情加载、字段保存、任务/记忆快捷动作从 `NodeDetailCard.vue` 中移出，后续可复用于搜索详情和白板节点详情。
 
 ## 2026-04-21
 
