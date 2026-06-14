@@ -2,6 +2,14 @@
 import { computed, ref, watch } from 'vue';
 import { ApiError } from '@/api/client';
 import { cancelTask, reviewDecision } from '@/api/knowledge';
+import {
+  decisionStatusLabel,
+  memoryCategoryLabel,
+  memoryStatusLabel,
+  objectKindLabel,
+  taskPriorityLabel,
+  taskStatusLabel,
+} from '@/composables/useObjectLabels';
 import { useObjectDetail, type ObjectDetail } from '@/composables/useObjectDetail';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { useWindowEventListener } from '@/composables/useEventListener';
@@ -64,41 +72,17 @@ const title = computed(() => {
   if (task.value) return task.value.title;
   if (memory.value) return memory.value.content;
   if (decision.value) return decision.value.title;
-  return kind.value ? `${kindLabel(kind.value)} #${props.target?.id ?? '-'}` : '';
+  return kind.value ? `${objectKindLabel(kind.value)} #${props.target?.id ?? '-'}` : '';
 });
 
 const subtitle = computed(() => {
-  if (task.value) return `${taskStatusLabel(task.value.status)} · ${priorityLabel(task.value.priority)}`;
+  if (task.value) return `${taskStatusLabel(task.value.status)} · ${taskPriorityLabel(task.value.priority)}`;
   if (memory.value) return `${memoryCategoryLabel(memory.value.category)} · ${memoryStatusLabel(memory.value.status)}`;
   if (decision.value) return decisionStatusLabel(decision.value.status);
   return '加载中';
 });
 
 const createdAt = computed(() => task.value?.created_at || memory.value?.created_at || decision.value?.created_at || '');
-
-function kindLabel(value: ObjectKind): string {
-  return { task: '任务', memory: '记忆', decision: '决策' }[value];
-}
-
-function taskStatusLabel(status: Task['status']): string {
-  return { todo: '待办', done: '已完成', cancelled: '已取消' }[status];
-}
-
-function priorityLabel(priority: Task['priority']): string {
-  return { high: '高优先级', medium: '中优先级', low: '低优先级' }[priority];
-}
-
-function memoryCategoryLabel(category: MemoryDetail['category']): string {
-  return { fact: '事实', preference: '偏好', goal: '目标', relationship: '关系', event: '事件' }[category];
-}
-
-function memoryStatusLabel(status: MemoryDetail['status']): string {
-  return { candidate: '候选', confirmed: '已确认', archived: '已归档' }[status];
-}
-
-function decisionStatusLabel(status: Decision['status']): string {
-  return { pending: '待回顾', reviewed: '已回顾' }[status];
-}
 
 function openWorkspace() {
   if (kind.value === 'task') mode.set('tasks');
@@ -202,7 +186,7 @@ useWindowEventListener('keydown', onKey);
 
         <header class="object-head">
           <div>
-            <p class="eyebrow">{{ kind ? kindLabel(kind) : 'Object' }}</p>
+            <p class="eyebrow">{{ kind ? objectKindLabel(kind) : 'Object' }}</p>
             <h2>{{ title }}</h2>
             <span>{{ subtitle }}<template v-if="createdAt"> · {{ formatRelative(createdAt) }}</template></span>
           </div>
@@ -250,7 +234,7 @@ useWindowEventListener('keydown', onKey);
                 @click="openLinkedTask(linked.id)"
               >
                 <strong>{{ linked.title }}</strong>
-                <small>{{ taskStatusLabel(linked.status) }} · {{ priorityLabel(linked.priority) }}</small>
+                <small>{{ taskStatusLabel(linked.status) }} · {{ taskPriorityLabel(linked.priority) }}</small>
               </button>
             </section>
           </template>

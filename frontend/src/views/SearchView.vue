@@ -5,6 +5,13 @@ import { searchAll, searchVector } from '@/api/search';
 import { ApiError } from '@/api/client';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
+import {
+  decisionStatusLabel,
+  memoryCategoryLabel,
+  memoryStatusLabel,
+  taskPriorityLabel,
+  taskStatusLabel,
+} from '@/composables/useObjectLabels';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';
 import { typeAccent } from '@/composables/useTypeAccent';
@@ -184,7 +191,7 @@ function resultMeta(result: SearchResult): string {
     const relevance = result.relevance === undefined ? '' : ` · 相关度 ${Math.round(result.relevance * 100)}%`;
     return `${itemTypeLabel(result.data.type)} · ${formatRelative(result.data.created_at)}${relevance}`;
   }
-  if (result.kind === 'task') return `${taskStatusLabel(result.data.status)} · ${priorityLabel(result.data.priority)}`;
+  if (result.kind === 'task') return `${taskStatusLabel(result.data.status)} · ${taskPriorityLabel(result.data.priority)}`;
   if (result.kind === 'memory') return `${memoryCategoryLabel(result.data.category)} · ${memoryStatusLabel(result.data.status)}`;
   return `${decisionStatusLabel(result.data.status)} · ${formatRelative(result.data.created_at)}`;
 }
@@ -245,26 +252,6 @@ function itemTypeLabel(type: Item['type']): string {
 
 function itemProcessingLabel(item: Item): string {
   return item.processing_note || item.processing_label || (item.processing_state === 'pending' ? '待处理' : '已就绪');
-}
-
-function taskStatusLabel(status: Task['status']): string {
-  return { todo: '待办', done: '已完成', cancelled: '已取消' }[status];
-}
-
-function priorityLabel(priority: Task['priority']): string {
-  return { high: '高优先级', medium: '中优先级', low: '低优先级' }[priority];
-}
-
-function memoryCategoryLabel(category: Memory['category']): string {
-  return { fact: '事实', preference: '偏好', goal: '目标', relationship: '关系', event: '事件' }[category];
-}
-
-function memoryStatusLabel(status: Memory['status']): string {
-  return { candidate: '候选', confirmed: '已确认', archived: '已归档' }[status];
-}
-
-function decisionStatusLabel(status: Decision['status']): string {
-  return { pending: '待回顾', reviewed: '已回顾' }[status];
 }
 
 function resultAccent(result: SearchResult): string {

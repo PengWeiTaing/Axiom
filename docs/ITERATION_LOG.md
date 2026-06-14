@@ -9,6 +9,7 @@
 - 新增 `scripts/check_frontend_api_imports.py`，用于阻止 `frontend/src` 重新引入 `@/api/endpoints`。
 - 抽出 `frontend/src/composables/useObjectDetail.ts`，把 Cosmos 节点详情加载、字段保存、任务/记忆快捷动作从 `NodeDetailCard.vue` 中移出，后续可复用于搜索详情和白板节点详情。
 - 将 `ObjectDrawer.vue` 接入 `useObjectDetail`，搜索结果抽屉与 Cosmos 节点共用对象详情加载、任务完成/恢复、记忆确认/归档逻辑，减少未来白板节点详情的重复实现。
+- 新增 `frontend/src/composables/useObjectLabels.ts`，统一任务状态、任务优先级、记忆分类/状态、决策状态与对象类型中文标签；搜索页和对象详情抽屉先迁移到该共享标签层。
 
 ## 2026-04-21
 
