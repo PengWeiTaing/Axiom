@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
-import { getProcessingBacklog, markProcessingPending, markProcessingReady } from '@/api/endpoints';
+import { getProcessingBacklog, markProcessingPending, markProcessingReady } from '@/api/records';
 import type { Item, ItemType, ProcessingBacklogGroup, ProcessingBacklogPayload } from '@/api/types';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';

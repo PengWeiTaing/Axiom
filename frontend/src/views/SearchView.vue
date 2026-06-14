@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { markProcessingPending, markProcessingReady, searchAll, searchVector } from '@/api/endpoints';
+import { markProcessingPending, markProcessingReady } from '@/api/records';
+import { searchAll, searchVector } from '@/api/search';
 import { ApiError } from '@/api/client';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';

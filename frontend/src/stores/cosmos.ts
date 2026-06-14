@@ -165,25 +165,25 @@ export const useCosmosStore = defineStore('cosmos', () => {
   }
 
   async function createLifeline(params: { id: string; name: string; parent_id?: string; order_index?: number }) {
-    const { createLifeline: apiCreate } = await import('@/api/endpoints')
+    const { createLifeline: apiCreate } = await import('@/api/cosmos')
     await apiCreate(params)
     await reload()
   }
 
   async function updateLifeline(id: string, params: { name?: string; parent_id?: string; order_index?: number }) {
-    const { updateLifeline: apiUpdate } = await import('@/api/endpoints')
+    const { updateLifeline: apiUpdate } = await import('@/api/cosmos')
     await apiUpdate(id, params)
     await reload()
   }
 
   async function deleteLifeline(id: string) {
-    const { deleteLifeline: apiDelete } = await import('@/api/endpoints')
+    const { deleteLifeline: apiDelete } = await import('@/api/cosmos')
     await apiDelete(id)
     await reload()
   }
 
   async function mountEntity(kind: string, entityId: number, lifelineId: string | null) {
-    const { mountEntity: apiMount } = await import('@/api/endpoints')
+    const { mountEntity: apiMount } = await import('@/api/cosmos')
     await apiMount(kind, entityId, lifelineId)
     await reload()
   }
@@ -212,7 +212,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
     }
 
     try {
-      const { reviewAssociation: apiReview } = await import('@/api/endpoints')
+      const { reviewAssociation: apiReview } = await import('@/api/cosmos')
       await apiReview(assocId, status)
     } catch {
       await reload()
@@ -228,7 +228,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
         redo: async () => { await updateEntityTitle(kind, id, oldTitle) }
       })
     }
-    const { updateEntity: apiUpdate } = await import('@/api/endpoints')
+    const { updateEntity: apiUpdate } = await import('@/api/cosmos')
     await apiUpdate(kind, id, { title })
     await reload()
   }
@@ -243,19 +243,19 @@ export const useCosmosStore = defineStore('cosmos', () => {
         redo: async () => {
           // Recreate via API
           if (kind === 'task') {
-            const { createTask } = await import('@/api/endpoints')
+            const { createTask } = await import('@/api/knowledge')
             const r = await createTask({ title: snap.title })
             if (snap.lifeline_id) await mountEntity('task', r.task.id, snap.lifeline_id)
           } else if (kind === 'memory') {
-            const { createMemory: cm } = await import('@/api/endpoints')
+            const { createMemory: cm } = await import('@/api/knowledge')
             const r = await cm({ category: 'fact', content: snap.title })
             if (snap.lifeline_id) await mountEntity('memory', r.memory.id, snap.lifeline_id)
           } else if (kind === 'decision') {
-            const { createDecision: cd } = await import('@/api/endpoints')
+            const { createDecision: cd } = await import('@/api/knowledge')
             const r = await cd({ title: snap.title, decision: snap.title })
             if (snap.lifeline_id) await mountEntity('decision', r.decision.id, snap.lifeline_id)
           } else {
-            const { addNote } = await import('@/api/endpoints')
+            const { addNote } = await import('@/api/records')
             const r = await addNote(snap.title)
             if (snap.lifeline_id) await mountEntity('item', r.id, snap.lifeline_id)
           }
@@ -263,7 +263,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
         }
       })
     }
-    const { deleteEntity: apiDelete } = await import('@/api/endpoints')
+    const { deleteEntity: apiDelete } = await import('@/api/cosmos')
     await apiDelete(kind, id)
     await reload()
   }
@@ -273,7 +273,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
     from: string; to: string; relation_type: string; confidence: number
     evidence?: { type: string; excerpt: string; weight: number }[]
   }) {
-    const { createAssociation: apiCreate } = await import('@/api/endpoints')
+    const { createAssociation: apiCreate } = await import('@/api/cosmos')
     await apiCreate({ ...data, status: 'accepted' })
     await reload()
   }
@@ -282,7 +282,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
     relation_type?: string; confidence?: number
     evidence?: { type: string; excerpt: string; weight: number }[]
   }) {
-    const { updateAssociation: apiUpdate } = await import('@/api/endpoints')
+    const { updateAssociation: apiUpdate } = await import('@/api/cosmos')
     await apiUpdate(id, data)
     await reload()
   }
@@ -296,7 +296,7 @@ export const useCosmosStore = defineStore('cosmos', () => {
         redo: async () => { await createAssoc(snap) }
       })
     }
-    const { deleteAssociation: apiDelete } = await import('@/api/endpoints')
+    const { deleteAssociation: apiDelete } = await import('@/api/cosmos')
     await apiDelete(id)
     await reload()
   }

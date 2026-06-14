@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
-import { getTimeline } from '@/api/endpoints';
+import { getTimeline } from '@/api/system';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';

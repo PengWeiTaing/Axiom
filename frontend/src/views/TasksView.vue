@@ -8,7 +8,7 @@ import {
   markTaskTodo,
   rescheduleTask,
   tasksToday,
-} from '@/api/endpoints';
+} from '@/api/knowledge';
 import { ApiError } from '@/api/client';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import type { Task, TaskList, TaskPriority, TaskStatus } from '@/api/types';

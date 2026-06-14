@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
-import { exportData, getAdminLogs, getAuditLog, getMetrics, getSystemInfo } from '@/api/endpoints';
+import { exportData, getAdminLogs, getAuditLog, getMetrics, getSystemInfo } from '@/api/system';
 import type { AdminLogsPayload, AuditLogEntry, AuditLogPayload, MetricsPayload, SystemInfoPayload } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { currentRouteParams, replaceRouteQuery } from '@/composables/useRouteQuery';

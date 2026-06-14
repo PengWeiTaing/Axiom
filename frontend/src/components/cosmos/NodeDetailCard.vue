@@ -31,16 +31,16 @@ async function loadDetail() {
     const rawId = parseInt(parts.slice(1).join(':'), 10)
     let data: Record<string, unknown> = {}
     if (kind === 'task') {
-      const { getTask } = await import('@/api/endpoints')
+      const { getTask } = await import('@/api/knowledge')
       const r = await getTask(rawId); data = (r as any).task || r
     } else if (kind === 'memory') {
-      const { getMemory: apiGet } = await import('@/api/endpoints')
+      const { getMemory: apiGet } = await import('@/api/knowledge')
       const r = await apiGet(rawId); data = (r as any).memory || r
     } else if (kind === 'decision') {
-      const { getDecision } = await import('@/api/endpoints')
+      const { getDecision } = await import('@/api/knowledge')
       const r = await getDecision(rawId); data = (r as any).decision || r
     } else if (kind === 'item') {
-      const { getItem } = await import('@/api/endpoints')
+      const { getItem } = await import('@/api/records')
       const r = await getItem(rawId); data = (r as any).item || r
     }
     detail.value = data
@@ -105,7 +105,7 @@ async function saveField() {
   const kind = parts[0]
   const rawId = parseInt(parts.slice(1).join(':'), 10)
   try {
-    const { updateEntityField } = await import('@/api/endpoints')
+    const { updateEntityField } = await import('@/api/cosmos')
     await updateEntityField(kind, rawId, { [fn]: newVal })
     detail.value = { ...detail.value, [fn]: newVal }
     store.entityDetailCache.set(entity.value.id, detail.value)
@@ -130,11 +130,11 @@ async function toggleTaskDone() {
   const curStatus = detail.value.status as string
   try {
     if (curStatus === 'todo') {
-      const { markTaskDone } = await import('@/api/endpoints')
+      const { markTaskDone } = await import('@/api/knowledge')
       await markTaskDone(rawId)
       detail.value = { ...detail.value, status: 'done' }
     } else {
-      const { markTaskTodo } = await import('@/api/endpoints')
+      const { markTaskTodo } = await import('@/api/knowledge')
       await markTaskTodo(rawId)
       detail.value = { ...detail.value, status: 'todo' }
     }
@@ -150,11 +150,11 @@ async function confirmOrArchiveMemory() {
   const curStatus = detail.value.status as string
   try {
     if (curStatus === 'candidate') {
-      const { confirmMemory } = await import('@/api/endpoints')
+      const { confirmMemory } = await import('@/api/knowledge')
       await confirmMemory(rawId)
       detail.value = { ...detail.value, status: 'confirmed' }
     } else {
-      const { archiveMemory: apiArch } = await import('@/api/endpoints')
+      const { archiveMemory: apiArch } = await import('@/api/knowledge')
       await apiArch(rawId)
       detail.value = { ...detail.value, status: 'archived' }
     }

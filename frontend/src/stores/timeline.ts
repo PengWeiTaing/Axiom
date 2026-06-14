@@ -9,7 +9,7 @@
 
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { getRecent } from '@/api/endpoints';
+import { getRecent } from '@/api/records';
 import type { Item } from '@/api/types';
 import { ApiError } from '@/api/client';
 

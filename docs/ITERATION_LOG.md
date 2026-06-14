@@ -2,6 +2,12 @@
 
 这份文档只记录迭代，不讲完整架构。
 
+## 2026-06-14
+
+- 前端调用方从 `@/api/endpoints` 兼容导出层迁移到领域 API 模块：`records` / `search` / `knowledge` / `system` / `automation` / `cosmos`。
+- 保留 `frontend/src/api/endpoints.ts` 作为旧代码兼容 barrel，新代码不再直接依赖它。
+- 新增 `scripts/check_frontend_api_imports.py`，用于阻止 `frontend/src` 重新引入 `@/api/endpoints`。
+
 ## 2026-04-21
 
 - 以 VPS 上 `/opt/axiom` 的项目快照作为当前状态基线

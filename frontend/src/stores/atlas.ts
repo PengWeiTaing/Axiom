@@ -12,9 +12,11 @@ import {
   getMemory,
   memoriesStats,
   listDecisions,
+} from '@/api/knowledge';
+import {
   weeklyReport,
   dailyStats,
-} from '@/api/endpoints';
+} from '@/api/system';
 import type { Memory, MemoryLinkedTask, Decision, MemoryStatsPayload } from '@/api/types';
 import { ApiError } from '@/api/client';
 

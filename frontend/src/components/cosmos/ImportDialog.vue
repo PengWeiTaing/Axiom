@@ -62,7 +62,7 @@ async function doImport() {
   if (!fileData.value) return
   importing.value = true
   try {
-    const { importCosmos } = await import('@/api/endpoints')
+    const { importCosmos } = await import('@/api/cosmos')
     const r = (await importCosmos(fileData.value)) as any
     result.value = r.imported
     step.value = 'result'

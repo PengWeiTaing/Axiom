@@ -17,7 +17,7 @@ import {
   getProcessingNext,
   markProcessingPending,
   markProcessingReady,
-} from '@/api/endpoints'
+} from '@/api/records'
 import { typeAccent } from '@/composables/useTypeAccent'
 import { useWindowEventListener } from '@/composables/useEventListener'
 import { humanSize } from '@/composables/useHumanSize'

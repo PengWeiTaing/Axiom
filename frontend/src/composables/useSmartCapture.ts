@@ -19,12 +19,18 @@ import {
   addNote,
   uploadFile,
   fetchUrl,
+} from '@/api/records';
+import {
   aiParse,
+} from '@/api/ai';
+import {
   createTask,
   createMemory,
   createDecision,
+} from '@/api/knowledge';
+import {
   mountEntity,
-} from '@/api/endpoints';
+} from '@/api/cosmos';
 import type { Item, ParseResult, ParseType } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { useTimelineStore } from '@/stores/timeline';

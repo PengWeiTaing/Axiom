@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { ApiError } from '@/api/client';
-import { createDecision, listDecisions, reviewDecision } from '@/api/endpoints';
+import { createDecision, listDecisions, reviewDecision } from '@/api/knowledge';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import type { Decision, DecisionList, DecisionStatus, ObjectTarget } from '@/api/types';
 import { formatRelative } from '@/composables/useRelativeTime';

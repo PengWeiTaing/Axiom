@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { getArtifactContent, getAutomationJobs, getAutomationRuns, runAutomationJob } from '@/api/endpoints';
+import { getAutomationJobs, getAutomationRuns, runAutomationJob } from '@/api/automation';
+import { getArtifactContent } from '@/api/records';
 import type { AutomationJob, AutomationRun, AutomationRunListPayload, AutomationRunStatus } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { formatRelative } from '@/composables/useRelativeTime';

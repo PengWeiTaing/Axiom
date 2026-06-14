@@ -12,7 +12,7 @@
  */
 
 import { ref, watch, nextTick } from 'vue';
-import { searchAll, searchVector } from '@/api/endpoints';
+import { searchAll, searchVector } from '@/api/search';
 import type { Item, Memory, Task, Decision, ObjectTarget } from '@/api/types';
 import { useWindowEventListener } from '@/composables/useEventListener';
 import { useTimeout } from '@/composables/useTimeout';

@@ -9,7 +9,7 @@ import {
   createMemory,
   listMemories,
   memoriesStats,
-} from '@/api/endpoints';
+} from '@/api/knowledge';
 import type {
   Memory,
   MemoryCategory,

@@ -45,19 +45,19 @@ async function submit() {
     let entityId: number
     let entityKind: string = kind.value
     if (kind.value === 'task') {
-      const { createTask } = await import('@/api/endpoints')
+      const { createTask } = await import('@/api/knowledge')
       const r = await createTask({ title: title.value.trim() })
       entityId = r.task.id
     } else if (kind.value === 'memory') {
-      const { createMemory: apiMem } = await import('@/api/endpoints')
+      const { createMemory: apiMem } = await import('@/api/knowledge')
       const r = await apiMem({ category: category.value as any, content: content.value.trim() })
       entityId = r.memory.id
     } else if (kind.value === 'decision') {
-      const { createDecision: apiDec } = await import('@/api/endpoints')
+      const { createDecision: apiDec } = await import('@/api/knowledge')
       const r = await apiDec({ title: title.value.trim(), decision: decision.value.trim() })
       entityId = r.decision.id
     } else {
-      const { addNote } = await import('@/api/endpoints')
+      const { addNote } = await import('@/api/records')
       const r = await addNote(content.value.trim())
       entityId = r.id
       entityKind = 'item'

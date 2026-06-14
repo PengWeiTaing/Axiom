@@ -11,7 +11,7 @@ import {
   markTaskDone,
   markTaskTodo,
   reviewDecision,
-} from '@/api/endpoints';
+} from '@/api/knowledge';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { useWindowEventListener } from '@/composables/useEventListener';
 import { useModeStore } from '@/stores/mode';

@@ -1,1 +1,0 @@
-import{e as c}from"./index-B0-T4HF0.js";const i=(e,r=20,o={})=>c("/search/all",{query:{q:e,limit:r,...o}}).then(t=>{const s=t.results??t;return{items:s.items??[],memories:s.memories??[],tasks:s.tasks??[],decisions:s.decisions??[]}}),m=(e,r=20)=>c("/search/vector",{query:{q:e,limit:r}});export{m as a,i as s};

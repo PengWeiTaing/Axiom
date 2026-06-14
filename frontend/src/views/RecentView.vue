@@ -12,7 +12,7 @@ import {
   listLearningBoards,
   markProcessingPending,
   markProcessingReady,
-} from '@/api/endpoints';
+} from '@/api/records';
 import type {
   ArtifactSummary,
   Item,

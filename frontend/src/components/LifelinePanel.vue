@@ -233,7 +233,7 @@ async function doSearch() {
   if (!q || q.length < 1) return
   searchLoading.value = true
   try {
-    const { searchAll } = await import('@/api/endpoints')
+    const { searchAll } = await import('@/api/search')
     const resp = await searchAll(q, 5)
     const flat: Array<{ id: string; kind: string; title: string; lifeline_id?: string; mounted_name?: string }> = []
     for (const item of resp.items || []) {
