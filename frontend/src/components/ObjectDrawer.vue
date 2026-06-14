@@ -1,17 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { ApiError } from '@/api/client';
-import {
-  archiveMemory,
-  cancelTask,
-  confirmMemory,
-  getDecision,
-  getMemory,
-  getTask,
-  markTaskDone,
-  markTaskTodo,
-  reviewDecision,
-} from '@/api/knowledge';
+import { cancelTask, reviewDecision } from '@/api/knowledge';
+import { useObjectDetail, type ObjectDetail } from '@/composables/useObjectDetail';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { useWindowEventListener } from '@/composables/useEventListener';
 import { useModeStore } from '@/stores/mode';
@@ -26,46 +17,48 @@ const emit = defineEmits<{
 }>();
 
 const mode = useModeStore();
-const loading = ref(false);
 const acting = ref(false);
 const error = ref<string | null>(null);
 const feedback = ref<string | null>(null);
-const task = ref<Task | null>(null);
-const memory = ref<MemoryDetail | null>(null);
-const decision = ref<Decision | null>(null);
 const decisionReviewDraft = ref('');
+
+const detailTarget = computed(() => (
+  props.target ? { id: `${props.target.kind}:${props.target.id}` } : null
+));
+
+const {
+  detail,
+  detailLoading: loading,
+  detailError,
+  setDetail,
+  updateTaskStatus,
+  updateMemoryStatus,
+} = useObjectDetail(detailTarget, {
+  afterEntityChanged: async () => emit('changed'),
+});
 
 watch(
   () => props.target,
-  async (target) => {
-    task.value = null;
-    memory.value = null;
-    decision.value = null;
+  () => {
     decisionReviewDraft.value = '';
     error.value = null;
     feedback.value = null;
-    if (!target) return;
-
-    loading.value = true;
-    try {
-      if (target.kind === 'task') {
-        task.value = (await getTask(target.id)).task;
-      } else if (target.kind === 'memory') {
-        memory.value = (await getMemory(target.id)).memory;
-      } else {
-        decision.value = (await getDecision(target.id)).decision;
-        decisionReviewDraft.value = decision.value.actual_outcome || '';
-      }
-    } catch (err) {
-      error.value = err instanceof ApiError ? err.message : '对象加载失败';
-    } finally {
-      loading.value = false;
-    }
   },
   { immediate: true },
 );
 
 const kind = computed<ObjectKind | null>(() => props.target?.kind ?? null);
+const task = computed(() => (props.target?.kind === 'task' ? detail.value as Task | null : null));
+const memory = computed(() => (props.target?.kind === 'memory' ? detail.value as MemoryDetail | null : null));
+const decision = computed(() => (props.target?.kind === 'decision' ? detail.value as Decision | null : null));
+const displayError = computed(() => error.value || (detailError.value ? '对象加载失败' : null));
+
+watch(
+  decision,
+  (nextDecision) => {
+    decisionReviewDraft.value = nextDecision?.actual_outcome || '';
+  },
+);
 
 const title = computed(() => {
   if (task.value) return task.value.title;
@@ -125,15 +118,18 @@ async function updateTask(action: 'done' | 'todo' | 'cancel') {
   feedback.value = null;
   try {
     const id = task.value.id;
-    const payload =
-      action === 'done'
-        ? await markTaskDone(id)
-        : action === 'todo'
-          ? await markTaskTodo(id)
-          : await cancelTask(id);
-    task.value = payload.task;
+    if (action === 'cancel') {
+      const payload = await cancelTask(id);
+      setDetail(payload.task as unknown as ObjectDetail);
+      emit('changed');
+    } else {
+      const ok = await updateTaskStatus(action);
+      if (!ok) {
+        error.value = '任务操作失败';
+        return;
+      }
+    }
     feedback.value = taskActionLabel(action);
-    emit('changed');
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '任务操作失败';
   } finally {
@@ -151,10 +147,12 @@ async function updateMemory(action: 'confirm' | 'archive') {
   error.value = null;
   feedback.value = null;
   try {
-    const payload = action === 'confirm' ? await confirmMemory(memory.value.id) : await archiveMemory(memory.value.id);
-    memory.value = { ...memory.value, ...payload.memory };
+    const ok = await updateMemoryStatus(action === 'confirm' ? 'confirmed' : 'archived');
+    if (!ok) {
+      error.value = '记忆操作失败';
+      return;
+    }
     feedback.value = memoryActionLabel(action);
-    emit('changed');
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '记忆操作失败';
   } finally {
@@ -175,7 +173,7 @@ async function submitDecisionReview() {
   feedback.value = null;
   try {
     const payload = await reviewDecision(decision.value.id, actualOutcome);
-    decision.value = payload.decision;
+    setDetail(payload.decision as unknown as ObjectDetail);
     decisionReviewDraft.value = payload.decision.actual_outcome || actualOutcome;
     feedback.value = '决策已回顾';
     emit('changed');
@@ -214,7 +212,7 @@ useWindowEventListener('keydown', onKey);
         <section class="object-body">
           <p v-if="feedback" class="feedback-line">{{ feedback }}</p>
           <p v-if="loading" class="empty-line">加载中</p>
-          <p v-else-if="error" class="error-line">{{ error }}</p>
+          <p v-else-if="displayError" class="error-line">{{ displayError }}</p>
 
           <template v-else-if="task">
             <article class="detail-block">

@@ -10,9 +10,12 @@ import {
   markTaskTodo,
 } from '@/api/knowledge'
 import { getItem } from '@/api/records'
-import type { CosmosEntity } from '@/cosmos/types'
 
 export type ObjectDetail = Record<string, unknown>
+
+export interface ObjectDetailEntity {
+  id: string
+}
 
 export interface EntityIdentity {
   kind: string
@@ -33,7 +36,7 @@ export function parseEntityIdentity(entityId: string): EntityIdentity {
 }
 
 export function useObjectDetail(
-  entity: Ref<CosmosEntity | null>,
+  entity: Ref<ObjectDetailEntity | null>,
   options: UseObjectDetailOptions = {},
 ) {
   const detail = ref<ObjectDetail | null>(null)
@@ -43,6 +46,19 @@ export function useObjectDetail(
   function cacheDetail(entityId: string, nextDetail: ObjectDetail) {
     detail.value = nextDetail
     options.cache?.set(entityId, nextDetail)
+  }
+
+  function setDetail(nextDetail: ObjectDetail) {
+    if (!entity.value) {
+      detail.value = nextDetail
+      return
+    }
+    cacheDetail(entity.value.id, nextDetail)
+  }
+
+  function patchDetail(patch: ObjectDetail) {
+    if (!detail.value) return
+    setDetail({ ...detail.value, ...patch })
   }
 
   async function loadDetail() {
@@ -91,42 +107,48 @@ export function useObjectDetail(
     return true
   }
 
-  async function toggleTaskDone() {
-    if (!entity.value || !detail.value) return
+  async function updateTaskStatus(nextStatus: 'done' | 'todo'): Promise<boolean> {
+    if (!entity.value || !detail.value) return false
     const { rawId } = parseEntityIdentity(entity.value.id)
-    const currentStatus = detail.value.status as string
     try {
-      if (currentStatus === 'todo') {
-        await markTaskDone(rawId)
-        cacheDetail(entity.value.id, { ...detail.value, status: 'done' })
-      } else {
-        await markTaskTodo(rawId)
-        cacheDetail(entity.value.id, { ...detail.value, status: 'todo' })
-      }
+      const response = nextStatus === 'done'
+        ? await markTaskDone(rawId)
+        : await markTaskTodo(rawId)
+      cacheDetail(entity.value.id, response.task as unknown as ObjectDetail)
     } catch {
       await options.afterEntityChanged?.()
-      return
+      return false
     }
     await options.afterEntityChanged?.()
+    return true
   }
 
-  async function confirmOrArchiveMemory() {
-    if (!entity.value || !detail.value) return
-    const { rawId } = parseEntityIdentity(entity.value.id)
+  async function toggleTaskDone(): Promise<boolean> {
+    if (!entity.value || !detail.value) return false
     const currentStatus = detail.value.status as string
+    return updateTaskStatus(currentStatus === 'todo' ? 'done' : 'todo')
+  }
+
+  async function updateMemoryStatus(nextStatus: 'confirmed' | 'archived'): Promise<boolean> {
+    if (!entity.value || !detail.value) return false
+    const { rawId } = parseEntityIdentity(entity.value.id)
     try {
-      if (currentStatus === 'candidate') {
-        await confirmMemory(rawId)
-        cacheDetail(entity.value.id, { ...detail.value, status: 'confirmed' })
-      } else {
-        await archiveMemory(rawId)
-        cacheDetail(entity.value.id, { ...detail.value, status: 'archived' })
-      }
+      const response = nextStatus === 'confirmed'
+        ? await confirmMemory(rawId)
+        : await archiveMemory(rawId)
+      cacheDetail(entity.value.id, { ...detail.value, ...response.memory })
     } catch {
       await options.afterEntityChanged?.()
-      return
+      return false
     }
     await options.afterEntityChanged?.()
+    return true
+  }
+
+  async function confirmOrArchiveMemory(): Promise<boolean> {
+    if (!entity.value || !detail.value) return false
+    const currentStatus = detail.value.status as string
+    return updateMemoryStatus(currentStatus === 'candidate' ? 'confirmed' : 'archived')
   }
 
   watch(() => entity.value?.id, () => {
@@ -139,8 +161,12 @@ export function useObjectDetail(
     detailLoading,
     detailError,
     loadDetail,
+    setDetail,
+    patchDetail,
     saveObjectField,
+    updateTaskStatus,
     toggleTaskDone,
+    updateMemoryStatus,
     confirmOrArchiveMemory,
   }
 }
