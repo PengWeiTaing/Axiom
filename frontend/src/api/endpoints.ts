@@ -5,16 +5,11 @@
 
 import { apiRequest } from './client';
 import type {
-  Item,
-  ItemDetail,
-  ItemType,
   Memory,
   MemoryDetail,
   Task,
   Decision,
   ParseResult,
-  Paginated,
-  ArtifactsSummaryPayload,
   AutomationJobsPayload,
   AutomationRunListPayload,
   AutomationRunPayload,
@@ -27,11 +22,6 @@ import type {
   TaskList,
   TaskPriority,
   TaskStatus,
-  OverviewPayload,
-  ProcessingBacklogPayload,
-  ProcessingMarkPayload,
-  ProcessingNextPayload,
-  LearningBoardListPayload,
   SystemInfoPayload,
   MetricsPayload,
   AuditLogPayload,
@@ -43,65 +33,8 @@ import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
 import type { AtlasGraphPayload } from '@/atlas/types';
 import { todayIsoDate } from '@/utils/date';
 
-// ---------- 采集 ----------
-export const addNote = (text: string, source = 'web_app') =>
-  apiRequest<{ message: string; item: Item }>('/add', {
-    method: 'POST',
-    json: { text, source },
-  }).then((payload) => ({ ...payload, id: payload.item.id }));
-
-export const uploadFile = (file: File, content?: string, source = 'web_app') => {
-  const fd = new FormData();
-  fd.append('file', file);
-  if (content) fd.append('content', content);
-  fd.append('source', source);
-  return apiRequest<{ id: number; item: Item }>('/upload', {
-    method: 'POST',
-    formData: fd,
-  }).then((payload) => ({ ...payload, id: payload.item.id }));
-};
-
-export const fetchUrl = (url: string) =>
-  apiRequest<{ id: number; item: Item }>('/fetch', {
-    method: 'POST',
-    json: { url },
-  });
-
-// ---------- 检索 ----------
-export const getRecent = (params: { page?: number; type?: string } = {}) =>
-  apiRequest<Paginated<Item>>('/recent', { query: params });
-
-export const getOverview = (params: { recent_limit?: number; preview_chars?: number } = {}) =>
-  apiRequest<OverviewPayload>('/overview', { query: params });
-
-export const getProcessingBacklog = (params: { group_limit?: number } = {}) =>
-  apiRequest<ProcessingBacklogPayload>('/processing/backlog', { query: params });
-
-export const getProcessingNext = (params: { type?: ItemType; exclude_id?: number } = {}) =>
-  apiRequest<ProcessingNextPayload>('/processing/next', { query: params });
-
-export const listLearningBoards = () =>
-  apiRequest<LearningBoardListPayload>('/api/learning/boards');
-
-export const getArtifactsSummary = (params: { preview_chars?: number } = {}) =>
-  apiRequest<ArtifactsSummaryPayload>('/artifacts/summary', { query: params });
-
-export const getArtifactContent = async (fileUrl: string) => {
-  const response = await apiRequest<Response>(fileUrl);
-  return response.text();
-};
-
-export const markProcessingReady = (ids: number[]) =>
-  apiRequest<ProcessingMarkPayload>('/processing/mark-ready', {
-    method: 'POST',
-    json: { ids },
-  });
-
-export const markProcessingPending = (ids: number[]) =>
-  apiRequest<ProcessingMarkPayload>('/processing/mark-pending', {
-    method: 'POST',
-    json: { ids },
-  });
+export * from './records';
+export * from './search';
 
 export const getAutomationJobs = () =>
   apiRequest<AutomationJobsPayload>('/automation/jobs');
@@ -166,33 +99,6 @@ export const getTimeline = (params: {
   };
   return apiRequest<TimelinePayload>('/timeline', { query });
 };
-
-export const searchAll = (q: string, limit = 20, filters: {
-  type?: ItemType | '';
-  source?: string;
-  processing_state?: 'ready' | 'pending' | '';
-  processing_override?: 'ready' | '';
-} = {}) =>
-  apiRequest<{
-    items?: Item[];
-    memories?: Memory[];
-    tasks?: Task[];
-    decisions?: Decision[];
-    results?: { items?: Item[]; memories?: Memory[]; tasks?: Task[]; decisions?: Decision[] };
-  }>('/search/all', { query: { q, limit, ...filters } }).then((payload) => {
-    const results = payload.results ?? payload;
-    return {
-      items: results.items ?? [],
-      memories: results.memories ?? [],
-      tasks: results.tasks ?? [],
-      decisions: results.decisions ?? [],
-    };
-  });
-
-export const searchVector = (q: string, limit = 20) =>
-  apiRequest<{ items: Array<Item & { relevance: number }> }>('/search/vector', {
-    query: { q, limit },
-  });
 
 // ---------- AI ----------
 export const aiParse = (text: string) =>
@@ -292,31 +198,6 @@ export const dailyStats = (days = 30) =>
     '/admin/stats/daily',
     { query: { days } },
   );
-
-// ---------- Item 详情与操作 ----------
-export const getItem = (id: number) =>
-  apiRequest<{ item: ItemDetail }>(`/item/${id}`);
-
-export const getItemFile = async (fileUrl: string) => {
-  const response = await apiRequest<Response>(fileUrl);
-  return response.blob();
-};
-
-export const updateItem = (id: number, data: {
-  content?: string
-  source?: string
-  derived_text?: string
-  transcript_text?: string
-}) => apiRequest<{ item: Item }>(`/item/${id}/update`, { method: 'POST', json: data });
-
-export const archiveItem = (id: number) =>
-  apiRequest<{ item: Item; message: string }>(`/archive/${id}`, { method: 'POST' });
-
-export const restoreItem = (id: number) =>
-  apiRequest<{ item: Item; message: string }>(`/restore/${id}`, { method: 'POST' });
-
-export const deleteItem = (id: number) =>
-  apiRequest<{ message: string }>(`/item/${id}`, { method: 'DELETE' });
 
 // ---------- Cosmos ----------
 export const getCosmos = () => apiRequest<CosmosData>('/cosmos');
