@@ -12,9 +12,10 @@ import {
   RefreshCw,
 } from '@lucide/vue';
 import { ApiError } from '@/api/client';
-import { completeTask, listDecisions, listMemories, tasksToday } from '@/api/knowledge';
+import { getNowContext } from '@/api/context';
+import { completeTask, listDecisions, listMemories } from '@/api/knowledge';
 import { getOverview } from '@/api/records';
-import type { Decision, Item, Memory, ObjectTarget, OverviewPayload, Task } from '@/api/types';
+import type { ContextAction, Decision, Item, Memory, NowContextPayload, ObjectTarget, OverviewPayload, Task } from '@/api/types';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';
@@ -27,8 +28,7 @@ const mode = useModeStore();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const overview = ref<OverviewPayload | null>(null);
-const today = ref<Task[]>([]);
-const overdue = ref<Task[]>([]);
+const nowContext = ref<NowContextPayload | null>(null);
 const candidateMemories = ref<Memory[]>([]);
 const pendingDecisions = ref<Decision[]>([]);
 const selectedItemId = ref<number | null>(null);
@@ -50,56 +50,20 @@ const greeting = computed(() => {
   return '晚上好';
 });
 
-const actionTasks = computed(() => {
-  const seen = new Set<number>();
-  return [...overdue.value, ...today.value]
-    .filter((task) => {
-      if (seen.has(task.id)) return false;
-      seen.add(task.id);
-      return task.status === 'todo';
-    })
-    .sort((a, b) => taskScore(b) - taskScore(a));
+const primaryAction = computed(() => nowContext.value?.focus ?? null);
+const primaryTask = computed(() => primaryAction.value?.task ?? null);
+const primaryCues = computed(() => {
+  const action = primaryAction.value;
+  if (!action) return [];
+  return action.cues.filter((cue) => cue !== action.reason.label);
 });
-
-const primaryTask = computed(() => actionTasks.value[0] ?? null);
-const nextTasks = computed(() => actionTasks.value.slice(1, 5));
+const nextActions = computed(() => nowContext.value?.alternatives ?? []);
 const recentItems = computed(() => overview.value?.recent.items.slice(0, 5) ?? []);
 const backlogTotal = computed(() => overview.value?.processing_backlog.total ?? 0);
 const judgementTotal = computed(() => candidateMemories.value.length + pendingDecisions.value.length);
 
-function taskScore(task: Task): number {
-  let score = 0;
-  if (overdue.value.some((entry) => entry.id === task.id)) score += 100;
-  if (task.priority === 'high') score += 30;
-  if (task.priority === 'medium') score += 15;
-  if (task.due_date) score += 10;
-  if (task.estimated_minutes && task.estimated_minutes <= 15) score += 4;
-  return score;
-}
-
-function focusReason(task: Task): string {
-  const overdueEntry = overdue.value.find((entry) => entry.id === task.id);
-  if (overdueEntry) {
-    const days = overdueEntry.overdue_days;
-    return days ? `已经逾期 ${days} 天` : '已经逾期';
-  }
-  if (task.priority === 'high') return '今天的高优先级行动';
-  if (task.estimated_minutes && task.estimated_minutes <= 15) return '现在就能启动';
-  return '今天计划推进';
-}
-
-function taskMeta(task: Task): string[] {
-  const values: string[] = [];
-  if (task.estimated_minutes) values.push(`${task.estimated_minutes} 分钟`);
-  if (task.due_date) values.push(`截止 ${formatDate(task.due_date)}`);
-  if (task.priority === 'high') values.push('高优先级');
-  return values;
-}
-
-function formatDate(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(parsed);
+function actionMeta(action: ContextAction): string {
+  return action.cues.slice(0, 3).join(' · ');
 }
 
 function compact(value: string | null | undefined, fallback: string, limit = 92): string {
@@ -120,15 +84,14 @@ async function load() {
   loading.value = true;
   error.value = null;
   try {
-    const [overviewPayload, taskPayload, memoryPayload, decisionPayload] = await Promise.all([
+    const [overviewPayload, contextPayload, memoryPayload, decisionPayload] = await Promise.all([
       getOverview({ recent_limit: 6, preview_chars: 140 }),
-      tasksToday(),
+      getNowContext(5),
       listMemories({ status: 'candidate', page: 1, page_size: 4 }),
       listDecisions({ status: 'pending', page: 1, page_size: 4 }),
     ]);
     overview.value = overviewPayload;
-    today.value = taskPayload.today;
-    overdue.value = taskPayload.overdue;
+    nowContext.value = contextPayload;
     candidateMemories.value = memoryPayload.memories;
     pendingDecisions.value = decisionPayload.decisions;
   } catch (err) {
@@ -188,15 +151,15 @@ watch(() => props.revision, load);
         <span>当前焦点</span>
       </div>
 
-      <template v-if="primaryTask">
+      <template v-if="primaryTask && primaryAction">
         <button class="focus-copy" type="button" @click="openTask(primaryTask)">
-          <span class="focus-reason">{{ focusReason(primaryTask) }}</span>
+          <span class="focus-reason">{{ primaryAction.reason.label }}</span>
           <h2 id="focus-title">{{ primaryTask.title }}</h2>
-          <p v-if="primaryTask.detail">{{ compact(primaryTask.detail, '') }}</p>
+          <p>{{ primaryAction.reason.detail }}</p>
         </button>
         <div class="focus-footer">
           <div class="task-meta">
-            <span v-for="entry in taskMeta(primaryTask)" :key="entry">{{ entry }}</span>
+            <span v-for="entry in primaryCues" :key="entry">{{ entry }}</span>
           </div>
           <button class="complete-button" type="button" :disabled="completingId !== null" @click="finishTask(primaryTask)">
             <Check :size="18" :stroke-width="2" />
@@ -218,7 +181,8 @@ watch(() => props.revision, load);
     </section>
 
     <div class="status-strip" aria-label="当前状态摘要">
-      <span><strong>{{ actionTasks.length }}</strong> 个今日行动</span>
+      <span><strong>{{ nowContext?.signals.open_tasks ?? 0 }}</strong> 个开放行动</span>
+      <span v-if="nowContext?.signals.overdue_tasks"><strong>{{ nowContext.signals.overdue_tasks }}</strong> 个已逾期</span>
       <button type="button" @click="mode.set('processing')"><strong>{{ backlogTotal }}</strong> 条待整理</button>
       <span><strong>{{ judgementTotal }}</strong> 项待判断</span>
       <span v-if="overview?.stats.streak"><strong>{{ overview.stats.streak }}</strong> 天连续记录</span>
@@ -236,12 +200,12 @@ watch(() => props.revision, load);
           </button>
         </header>
 
-        <div v-if="nextTasks.length" class="row-list">
-          <button v-for="task in nextTasks" :key="task.id" class="content-row" type="button" @click="openTask(task)">
+        <div v-if="nextActions.length" class="row-list">
+          <button v-for="action in nextActions" :key="action.task.id" class="content-row" type="button" @click="openTask(action.task)">
             <span class="row-icon task-icon"><Clock :size="16" /></span>
             <span class="row-copy">
-              <strong>{{ task.title }}</strong>
-              <small>{{ focusReason(task) }}<template v-if="task.estimated_minutes"> · {{ task.estimated_minutes }} 分钟</template></small>
+              <strong>{{ action.task.title }}</strong>
+              <small>{{ actionMeta(action) }}</small>
             </span>
             <ArrowRight class="row-arrow" :size="15" />
           </button>
@@ -442,6 +406,7 @@ h2 {
 }
 
 .task-meta {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 18px;
@@ -451,6 +416,7 @@ h2 {
 
 .complete-button,
 .capture-button {
+  flex: 0 0 auto;
   min-height: 38px;
   display: inline-flex;
   align-items: center;
@@ -459,6 +425,7 @@ h2 {
   border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
   border-radius: 6px;
   color: var(--success);
+  white-space: nowrap;
 }
 
 .complete-button:hover:not(:disabled),

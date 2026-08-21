@@ -103,6 +103,46 @@ export interface Task {
   overdue_days?: number;
 }
 
+export interface ContextTask extends Task {
+  lifeline_id: string | null;
+  lifeline_name: string | null;
+}
+
+export interface ContextFactor {
+  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness';
+  label: string;
+  points: number;
+}
+
+export interface ContextReason {
+  code: 'overdue' | 'due_today' | 'due_soon' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
+  label: string;
+  detail: string;
+}
+
+export interface ContextAction {
+  task: ContextTask;
+  score: number;
+  reason: ContextReason;
+  cues: string[];
+  factors: ContextFactor[];
+}
+
+export interface NowContextPayload {
+  schema_version: 'context.now.v1';
+  generated_at: string;
+  date: string;
+  mode: 'focus' | 'empty';
+  focus: ContextAction | null;
+  alternatives: ContextAction[];
+  signals: {
+    open_tasks: number;
+    overdue_tasks: number;
+    due_today_tasks: number;
+    undated_tasks: number;
+  };
+}
+
 export type DecisionStatus = 'pending' | 'reviewed';
 
 export interface Decision {

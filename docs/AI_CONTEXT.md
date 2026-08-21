@@ -73,6 +73,7 @@ frontend/
   src/                 # 当前主前端：此刻 / 资料库 / Atlas + 全局记录
 core/
   receiver.py
+  context_engine.py    # 此刻的确定性、可解释行动判断
   init_db.py
   templates/
     app.html
@@ -187,6 +188,7 @@ logs/
 - `/memories/stats` — 分类统计
 - `/tasks` / `/tasks/<id>` — 任务 CRUD + done/todo/cancel
 - `/tasks/today` — 今日任务
+- `/api/context/now` — 此刻的主要行动、备选行动、判断理由与任务信号
 - `DELETE /item/<id>` — 删除条目
 - `POST /export` — 数据导出 ZIP
 - `GET /audit-log` — 审计日志
@@ -218,7 +220,8 @@ logs/
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
 - `/processing/backlog` 会把待补正文、待补转写、待补说明的条目按类型聚合起来，并返回每组的最近样本、快速过滤参数，以及可直接打开的 `next_item`
 - `/processing/next` 会返回当前“下一条待处理记录”，可选按 `type` 过滤，适合作为 Web 端和后续快捷入口的统一直达接口
-- `/app` 提供当前主前端入口，承载 Capture / Atlas / 近况三模式；`/atlas` 是同一套前端的 Atlas 深链接
+- `/api/context/now` 使用 `context.now.v1` 契约，根据截止压力、显式优先级、预估启动成本、生活线近期活动和搁置时长给出稳定排序，同时返回判断理由与因子；尚不存在的精力、目标贡献、依赖和影响信息不得由系统虚构
+- `/app` 提供当前主前端入口，一级目的地为“此刻 / 资料库 / Atlas”，记录是全局动作；`/atlas` 是同一套前端的 Atlas 深链接
 - `/app/legacy` 提供旧移动 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；它保留处理工作台与旧 PWA 链路，但不再作为新功能主入口
 - `/automation/jobs` 返回当前允许手动触发的任务清单，当前开放 review、inbox report、dry-run、`audio_transcribe_day` 和 `image_describe_day`
 - `/automation/runs` 返回自动化运行历史，覆盖手动任务与 systemd 定时任务，包含状态、产物、stdout/stderr 尾部和耗时；当前状态除了 `success / failed / timeout / running`，还包含 `skipped`

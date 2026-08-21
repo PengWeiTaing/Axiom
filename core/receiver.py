@@ -58,6 +58,7 @@ from core.routes.lifelines import register_routes as register_lifelines  # noqa:
 from core.routes.cosmos_import import register_routes as register_cosmos_import  # noqa: E402
 from core.routes.atlas import register_routes as register_atlas  # noqa: E402
 from core.routes.boards import register_routes as register_boards  # noqa: E402
+from core.routes.context import register_routes as register_context  # noqa: E402
 
 register_core(app)
 register_items(app)
@@ -74,6 +75,7 @@ register_lifelines(app)
 register_cosmos_import(app)
 register_atlas(app)
 register_boards(app)
+register_context(app)
 
 # ===== 错误处理 =====
 @app.errorhandler(Exception)

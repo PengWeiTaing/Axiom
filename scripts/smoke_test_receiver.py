@@ -10,12 +10,30 @@ import tempfile
 import time
 import zipfile
 from datetime import datetime, timedelta, timezone
+from html.parser import HTMLParser
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+
+class ViteShellParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.has_app_root = False
+        self.module_scripts: list[str] = []
+        self.stylesheets: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "div" and attributes.get("id") == "app":
+            self.has_app_root = True
+        if tag == "script" and attributes.get("type") == "module" and attributes.get("src"):
+            self.module_scripts.append(str(attributes["src"]))
+        if tag == "link" and attributes.get("rel") == "stylesheet" and attributes.get("href"):
+            self.stylesheets.append(str(attributes["href"]))
 
 
 def assert_status(response, expected_status: int, label: str) -> dict:
@@ -35,6 +53,29 @@ def assert_file_body(response, expected_bytes: bytes, label: str) -> None:
     if expected_bytes not in response.data:
         raise AssertionError(f"{label}: file content did not match expected bytes")
     response.close()
+
+
+def assert_vite_shell(client, response, label: str) -> None:
+    if response.status_code != 200:
+        raise AssertionError(f"{label}: expected HTTP 200, got {response.status_code}")
+
+    parser = ViteShellParser()
+    parser.feed(response.get_data(as_text=True))
+    if not parser.has_app_root or not parser.module_scripts or not parser.stylesheets:
+        raise AssertionError(
+            f"{label}: missing app root or Vite entry assets "
+            f"(root={parser.has_app_root}, scripts={parser.module_scripts}, styles={parser.stylesheets})"
+        )
+
+    for asset_url in parser.module_scripts + parser.stylesheets:
+        if not asset_url.startswith("/static/v2/assets/"):
+            raise AssertionError(f"{label}: unexpected asset path {asset_url}")
+        asset_response = client.get(asset_url)
+        if asset_response.status_code != 200:
+            raise AssertionError(
+                f"{label}: asset {asset_url} returned HTTP {asset_response.status_code}"
+            )
+        asset_response.close()
 
 
 def current_local_date_iso() -> str:
@@ -137,23 +178,20 @@ def main() -> None:
             health = assert_status(client.get("/health"), 200, "health")
             assert health["ok"] is True
 
-            vite_app_shell = client.get("/app")
-            if vite_app_shell.status_code != 200:
-                raise AssertionError(
-                    f"vite app shell: expected HTTP 200, got {vite_app_shell.status_code}"
-                )
-            vite_app_body = vite_app_shell.get_data(as_text=True)
-            if '<div id="app"></div>' not in vite_app_body or "assets/index.js" not in vite_app_body:
-                raise AssertionError(f"vite app shell body unexpected: {vite_app_body[:200]}")
+            empty_context = assert_status(
+                client.get(
+                    "/api/context/now",
+                    headers={"X-Axiom-Key": "test-key"},
+                ),
+                200,
+                "empty current context",
+            )
+            assert empty_context["schema_version"] == "context.now.v1"
+            assert empty_context["mode"] == "empty"
+            assert empty_context["focus"] is None
 
-            atlas_shell = client.get("/atlas")
-            if atlas_shell.status_code != 200:
-                raise AssertionError(
-                    f"atlas shell: expected HTTP 200, got {atlas_shell.status_code}"
-                )
-            atlas_body = atlas_shell.get_data(as_text=True)
-            if '<div id="app"></div>' not in atlas_body or "assets/index.js" not in atlas_body:
-                raise AssertionError(f"atlas shell body unexpected: {atlas_body[:200]}")
+            assert_vite_shell(client, client.get("/app"), "vite app shell")
+            assert_vite_shell(client, client.get("/atlas"), "atlas shell")
 
             app_v2_redirect = client.get("/app/v2")
             if app_v2_redirect.status_code not in {301, 302, 308}:

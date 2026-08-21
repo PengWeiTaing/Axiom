@@ -10,6 +10,10 @@
 - 移除已被新产品形态替代的 `ModeSwitcher.vue`、`CaptureView.vue`、`FloatChat.vue` 和 `SearchOverlay.vue`；Learning Board 与 MemoryGuard 明确保持竞赛项目边界，不进入 Axiom 一级导航。
 - 新增 `scripts/check_product_shell.py`，防止一级导航重新膨胀为对象类型工作台，并守住竞赛项目的产品边界。
 - 前端构建链升级到 Vite 7 与 Vue 插件 6，更新受影响的传递依赖；`npm audit` 恢复为 0 个已知漏洞。
+- 新增 `context.now.v1` 上下文判断契约与受鉴权的 `/api/context/now`：基于截止压力、显式优先级、预估启动成本、生活线近期活动和搁置时长，给出一个主要行动、少量备选及可核对理由。
+- “此刻”改为消费后端统一判断结果，不再在页面中临时拼排序规则；完成主要行动后会重新读取上下文并自动选出下一步。
+- 新增 `scripts/smoke_test_context.py`，覆盖鉴权、排序、解释因子、数量限制、状态摘要、非法参数和无行动空态；使用隔离数据完成桌面与移动页面验证，未改动真实本地数据。
+- 修正 `smoke_test_receiver.py` 对固定 `assets/index.js` 文件名的过时假设，改为解析 Vite HTML 并验证实际哈希入口脚本和样式均可访问。
 
 ## 2026-06-17
 
