@@ -1117,6 +1117,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 .atlas-view {
   position: fixed;
   inset: 0;
+  left: var(--atlas-shell-left, 0px);
+  bottom: var(--atlas-shell-bottom, 0px);
   z-index: 10;
   overflow: hidden;
   color: var(--text-2);

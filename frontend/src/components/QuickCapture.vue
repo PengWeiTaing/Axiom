@@ -1,19 +1,12 @@
 <script setup lang="ts">
 /*
- * QuickCapture — Ctrl+Shift+N 全局浮层
- *
- * 这是 Axiom 整个交互模型的灵魂。
- * 用户在 iPhone 用快捷指令，在桌面 Web 阶段先用 Ctrl+Shift+N
- * （Tauri 阶段会升级成系统级全局快捷键）。
- *
- * 设计：
- *   - 全屏遮罩 + 居中输入框
- *   - 只有一个输入框，没有任何按钮
- *   - Enter 提交并关闭，Esc 取消
- *   - 提交成功显示 1.2s 的 AI 判定 toast，然后消失
+ * QuickCapture is the global intake layer for text, links and files.
+ * The web shell exposes it from navigation and local keyboard shortcuts;
+ * a native shell can later bind the same component to a system shortcut.
  */
 
-import { ref, nextTick, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
+import { ArrowUp, File, Paperclip, X } from '@lucide/vue';
 import { useWindowEventListener } from '@/composables/useEventListener';
 import { useSmartCapture, type CaptureSuccess } from '@/composables/useSmartCapture';
 import { useTimeout } from '@/composables/useTimeout';
@@ -21,7 +14,10 @@ import { useTimeout } from '@/composables/useTimeout';
 const open = ref(false);
 const text = ref('');
 const textarea = ref<HTMLTextAreaElement | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+const files = ref<File[]>([]);
 const toast = ref<CaptureSuccess | null>(null);
+const emit = defineEmits<{ captured: [result: CaptureSuccess] }>();
 
 const { capture, submitting, lastError } = useSmartCapture();
 const toastTimer = useTimeout();
@@ -66,23 +62,62 @@ function show() {
   if (open.value) return;
   open.value = true;
   text.value = '';
+  files.value = [];
+  lastError.value = null;
 }
 
 function close() {
   open.value = false;
+  files.value = [];
 }
 
 async function submit(e?: Event) {
   e?.preventDefault();
-  if (!text.value.trim() || submitting.value) return;
+  if ((!text.value.trim() && !files.value.length) || submitting.value) return;
   try {
-    const result = await capture(text.value);
+    const result = await capture(text.value, files.value);
     text.value = '';
+    files.value = [];
     open.value = false;
+    emit('captured', result);
     showToast(result);
   } catch {
     // lastError 已经更新，UI 会显示
   }
+}
+
+function appendFiles(incoming: File[]) {
+  const known = new Set(files.value.map(fileKey));
+  for (const file of incoming) {
+    const key = fileKey(file);
+    if (!known.has(key)) {
+      files.value.push(file);
+      known.add(key);
+    }
+  }
+}
+
+function fileKey(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function onFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  appendFiles(Array.from(input.files || []));
+  input.value = '';
+}
+
+function onPaste(event: ClipboardEvent) {
+  const pasted = Array.from(event.clipboardData?.files || []);
+  if (pasted.length) appendFiles(pasted);
+}
+
+function onDrop(event: DragEvent) {
+  appendFiles(Array.from(event.dataTransfer?.files || []));
+}
+
+function removeFile(index: number) {
+  files.value.splice(index, 1);
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -106,23 +141,55 @@ defineExpose({ show, close });
 
 <template>
   <Transition name="overlay">
-    <div v-if="open" class="quick-overlay" @click.self="close">
-      <div class="quick-card">
-        <span class="eyebrow">速记 · Ctrl+Shift+N</span>
+    <div v-if="open" class="quick-overlay" @click.self="close" @dragover.prevent @drop.prevent="onDrop">
+      <div class="quick-card" role="dialog" aria-modal="true" aria-label="记录">
+        <header class="quick-head">
+          <div>
+            <span class="eyebrow">Capture</span>
+            <strong>记录此刻</strong>
+          </div>
+          <button class="icon-button" type="button" title="关闭" aria-label="关闭记录" @click="close">
+            <X :size="18" />
+          </button>
+        </header>
         <textarea
           ref="textarea"
           v-model="text"
-          rows="3"
-          placeholder="想到什么直接说，AI 会判断怎么放"
+          rows="4"
+          placeholder="写下正在占据你注意力的事…"
           :disabled="submitting"
           @keydown="onKeydown"
+          @paste="onPaste"
         />
+
+        <div v-if="files.length" class="file-list" aria-label="待记录附件">
+          <div v-for="(file, index) in files" :key="fileKey(file)" class="file-row">
+            <File :size="15" />
+            <span>{{ file.name }}</span>
+            <button type="button" :title="`移除 ${file.name}`" :aria-label="`移除 ${file.name}`" @click="removeFile(index)">
+              <X :size="14" />
+            </button>
+          </div>
+        </div>
+
         <div class="bar">
+          <input ref="fileInput" class="file-input" type="file" multiple @change="onFileChange">
+          <button class="attach-button" type="button" title="添加附件" aria-label="添加附件" @click="fileInput?.click()">
+            <Paperclip :size="18" />
+          </button>
           <span v-if="lastError" class="error">{{ lastError }}</span>
-          <span v-else-if="submitting" class="dim">写入中…</span>
-          <span v-else class="dim mono">
-            <kbd>↵</kbd> 提交 · <kbd>⇧↵</kbd> 换行 · <kbd>Esc</kbd> 取消
-          </span>
+          <span v-else-if="submitting" class="dim">正在记录</span>
+          <span v-else class="dim">文字、文件、图片或链接</span>
+          <button
+            class="submit-button"
+            type="button"
+            title="记录"
+            aria-label="记录"
+            :disabled="(!text.trim() && !files.length) || submitting"
+            @click="submit()"
+          >
+            <ArrowUp :size="18" :stroke-width="2" />
+          </button>
         </div>
       </div>
     </div>
@@ -159,9 +226,42 @@ defineExpose({ show, close });
   box-shadow: var(--shadow-2);
 }
 
-.quick-card .eyebrow {
-  display: block;
-  margin-bottom: var(--s-3);
+.quick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s-4);
+}
+
+.quick-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-head strong {
+  color: var(--text-1);
+  font-size: var(--fs-4);
+  font-weight: 560;
+}
+
+.quick-head .eyebrow {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--text-4);
+}
+
+.icon-button:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .quick-card textarea {
@@ -182,21 +282,77 @@ defineExpose({ show, close });
 
 .bar {
   margin-top: var(--s-4);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
   font-size: var(--fs-2);
   color: var(--text-3);
-  min-height: 20px;
+  min-height: 36px;
 }
 
-.bar kbd {
-  display: inline-block;
-  padding: 1px 6px;
-  margin: 0 2px;
-  background: var(--surface-2);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-1);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-2);
+.file-input {
+  display: none;
+}
+
+.attach-button,
+.submit-button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--text-3);
+}
+
+.attach-button:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.submit-button {
+  margin-left: auto;
+  background: var(--focus);
+  color: #111318;
+}
+
+.submit-button:disabled {
+  background: var(--surface-3);
+  color: var(--text-5);
+  cursor: default;
+}
+
+.file-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.file-row {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 7px 0 10px;
+  border: 1px solid var(--line-1);
+  border-radius: 5px;
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.file-row span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-row button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
 }
 
 .error {
@@ -231,8 +387,24 @@ defineExpose({ show, close });
 }
 
 .quick-toast strong {
-  color: var(--accent);
+  color: var(--focus);
   font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .quick-overlay {
+    align-items: flex-end;
+    padding: 0 0 calc(var(--app-mobile-nav-height) + 8px);
+  }
+
+  .quick-card {
+    width: calc(100vw - 16px);
+    padding: var(--s-4);
+  }
+
+  .quick-card textarea {
+    font-size: 18px;
+  }
 }
 
 .overlay-enter-active,

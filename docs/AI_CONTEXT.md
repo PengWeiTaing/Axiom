@@ -6,6 +6,8 @@
 
 Axiom 是个人“外脑系统”的后端工程。当前已经从最小接收链路推进到 VPS 线上基线：能接收文本、图片、文档和音频，能落盘，能入库，能检索，能归档恢复，能备份，也能生成回顾和 inbox action 留痕。
 
+当前产品形态以 `docs/PRODUCT_MODEL.md` 为最高事实源：默认工作面是“此刻”，一级目的地只有“此刻 / 资料库 / Atlas”，记录是全局动作。任务、记忆、决策、时间线、处理和系统治理不得重新扩张为平级一级工作台。
+
 长期方向来自 `deep-research-report.md`，短期执行看 `docs/SHORT_TERM.md`。
 
 ## 当前运行事实
@@ -68,7 +70,7 @@ Axiom 是个人“外脑系统”的后端工程。当前已经从最小接收�
 
 ```text
 frontend/
-  src/                 # 当前主前端：Capture / Atlas / 近况
+  src/                 # 当前主前端：此刻 / 资料库 / Atlas + 全局记录
 core/
   receiver.py
   init_db.py

@@ -1,12 +1,15 @@
 # Axiom 项目主线
 
-更新时间：2026-06-06
+更新时间：2026-08-21
 
 这份文档是当前开发前置事实源。它不替代详细设计文档，只回答一个问题：新功能应该接到哪条主线，哪些东西只是兼容或历史保留。
 
+产品形态与内在逻辑以 `docs/PRODUCT_MODEL.md` 为准。
+
 ## 当前主入口
 
-- `/app` 是当前主前端入口，服务 `frontend/` 构建出的 Vite + Vue 3 应用。
+- `/app` 是当前主前端入口，默认进入“此刻”。
+- `/app?mode=library` 进入统一资料库。
 - `/atlas` 是同一套 Vite 应用的 Atlas 深链接，进入后默认打开 Atlas 模式。
 - `/app/v2` 仅作为历史兼容入口，会重定向到 `/app`。
 - `/app/legacy` 保留旧移动 Web App，用于兼容和回归测试，不再承载新功能。
@@ -19,19 +22,20 @@
 frontend/src/
 ```
 
-Vue 主应用模式：
+Vue 一级目的地：
 
 ```text
-Capture -> Atlas -> Cosmos -> 近况 -> 处理 -> 搜索 -> 时间 -> 任务 -> 记忆 -> 决策 -> 自动化 -> 系统
+此刻 / 资料库 / Atlas + 全局记录
 ```
 
-- `CaptureView.vue` 是记录入口；`SmartInput.vue` 支持文本、纯 URL、可见附件选择、拖拽文件和粘贴图片。
-- `SearchOverlay.vue` 是 Capture 内的轻量搜索浮层，读取主线搜索 API；点击记录结果打开 `ItemDrawer.vue`，点击任务/记忆/决策结果打开 `ObjectDrawer.vue`。
+- `AppNavigation.vue` 提供桌面侧栏与移动底栏，只呈现三个一级目的地、全局记录和次级“更多”入口。
+- `TodayView.vue` 是默认“此刻”工作面，汇合当前焦点、今日行动、待确认记忆、待回顾决策和最近记录。
+- `QuickCapture.vue` 是全局记录动作，支持文字、链接、附件、拖放和粘贴文件；记录完成后刷新当前上下文。
+- `SearchView.vue` 当前承担资料库视图：无查询时显示最近内容，有查询时支持关键词/语义检索和按需展开的高级筛选。
 - `AtlasView.vue` 是新 Atlas 主实现，包含 3D 全局图和 2D 聚焦图。
-- `CosmosView.vue` 是关系图谱编辑与对象挂载层，保留在 Vue 主线内的 `/app?mode=cosmos`，但不替代 `/atlas` 的 Atlas 主视图。
+- `CosmosView.vue` 是关系图谱编辑与对象挂载层，只从“更多”进入，不与 Atlas 并列。
 - `RecentView.vue` 是 Vue 主线近况页，读取 `/overview` 展示运行摘要、处理积压、最近记录和自动化产物；已支持积压单条打开、标记就绪、手动完成项退回待处理和 Markdown 产物预览。
 - `ProcessingView.vue` 是 Vue 主线处理工作台，读取 `/processing/backlog`，支持全局下一条、分组队列、分组批量标记就绪和退回待处理；条目详情复用 `ItemDrawer.vue`，支持标记就绪、退回待处理、完成并打开同类下一条。
-- `SearchView.vue` 是 Vue 主线搜索工作台，读取 `/search/all` 与 `/search/vector`，支持关键词/语义切换、跨记录/任务/记忆/决策分组展示；关键词模式下支持记录类型、来源、处理状态、处理覆盖筛选，并可对当前记录结果批量标记就绪或退回待处理；搜索词、模式和记录筛选会同步到 URL，方便刷新、分享和调试；记录结果可打开 `ItemDrawer.vue`，任务/记忆/决策结果可打开 `ObjectDrawer.vue`。
 - `TimelineView.vue` 是 Vue 主线时间流，读取 `/timeline`，把记录/任务/记忆/决策的创建与状态变更合成统一活动视图，支持按对象类型和日期窗口筛选；时间流筛选会同步到 URL，并支持从 URL 恢复筛选状态；选中事件后在侧栏展示事件详情，记录事件可继续打开 `ItemDrawer.vue`，任务/记忆/决策事件可继续打开 `ObjectDrawer.vue`。
 - `TasksView.vue` 是 Vue 主线任务台，读取 `/tasks/today` 和 `/tasks`，支持快速新增、今日/逾期、状态/优先级筛选，以及完成、恢复、取消、安排到今天；任务列表筛选会同步到 URL，并支持从 URL 恢复筛选状态；列表项可用 `ObjectDrawer.vue` 查看完整任务详情。
 - `MemoriesView.vue` 是 Vue 主线记忆库，读取 `/memories/stats` 和 `/memories`，支持快速新增、分类/状态筛选、确认和归档；记忆列表筛选会同步到 URL，并支持从 URL 恢复筛选状态；列表项可用 `ObjectDrawer.vue` 查看完整记忆详情，记忆来源记录可继续打开 `ItemDrawer.vue`。
@@ -41,12 +45,13 @@ Capture -> Atlas -> Cosmos -> 近况 -> 处理 -> 搜索 -> 时间 -> 任务 -> 
 - `ObjectDrawer.vue` 是 Vue 主线任务/记忆/决策的轻量详情抽屉，供搜索、时间流等跨对象视图复用；任务详情可直接完成/恢复/取消并通知父视图刷新，记忆详情可直接确认/归档，决策详情可填写实际结果并标记已回顾；记忆详情里的关联任务可继续在同一抽屉打开任务详情，记忆来源记录通过 `open-item` 交给 `ItemDrawer.vue` 展示，`ItemDrawer.vue` 继续负责记录详情、轻量编辑、鉴权文件预览/下载和处理动作。
 - `frontend/src/views/_legacy/AtlasView.vue` 不是新 Atlas，不要在新功能中继续扩展它。
 
-## Learning Board 主线
+## 竞赛项目边界
 
-- `/board` 是 Learning Board 独立前端入口，服务 `frontend/board/` 构建出的 React + tldraw 应用。
+- `/board` 当前保留 Learning Board 兼容入口，服务 `frontend/board/` 构建出的 React + tldraw 应用。
 - Board 后端 API 在 `/api/learning/*`，核心代码在 `core/boards/` 与 `core/routes/boards.py`。
 - Board 构建产物输出到 `core/static/board/`，独立于主 Vue 的 `core/static/v2/`，避免 Vue 构建清空 Board 产物；产物暂时入库，保证 VPS 不依赖 Node.js。
-- `ModeSwitcher` 中的 `Board` 会跳转到 `/board`，不在 `frontend/src/App.vue` 内直接渲染 Board。
+- Learning Board 属于火山杯竞赛项目，不进入 Axiom 一级导航，新 Axiom 功能不得依赖其运行时。
+- MemoryGuard 属于鸿蒙杯独立项目，Axiom 只吸收治理原则，不建立代码或部署依赖。
 
 ## Atlas / Cosmos 主线
 

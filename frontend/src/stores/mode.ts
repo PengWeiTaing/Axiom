@@ -4,25 +4,31 @@ import { navigateToPath, pathForRecentBoard } from '@/composables/useAppNavigati
 import { listenToBrowserPopState, pushBrowserPath } from '@/composables/useBrowserHistory';
 import { currentRouteParams, currentRoutePathname, currentRoutePathWithSearch } from '@/composables/useRouteQuery';
 
-export type AppMode = 'capture' | 'atlas' | 'cosmos' | 'recent' | 'processing' | 'search' | 'timeline' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
+export type PrimaryMode = 'today' | 'library' | 'atlas';
+export type LegacyMode = 'capture' | 'cosmos' | 'recent' | 'processing' | 'search' | 'timeline' | 'tasks' | 'memories' | 'decisions' | 'automation' | 'system' | 'board';
+export type AppMode = PrimaryMode | LegacyMode;
 
-const MODES: AppMode[] = ['capture', 'atlas', 'cosmos', 'recent', 'processing', 'search', 'timeline', 'tasks', 'memories', 'decisions', 'automation', 'system', 'board'];
+const MODES: AppMode[] = ['today', 'library', 'atlas', 'capture', 'cosmos', 'recent', 'processing', 'search', 'timeline', 'tasks', 'memories', 'decisions', 'automation', 'system', 'board'];
 
 function isMode(value: string | null): value is AppMode {
   return Boolean(value && MODES.includes(value as AppMode));
 }
 
 function modeFromLocation(): AppMode {
-  if (typeof window === 'undefined') return 'capture';
+  if (typeof window === 'undefined') return 'today';
   const path = currentRoutePathname().replace(/\/+$/, '') || '/';
   if (path === '/atlas') return 'atlas';
   if (path.startsWith('/board')) return 'board';
   const requested = currentRouteParams().get('mode');
-  return isMode(requested) ? requested : 'capture';
+  if (requested === 'capture') return 'today';
+  if (requested === 'search') return 'library';
+  return isMode(requested) ? requested : 'today';
 }
 
 function urlForMode(mode: AppMode): string {
   if (mode === 'atlas') return '/atlas';
+  if (mode === 'library' || mode === 'search') return '/app?mode=library';
+  if (mode === 'today' || mode === 'capture') return '/app';
   if (mode === 'board') return pathForRecentBoard();
   if (mode === 'cosmos') return '/app?mode=cosmos';
   if (mode === 'tasks') return '/app?mode=tasks';
@@ -32,7 +38,6 @@ function urlForMode(mode: AppMode): string {
   if (mode === 'system') return '/app?mode=system';
   if (mode === 'timeline') return '/app?mode=timeline';
   if (mode === 'processing') return '/app?mode=processing';
-  if (mode === 'search') return '/app?mode=search';
   if (mode === 'recent') return '/app?mode=recent';
   return '/app';
 }

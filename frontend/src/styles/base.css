@@ -21,15 +21,8 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* 背景：一点点冷光从顶部洒下，不要任何彩色 bloom */
 body {
-  background:
-    radial-gradient(
-      ellipse 120% 60% at 50% -20%,
-      rgba(110, 231, 208, 0.04),
-      transparent 60%
-    ),
-    var(--surface-0);
+  background: var(--surface-0);
   background-attachment: fixed;
 }
 

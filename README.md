@@ -84,36 +84,33 @@ Atlas/Cosmos 不是为了炫技，而是为了让记录、记忆、任务、决�
 ### 前端与跨端
 
 - 主前端：Vite + Vue 3，入口为 `/app`。
+- 默认工作面“此刻”，一级目的地为“此刻 / 资料库 / Atlas”，记录是任意位置可用的全局动作。
 - Atlas 深链接：`/atlas`。
 - 旧 PWA：`/app/legacy`，只保留兼容与回归价值。
-- Learning Board：React + tldraw，用于 AI 学习白板与掌握度模型。
+- Learning Board 属于火山杯竞赛项目，只保留兼容入口，不进入 Axiom 一级产品结构。
 - Tauri 桌面端基础设施已经跑通，移动端/PWA 继续作为轻量入口。
 
 ## 产品形态
 
 ```mermaid
 flowchart LR
-    Input["多源输入\n文本 / 文件 / 音频 / URL / 图片"] --> Ingest["采集与解析"]
-    Ingest --> Store["个人资料库\n文件系统 + SQLite"]
-    Store --> Search["检索与回看\nFTS5 / 时间流 / 搜索"]
-    Store --> Memory["长期记忆\n候选 / 确认 / 归档"]
-    Store --> Graph["Cosmos / Atlas\n关系图谱"]
-    Memory --> Task["任务与目标推进"]
-    Search --> Decision["决策与复盘"]
-    Graph --> Decision
-    Task --> Review["日/周回顾"]
-    Decision --> Review
-    Review --> Automation["低权限自动化\n审计 / dry-run / 人工确认"]
+    Capture["随时记录\n文字 / 文件 / 音频 / URL / 图片"] --> Context["理解上下文\n事实 / 推断 / 意图"]
+    Context --> Now["此刻\n当前焦点 / 下一步 / 待判断"]
+    Context --> Library["资料库\n统一找回"]
+    Context --> Atlas["Atlas\n3D 全局 / 2D 聚焦"]
+    Now --> Result["行动结果"]
+    Result --> Review["复盘与校准"]
+    Review --> Context
 ```
 
 Axiom 的理想工作流是：
 
-1. 低摩擦采集：把网页、笔记、录音、文件和想法先放进系统。
-2. 自动解析：抽正文、补转写、生成描述、建立索引。
-3. 人工确认：重要内容升级为记忆、任务或决策。
-4. 关系组织：挂载到 lifeline，进入 Atlas/Cosmos 图谱。
-5. 回顾校准：日/周回顾发现重复输入、计划漂移和下一步行动。
-6. 谨慎自动化：从可审计的建议、dry-run 和人工确认开始。
+1. 用户随时记录，不需要先判断对象类型。
+2. Axiom 保留原始事实，并提出带依据的上下文理解。
+3. “此刻”只突出当前焦点、可执行下一步和少量待判断内容。
+4. 资料库负责统一找回，Atlas 负责理解关系。
+5. 行动结果和日/周复盘持续校准之后的建议与记忆。
+6. 外部写操作和高影响变化保持可审计、可撤回和人工确认。
 
 ## 技术架构
 

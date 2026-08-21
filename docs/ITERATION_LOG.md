@@ -2,6 +2,15 @@
 
 这份文档只记录迭代，不讲完整架构。
 
+## 2026-08-21
+
+- 确立新的 Axiom 产品模型，新增 `docs/PRODUCT_MODEL.md`。一级目的地从十三个平级工作台收敛为“此刻 / 资料库 / Atlas”，记录改为全局动作；任务、记忆、决策、处理、时间线和治理能力降为上下文或次级入口。
+- Vue 主线新增 `AppNavigation.vue` 与 `TodayView.vue`；桌面采用侧栏、移动采用五格底栏。“此刻”真实汇合今日/逾期行动、待确认记忆、待回顾决策、处理积压和最近记录，并支持直接完成当前行动。
+- `QuickCapture.vue` 升级为全局多模态记录层，支持文字、链接、附件选择、拖放和粘贴文件；`SearchView.vue` 重新定位为资料库，无查询时直接显示最近内容，高级筛选按需展开。
+- 移除已被新产品形态替代的 `ModeSwitcher.vue`、`CaptureView.vue`、`FloatChat.vue` 和 `SearchOverlay.vue`；Learning Board 与 MemoryGuard 明确保持竞赛项目边界，不进入 Axiom 一级导航。
+- 新增 `scripts/check_product_shell.py`，防止一级导航重新膨胀为对象类型工作台，并守住竞赛项目的产品边界。
+- 前端构建链升级到 Vite 7 与 Vue 插件 6，更新受影响的传递依赖；`npm audit` 恢复为 0 个已知漏洞。
+
 ## 2026-06-17
 
 - 重写 `README.md` 为面向 GitHub 访客的项目介绍页，围绕研究报告中的“个人外脑/长期复利系统”定位，重新组织项目愿景、当前能力、产品形态、技术架构、阶段状态与路线图。

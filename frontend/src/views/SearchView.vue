@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { markProcessingPending, markProcessingReady } from '@/api/records';
+import { Search, SlidersHorizontal } from '@lucide/vue';
+import { getRecent, markProcessingPending, markProcessingReady } from '@/api/records';
 import { searchAll, searchVector } from '@/api/search';
 import { ApiError } from '@/api/client';
 import ItemDrawer from '@/components/ItemDrawer.vue';
@@ -43,6 +44,8 @@ const hasSearched = ref(false);
 const selectedItemId = ref<number | null>(null);
 const selectedObject = ref<ObjectTarget | null>(null);
 const results = ref<SearchResult[]>([]);
+const initialItems = ref<Item[]>([]);
+const filtersOpen = ref(false);
 
 const groupedResults = computed(() => {
   const groups: Record<ResultKind, SearchResult[]> = {
@@ -149,7 +152,7 @@ function selectMode(next: SearchMode) {
 
 function syncSearchUrl(q: string) {
   const canUseRecordFilters = searchMode.value === 'all';
-  replaceRouteQuery('search', {
+  replaceRouteQuery('library', {
     q,
     search_mode: searchMode.value === 'vector' ? 'vector' : '',
     type: canUseRecordFilters ? itemTypeFilter.value : '',
@@ -180,10 +183,15 @@ function resultTitle(result: SearchResult): string {
 }
 
 function resultSummary(result: SearchResult): string {
-  if (result.kind === 'item') return itemSummary(result.data);
-  if (result.kind === 'task') return result.data.detail || '没有补充说明';
-  if (result.kind === 'memory') return result.data.detail || result.data.source_text || '没有补充说明';
-  return result.data.decision || result.data.context || '没有补充说明';
+  let summary = '';
+  if (result.kind === 'item') summary = itemSummary(result.data);
+  else if (result.kind === 'task') summary = result.data.detail || '';
+  else if (result.kind === 'memory') summary = result.data.detail || result.data.source_text || '';
+  else summary = result.data.decision || result.data.context || '';
+
+  const normalizedSummary = summary.replace(/\s+/g, ' ').trim();
+  const normalizedTitle = resultTitle(result).replace(/\s+/g, ' ').trim();
+  return normalizedSummary === normalizedTitle ? '' : normalizedSummary;
 }
 
 function resultMeta(result: SearchResult): string {
@@ -261,6 +269,27 @@ function resultAccent(result: SearchResult): string {
   return 'var(--warm)';
 }
 
+function initialResult(item: Item): SearchResult {
+  return { kind: 'item', data: item };
+}
+
+async function loadInitialItems() {
+  try {
+    const payload = await getRecent({ page: 1 });
+    initialItems.value = payload.items.slice(0, 8);
+  } catch {
+    initialItems.value = [];
+  }
+}
+
+async function refreshContent() {
+  if (query.value.trim()) {
+    await runSearch();
+    return;
+  }
+  await loadInitialItems();
+}
+
 onMounted(() => {
   const params = currentRouteParams();
   const initialMode = params.get('search_mode');
@@ -279,6 +308,13 @@ onMounted(() => {
     processingOverrideFilter.value = initialProcessingOverride;
   }
   sourceFilter.value = params.get('source') || '';
+  filtersOpen.value = Boolean(
+    itemTypeFilter.value
+    || processingStateFilter.value
+    || processingOverrideFilter.value
+    || sourceFilter.value,
+  );
+  loadInitialItems();
 
   const initial = params.get('q');
   if (initial) {
@@ -292,10 +328,11 @@ onMounted(() => {
   <main class="search-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Search</p>
-        <h1>搜索</h1>
+        <p class="eyebrow">Library</p>
+        <h1>资料库</h1>
       </div>
       <button class="refresh-btn" type="button" :disabled="loading || !query.trim()" @click="runSearch()">
+        <Search :size="16" />
         <span>{{ loading ? '搜索中' : '搜索' }}</span>
       </button>
     </header>
@@ -320,8 +357,12 @@ onMounted(() => {
             <button type="button" :class="{ active: searchMode === 'vector' }" @click="selectMode('vector')">
               语义
             </button>
+            <button type="button" :class="{ active: filtersOpen }" @click="filtersOpen = !filtersOpen">
+              <SlidersHorizontal :size="15" />
+              <span>筛选</span>
+            </button>
           </div>
-          <div class="filter-grid" aria-label="记录筛选">
+          <div v-if="filtersOpen" class="filter-grid" aria-label="记录筛选">
             <label>
               <span>记录类型</span>
               <select v-model="itemTypeFilter" aria-label="记录类型" :disabled="searchMode === 'vector'">
@@ -360,6 +401,7 @@ onMounted(() => {
             </label>
           </div>
           <button
+            v-if="filtersOpen"
             class="reset-filter-btn"
             type="button"
             :disabled="!recordFiltersActive || loading"
@@ -372,7 +414,7 @@ onMounted(() => {
           </div>
         </form>
 
-        <div class="metrics" aria-label="搜索结果统计">
+        <div v-if="hasSearched" class="metrics" aria-label="搜索结果统计">
           <article>
             <span>总计</span>
             <strong>{{ totalCount }}</strong>
@@ -391,8 +433,8 @@ onMounted(() => {
       <section class="panel result-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Results</p>
-            <h2>结果</h2>
+            <p class="eyebrow">Recall</p>
+            <h2>找到的内容</h2>
           </div>
           <span class="result-mode">{{ searchMode === 'all' ? '关键词' : '语义' }}</span>
         </div>
@@ -403,7 +445,30 @@ onMounted(() => {
           <button type="button" @click="runSearch()">重试</button>
         </div>
         <div v-else-if="loading" class="empty-state">搜索中</div>
-        <div v-else-if="!hasSearched" class="empty-state">等待查询</div>
+        <div v-else-if="!hasSearched && initialItems.length" class="result-groups initial-results">
+          <section class="result-group">
+            <header>
+              <h3>最近进入外脑</h3>
+              <span>{{ initialItems.length }}</span>
+            </header>
+            <button
+              v-for="item in initialItems"
+              :key="item.id"
+              class="result-row"
+              type="button"
+              :style="{ '--result-accent': typeAccent(item.type) }"
+              @click="selectedItemId = item.id"
+            >
+              <span class="result-dot" />
+              <span class="result-copy">
+                <strong>{{ resultTitle(initialResult(item)) }}</strong>
+                <small v-if="resultSummary(initialResult(item))">{{ resultSummary(initialResult(item)) }}</small>
+              </span>
+              <span class="result-meta">{{ resultMeta(initialResult(item)) }}</span>
+            </button>
+          </section>
+        </div>
+        <div v-else-if="!hasSearched" class="empty-state">输入一个主题、人物、项目或记得的片段。</div>
         <div v-else-if="!results.length" class="empty-state">没有匹配</div>
 
         <div v-else class="result-groups">
@@ -443,7 +508,7 @@ onMounted(() => {
               <span class="result-dot" />
               <span class="result-copy">
                 <strong>{{ resultTitle(result) }}</strong>
-                <small>{{ resultSummary(result) }}</small>
+                <small v-if="resultSummary(result)">{{ resultSummary(result) }}</small>
               </span>
               <span class="result-meta">
                 <span
@@ -461,11 +526,11 @@ onMounted(() => {
       </section>
     </section>
 
-    <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="runSearch()" />
+    <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="refreshContent" />
     <ObjectDrawer
       :target="selectedObject"
       @close="selectedObject = null"
-      @changed="runSearch"
+      @changed="refreshContent"
       @open-item="openSourceItem"
       @open-object="selectedObject = $event"
     />
@@ -474,7 +539,7 @@ onMounted(() => {
 
 <style scoped>
 .search-view {
-  width: min(1180px, calc(100vw - var(--s-8)));
+  width: min(1180px, calc(100% - var(--s-8)));
   margin: 0 auto;
   padding: calc(var(--s-8) + var(--s-5)) 0 var(--s-8);
 }
@@ -517,6 +582,9 @@ h3 {
 }
 
 .refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
   color: var(--text-2);
@@ -534,31 +602,35 @@ h3 {
 }
 
 .search-shell {
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: var(--s-4);
-  align-items: start;
+  display: block;
 }
 
 .panel {
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: rgba(13, 17, 22, 0.74);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .query-panel,
 .result-panel {
-  padding: var(--s-4);
+  padding: 0;
 }
 
 .query-panel {
-  position: sticky;
-  top: calc(var(--s-8) + var(--s-4));
+  position: static;
+  padding-bottom: var(--s-5);
+  border-bottom: 1px solid var(--line-1);
 }
 
 .query-form {
   display: grid;
   gap: var(--s-3);
+}
+
+.query-form > label:first-child input {
+  min-height: 54px;
+  font-size: var(--fs-5);
+  background: var(--surface-1);
 }
 
 label {
@@ -590,13 +662,18 @@ input::placeholder {
 }
 
 .mode-pills {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  align-items: center;
   gap: var(--s-2);
 }
 
 .mode-pills button {
   min-height: 36px;
+  min-width: 96px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   color: var(--text-3);
@@ -612,8 +689,9 @@ input::placeholder {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--s-3);
+  padding-top: var(--s-2);
 }
 
 .reset-filter-btn {
@@ -641,18 +719,15 @@ input::placeholder {
 }
 
 .metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--s-2);
+  display: flex;
+  gap: var(--s-5);
   margin-top: var(--s-4);
 }
 
 .metrics article {
-  min-width: 0;
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-  padding: var(--s-3);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
 }
 
 .metrics span,
@@ -664,8 +739,7 @@ input::placeholder {
 }
 
 .metrics strong {
-  display: block;
-  color: var(--accent-bright);
+  color: var(--text-2);
   font-family: var(--font-mono);
   font-size: var(--fs-6);
   font-weight: 520;
@@ -680,6 +754,12 @@ input::placeholder {
   gap: var(--s-3);
 }
 
+.panel-head {
+  margin-top: 42px;
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line-1);
+}
+
 .result-mode {
   border: 1px solid var(--line-1);
   border-radius: var(--r-pill);
@@ -689,9 +769,9 @@ input::placeholder {
 .notice,
 .empty-state {
   margin-top: var(--s-4);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-3);
   padding: var(--s-4);
 }
@@ -776,16 +856,17 @@ input::placeholder {
   gap: var(--s-3);
   align-items: center;
   min-height: 64px;
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
+  border: 0;
+  border-bottom: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
   padding: var(--s-3);
   text-align: left;
 }
 
 .result-row:hover {
-  border-color: rgba(110, 231, 208, 0.22);
-  background: var(--surface-2);
+  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.022);
 }
 
 .result-dot {
@@ -848,7 +929,7 @@ input::placeholder {
   }
 
   .filter-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .query-panel {
@@ -861,6 +942,17 @@ input::placeholder {
 
   .result-meta {
     grid-column: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  .mode-pills button {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .filter-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
