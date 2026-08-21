@@ -21,6 +21,43 @@ USER_ID = "default"
 
 def register_routes(app):
 
+    # ---- Competition knowledge scene ----
+
+    @app.route("/api/learning/knowledge-scenes/generate", methods=["POST"])
+    def learning_generate_knowledge_scene():
+        """Plan one safe, template-backed learning scene.
+
+        Unauthenticated visitors can use the local fixture so the competition
+        demo opens without setup.  Remote Coze execution still requires the
+        normal Axiom key, preventing a public page from spending points.
+        """
+        body = request.get_json(silent=True) or {}
+        goal = str(body.get("goal") or "").strip()
+        if not goal:
+            return error_response(400, "missing_goal", "goal 不能为空")
+
+        source_text = str(body.get("source_text") or "").strip()
+        if len(goal) > 240:
+            return error_response(400, "goal_too_long", "goal 最多 240 个字符")
+        if len(source_text) > 12000:
+            return error_response(400, "source_too_long", "source_text 最多 12000 个字符")
+
+        from core.boards.knowledge_scene import (
+            SceneGenerationUnavailableError,
+            generate_knowledge_scene,
+        )
+
+        allow_remote = require_key() is None
+        try:
+            scene = generate_knowledge_scene(
+                goal,
+                source_text=source_text,
+                allow_remote=allow_remote,
+            )
+        except SceneGenerationUnavailableError as exc:
+            return error_response(503, "knowledge_scene_unavailable", str(exc))
+        return ok_response({"scene": scene})
+
     # ---- Board CRUD ----
 
     @app.route("/api/learning/boards/generate", methods=["POST"])

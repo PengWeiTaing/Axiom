@@ -1,0 +1,1280 @@
+.structured-scene {
+  --scene-bg: #0b0f13;
+  --scene-ink: #f2eee5;
+  --scene-muted: #959ca8;
+  --scene-faint: rgba(242, 238, 229, 0.16);
+  --scene-line: rgba(242, 238, 229, 0.12);
+  --scene-cyan: #57d2d0;
+  --scene-blue: #6fa8ff;
+  --scene-yellow: #f2c14e;
+  --scene-red: #ee7674;
+  position: relative;
+  container-name: knowledge-scene;
+  container-type: inline-size;
+  min-height: 100vh;
+  overflow-x: clip;
+  overflow-y: visible;
+  color: var(--scene-ink);
+  background: var(--scene-bg);
+  font-family: "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.structured-scene--light {
+  --scene-bg: #ffffff;
+  --scene-ink: #17191d;
+  --scene-muted: #626971;
+  --scene-faint: rgba(23, 25, 29, 0.12);
+  --scene-line: rgba(23, 25, 29, 0.14);
+  --scene-cyan: #087f91;
+  --scene-blue: #2867b2;
+  --scene-yellow: #a66a00;
+  --scene-red: #b74642;
+}
+
+.structured-scene__title {
+  width: min(500px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 48px 0 64px;
+}
+
+.structured-scene__title > p {
+  margin: 0 0 17px;
+  color: var(--scene-cyan);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+
+.structured-scene__title h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: clamp(32px, 3vw, 38px);
+  font-weight: 500;
+  line-height: 1.28;
+  letter-spacing: -0.025em;
+}
+
+.structured-scene__title > div {
+  max-width: 500px;
+  margin-top: 18px;
+  color: var(--scene-muted);
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.structured-scene__body {
+  width: min(1240px, calc(100% - 36px));
+  margin: 0 auto;
+}
+
+.scene-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(400px, 500px) minmax(220px, 1fr);
+  gap: clamp(22px, 3vw, 48px);
+  align-items: start;
+}
+
+.scene-text-section {
+  position: relative;
+  min-width: 0;
+  padding: 34px 0 70px;
+}
+
+.scene-row:last-child .scene-text-section {
+  padding-bottom: 70px;
+}
+
+.scene-text-section > header {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.scene-text-section > header span {
+  display: none;
+}
+
+.scene-text-section h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: clamp(24px, 2.2vw, 28px);
+  font-weight: 500;
+  line-height: 1.42;
+  letter-spacing: -0.02em;
+}
+
+.scene-blocks {
+  display: grid;
+  gap: 24px;
+}
+
+.scene-paragraph,
+.scene-definition p,
+.scene-example > p,
+.scene-list {
+  margin: 0;
+  font-size: 16px;
+  line-height: 2;
+}
+
+.scene-definition {
+  padding-left: 18px;
+  border-left: 2px solid var(--scene-yellow);
+}
+
+.scene-definition p span {
+  margin-right: 10px;
+  color: var(--scene-yellow);
+  font-weight: 650;
+}
+
+.scene-definition .scene-math {
+  margin-top: 18px;
+}
+
+.scene-math {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  color: var(--scene-ink);
+  font-size: 1.08em;
+  scrollbar-width: thin;
+}
+
+.scene-formula {
+  margin: 3px 0;
+  padding: 10px 0 4px;
+}
+
+.scene-formula figcaption {
+  margin-top: 12px;
+  color: var(--scene-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.scene-block-label {
+  margin: 0 0 14px !important;
+  color: var(--scene-cyan);
+  font-size: 12px !important;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+}
+
+.scene-derivation ol,
+.scene-example ol {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-derivation li {
+  position: relative;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--scene-line);
+}
+
+.scene-derivation li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.scene-derivation__note {
+  display: block;
+  margin-top: 4px;
+  color: var(--scene-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.scene-example {
+  padding: 22px 0 2px 18px;
+  border-left: 1px solid var(--scene-cyan);
+}
+
+.scene-example ol {
+  gap: 16px;
+  margin-top: 22px;
+  counter-reset: example-step;
+}
+
+.scene-example li {
+  display: grid;
+  gap: 8px;
+  color: var(--scene-muted);
+  font-size: 14px;
+  line-height: 1.8;
+  counter-increment: example-step;
+}
+
+.scene-example li::before {
+  content: counter(example-step, decimal-leading-zero);
+  color: var(--scene-cyan);
+  font-family: "Cascadia Code", monospace;
+  font-size: 10px;
+}
+
+.scene-example__result {
+  margin-top: 22px !important;
+  color: var(--scene-ink);
+}
+
+.scene-list {
+  display: grid;
+  gap: 14px;
+  padding-left: 22px;
+}
+
+.scene-list li {
+  padding-left: 6px;
+}
+
+.scene-list li::marker {
+  color: var(--scene-cyan);
+}
+
+.scene-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.scene-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.scene-table-wrap th,
+.scene-table-wrap td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--scene-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.scene-table-wrap th {
+  color: var(--scene-cyan);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scene-rail {
+  display: grid;
+  gap: 68px;
+  min-width: 0;
+  padding-top: 54px;
+}
+
+.scene-rail--left .scene-demo {
+  justify-self: end;
+}
+
+.scene-demo {
+  width: min(100%, 330px);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  color: var(--scene-ink);
+}
+
+.scene-demo > figcaption {
+  margin-bottom: 18px;
+  color: var(--scene-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.scene-demo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.scene-demo svg text {
+  fill: var(--scene-muted);
+  font-family: "Noto Sans SC", sans-serif;
+  font-size: 10px;
+}
+
+.scene-axis {
+  stroke: var(--scene-line);
+  stroke-width: 1;
+}
+
+.scene-curve {
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: scene-draw 3.8s cubic-bezier(.45, 0, .2, 1) 0.4s forwards;
+}
+
+.scene-curve--1 { stroke: var(--scene-cyan); }
+.scene-curve--2 { stroke: var(--scene-yellow); animation-delay: 0.8s; }
+.scene-curve--3 { stroke: var(--scene-blue); animation-delay: 1.2s; }
+
+.scene-plot-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 18px;
+  margin-top: 7px;
+  font-family: "Cascadia Code", monospace;
+  font-size: 10px;
+}
+
+.scene-plot-legend--1 { color: var(--scene-cyan); }
+.scene-plot-legend--2 { color: var(--scene-yellow); }
+.scene-plot-legend--3 { color: var(--scene-blue); }
+
+.scene-plot-parameter {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  color: var(--scene-muted);
+  font-family: "Cascadia Code", monospace;
+  font-size: 10px;
+}
+
+.scene-plot-parameter input {
+  width: 100%;
+  accent-color: var(--scene-cyan);
+}
+
+.scene-constrained-extremum {
+  display: grid;
+  gap: 12px;
+}
+
+.scene-constrained-extremum svg {
+  touch-action: pan-y;
+}
+
+.scene-constrained-axis {
+  stroke: var(--scene-line);
+  stroke-width: 1;
+}
+
+.scene-constrained-circle {
+  fill: color-mix(in srgb, var(--scene-cyan) 4%, transparent);
+  stroke: var(--scene-cyan);
+  stroke-width: 2;
+}
+
+.scene-constrained-contour {
+  stroke: var(--scene-blue);
+  stroke-width: 1.8;
+}
+
+.scene-constrained-contour--faint {
+  opacity: 0.24;
+  stroke-width: 1;
+}
+
+.scene-constrained-tangent {
+  stroke: var(--scene-muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 5 5;
+}
+
+.scene-constrained-vector {
+  stroke-width: 2.3;
+  stroke-linecap: round;
+}
+
+.scene-constrained-vector--f { stroke: var(--scene-yellow); }
+.scene-constrained-vector--g { stroke: var(--scene-cyan); }
+.scene-constrained-vector--t { stroke: var(--scene-red); }
+.scene-constrained-marker-f { fill: var(--scene-yellow); }
+.scene-constrained-marker-g { fill: var(--scene-cyan); }
+.scene-constrained-marker-t { fill: var(--scene-red); }
+
+.scene-constrained-target {
+  fill: none;
+  stroke: var(--scene-yellow);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 4;
+}
+
+.scene-constrained-point {
+  fill: var(--scene-ink);
+  stroke: var(--scene-bg);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.scene-constrained-point-hit {
+  fill: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.scene-constrained-point-hit:active { cursor: grabbing; }
+
+.scene-constrained-point-hit:focus-visible {
+  fill: color-mix(in srgb, var(--scene-cyan) 8%, transparent);
+  stroke: var(--scene-cyan);
+  stroke-width: 1;
+}
+
+.scene-constrained-q {
+  fill: var(--scene-bg);
+  stroke: var(--scene-blue);
+  stroke-width: 1.5;
+  transition: opacity 180ms ease;
+}
+
+.scene-demo svg .scene-constrained-label {
+  fill: var(--scene-muted);
+  font-family: "Noto Sans SC", sans-serif;
+  font-size: 9px;
+  pointer-events: none;
+}
+
+.scene-demo svg .scene-constrained-label--f,
+.scene-demo svg .scene-constrained-label--target { fill: var(--scene-yellow); }
+.scene-demo svg .scene-constrained-label--g { fill: var(--scene-cyan); }
+.scene-demo svg .scene-constrained-label--t { fill: var(--scene-red); }
+.scene-demo svg .scene-constrained-label--q { fill: var(--scene-blue); }
+
+.scene-demo svg .scene-constrained-caption {
+  fill: var(--scene-muted);
+  font-family: "Cascadia Code", monospace;
+  font-size: 8.5px;
+  pointer-events: none;
+}
+
+.scene-constrained-slider {
+  display: grid;
+  gap: 6px;
+  color: var(--scene-muted);
+  font-size: 10px;
+}
+
+.scene-constrained-slider input {
+  width: 100%;
+  accent-color: var(--scene-cyan);
+}
+
+.scene-constrained-readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  align-items: center;
+  color: var(--scene-muted);
+  font-family: "Cascadia Code", monospace;
+  font-size: 9px;
+}
+
+.scene-constrained-readout button {
+  min-height: 36px;
+  padding: 0;
+  color: var(--scene-cyan);
+  font-family: "Noto Sans SC", sans-serif;
+  font-size: 10px;
+}
+
+.scene-constrained-meter {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding-top: 3px;
+  color: var(--scene-muted);
+  font-family: "Cascadia Code", monospace;
+  font-size: 9px;
+}
+
+.scene-constrained-meter > i {
+  display: block;
+  height: 2px;
+  background: var(--scene-line);
+}
+
+.scene-constrained-meter > i::after {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 1px;
+  height: 11px;
+  content: "";
+  background: var(--scene-muted);
+}
+
+.scene-constrained-meter > b {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--scene-red);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  transition: left 80ms linear;
+}
+
+.scene-equation-morph {
+  position: relative;
+  min-height: 172px;
+  padding-top: 24px;
+}
+
+.scene-equation-stage {
+  position: relative;
+  display: grid;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.scene-equation-row {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 4px 11px 16px;
+  color: var(--scene-ink);
+  opacity: .26;
+  transition: color 480ms ease, opacity 620ms ease;
+}
+
+.scene-equation-row::before {
+  position: absolute;
+  top: 11px;
+  bottom: 11px;
+  left: 1px;
+  width: 1px;
+  content: "";
+  background: var(--scene-line);
+  transform: scaleY(.42);
+  transform-origin: top;
+  transition: background 620ms ease, transform 620ms cubic-bezier(.22,.72,.24,1);
+}
+
+.scene-equation-row.is-resolved {
+  opacity: .56;
+}
+
+.scene-equation-row.is-active {
+  opacity: 1;
+}
+
+.scene-equation-row.is-resolved::before {
+  background: color-mix(in srgb, var(--scene-cyan) 45%, var(--scene-line));
+  transform: scaleY(1);
+}
+
+.scene-equation-row.is-active::before {
+  width: 2px;
+  background: var(--scene-cyan);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--scene-cyan) 28%, transparent);
+  transform: scaleY(1);
+}
+
+.scene-equation-formula {
+  position: relative;
+  min-width: 0;
+  pointer-events: none;
+}
+
+/* targetIndex renders before the animation effect has measured both rows. */
+.scene-equation-row.is-entering .scene-equation-formula {
+  opacity: 0;
+}
+
+.scene-equation-ghost {
+  position: absolute !important;
+  z-index: 4;
+  display: inline-block !important;
+  margin: 0 !important;
+  white-space: nowrap;
+  pointer-events: none;
+  transform-origin: center;
+}
+
+.scene-semantic-token {
+  display: inline-block;
+  position: relative;
+  transform-origin: center;
+  will-change: opacity, transform;
+}
+
+.scene-tokenized-math {
+  overflow: visible !important;
+}
+
+.scene-equation-cancel-ghost::after {
+  position: absolute;
+  top: 52%;
+  right: -3px;
+  left: -3px;
+  height: 1.5px;
+  content: "";
+  background: var(--scene-red);
+  transform: rotate(-18deg);
+  transform-origin: center;
+}
+
+.scene-equation-lines {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  text-align: left;
+}
+
+.scene-equation-lines .scene-math {
+  overflow: visible;
+  font-size: .88em;
+}
+
+.scene-equation-lines.is-multiline .scene-math {
+  font-size: .84em;
+}
+
+.scene-equation-lines .katex-display {
+  margin: 0;
+  text-align: left;
+}
+
+.scene-equation-replay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 3px 0;
+  color: var(--scene-muted);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: .04em;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.scene-equation-replay:hover,
+.scene-equation-replay:focus-visible {
+  color: var(--scene-cyan);
+  outline: none;
+}
+
+.scene-equation-row p {
+  min-height: 0;
+  margin: 0;
+  color: var(--scene-muted);
+  font-size: 10px;
+  line-height: 1.55;
+  text-align: left;
+  transition: color 480ms ease, opacity 380ms ease, transform 380ms ease;
+}
+
+.scene-equation-row.is-entering p {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.scene-equation-row.is-active p {
+  color: color-mix(in srgb, var(--scene-muted) 80%, var(--scene-ink));
+}
+
+/* A companion derivation already exists in the reading column. Delta mode is
+   therefore a small visual lens: one trustworthy fragment change, never a
+   second copy of the proof or a miniature slide deck. */
+.scene-equation-morph--delta {
+  display: flex;
+  width: 100%;
+  height: clamp(164px, 17vw, 210px);
+  min-height: 164px;
+  max-height: 240px;
+  padding-top: 34px;
+  align-items: center;
+}
+
+.scene-equation-delta-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 96px;
+  animation: scene-delta-beat-in 420ms cubic-bezier(.22,.72,.24,1) both;
+}
+
+.scene-equation-delta__formula {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 72px;
+  overflow: hidden;
+  place-items: center;
+  color: var(--scene-ink);
+  opacity: .58;
+  transition: color 420ms ease, opacity 420ms ease;
+}
+
+.scene-equation-delta__target {
+  color: var(--scene-cyan);
+  opacity: 1;
+}
+
+.scene-equation-morph--delta[data-delta-phase="before"] .scene-equation-delta__target {
+  opacity: .08;
+}
+
+.scene-equation-morph--delta[data-delta-phase="after"] .scene-equation-delta__source {
+  opacity: .36;
+}
+
+.scene-equation-delta__formula .scene-equation-lines {
+  place-items: center;
+  text-align: center;
+}
+
+.scene-equation-delta__formula .scene-math {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(.78em, 1.25vw, .96em);
+}
+
+.scene-equation-delta__formula .katex-display {
+  margin: 0;
+  text-align: center;
+}
+
+.scene-equation-delta__arrow {
+  color: var(--scene-muted);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+  line-height: 1;
+  text-align: center;
+  opacity: .7;
+}
+
+.scene-equation-morph--delta .scene-equation-replay {
+  min-height: 32px;
+}
+
+.scene-equation-static {
+  display: grid;
+  gap: 14px;
+}
+
+.scene-geometry line,
+.scene-geometry polygon {
+  fill: color-mix(in srgb, var(--scene-cyan) 8%, transparent);
+  stroke: var(--scene-cyan);
+  stroke-width: 1.6;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: scene-draw 3.6s ease 0.3s forwards;
+}
+
+.scene-geometry circle {
+  fill: var(--scene-yellow);
+}
+
+.scene-force rect {
+  fill: color-mix(in srgb, var(--scene-ink) 5%, transparent);
+  stroke: var(--scene-muted);
+}
+
+.scene-force marker path,
+.scene-concept-map marker path {
+  fill: var(--scene-cyan);
+}
+
+.scene-vector {
+  stroke: var(--scene-cyan);
+  stroke-width: 2;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: scene-draw 2.7s ease forwards;
+}
+
+.scene-vector--1 { stroke: var(--scene-yellow); animation-delay: 0.35s; }
+.scene-vector--2 { stroke: var(--scene-blue); animation-delay: 0.7s; }
+.scene-vector-zero { fill: var(--scene-cyan); }
+.scene-vector-zero--1 { fill: var(--scene-yellow); }
+.scene-vector-zero--2 { fill: var(--scene-blue); }
+.scene-force__body-label { fill: var(--scene-ink) !important; }
+
+.scene-concept-map > line {
+  stroke: var(--scene-line);
+  stroke-width: 1.2;
+}
+
+.scene-concept-map circle {
+  fill: var(--scene-bg);
+  stroke: var(--scene-cyan);
+  stroke-width: 1.2;
+}
+
+.scene-concept-map g:nth-of-type(2n) circle {
+  stroke: var(--scene-yellow);
+}
+
+.scene-concept-map g text {
+  fill: var(--scene-ink);
+  font-size: 9px;
+}
+
+.scene-concept-map__edge-label {
+  fill: var(--scene-muted);
+  font-size: 8px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--scene-bg);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.scene-bars {
+  display: grid;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.scene-bars > div {
+  display: grid;
+  grid-template-columns: minmax(78px, 1fr) minmax(80px, 1.4fr) 46px;
+  gap: 10px;
+  align-items: center;
+  font-size: 10px;
+}
+
+.scene-bars span {
+  color: var(--scene-muted);
+  line-height: 1.4;
+}
+
+.scene-bars i {
+  width: 0;
+  height: 5px;
+  background: var(--scene-cyan);
+  animation: scene-grow 2.8s cubic-bezier(.2, .7, .2, 1) var(--bar-delay) forwards;
+}
+
+.scene-bars > div:nth-child(2n) i { background: var(--scene-yellow); }
+.scene-bars b { color: var(--scene-ink); font-family: "Cascadia Code", monospace; font-size: 10px; font-weight: 400; }
+
+.scene-timeline,
+.scene-process {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-timeline li,
+.scene-process li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  min-height: 62px;
+}
+
+.scene-timeline i,
+.scene-process i {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  color: var(--scene-bg);
+  background: var(--scene-cyan);
+  border-radius: 50%;
+  font-family: "Cascadia Code", monospace;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 20px;
+  text-align: center;
+}
+
+.scene-process i {
+  color: var(--scene-cyan);
+  background: transparent;
+  border: 1px solid var(--scene-cyan);
+}
+
+.scene-timeline li:not(:last-child) i::after,
+.scene-process li:not(:last-child) i::after {
+  position: absolute;
+  top: 24px;
+  bottom: -38px;
+  left: 9px;
+  width: 1px;
+  content: "";
+  background: var(--scene-line);
+}
+
+.scene-timeline strong,
+.scene-process strong {
+  display: block;
+  color: var(--scene-ink);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.scene-timeline span,
+.scene-process span {
+  display: block;
+  margin-top: 4px;
+  color: var(--scene-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+
+.scene-inline-demos { display: none; }
+
+.structured-scene__summary {
+  width: min(500px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 50px 0 110px;
+}
+
+.structured-scene__summary h2 {
+  margin: 0 0 28px;
+  color: var(--scene-cyan);
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.structured-scene__summary ul {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.structured-scene__summary li::marker {
+  color: var(--scene-cyan);
+}
+
+.scene-semantic-block {
+  min-width: 0;
+  border-radius: 5px;
+  outline: none;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.scene-semantic-block.is-semantic-highlighted {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--scene-cyan) 9%, transparent), transparent 78%);
+  box-shadow: -3px 0 0 color-mix(in srgb, var(--scene-cyan) 72%, transparent);
+}
+
+.scene-semantic-block:focus-visible,
+.scene-demo:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--scene-cyan) 70%, transparent);
+  outline-offset: 6px;
+}
+
+.scene-demo {
+  border-radius: 6px;
+  outline: none;
+  transition: filter 160ms ease, box-shadow 160ms ease;
+}
+
+.scene-demo.is-semantic-highlighted {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--scene-cyan) 34%, transparent);
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--scene-cyan) 12%, transparent));
+}
+
+.scene-demo.is-semantic-highlighted[data-semantic-object-active="true"] {
+  box-shadow: none;
+  filter: none;
+}
+
+.scene-demo [data-semantic-id] {
+  transition: opacity 150ms ease, filter 150ms ease;
+}
+
+.scene-demo [data-semantic-active="true"] {
+  opacity: 1;
+  filter: brightness(1.12) drop-shadow(0 0 5px color-mix(in srgb, var(--scene-cyan) 36%, transparent));
+}
+
+.scene-demo [data-semantic-muted="true"] {
+  opacity: .3;
+  filter: saturate(.5);
+}
+
+.scene-prediction__question {
+  padding: 14px 0 2px;
+  border-top: 1px solid var(--scene-line);
+}
+
+.scene-prediction__question > p {
+  margin: 0 0 12px;
+  color: var(--scene-ink);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.scene-prediction__options {
+  display: grid;
+  gap: 7px;
+}
+
+.scene-prediction button,
+.knowledge-timeline button {
+  min-height: 30px;
+  padding: 5px 9px;
+  color: var(--scene-muted);
+  background: transparent;
+  border: 1px solid var(--scene-line);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.scene-prediction button:hover,
+.scene-prediction button:focus-visible,
+.knowledge-timeline button:hover,
+.knowledge-timeline button:focus-visible {
+  color: var(--scene-ink);
+  border-color: color-mix(in srgb, var(--scene-cyan) 55%, var(--scene-line));
+  outline: none;
+}
+
+.scene-prediction__options button {
+  text-align: left;
+}
+
+.scene-prediction__options button[aria-pressed="true"] {
+  color: var(--scene-ink);
+  background: color-mix(in srgb, var(--scene-cyan) 9%, transparent);
+  border-color: var(--scene-cyan);
+}
+
+.scene-prediction__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.scene-prediction__actions .scene-prediction__skip {
+  margin-right: auto;
+  border-color: transparent;
+}
+
+.scene-prediction button:disabled,
+.knowledge-timeline button:disabled {
+  opacity: .38;
+  cursor: default;
+}
+
+.scene-prediction__explanation {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 10px 0 0 12px;
+  border-left: 2px solid var(--scene-yellow);
+  color: var(--scene-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.scene-prediction__explanation[data-matches-answer="true"] {
+  border-left-color: var(--scene-cyan);
+}
+
+.scene-prediction__explanation p {
+  margin: 0;
+}
+
+.scene-prediction__explanation span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--scene-cyan);
+  font-size: 9px;
+  letter-spacing: .08em;
+}
+
+.knowledge-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--scene-muted);
+  font-family: "Cascadia Code", monospace;
+  font-size: 9px;
+}
+
+.knowledge-timeline__transport {
+  display: flex;
+  gap: 5px;
+}
+
+.knowledge-timeline__scrubber {
+  flex: 1 1 96px;
+  min-width: 72px;
+  accent-color: var(--scene-cyan);
+}
+
+.knowledge-timeline__step {
+  min-width: 28px;
+  text-align: center;
+}
+
+@keyframes scene-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes scene-grow {
+  to { width: var(--bar-value); }
+}
+
+@keyframes scene-formula-in {
+  from { opacity: 0; transform: translateY(9px); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes scene-reason-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scene-delta-beat-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 979px) {
+  .structured-scene__body {
+    width: min(640px, calc(100% - 40px));
+  }
+
+  .scene-row {
+    display: block;
+  }
+
+  .scene-inline-demos {
+    display: grid;
+    gap: 54px;
+    width: min(420px, 100%);
+    margin: -16px auto 56px;
+  }
+
+  .scene-inline-demos .scene-demo {
+    width: 100%;
+    justify-self: center;
+  }
+}
+
+/* The board can live inside a narrow desktop pane while the browser viewport
+   remains wide. React measures the article itself and sets data-layout so the
+   DOM branch and CSS layout always switch together. */
+.structured-scene[data-layout="narrow"] .structured-scene__body {
+  width: min(640px, calc(100% - 40px));
+}
+
+.structured-scene[data-layout="narrow"] .scene-row {
+  display: block;
+}
+
+.structured-scene[data-layout="narrow"] .scene-inline-demos {
+  display: grid;
+  gap: 54px;
+  width: min(420px, 100%);
+  margin: -16px auto 56px;
+}
+
+.structured-scene[data-layout="narrow"] .scene-inline-demos .scene-demo {
+  width: 100%;
+  justify-self: center;
+}
+
+@media (max-width: 560px) {
+  .scene-prediction button,
+  .knowledge-timeline button {
+    min-height: 44px;
+  }
+
+  .structured-scene__title {
+    width: calc(100% - 42px);
+    padding: 50px 0 42px;
+  }
+
+  .structured-scene__title h1 {
+    font-size: 31px;
+  }
+
+  .structured-scene__body {
+    width: calc(100% - 28px);
+  }
+
+  .scene-text-section {
+    padding: 30px 0 56px;
+  }
+
+  .scene-paragraph,
+  .scene-definition p,
+  .scene-example > p,
+  .scene-list {
+    font-size: 15px;
+  }
+
+  .structured-scene__summary {
+    width: calc(100% - 28px);
+  }
+
+  .scene-equation-morph--delta {
+    height: 176px;
+    min-height: 154px;
+    max-height: 220px;
+    padding-top: 38px;
+  }
+
+  .scene-equation-morph--delta .scene-equation-replay {
+    top: -4px;
+    min-width: 88px;
+    min-height: 44px;
+  }
+
+  .scene-equation-delta-stage {
+    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+    min-height: 92px;
+  }
+
+  .scene-equation-delta__formula {
+    min-height: 64px;
+  }
+
+  .scene-equation-delta__formula .scene-math {
+    font-size: .82em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .structured-scene *,
+  .structured-scene *::before,
+  .structured-scene *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+  }
+
+  .scene-curve,
+  .scene-geometry line,
+  .scene-geometry polygon,
+  .scene-vector {
+    stroke-dashoffset: 0;
+  }
+
+  .scene-bars i {
+    width: var(--bar-value);
+  }
+}

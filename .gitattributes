@@ -1,0 +1,5 @@
+core/static/board/assets/*.js linguist-generated=true whitespace=-trailing-space
+core/static/board/assets/*.css linguist-generated=true
+core/static/board/assets/*.woff binary
+core/static/board/assets/*.woff2 binary
+core/static/board/assets/*.ttf binary

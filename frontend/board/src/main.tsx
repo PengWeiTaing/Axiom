@@ -2,6 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './styles/board.css'
+import './styles/competition.css'
+import './knowledge-scene/knowledge-scene.css'
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {

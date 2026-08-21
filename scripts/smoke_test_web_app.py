@@ -241,12 +241,19 @@ def main() -> None:
             board_html = fetch_text(f"{base_url}/board")
             if "Learning Board 未构建" in board_html:
                 raise AssertionError("/board should serve the built Learning Board shell")
-            if "/static/board/assets/index.js" not in board_html:
-                raise AssertionError("Learning Board shell should reference the built JS bundle")
-            board_asset_cache_control = fetch_header(f"{base_url}/static/board/assets/index.js", "Cache-Control")
+            board_entry_match = re.search(
+                r'src="(/static/board/assets/index-[^"]+\.js)"',
+                board_html,
+            )
+            if not board_entry_match:
+                raise AssertionError("Learning Board shell should reference a hashed JS bundle")
+            board_asset_cache_control = fetch_header(
+                f"{base_url}{board_entry_match.group(1)}",
+                "Cache-Control",
+            )
             if "no-cache" not in board_asset_cache_control:
                 raise AssertionError(
-                    f"Learning Board assets should revalidate fixed bundle names: {board_asset_cache_control}"
+                    f"Learning Board assets should revalidate hashed bundles: {board_asset_cache_control}"
                 )
             if fetch_status(f"{base_url}/api/learning/boards") not in (401, 403):
                 raise AssertionError("Learning Board list endpoint should require X-Axiom-Key")
