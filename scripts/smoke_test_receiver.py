@@ -187,7 +187,7 @@ def main() -> None:
                 200,
                 "empty current context",
             )
-            assert empty_context["schema_version"] == "context.now.v2"
+            assert empty_context["schema_version"] == "context.now.v3"
             assert empty_context["mode"] == "empty"
             assert empty_context["focus"] is None
 
@@ -2429,6 +2429,46 @@ def main() -> None:
             )
             assert context_feedback["outcome"]["fit_feedback"] == "right"
 
+            conn = get_db_connection()
+            try:
+                portable_created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                conn.execute(
+                    "INSERT INTO lifelines (id, name, parent_id, order_index) VALUES (?, ?, ?, ?)",
+                    ("portable-goal", "可移植目标", None, 90),
+                )
+                portable_goal_cursor = conn.execute(
+                    """
+                    INSERT INTO memories (
+                        category, content, status, created_at, updated_at, lifeline_id
+                    ) VALUES ('goal', ?, 'confirmed', ?, ?, ?)
+                    """,
+                    (
+                        "验证目标和行动的备份恢复",
+                        portable_created_at,
+                        portable_created_at,
+                        "portable-goal",
+                    ),
+                )
+                portable_goal_id = int(portable_goal_cursor.lastrowid)
+                portable_task_cursor = conn.execute(
+                    """
+                    INSERT INTO tasks (
+                        title, status, priority, memory_id, created_at, updated_at, lifeline_id
+                    ) VALUES (?, 'done', 'medium', ?, ?, ?, ?)
+                    """,
+                    (
+                        "验证可移植目标行动",
+                        portable_goal_id,
+                        portable_created_at,
+                        portable_created_at,
+                        "portable-goal",
+                    ),
+                )
+                portable_task_id = int(portable_task_cursor.lastrowid)
+                conn.commit()
+            finally:
+                conn.close()
+
             context_csv = client.get(
                 "/export/csv",
                 query_string={"table": "context_action_outcomes"},
@@ -2452,6 +2492,8 @@ def main() -> None:
             conn = get_db_connection()
             try:
                 conn.execute("DELETE FROM context_action_outcomes WHERE id = ?", (outcome_id,))
+                conn.execute("DELETE FROM tasks WHERE id = ?", (portable_task_id,))
+                conn.execute("DELETE FROM memories WHERE id = ?", (portable_goal_id,))
                 conn.commit()
             finally:
                 conn.close()
@@ -2472,9 +2514,20 @@ def main() -> None:
                     "SELECT fit_feedback FROM context_action_outcomes WHERE id = ?",
                     (outcome_id,),
                 ).fetchone()
+                imported_goal = conn.execute(
+                    "SELECT lifeline_id FROM memories WHERE id = ?",
+                    (portable_goal_id,),
+                ).fetchone()
+                imported_task = conn.execute(
+                    "SELECT memory_id, lifeline_id FROM tasks WHERE id = ?",
+                    (portable_task_id,),
+                ).fetchone()
             finally:
                 conn.close()
             assert imported_outcome["fit_feedback"] == "right"
+            assert imported_goal["lifeline_id"] == "portable-goal"
+            assert imported_task["memory_id"] == portable_goal_id
+            assert imported_task["lifeline_id"] == "portable-goal"
 
             # 6. 分页
             for i in range(5):

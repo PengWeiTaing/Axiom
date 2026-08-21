@@ -4,11 +4,17 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+from core.context_commitments import (
+    COMMITMENT_FACTOR_POINTS,
+    compact_goal_title,
+    confirmed_goal_from_task_row,
+    read_commitments,
+)
 from core.database import get_db_connection
 from core.items import local_date_now, utc_now
 
 
-CONTEXT_SCHEMA_VERSION = "context.now.v2"
+CONTEXT_SCHEMA_VERSION = "context.now.v3"
 MAX_CONTEXT_ACTIONS = 8
 FEEDBACK_WINDOW_DAYS = 7
 CONTEXT_FIT_FEEDBACK = {"right", "too_heavy", "wrong_time"}
@@ -86,6 +92,7 @@ def _read_recent_outcomes(conn, now: datetime) -> list[Any]:
 
 
 def _task_payload(row) -> dict[str, Any]:
+    goal = confirmed_goal_from_task_row(row)
     return {
         "id": row["id"],
         "title": row["title"],
@@ -98,8 +105,9 @@ def _task_payload(row) -> dict[str, Any]:
         "completed_at": row["completed_at"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
-        "lifeline_id": row["lifeline_id"],
-        "lifeline_name": row["lifeline_name"],
+        "lifeline_id": row["lifeline_id"] or (goal["lifeline_id"] if goal else None),
+        "lifeline_name": row["lifeline_name"] or (goal["lifeline_name"] if goal else None),
+        "goal": goal,
     }
 
 
@@ -222,6 +230,7 @@ def _primary_reason(
     due_factor: dict[str, Any] | None,
     due_delta: int | None,
     feedback_reason: dict[str, str] | None,
+    goal: dict[str, Any] | None,
     priority: str,
     minutes: int | None,
     activity_count: int,
@@ -247,6 +256,13 @@ def _primary_reason(
         }
     if feedback_reason:
         return feedback_reason
+    if goal:
+        short_title = compact_goal_title(goal["title"])
+        return {
+            "code": "goal_progress",
+            "label": f"推进「{short_title}」",
+            "detail": "这一步明确关联到你已确认的目标，因此它不只是待办，也在推进一项承诺。",
+        }
     if priority == "high":
         return {
             "code": "high_priority",
@@ -325,10 +341,20 @@ def _rank_task(
     if feedback_factor:
         factors.append(feedback_factor)
 
+    if task["goal"]:
+        factors.append(
+            _factor(
+                "commitment",
+                f"推进「{compact_goal_title(task['goal']['title'])}」",
+                COMMITMENT_FACTOR_POINTS,
+            )
+        )
+
     reason = _primary_reason(
         due_factor,
         due_delta,
         feedback_reason,
+        task["goal"],
         task["priority"],
         task["estimated_minutes"],
         activity_count,
@@ -386,15 +412,22 @@ def build_now_context(
     try:
         activity = _read_lifeline_activity(conn, current_time)
         outcomes = _read_recent_outcomes(conn, current_time)
+        commitments = read_commitments(conn)
         rows = conn.execute(
             """
             SELECT
                 t.id, t.title, t.detail, t.status, t.priority,
                 t.memory_id, t.due_date, t.estimated_minutes,
                 t.completed_at, t.created_at, t.updated_at,
-                t.lifeline_id, l.name AS lifeline_name
+                t.lifeline_id, l.name AS lifeline_name,
+                gm.id AS goal_id, gm.category AS goal_category,
+                gm.status AS goal_status, gm.content AS goal_title,
+                gm.lifeline_id AS goal_lifeline_id,
+                gl.name AS goal_lifeline_name
             FROM tasks t
             LEFT JOIN lifelines l ON l.id = t.lifeline_id
+            LEFT JOIN memories gm ON gm.id = t.memory_id
+            LEFT JOIN lifelines gl ON gl.id = gm.lifeline_id
             WHERE t.status = 'todo'
             """
         ).fetchall()
@@ -407,6 +440,10 @@ def build_now_context(
     ]
     ranked.sort(key=_sort_key)
     visible = ranked[:action_limit]
+    commitments["linked_open_actions"] = sum(
+        1 for action in ranked if action["task"]["goal"] is not None
+    )
+    commitments["unlinked_open_actions"] = len(ranked) - commitments["linked_open_actions"]
 
     overdue = 0
     due_today = 0
@@ -440,4 +477,5 @@ def build_now_context(
             ),
             "window_days": FEEDBACK_WINDOW_DAYS,
         },
+        "commitments": commitments,
     }

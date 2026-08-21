@@ -29,7 +29,8 @@ def register_routes(app):
 
     TASK_SELECT_FIELDS = """
         id, title, detail, status, priority,
-        memory_id, due_date, estimated_minutes, completed_at, created_at, updated_at
+        memory_id, due_date, estimated_minutes, completed_at,
+        created_at, updated_at, lifeline_id
     """
 
 
@@ -48,6 +49,7 @@ def register_routes(app):
             "completed_at": row["completed_at"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "lifeline_id": row["lifeline_id"],
         }
 
 
@@ -150,10 +152,34 @@ def register_routes(app):
                 if priority not in TASK_PRIORITIES:
                     return error_response(400, "invalid_priority", f"priority 不支持: {priority}")
 
+                inherited_lifeline_id = None
+                if memory_id is not None:
+                    try:
+                        memory_id = int(memory_id)
+                    except (TypeError, ValueError):
+                        return error_response(400, "invalid_memory_id", "memory_id 必须是整数")
+                    memory_row = conn.execute(
+                        "SELECT id, lifeline_id FROM memories WHERE id = ?",
+                        (memory_id,),
+                    ).fetchone()
+                    if memory_row is None:
+                        return error_response(400, "invalid_memory_id", "关联记忆不存在")
+                    inherited_lifeline_id = memory_row["lifeline_id"]
+
                 now = utc_now().isoformat(timespec="seconds")
                 cursor = conn.execute(
-                    "INSERT INTO tasks (title, detail, status, priority, memory_id, due_date, estimated_minutes, created_at, updated_at) VALUES (?, ?, 'todo', ?, ?, ?, ?, ?, ?)",
-                    (title, detail, priority, memory_id, due_date, estimated_minutes, now, now),
+                    "INSERT INTO tasks (title, detail, status, priority, memory_id, due_date, estimated_minutes, created_at, updated_at, lifeline_id) VALUES (?, ?, 'todo', ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        title,
+                        detail,
+                        priority,
+                        memory_id,
+                        due_date,
+                        estimated_minutes,
+                        now,
+                        now,
+                        inherited_lifeline_id,
+                    ),
                 )
                 conn.commit()
                 task_id = cursor.lastrowid

@@ -119,7 +119,7 @@ def complete_current_action(task_id: int) -> dict[str, Any]:
                 action["reason"]["code"],
                 action["reason"]["label"],
                 int(action["score"]),
-                row["lifeline_id"],
+                action["task"]["lifeline_id"],
                 row["estimated_minutes"],
                 json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
                 current_time,

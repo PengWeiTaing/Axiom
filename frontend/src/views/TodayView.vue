@@ -10,6 +10,7 @@ import {
   Inbox,
   Plus,
   RefreshCw,
+  Target,
   X,
 } from '@lucide/vue';
 import { ApiError } from '@/api/client';
@@ -19,6 +20,8 @@ import { getOverview } from '@/api/records';
 import type {
   ContextAction,
   ContextFitFeedback,
+  ContextGoal,
+  ContextCommitmentGoal,
   ContextOutcome,
   Decision,
   Item,
@@ -45,6 +48,7 @@ const candidateMemories = ref<Memory[]>([]);
 const pendingDecisions = ref<Decision[]>([]);
 const selectedItemId = ref<number | null>(null);
 const selectedObject = ref<ObjectTarget | null>(null);
+const selectedObjectIntent = ref<'view' | 'add-goal-action'>('view');
 const completingId = ref<number | null>(null);
 const feedbackOutcome = ref<ContextOutcome | null>(null);
 const feedbackEffect = ref<string | null>(null);
@@ -79,9 +83,13 @@ const primaryCues = computed(() => {
   return action.cues.filter((cue) => cue !== action.reason.label);
 });
 const nextActions = computed(() => nowContext.value?.alternatives ?? []);
+const goalGaps = computed(() => nowContext.value?.commitments.gaps ?? []);
+const firstGoalGap = computed(() => goalGaps.value[0] ?? null);
 const recentItems = computed(() => overview.value?.recent.items.slice(0, 5) ?? []);
 const backlogTotal = computed(() => overview.value?.processing_backlog.total ?? 0);
-const judgementTotal = computed(() => candidateMemories.value.length + pendingDecisions.value.length);
+const judgementTotal = computed(() => (
+  goalGaps.value.length + candidateMemories.value.length + pendingDecisions.value.length
+));
 
 function actionMeta(action: ContextAction): string {
   return action.cues.slice(0, 3).join(' · ');
@@ -162,15 +170,23 @@ function dismissFeedback() {
 }
 
 function openTask(task: Task) {
+  selectedObjectIntent.value = 'view';
   selectedObject.value = { kind: 'task', id: task.id };
 }
 
 function openMemory(memory: Memory) {
+  selectedObjectIntent.value = 'view';
   selectedObject.value = { kind: 'memory', id: memory.id };
 }
 
 function openDecision(decision: Decision) {
+  selectedObjectIntent.value = 'view';
   selectedObject.value = { kind: 'decision', id: decision.id };
+}
+
+function openGoal(goal: ContextGoal | ContextCommitmentGoal, addAction = false) {
+  selectedObjectIntent.value = addAction ? 'add-goal-action' : 'view';
+  selectedObject.value = { kind: 'memory', id: goal.id };
 }
 
 onMounted(load);
@@ -203,6 +219,12 @@ watch(() => props.revision, load);
           <h2 id="focus-title">{{ primaryTask.title }}</h2>
           <p>{{ primaryAction.reason.detail }}</p>
         </button>
+        <button v-if="primaryTask.goal" class="focus-goal" type="button" @click="openGoal(primaryTask.goal)">
+          <Target :size="15" />
+          <span v-if="primaryAction.reason.code === 'goal_progress'">查看目标与进展</span>
+          <span v-else>同时推进「{{ compact(primaryTask.goal.title, '已确认目标', 40) }}」</span>
+          <ArrowRight :size="14" />
+        </button>
         <div class="focus-footer">
           <div class="task-meta">
             <span v-for="entry in primaryCues" :key="entry">{{ entry }}</span>
@@ -215,12 +237,22 @@ watch(() => props.revision, load);
       </template>
 
       <div v-else-if="!loading" class="empty-focus">
-        <h2 id="focus-title">今天还没有明确的下一步</h2>
-        <p>先记下正在占据你注意力的事情。</p>
-        <button class="capture-button" type="button" @click="emit('capture')">
-          <Plus :size="18" />
-          <span>记录此刻</span>
-        </button>
+        <template v-if="firstGoalGap">
+          <h2 id="focus-title">目标还在，下一步还没落下来</h2>
+          <p>先为「{{ compact(firstGoalGap.title, '已确认目标', 40) }}」补一个可以开始的动作。</p>
+          <button class="capture-button" type="button" @click="openGoal(firstGoalGap, true)">
+            <Target :size="18" />
+            <span>补下一步</span>
+          </button>
+        </template>
+        <template v-else>
+          <h2 id="focus-title">今天还没有明确的下一步</h2>
+          <p>先记下正在占据你注意力的事情。</p>
+          <button class="capture-button" type="button" @click="emit('capture')">
+            <Plus :size="18" />
+            <span>记录此刻</span>
+          </button>
+        </template>
       </div>
 
       <div v-else class="focus-loading">正在整理此刻</div>
@@ -290,7 +322,15 @@ watch(() => props.revision, load);
           </div>
         </header>
 
-        <div v-if="candidateMemories.length || pendingDecisions.length" class="row-list">
+        <div v-if="goalGaps.length || candidateMemories.length || pendingDecisions.length" class="row-list">
+          <button v-for="goal in goalGaps" :key="`goal-${goal.id}`" class="content-row" type="button" @click="openGoal(goal, true)">
+            <span class="row-icon goal-icon"><Target :size="16" /></span>
+            <span class="row-copy">
+              <strong>{{ goal.title }}</strong>
+              <small>已确认目标 · 还没有下一步</small>
+            </span>
+            <ArrowRight class="row-arrow" :size="15" />
+          </button>
           <button v-for="memory in candidateMemories" :key="`memory-${memory.id}`" class="content-row" type="button" @click="openMemory(memory)">
             <span class="row-icon memory-icon"><Brain :size="16" /></span>
             <span class="row-copy">
@@ -339,6 +379,7 @@ watch(() => props.revision, load);
     <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="load" />
     <ObjectDrawer
       :target="selectedObject"
+      :intent="selectedObjectIntent"
       @close="selectedObject = null"
       @changed="load"
       @open-item="selectedItemId = $event"
@@ -512,6 +553,28 @@ h2 {
 .empty-focus,
 .focus-loading {
   color: var(--text-3);
+}
+
+.focus-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: min(100%, 520px);
+  margin-top: 17px;
+  color: var(--text-3);
+  font-size: var(--fs-2);
+  text-align: left;
+}
+
+.focus-goal span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-goal:hover {
+  color: var(--text-1);
 }
 
 .feedback-strip {

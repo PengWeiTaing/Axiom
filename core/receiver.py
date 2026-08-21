@@ -364,8 +364,8 @@ def import_data():
                     try:
                         for mem in data:
                             try:
-                                conn.execute("INSERT OR IGNORE INTO memories (id,category,content,detail,status,source_item_id,source_text,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                                             (mem.get("id"),mem.get("category","fact"),mem.get("content"),mem.get("detail"),mem.get("status","confirmed"),mem.get("source_item_id"),mem.get("source_text"),mem.get("created_at"),mem.get("updated_at",mem.get("created_at"))))
+                                conn.execute("INSERT OR IGNORE INTO memories (id,category,content,detail,status,source_item_id,source_text,created_at,updated_at,lifeline_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                                             (mem.get("id"),mem.get("category","fact"),mem.get("content"),mem.get("detail"),mem.get("status","confirmed"),mem.get("source_item_id"),mem.get("source_text"),mem.get("created_at"),mem.get("updated_at",mem.get("created_at")),mem.get("lifeline_id")))
                                 imported["memories"] += 1
                             except Exception: pass
                         conn.commit()
@@ -376,8 +376,8 @@ def import_data():
                     try:
                         for task in data:
                             try:
-                                conn.execute("INSERT OR IGNORE INTO tasks (id,title,detail,status,priority,memory_id,due_date,estimated_minutes,completed_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                                             (task.get("id"),task.get("title"),task.get("detail"),task.get("status","todo"),task.get("priority","medium"),task.get("memory_id"),task.get("due_date"),task.get("estimated_minutes"),task.get("completed_at"),task.get("created_at"),task.get("updated_at",task.get("created_at"))))
+                                conn.execute("INSERT OR IGNORE INTO tasks (id,title,detail,status,priority,memory_id,due_date,estimated_minutes,completed_at,created_at,updated_at,lifeline_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                                             (task.get("id"),task.get("title"),task.get("detail"),task.get("status","todo"),task.get("priority","medium"),task.get("memory_id"),task.get("due_date"),task.get("estimated_minutes"),task.get("completed_at"),task.get("created_at"),task.get("updated_at",task.get("created_at")),task.get("lifeline_id")))
                                 imported["tasks"] += 1
                             except Exception: pass
                         conn.commit()
@@ -403,7 +403,7 @@ def import_data():
                                         outcome.get("task_title", "已导入行动"),
                                         outcome.get("outcome", "completed"),
                                         outcome.get("fit_feedback"),
-                                        outcome.get("schema_version", "context.now.v2"),
+                                        outcome.get("schema_version", "context.now.v3"),
                                         outcome.get("reason_code", "available"),
                                         outcome.get("reason_label", "当前可推进"),
                                         outcome.get("score", 0),

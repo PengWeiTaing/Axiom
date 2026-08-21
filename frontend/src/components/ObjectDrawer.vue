@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { ApiError } from '@/api/client';
-import { cancelTask, reviewDecision } from '@/api/knowledge';
+import { cancelTask, createTask, reviewDecision } from '@/api/knowledge';
 import {
   decisionStatusLabel,
   memoryCategoryLabel,
@@ -16,7 +16,12 @@ import { useWindowEventListener } from '@/composables/useEventListener';
 import { useModeStore } from '@/stores/mode';
 import type { Decision, MemoryDetail, ObjectKind, ObjectTarget, Task } from '@/api/types';
 
-const props = defineProps<{ target: ObjectTarget | null }>();
+const props = withDefaults(defineProps<{
+  target: ObjectTarget | null;
+  intent?: 'view' | 'add-goal-action';
+}>(), {
+  intent: 'view',
+});
 const emit = defineEmits<{
   close: [];
   openItem: [id: number];
@@ -29,6 +34,8 @@ const acting = ref(false);
 const error = ref<string | null>(null);
 const feedback = ref<string | null>(null);
 const decisionReviewDraft = ref('');
+const goalActionOpen = ref(false);
+const goalActionDraft = ref({ title: '', estimated_minutes: 25 });
 
 const detailTarget = computed(() => (
   props.target ? { id: `${props.target.kind}:${props.target.id}` } : null
@@ -39,6 +46,7 @@ const {
   detailLoading: loading,
   detailError,
   setDetail,
+  loadDetail,
   updateTaskStatus,
   updateMemoryStatus,
 } = useObjectDetail(detailTarget, {
@@ -46,9 +54,11 @@ const {
 });
 
 watch(
-  () => props.target,
+  [() => props.target, () => props.intent],
   () => {
     decisionReviewDraft.value = '';
+    goalActionOpen.value = props.intent === 'add-goal-action';
+    goalActionDraft.value = { title: '', estimated_minutes: 25 };
     error.value = null;
     feedback.value = null;
   },
@@ -60,6 +70,17 @@ const task = computed(() => (props.target?.kind === 'task' ? detail.value as Tas
 const memory = computed(() => (props.target?.kind === 'memory' ? detail.value as MemoryDetail | null : null));
 const decision = computed(() => (props.target?.kind === 'decision' ? detail.value as Decision | null : null));
 const displayError = computed(() => error.value || (detailError.value ? '对象加载失败' : null));
+const isConfirmedGoal = computed(() => (
+  memory.value?.category === 'goal' && memory.value.status === 'confirmed'
+));
+const goalProgress = computed(() => {
+  const linked = memory.value?.linked_tasks || [];
+  return {
+    total: linked.length,
+    done: linked.filter((task) => task.status === 'done').length,
+    open: linked.filter((task) => task.status === 'todo').length,
+  };
+});
 
 watch(
   decision,
@@ -168,6 +189,34 @@ async function submitDecisionReview() {
   }
 }
 
+async function submitGoalAction() {
+  if (!memory.value || !isConfirmedGoal.value || acting.value) return;
+  const title = goalActionDraft.value.title.trim();
+  const estimatedMinutes = Number(goalActionDraft.value.estimated_minutes);
+  if (!title || !Number.isFinite(estimatedMinutes) || estimatedMinutes < 5) return;
+
+  acting.value = true;
+  error.value = null;
+  feedback.value = null;
+  try {
+    await createTask({
+      title,
+      priority: 'medium',
+      estimated_minutes: Math.round(estimatedMinutes),
+      memory_id: memory.value.id,
+    });
+    goalActionDraft.value = { title: '', estimated_minutes: 25 };
+    goalActionOpen.value = false;
+    await loadDetail();
+    feedback.value = '下一步已加入“此刻”的判断范围';
+    emit('changed');
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '下一步添加失败';
+  } finally {
+    acting.value = false;
+  }
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.target) {
     e.preventDefault();
@@ -224,6 +273,44 @@ useWindowEventListener('keydown', onKey);
               <strong>{{ memory.source_item.snippet || `#${memory.source_item.id}` }}</strong>
               <small>{{ formatRelative(memory.source_item.created_at) }}</small>
             </button>
+            <article v-if="isConfirmedGoal" class="goal-progress">
+              <span>承诺进展</span>
+              <strong v-if="goalProgress.total">
+                {{ goalProgress.done }} / {{ goalProgress.total }} 已完成
+              </strong>
+              <strong v-else>还没有下一步</strong>
+              <p v-if="goalProgress.open">{{ goalProgress.open }} 个行动仍在推进</p>
+              <p v-else>目标仍然有效，需要补一个可以开始的动作。</p>
+            </article>
+            <form v-if="isConfirmedGoal && goalActionOpen" class="goal-action-form" @submit.prevent="submitGoalAction">
+              <label>
+                <span>下一步</span>
+                <input
+                  v-model="goalActionDraft.title"
+                  type="text"
+                  maxlength="160"
+                  placeholder="写下一个可以直接开始的动作"
+                  aria-label="目标的下一步"
+                />
+              </label>
+              <label class="goal-duration-field">
+                <span>预计分钟</span>
+                <input
+                  v-model.number="goalActionDraft.estimated_minutes"
+                  type="number"
+                  min="5"
+                  max="480"
+                  step="5"
+                  aria-label="预计分钟"
+                />
+              </label>
+              <div class="goal-action-buttons">
+                <button type="submit" :disabled="acting || !goalActionDraft.title.trim()">
+                  {{ acting ? '添加中' : '添加下一步' }}
+                </button>
+                <button type="button" :disabled="acting" @click="goalActionOpen = false">取消</button>
+              </div>
+            </form>
             <section v-if="memory.linked_tasks.length" class="linked-list">
               <span>关联任务</span>
               <button
@@ -291,6 +378,12 @@ useWindowEventListener('keydown', onKey);
             >取消</button>
           </template>
           <template v-if="memory">
+            <button
+              v-if="isConfirmedGoal && !goalActionOpen"
+              type="button"
+              :disabled="acting"
+              @click="goalActionOpen = true"
+            >补下一步</button>
             <button
               v-if="memory.status === 'candidate'"
               type="button"
@@ -417,6 +510,7 @@ useWindowEventListener('keydown', onKey);
 .detail-block,
 .source-card,
 .linked-row,
+.goal-progress,
 .meta-grid div,
 .empty-line,
 .feedback-line,
@@ -430,6 +524,73 @@ useWindowEventListener('keydown', onKey);
 .detail-block {
   display: grid;
   gap: var(--s-2);
+}
+
+.goal-progress {
+  display: grid;
+  gap: var(--s-1);
+}
+
+.goal-progress > span,
+.goal-action-form label > span {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.goal-progress strong {
+  color: var(--text-1);
+  font-size: var(--fs-4);
+  font-weight: 560;
+}
+
+.goal-progress p {
+  color: var(--text-2);
+  font-size: var(--fs-3);
+  line-height: var(--lh-base);
+}
+
+.goal-action-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.goal-action-form label {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.goal-action-form input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: rgba(7, 10, 15, 0.52);
+  color: var(--text-1);
+  font: inherit;
+  padding: 0 var(--s-3);
+}
+
+.goal-action-form input:focus {
+  border-color: rgba(110, 231, 208, 0.3);
+  outline: none;
+}
+
+.goal-action-buttons {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+}
+
+.goal-action-buttons button {
+  min-height: 38px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  color: var(--text-2);
 }
 
 .detail-block p,

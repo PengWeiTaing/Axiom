@@ -36,11 +36,13 @@ def main() -> None:
         )
         from core.routes.context import register_routes  # noqa: WPS433
         from core.routes.governance import register_routes as register_governance  # noqa: WPS433
+        from core.routes.tasks import register_routes as register_tasks  # noqa: WPS433
 
         app.config["TESTING"] = True
         init_app_storage()
         register_routes(app)
         register_governance(app)
+        register_tasks(app)
 
         today = local_date_now()
         now = utc_now()
@@ -52,6 +54,32 @@ def main() -> None:
             conn.execute(
                 "INSERT INTO lifelines (id, name, parent_id, order_index) VALUES (?, ?, ?, ?)",
                 ("axiom-dev", "Axiom 开发", None, 1),
+            )
+            goal_cursor = conn.execute(
+                """
+                INSERT INTO memories (
+                    category, content, detail, status, created_at, updated_at, lifeline_id
+                ) VALUES ('goal', ?, ?, 'confirmed', ?, ?, 'axiom-dev')
+                """,
+                ("把 Axiom 推进为可长期使用的个人外脑", "保持产品主线收敛", recent, recent),
+            )
+            active_goal_id = int(goal_cursor.lastrowid)
+            gap_cursor = conn.execute(
+                """
+                INSERT INTO memories (
+                    category, content, detail, status, created_at, updated_at, lifeline_id
+                ) VALUES ('goal', ?, ?, 'confirmed', ?, ?, 'axiom-dev')
+                """,
+                ("完成下一阶段研究整理", "需要补一个可以开始的动作", recent, recent),
+            )
+            gap_goal_id = int(gap_cursor.lastrowid)
+            conn.execute(
+                """
+                INSERT INTO memories (
+                    category, content, status, created_at, updated_at, lifeline_id
+                ) VALUES ('goal', ?, 'candidate', ?, ?, 'axiom-dev')
+                """,
+                ("尚未确认的候选方向", recent, recent),
             )
             for index in range(3):
                 conn.execute(
@@ -70,7 +98,8 @@ def main() -> None:
                     20,
                     recent,
                     recent,
-                    "axiom-dev",
+                    None,
+                    active_goal_id,
                 ),
                 (
                     "已经逾期但价值较低的任务",
@@ -80,6 +109,7 @@ def main() -> None:
                     15,
                     recent,
                     recent,
+                    None,
                     None,
                 ),
                 (
@@ -91,6 +121,7 @@ def main() -> None:
                     recent,
                     recent,
                     None,
+                    None,
                 ),
                 (
                     "长期未处理的低优先级任务",
@@ -101,14 +132,15 @@ def main() -> None:
                     old,
                     old,
                     None,
+                    None,
                 ),
             ]
             conn.executemany(
                 """
                 INSERT INTO tasks (
                     title, detail, status, priority, due_date, estimated_minutes,
-                    created_at, updated_at, lifeline_id
-                ) VALUES (?, ?, 'todo', ?, ?, ?, ?, ?, ?)
+                    created_at, updated_at, lifeline_id, memory_id
+                ) VALUES (?, ?, 'todo', ?, ?, ?, ?, ?, ?, ?)
                 """,
                 tasks,
             )
@@ -126,7 +158,7 @@ def main() -> None:
             )
             check("context 200", response.status_code == 200, str(response.status_code))
             payload = response.get_json()
-            check("schema", payload["schema_version"] == "context.now.v2", str(payload))
+            check("schema", payload["schema_version"] == "context.now.v3", str(payload))
             check("focus mode", payload["mode"] == "focus", str(payload))
             check(
                 "important due-today focus",
@@ -137,8 +169,14 @@ def main() -> None:
             factor_keys = {factor["key"] for factor in payload["focus"]["factors"]}
             check(
                 "explainable factors",
-                {"urgency", "importance", "startability", "momentum"} <= factor_keys,
+                {"urgency", "importance", "startability", "momentum", "commitment"}
+                <= factor_keys,
                 str(payload["focus"]["factors"]),
+            )
+            check(
+                "focus carries confirmed goal",
+                payload["focus"]["task"]["goal"]["id"] == active_goal_id,
+                str(payload["focus"]["task"]),
             )
             check("alternatives limited", len(payload["alternatives"]) == 2, str(payload["alternatives"]))
             check(
@@ -158,6 +196,20 @@ def main() -> None:
                 == {"recent_outcomes": 0, "explicit_feedback": 0, "window_days": 7},
                 str(payload["learning"]),
             )
+            check(
+                "confirmed commitment summary",
+                payload["commitments"]["confirmed_goals"] == 2
+                and payload["commitments"]["with_open_actions"] == 1
+                and payload["commitments"]["without_open_actions"] == 1
+                and payload["commitments"]["linked_open_actions"] == 1
+                and payload["commitments"]["unlinked_open_actions"] == 3,
+                str(payload["commitments"]),
+            )
+            check(
+                "commitment gap is explicit",
+                [entry["id"] for entry in payload["commitments"]["gaps"]] == [gap_goal_id],
+                str(payload["commitments"]["gaps"]),
+            )
 
             focus_task_id = payload["focus"]["task"]["id"]
             no_key_complete = client.post(f"/api/context/actions/{focus_task_id}/complete")
@@ -172,6 +224,11 @@ def main() -> None:
             outcome = completed_payload["outcome"]
             check("completion outcome", outcome["outcome"] == "completed", str(outcome))
             check("completion task", outcome["task_id"] == focus_task_id, str(outcome))
+            check(
+                "completion keeps inherited goal lifeline",
+                outcome["lifeline_id"] == "axiom-dev",
+                str(outcome),
+            )
             check("feedback initially empty", outcome["fit_feedback"] is None, str(outcome))
             check(
                 "completion reranks",
@@ -193,8 +250,13 @@ def main() -> None:
                 conn.close()
             check("task completed", task_row["status"] == "done", str(dict(task_row)))
             snapshot = json.loads(outcome_row["snapshot_json"])
-            check("snapshot schema", snapshot["schema_version"] == "context.now.v2", str(snapshot))
+            check("snapshot schema", snapshot["schema_version"] == "context.now.v3", str(snapshot))
             check("snapshot reason", snapshot["reason"]["code"] == "due_today", str(snapshot))
+            check(
+                "completion creates commitment gap",
+                completed_payload["now_context"]["commitments"]["without_open_actions"] == 2,
+                str(completed_payload["now_context"]["commitments"]),
+            )
 
             invalid_feedback = client.post(
                 f"/api/context/outcomes/{outcome['id']}/feedback",
@@ -285,11 +347,89 @@ def main() -> None:
                 str(learned["learning"]),
             )
 
+            conn = get_db_connection()
+            try:
+                conn.execute("UPDATE tasks SET status = 'cancelled' WHERE status = 'todo'")
+                conn.executemany(
+                    """
+                    INSERT INTO tasks (
+                        title, status, priority, estimated_minutes, memory_id,
+                        created_at, updated_at, lifeline_id
+                    ) VALUES (?, 'todo', 'medium', 30, ?, ?, ?, ?)
+                    """,
+                    [
+                        ("推进已确认目标", gap_goal_id, recent, recent, "axiom-dev"),
+                        ("普通同级任务", None, recent, recent, None),
+                    ],
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            committed = client.get(
+                "/api/context/now?limit=3",
+                headers={"X-Axiom-Key": "test-key"},
+            ).get_json()
+            check(
+                "confirmed goal contribution wins peer comparison",
+                committed["focus"]["task"]["title"] == "推进已确认目标",
+                str(committed["focus"]),
+            )
+            check(
+                "goal contribution is primary reason",
+                committed["focus"]["reason"]["code"] == "goal_progress",
+                str(committed["focus"]["reason"]),
+            )
+
             bad_limit = client.get(
                 "/api/context/now?limit=0",
                 headers={"X-Axiom-Key": "test-key"},
             )
             check("invalid limit", bad_limit.status_code == 400, str(bad_limit.status_code))
+
+            conn = get_db_connection()
+            try:
+                conn.execute("DELETE FROM tasks")
+                conn.commit()
+            finally:
+                conn.close()
+
+            invalid_goal_task = client.post(
+                "/tasks",
+                headers={"X-Axiom-Key": "test-key"},
+                json={"title": "无效目标行动", "memory_id": 999999},
+            )
+            check(
+                "task rejects missing linked memory",
+                invalid_goal_task.status_code == 400,
+                str(invalid_goal_task.status_code),
+            )
+            inherited_task = client.post(
+                "/tasks",
+                headers={"X-Axiom-Key": "test-key"},
+                json={
+                    "title": "为研究目标补一个下一步",
+                    "memory_id": gap_goal_id,
+                    "estimated_minutes": 25,
+                },
+            )
+            check("goal action created", inherited_task.status_code == 201, str(inherited_task.status_code))
+            inherited_payload = inherited_task.get_json()["task"]
+            check(
+                "goal action inherits context",
+                inherited_payload["memory_id"] == gap_goal_id
+                and inherited_payload["lifeline_id"] == "axiom-dev",
+                str(inherited_payload),
+            )
+            inherited_context = client.get(
+                "/api/context/now",
+                headers={"X-Axiom-Key": "test-key"},
+            ).get_json()
+            check(
+                "created goal action enters current context",
+                inherited_context["focus"]["task"]["goal"]["id"] == gap_goal_id,
+                str(inherited_context["focus"]),
+            )
 
             conn = get_db_connection()
             try:

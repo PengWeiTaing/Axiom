@@ -100,22 +100,38 @@ export interface Task {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  lifeline_id?: string | null;
   overdue_days?: number;
+}
+
+export interface ContextGoal {
+  id: number;
+  title: string;
+  lifeline_id: string | null;
+  lifeline_name: string | null;
+}
+
+export interface ContextCommitmentGoal extends ContextGoal {
+  detail: string | null;
+  total_actions: number;
+  open_actions: number;
+  completed_actions: number;
 }
 
 export interface ContextTask extends Task {
   lifeline_id: string | null;
   lifeline_name: string | null;
+  goal: ContextGoal | null;
 }
 
 export interface ContextFactor {
-  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness' | 'feedback';
+  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness' | 'feedback' | 'commitment';
   label: string;
   points: number;
 }
 
 export interface ContextReason {
-  code: 'overdue' | 'due_today' | 'due_soon' | 'feedback' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
+  code: 'overdue' | 'due_today' | 'due_soon' | 'feedback' | 'goal_progress' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
   label: string;
   detail: string;
 }
@@ -129,7 +145,7 @@ export interface ContextAction {
 }
 
 export interface NowContextPayload {
-  schema_version: 'context.now.v2';
+  schema_version: 'context.now.v3';
   generated_at: string;
   date: string;
   mode: 'focus' | 'empty';
@@ -145,6 +161,14 @@ export interface NowContextPayload {
     recent_outcomes: number;
     explicit_feedback: number;
     window_days: number;
+  };
+  commitments: {
+    confirmed_goals: number;
+    with_open_actions: number;
+    without_open_actions: number;
+    linked_open_actions: number;
+    unlinked_open_actions: number;
+    gaps: ContextCommitmentGoal[];
   };
 }
 
