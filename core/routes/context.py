@@ -3,6 +3,14 @@ from flask import request
 
 from core._common import error_response, ok_response, parse_positive_int, require_key
 from core.context_engine import MAX_CONTEXT_ACTIONS, build_now_context
+from core.context_outcomes import (
+    ContextActionUnavailableError,
+    ContextOutcomeNotFoundError,
+    ContextTaskNotFoundError,
+    complete_current_action,
+    context_feedback_effect,
+    record_context_feedback,
+)
 
 
 def register_routes(app):
@@ -23,3 +31,42 @@ def register_routes(app):
             return error_response(400, "invalid_context_param", str(exc))
 
         return ok_response(build_now_context(limit=limit))
+
+    @app.route("/api/context/actions/<int:task_id>/complete", methods=["POST"])
+    def complete_context_action(task_id: int):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        try:
+            outcome = complete_current_action(task_id)
+        except ContextTaskNotFoundError as exc:
+            return error_response(404, "context_task_not_found", str(exc))
+        except ContextActionUnavailableError as exc:
+            return error_response(409, "context_action_unavailable", str(exc))
+
+        return ok_response({
+            "outcome": outcome,
+            "now_context": build_now_context(limit=5),
+        })
+
+    @app.route("/api/context/outcomes/<int:outcome_id>/feedback", methods=["POST"])
+    def submit_context_feedback(outcome_id: int):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        body = request.get_json(silent=True) or {}
+        fit_feedback = str(body.get("fit_feedback", "")).strip()
+        try:
+            outcome = record_context_feedback(outcome_id, fit_feedback)
+        except ValueError as exc:
+            return error_response(400, "invalid_context_feedback", str(exc))
+        except ContextOutcomeNotFoundError as exc:
+            return error_response(404, "context_outcome_not_found", str(exc))
+
+        return ok_response({
+            "outcome": outcome,
+            "effect": context_feedback_effect(outcome),
+            "now_context": build_now_context(limit=5),
+        })

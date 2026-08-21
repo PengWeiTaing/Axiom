@@ -74,6 +74,7 @@ frontend/
 core/
   receiver.py
   context_engine.py    # 此刻的确定性、可解释行动判断
+  context_outcomes.py  # 推荐完成证据、适配反馈与审计
   init_db.py
   templates/
     app.html
@@ -189,6 +190,8 @@ logs/
 - `/tasks` / `/tasks/<id>` — 任务 CRUD + done/todo/cancel
 - `/tasks/today` — 今日任务
 - `/api/context/now` — 此刻的主要行动、备选行动、判断理由与任务信号
+- `POST /api/context/actions/<task_id>/complete` — 原子完成当前推荐并保存当时的推荐证据
+- `POST /api/context/outcomes/<outcome_id>/feedback` — 保存“正合适 / 比预期费力 / 时机不对”的可选反馈并重新判断
 - `DELETE /item/<id>` — 删除条目
 - `POST /export` — 数据导出 ZIP
 - `GET /audit-log` — 审计日志
@@ -220,7 +223,9 @@ logs/
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
 - `/processing/backlog` 会把待补正文、待补转写、待补说明的条目按类型聚合起来，并返回每组的最近样本、快速过滤参数，以及可直接打开的 `next_item`
 - `/processing/next` 会返回当前“下一条待处理记录”，可选按 `type` 过滤，适合作为 Web 端和后续快捷入口的统一直达接口
-- `/api/context/now` 使用 `context.now.v1` 契约，根据截止压力、显式优先级、预估启动成本、生活线近期活动和搁置时长给出稳定排序，同时返回判断理由与因子；尚不存在的精力、目标贡献、依赖和影响信息不得由系统虚构
+- `/api/context/now` 使用 `context.now.v2` 契约，根据截止压力、显式优先级、预估启动成本、生活线近期活动、搁置时长和近期显式反馈给出稳定排序，同时返回判断理由与因子；尚不存在的精力、目标贡献、依赖和影响信息不得由系统虚构
+- 推荐完成会写入 `context_action_outcomes`，保留推荐快照与任务结果；显式反馈只在 7 天窗口内衰减生效，紧迫期限优先，没有时长或生活线依据时不得跨任务外推
+- `/export` 会包含 `context_action_outcomes.json`，行动结果和反馈与其他用户数据一样可导出
 - `/app` 提供当前主前端入口，一级目的地为“此刻 / 资料库 / Atlas”，记录是全局动作；`/atlas` 是同一套前端的 Atlas 深链接
 - `/app/legacy` 提供旧移动 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；它保留处理工作台与旧 PWA 链路，但不再作为新功能主入口
 - `/automation/jobs` 返回当前允许手动触发的任务清单，当前开放 review、inbox report、dry-run、`audio_transcribe_day` 和 `image_describe_day`

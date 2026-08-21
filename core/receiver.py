@@ -160,7 +160,7 @@ def system_info():
     conn = get_db_connection()
     try:
         tables = {}
-        for t in ["items", "memories", "tasks", "decisions", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
+        for t in ["items", "memories", "tasks", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
             try:
                 tables[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             except Exception:
@@ -299,8 +299,12 @@ def export_csv():
     auth_error = require_key()
     if auth_error: return auth_error
     table = request.args.get("table", "items").strip()
-    if table not in ("items", "memories", "tasks", "decisions"):
-        return error_response(400, "invalid_table", "table 必须是 items, memories, tasks 或 decisions")
+    if table not in ("items", "memories", "tasks", "decisions", "context_action_outcomes"):
+        return error_response(
+            400,
+            "invalid_table",
+            "table 必须是 items, memories, tasks, decisions 或 context_action_outcomes",
+        )
     conn = get_db_connection()
     try:
         rows = conn.execute(f"SELECT * FROM {table} ORDER BY id DESC LIMIT 10000").fetchall()
@@ -332,7 +336,14 @@ def import_data():
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
     try:
         uploaded.save(tmp.name)
-        imported = {"items": 0, "memories": 0, "tasks": 0, "decisions": 0, "files": 0}
+        imported = {
+            "items": 0,
+            "memories": 0,
+            "tasks": 0,
+            "decisions": 0,
+            "context_action_outcomes": 0,
+            "files": 0,
+        }
         with zipfile.ZipFile(tmp.name, "r") as zf:
             for name in zf.namelist():
                 if name.endswith("items.json"):
@@ -371,13 +382,55 @@ def import_data():
                             except Exception: pass
                         conn.commit()
                     finally: conn.close()
+                if name.endswith("context_action_outcomes.json"):
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for outcome in data:
+                            try:
+                                conn.execute(
+                                    """
+                                    INSERT OR IGNORE INTO context_action_outcomes (
+                                        id, task_id, task_title, outcome, fit_feedback,
+                                        schema_version, reason_code, reason_label, score,
+                                        lifeline_id, estimated_minutes, snapshot_json,
+                                        created_at, feedback_at
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        outcome.get("id"),
+                                        outcome.get("task_id"),
+                                        outcome.get("task_title", "已导入行动"),
+                                        outcome.get("outcome", "completed"),
+                                        outcome.get("fit_feedback"),
+                                        outcome.get("schema_version", "context.now.v2"),
+                                        outcome.get("reason_code", "available"),
+                                        outcome.get("reason_label", "当前可推进"),
+                                        outcome.get("score", 0),
+                                        outcome.get("lifeline_id"),
+                                        outcome.get("estimated_minutes"),
+                                        outcome.get("snapshot_json", "{}"),
+                                        outcome.get("created_at"),
+                                        outcome.get("feedback_at"),
+                                    ),
+                                )
+                                imported["context_action_outcomes"] += 1
+                            except Exception:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
                 if "/files/" in name and not name.endswith("/"):
                     dest = AXIOM_ROOT / "data" / name.split("files/",1)[1]
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     if not dest.exists():
                         dest.write_bytes(zf.read(name))
                         imported["files"] += 1
-        fts_backfill(get_db_connection())
+        conn = get_db_connection()
+        try:
+            fts_backfill(conn)
+        finally:
+            conn.close()
         write_audit_log("data_import", "system")
         return ok_response({"imported": imported})
     except Exception as exc:

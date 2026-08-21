@@ -73,6 +73,9 @@ def register_routes(app):
             items_rows = conn.execute("SELECT * FROM items ORDER BY id").fetchall()
             memories_rows = conn.execute("SELECT * FROM memories ORDER BY id").fetchall()
             tasks_rows = conn.execute("SELECT * FROM tasks ORDER BY id").fetchall()
+            context_outcome_rows = conn.execute(
+                "SELECT * FROM context_action_outcomes ORDER BY id"
+            ).fetchall()
         finally:
             conn.close()
 
@@ -82,6 +85,11 @@ def register_routes(app):
         items_json = json.dumps([dict(r) for r in items_rows], ensure_ascii=False, indent=2)
         memories_json = json.dumps([dict(r) for r in memories_rows], ensure_ascii=False, indent=2)
         tasks_json = json.dumps([dict(r) for r in tasks_rows], ensure_ascii=False, indent=2)
+        context_outcomes_json = json.dumps(
+            [dict(r) for r in context_outcome_rows],
+            ensure_ascii=False,
+            indent=2,
+        )
 
         file_count = 0
         for r in items_rows:
@@ -96,6 +104,7 @@ def register_routes(app):
             f"items: {len(items_rows)}\n"
             f"memories: {len(memories_rows)}\n"
             f"tasks: {len(tasks_rows)}\n"
+            f"context_action_outcomes: {len(context_outcome_rows)}\n"
             f"files: {file_count}\n"
         )
 
@@ -105,6 +114,10 @@ def register_routes(app):
             zf.writestr(f"{export_name}/items.json", items_json)
             zf.writestr(f"{export_name}/memories.json", memories_json)
             zf.writestr(f"{export_name}/tasks.json", tasks_json)
+            zf.writestr(
+                f"{export_name}/context_action_outcomes.json",
+                context_outcomes_json,
+            )
             for r in items_rows:
                 if r["file_path"]:
                     fp = resolve_stored_file_path(r["file_path"])
@@ -114,7 +127,13 @@ def register_routes(app):
 
         buf.seek(0)
         write_audit_log("export", "system")
-        logger.info("exported %d items, %d memories, %d tasks", len(items_rows), len(memories_rows), len(tasks_rows))
+        logger.info(
+            "exported %d items, %d memories, %d tasks, %d context outcomes",
+            len(items_rows),
+            len(memories_rows),
+            len(tasks_rows),
+            len(context_outcome_rows),
+        )
         return send_file(
             buf,
             mimetype="application/zip",

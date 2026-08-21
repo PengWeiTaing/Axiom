@@ -109,13 +109,13 @@ export interface ContextTask extends Task {
 }
 
 export interface ContextFactor {
-  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness';
+  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness' | 'feedback';
   label: string;
   points: number;
 }
 
 export interface ContextReason {
-  code: 'overdue' | 'due_today' | 'due_soon' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
+  code: 'overdue' | 'due_today' | 'due_soon' | 'feedback' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
   label: string;
   detail: string;
 }
@@ -129,7 +129,7 @@ export interface ContextAction {
 }
 
 export interface NowContextPayload {
-  schema_version: 'context.now.v1';
+  schema_version: 'context.now.v2';
   generated_at: string;
   date: string;
   mode: 'focus' | 'empty';
@@ -141,6 +141,38 @@ export interface NowContextPayload {
     due_today_tasks: number;
     undated_tasks: number;
   };
+  learning: {
+    recent_outcomes: number;
+    explicit_feedback: number;
+    window_days: number;
+  };
+}
+
+export type ContextFitFeedback = 'right' | 'too_heavy' | 'wrong_time';
+
+export interface ContextOutcome {
+  id: number;
+  task_id: number | null;
+  task_title: string;
+  outcome: 'completed';
+  fit_feedback: ContextFitFeedback | null;
+  fit_feedback_label: string | null;
+  schema_version: string;
+  reason_code: ContextReason['code'];
+  reason_label: string;
+  lifeline_id: string | null;
+  estimated_minutes: number | null;
+  created_at: string;
+  feedback_at: string | null;
+}
+
+export interface ContextCompletionPayload {
+  outcome: ContextOutcome;
+  now_context: NowContextPayload;
+}
+
+export interface ContextFeedbackPayload extends ContextCompletionPayload {
+  effect: string;
 }
 
 export type DecisionStatus = 'pending' | 'reviewed';

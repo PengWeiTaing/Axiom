@@ -232,6 +232,44 @@ def init_db(db_path: Path = DB_PATH) -> None:
         ensure_tasks_table_columns(conn)
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS context_action_outcomes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+                task_title TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                fit_feedback TEXT,
+                schema_version TEXT NOT NULL,
+                reason_code TEXT NOT NULL,
+                reason_label TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                lifeline_id TEXT,
+                estimated_minutes INTEGER,
+                snapshot_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                feedback_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_context_outcomes_task_id
+            ON context_action_outcomes(task_id)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_context_outcomes_created_at
+            ON context_action_outcomes(created_at)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_context_outcomes_feedback_at
+            ON context_action_outcomes(feedback_at)
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS items_vectors (
                 item_id INTEGER PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
                 embedding BLOB NOT NULL,

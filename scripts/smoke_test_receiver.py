@@ -167,6 +167,7 @@ def main() -> None:
         os.environ["AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE"] = "mock image description for {original_name}"
 
         try:
+            from core.database import get_db_connection  # noqa: WPS433
             from core.receiver import app  # noqa: WPS433
             from scripts.backfill_audio_transcript import backfill_audio_transcript  # noqa: WPS433
             from scripts.backfill_document_text import backfill_document_text  # noqa: WPS433
@@ -186,7 +187,7 @@ def main() -> None:
                 200,
                 "empty current context",
             )
-            assert empty_context["schema_version"] == "context.now.v1"
+            assert empty_context["schema_version"] == "context.now.v2"
             assert empty_context["mode"] == "empty"
             assert empty_context["focus"] is None
 
@@ -2393,7 +2394,89 @@ def main() -> None:
             invalid_resp = client.get("/timeline", query_string={"key": "test-key", "kinds": "invalid"})
             assert invalid_resp.status_code == 400
 
-            # 5. 分页
+            # 5. 此刻完成、反馈及可移植数据闭环
+            context_task = assert_status(
+                client.post(
+                    "/tasks",
+                    json={
+                        "title": "context feedback smoke task",
+                        "priority": "medium",
+                        "estimated_minutes": 20,
+                    },
+                    headers={"X-Axiom-Key": "test-key"},
+                ),
+                201,
+                "context feedback task create",
+            )["task"]
+            context_completed = assert_status(
+                client.post(
+                    f"/api/context/actions/{context_task['id']}/complete",
+                    headers={"X-Axiom-Key": "test-key"},
+                ),
+                200,
+                "context feedback task complete",
+            )
+            outcome_id = context_completed["outcome"]["id"]
+            assert context_completed["outcome"]["task_id"] == context_task["id"]
+            context_feedback = assert_status(
+                client.post(
+                    f"/api/context/outcomes/{outcome_id}/feedback",
+                    json={"fit_feedback": "right"},
+                    headers={"X-Axiom-Key": "test-key"},
+                ),
+                200,
+                "context feedback submit",
+            )
+            assert context_feedback["outcome"]["fit_feedback"] == "right"
+
+            context_csv = client.get(
+                "/export/csv",
+                query_string={"table": "context_action_outcomes"},
+                headers={"X-Axiom-Key": "test-key"},
+            )
+            assert context_csv.status_code == 200
+            assert b"context feedback smoke task" in context_csv.data
+
+            portable_export = client.post(
+                "/export",
+                headers={"X-Axiom-Key": "test-key"},
+            )
+            assert portable_export.status_code == 200
+            portable_bytes = portable_export.data
+            with zipfile.ZipFile(io.BytesIO(portable_bytes), "r") as archive:
+                assert any(
+                    name.endswith("context_action_outcomes.json")
+                    for name in archive.namelist()
+                )
+
+            conn = get_db_connection()
+            try:
+                conn.execute("DELETE FROM context_action_outcomes WHERE id = ?", (outcome_id,))
+                conn.commit()
+            finally:
+                conn.close()
+            imported = assert_status(
+                client.post(
+                    "/import",
+                    data={"file": (io.BytesIO(portable_bytes), "context-export.zip")},
+                    content_type="multipart/form-data",
+                    headers={"X-Axiom-Key": "test-key"},
+                ),
+                200,
+                "context outcome import",
+            )
+            assert imported["imported"]["context_action_outcomes"] == 1
+            conn = get_db_connection()
+            try:
+                imported_outcome = conn.execute(
+                    "SELECT fit_feedback FROM context_action_outcomes WHERE id = ?",
+                    (outcome_id,),
+                ).fetchone()
+            finally:
+                conn.close()
+            assert imported_outcome["fit_feedback"] == "right"
+
+            # 6. 分页
             for i in range(5):
                 client.post("/add", json={"text": f"page test {i}"}, headers={"X-Axiom-Key": "test-key"})
             body = assert_status(

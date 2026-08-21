@@ -8,8 +8,10 @@ from core.database import get_db_connection
 from core.items import local_date_now, utc_now
 
 
-CONTEXT_SCHEMA_VERSION = "context.now.v1"
+CONTEXT_SCHEMA_VERSION = "context.now.v2"
 MAX_CONTEXT_ACTIONS = 8
+FEEDBACK_WINDOW_DAYS = 7
+CONTEXT_FIT_FEEDBACK = {"right", "too_heavy", "wrong_time"}
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -67,6 +69,22 @@ def _read_lifeline_activity(conn, now: datetime) -> dict[str, int]:
     return {str(row["lifeline_id"]): int(row["activity_count"]) for row in rows}
 
 
+def _read_recent_outcomes(conn, now: datetime) -> list[Any]:
+    threshold = (now - timedelta(days=FEEDBACK_WINDOW_DAYS)).isoformat(timespec="seconds")
+    return conn.execute(
+        """
+        SELECT
+            id, task_id, outcome, fit_feedback, lifeline_id,
+            estimated_minutes, created_at, feedback_at
+        FROM context_action_outcomes
+        WHERE datetime(created_at) >= datetime(?)
+        ORDER BY created_at DESC
+        LIMIT 32
+        """,
+        (threshold,),
+    ).fetchall()
+
+
 def _task_payload(row) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -119,9 +137,91 @@ def _startability_factor(minutes: int | None) -> dict[str, Any] | None:
     return None
 
 
+def _feedback_adjustment(
+    task: dict[str, Any],
+    outcomes: list[Any],
+    now: datetime,
+) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
+    points = 0.0
+    lighter_signal = 0.0
+    confirmed_signal = 0.0
+    task_minutes = task["estimated_minutes"]
+    task_lifeline = task["lifeline_id"]
+
+    for outcome in outcomes:
+        feedback = outcome["fit_feedback"]
+        feedback_at = _parse_datetime(outcome["feedback_at"])
+        if feedback not in CONTEXT_FIT_FEEDBACK or feedback_at is None:
+            continue
+
+        age_hours = max(0.0, (now - feedback_at).total_seconds() / 3600)
+        if age_hours > FEEDBACK_WINDOW_DAYS * 24:
+            continue
+        recency = 1.0 if age_hours <= 24 else 0.6 if age_hours <= 72 else 0.3
+        outcome_minutes = outcome["estimated_minutes"]
+        same_lifeline = bool(
+            task_lifeline
+            and outcome["lifeline_id"]
+            and str(task_lifeline) == str(outcome["lifeline_id"])
+        )
+
+        if feedback == "right":
+            contribution = 0.0
+            if same_lifeline:
+                contribution += 4 * recency
+            if (
+                task_minutes is not None
+                and outcome_minutes is not None
+                and abs(int(task_minutes) - int(outcome_minutes)) <= 15
+            ):
+                contribution += 2 * recency
+            points += contribution
+            confirmed_signal += contribution
+            continue
+
+        if feedback == "too_heavy" and task_minutes is not None and outcome_minutes is not None:
+            lighter_threshold = max(15, round(int(outcome_minutes) * 0.6))
+            if int(task_minutes) <= lighter_threshold:
+                contribution = 7 * recency
+                points += contribution
+                lighter_signal += contribution
+            elif int(task_minutes) >= int(outcome_minutes):
+                points -= 6 * recency
+            continue
+
+        if feedback == "wrong_time" and age_hours <= 24 and same_lifeline:
+            points -= 10 * recency
+
+    rounded_points = max(-12, min(8, round(points)))
+    if rounded_points == 0:
+        return None, None
+
+    if rounded_points > 0 and lighter_signal >= confirmed_signal:
+        label = "按反馈换成更轻的一步"
+        reason = {
+            "code": "feedback",
+            "label": label,
+            "detail": "你刚反馈上一项负担偏重，因此先给出一个更轻、容易重新启动的选择。",
+        }
+    elif rounded_points > 0:
+        label = "延续已确认合适的节奏"
+        reason = {
+            "code": "feedback",
+            "label": label,
+            "detail": "相近时长或生活线刚被你确认合适，系统只做轻度延续。",
+        }
+    else:
+        label = "近期反馈降低了当前适配度"
+        reason = None
+
+    factor = _factor("feedback", label, rounded_points)
+    return factor, reason
+
+
 def _primary_reason(
     due_factor: dict[str, Any] | None,
     due_delta: int | None,
+    feedback_reason: dict[str, str] | None,
     priority: str,
     minutes: int | None,
     activity_count: int,
@@ -145,6 +245,8 @@ def _primary_reason(
             "label": due_factor["label"],
             "detail": "时间窗口正在收窄，现在推进能避免临期堆积。",
         }
+    if feedback_reason:
+        return feedback_reason
     if priority == "high":
         return {
             "code": "high_priority",
@@ -170,7 +272,13 @@ def _primary_reason(
     }
 
 
-def _rank_task(row, today: date, now: datetime, activity: dict[str, int]) -> dict[str, Any]:
+def _rank_task(
+    row,
+    today: date,
+    now: datetime,
+    activity: dict[str, int],
+    outcomes: list[Any],
+) -> dict[str, Any]:
     task = _task_payload(row)
     factors: list[dict[str, Any]] = []
 
@@ -213,9 +321,14 @@ def _rank_task(row, today: date, now: datetime, activity: dict[str, int]) -> dic
         stale_points = 4 if created_age >= 30 else 2
         factors.append(_factor("staleness", f"已搁置 {created_age} 天", stale_points))
 
+    feedback_factor, feedback_reason = _feedback_adjustment(task, outcomes, now)
+    if feedback_factor:
+        factors.append(feedback_factor)
+
     reason = _primary_reason(
         due_factor,
         due_delta,
+        feedback_reason,
         task["priority"],
         task["estimated_minutes"],
         activity_count,
@@ -223,7 +336,11 @@ def _rank_task(row, today: date, now: datetime, activity: dict[str, int]) -> dic
     )
     cues = [reason["label"]]
     for factor in factors:
-        if factor["label"] not in cues and factor["key"] != "importance":
+        if (
+            factor["label"] not in cues
+            and factor["key"] != "importance"
+            and int(factor["points"]) > 0
+        ):
             cues.append(factor["label"])
         if len(cues) >= 4:
             break
@@ -268,6 +385,7 @@ def build_now_context(
     conn = get_db_connection()
     try:
         activity = _read_lifeline_activity(conn, current_time)
+        outcomes = _read_recent_outcomes(conn, current_time)
         rows = conn.execute(
             """
             SELECT
@@ -283,7 +401,10 @@ def build_now_context(
     finally:
         conn.close()
 
-    ranked = [_rank_task(row, current_date, current_time, activity) for row in rows]
+    ranked = [
+        _rank_task(row, current_date, current_time, activity, outcomes)
+        for row in rows
+    ]
     ranked.sort(key=_sort_key)
     visible = ranked[:action_limit]
 
@@ -311,5 +432,12 @@ def build_now_context(
             "overdue_tasks": overdue,
             "due_today_tasks": due_today,
             "undated_tasks": undated,
+        },
+        "learning": {
+            "recent_outcomes": len(outcomes),
+            "explicit_feedback": sum(
+                1 for outcome in outcomes if outcome["fit_feedback"] in CONTEXT_FIT_FEEDBACK
+            ),
+            "window_days": FEEDBACK_WINDOW_DAYS,
         },
     }

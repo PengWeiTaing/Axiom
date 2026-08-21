@@ -10,12 +10,24 @@ import {
   Inbox,
   Plus,
   RefreshCw,
+  X,
 } from '@lucide/vue';
 import { ApiError } from '@/api/client';
-import { getNowContext } from '@/api/context';
-import { completeTask, listDecisions, listMemories } from '@/api/knowledge';
+import { completeContextAction, getNowContext, submitContextFeedback } from '@/api/context';
+import { listDecisions, listMemories } from '@/api/knowledge';
 import { getOverview } from '@/api/records';
-import type { ContextAction, Decision, Item, Memory, NowContextPayload, ObjectTarget, OverviewPayload, Task } from '@/api/types';
+import type {
+  ContextAction,
+  ContextFitFeedback,
+  ContextOutcome,
+  Decision,
+  Item,
+  Memory,
+  NowContextPayload,
+  ObjectTarget,
+  OverviewPayload,
+  Task,
+} from '@/api/types';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import { formatRelative } from '@/composables/useRelativeTime';
@@ -34,6 +46,15 @@ const pendingDecisions = ref<Decision[]>([]);
 const selectedItemId = ref<number | null>(null);
 const selectedObject = ref<ObjectTarget | null>(null);
 const completingId = ref<number | null>(null);
+const feedbackOutcome = ref<ContextOutcome | null>(null);
+const feedbackEffect = ref<string | null>(null);
+const feedbackSubmitting = ref(false);
+
+const feedbackOptions: { value: ContextFitFeedback; label: string }[] = [
+  { value: 'right', label: '正合适' },
+  { value: 'too_heavy', label: '有点重' },
+  { value: 'wrong_time', label: '时机不对' },
+];
 
 const dateLabel = new Intl.DateTimeFormat('zh-CN', {
   month: 'long',
@@ -83,6 +104,8 @@ function itemTypeLabel(item: Item): string {
 async function load() {
   loading.value = true;
   error.value = null;
+  feedbackOutcome.value = null;
+  feedbackEffect.value = null;
   try {
     const [overviewPayload, contextPayload, memoryPayload, decisionPayload] = await Promise.all([
       getOverview({ recent_limit: 6, preview_chars: 140 }),
@@ -106,13 +129,36 @@ async function finishTask(task: Task) {
   completingId.value = task.id;
   error.value = null;
   try {
-    await completeTask(task.id);
-    await load();
+    const result = await completeContextAction(task.id);
+    nowContext.value = result.now_context;
+    feedbackOutcome.value = result.outcome;
+    feedbackEffect.value = null;
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '任务完成失败';
   } finally {
     completingId.value = null;
   }
+}
+
+async function sendFeedback(fitFeedback: ContextFitFeedback) {
+  if (!feedbackOutcome.value || feedbackSubmitting.value) return;
+  feedbackSubmitting.value = true;
+  error.value = null;
+  try {
+    const result = await submitContextFeedback(feedbackOutcome.value.id, fitFeedback);
+    feedbackOutcome.value = result.outcome;
+    feedbackEffect.value = result.effect;
+    nowContext.value = result.now_context;
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '反馈记录失败';
+  } finally {
+    feedbackSubmitting.value = false;
+  }
+}
+
+function dismissFeedback() {
+  feedbackOutcome.value = null;
+  feedbackEffect.value = null;
 }
 
 function openTask(task: Task) {
@@ -179,6 +225,29 @@ watch(() => props.revision, load);
 
       <div v-else class="focus-loading">正在整理此刻</div>
     </section>
+
+    <Transition name="feedback">
+      <section v-if="feedbackOutcome" class="feedback-strip" aria-live="polite">
+        <div class="feedback-copy">
+          <span>已完成「{{ compact(feedbackOutcome.task_title, '刚才的行动', 42) }}」</span>
+          <p>{{ feedbackEffect || '刚才把它放在“此刻”，合适吗？' }}</p>
+        </div>
+        <div v-if="!feedbackEffect" class="feedback-options" role="group" aria-label="评价刚才的推荐">
+          <button
+            v-for="option in feedbackOptions"
+            :key="option.value"
+            type="button"
+            :disabled="feedbackSubmitting"
+            @click="sendFeedback(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <button class="feedback-dismiss" type="button" aria-label="关闭反馈" @click="dismissFeedback">
+          <X :size="16" />
+        </button>
+      </section>
+    </Transition>
 
     <div class="status-strip" aria-label="当前状态摘要">
       <span><strong>{{ nowContext?.signals.open_tasks ?? 0 }}</strong> 个开放行动</span>
@@ -445,6 +514,89 @@ h2 {
   color: var(--text-3);
 }
 
+.feedback-strip {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 32px;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.feedback-copy {
+  min-width: 0;
+}
+
+.feedback-copy span {
+  display: block;
+  color: var(--success);
+  font-size: var(--fs-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feedback-copy p {
+  color: var(--text-2);
+  font-size: var(--fs-3);
+  margin-top: 3px;
+}
+
+.feedback-options {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.feedback-options button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--text-3);
+  font-size: var(--fs-2);
+  border-left: 1px solid var(--line-1);
+  white-space: nowrap;
+}
+
+.feedback-options button:first-child {
+  border-left: 0;
+}
+
+.feedback-options button:hover:not(:disabled) {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.feedback-dismiss {
+  grid-column: 3;
+  grid-row: 1;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
+  border-radius: 6px;
+}
+
+.feedback-dismiss:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.feedback-enter-active,
+.feedback-leave-active {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.feedback-enter-from,
+.feedback-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
 .status-strip {
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -618,6 +770,29 @@ h2 {
   .status-strip {
     gap: 8px 18px;
     padding: 10px 0;
+  }
+
+  .feedback-strip {
+    grid-template-columns: minmax(0, 1fr) 32px;
+    gap: 9px;
+    padding: 13px 0;
+  }
+
+  .feedback-options {
+    width: 100%;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .feedback-dismiss {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .feedback-options button {
+    padding: 0 8px;
   }
 
   .today-columns {
