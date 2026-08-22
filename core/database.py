@@ -36,6 +36,39 @@ def ensure_tasks_table_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER")
 
 
+def ensure_weekly_plan_table(conn: sqlite3.Connection) -> None:
+    """Keep weekly intent as references to canonical tasks, with reversible history."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS weekly_plan_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_start TEXT NOT NULL,
+            task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+            task_title TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            selected_at TEXT NOT NULL,
+            removed_at TEXT,
+            removal_reason TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(week_start, task_id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_weekly_plan_week_active
+        ON weekly_plan_items(week_start, removed_at, position)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_weekly_plan_task_id
+        ON weekly_plan_items(task_id)
+        """
+    )
+
+
 def ensure_items_lifeline_id(conn: sqlite3.Connection) -> None:
     exists = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='items'"
@@ -260,6 +293,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
             "CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date)"
         )
         ensure_tasks_table_columns(conn)
+        ensure_weekly_plan_table(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS context_action_outcomes (

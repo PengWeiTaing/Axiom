@@ -74,6 +74,7 @@ frontend/
 core/
   receiver.py
   goals.py             # 承诺档案、生命周期和目标层级规则
+  weekly_plan.py       # 本周承诺引用、容量、完成保留和可撤销历史
   lifeline_context.py  # 项目/生活线的层级汇总与统一上下文读取
   context_engine.py    # 此刻的确定性、可解释行动判断
   context_commitments.py # 承诺状态、待判断原因和目标行动摘要
@@ -193,6 +194,8 @@ logs/
 - `/tasks` / `/tasks/<id>` — 任务 CRUD + done/todo/cancel
 - `/tasks/today` — 今日任务
 - `/api/context/now` — 此刻的主要行动、备选行动、判断理由、任务信号与承诺断点
+- `GET /api/planning/week` — 当前周承诺、完成进度与从当前脉络产生的候选行动
+- `POST /api/planning/week/tasks/<task_id>` / `DELETE /api/planning/week/selections/<id>` — 明确加入或移出本周
 - `GET /api/lifelines` — 项目/生活线层级、直接计数与子树汇总
 - `GET /api/lifelines/<id>/context` — 承诺、行动、材料、记忆、决定与近期历史的统一脉络详情
 - `POST /api/context/actions/<task_id>/complete` — 原子完成当前推荐并保存当时的推荐证据
@@ -228,11 +231,12 @@ logs/
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
 - `/processing/backlog` 会把待补正文、待补转写、待补说明的条目按类型聚合起来，并返回每组的最近样本、快速过滤参数，以及可直接打开的 `next_item`
 - `/processing/next` 会返回当前“下一条待处理记录”，可选按 `type` 过滤，适合作为 Web 端和后续快捷入口的统一直达接口
-- `/api/context/now` 使用 `context.now.v4` 契约，根据行动期限、显式优先级、预估启动成本、生活线近期活动、搁置时长、近期显式反馈、承诺关联和可选目标日期给出稳定排序，同时返回判断理由、因子、承诺摘要与待判断原因
+- `/api/context/now` 使用 `context.now.v5` 契约，根据行动期限、显式优先级、预估启动成本、生活线近期活动、搁置时长、近期显式反馈、本周明确选择、承诺关联和可选目标日期给出稳定排序，同时返回判断理由、因子、承诺摘要与待判断原因
 - 只有 `category=goal AND status=confirmed` 的记忆可以成为承诺；`goal_commitments` 保存完成定义、目标日期、父目标、复盘节奏和 `active / paused / achieved / released` 生命周期。candidate / archived 目标不参与排序，非 active 承诺的 todo 行动保留但退出“此刻”
 - 推进中目标没有 `todo` 行动时进入 `commitments.gaps`；缺行动、临近/逾期、缺完成定义或复盘到期会按优先级进入 `commitments.attention`。前端从“此刻”或目标详情补下一步时，新任务通过 `memory_id` 关联目标并继承目标 `lifeline_id`
 - 推荐完成会写入 `context_action_outcomes`，保留推荐快照与任务结果；显式反馈只在 7 天窗口内衰减生效，紧迫期限优先，没有时长或生活线依据时不得跨任务外推
-- `/export` 会包含 `context_action_outcomes.json` 与 `goal_commitments.json`；行动结果、反馈、承诺档案、目标记忆和关联行动可一起恢复，并保留 `lifeline_id`
+- `weekly_plan_items` 只引用现有 task，并保存选择时标题、顺序和移出历史；每周最多五项，完成项保留到周末，本周选择只能作为有界辅助信号，不能覆盖行动自身期限
+- `/export` 会包含 `context_action_outcomes.json`、`goal_commitments.json` 与 `weekly_plan_items.json`；行动结果、反馈、承诺档案、周意图、目标记忆和关联行动可一起恢复，并保留 `lifeline_id`
 - `/app` 提供当前主前端入口，一级目的地为“此刻 / 资料库 / Atlas”，记录是全局动作；`/atlas` 是同一套前端的 Atlas 深链接
 - 资料库内部有“查找 / 项目脉络”两种查看方式；项目脉络读取现有 lifeline、goal、task、item、memory 和 decision，不创建平行数据。父生活线汇总子线，明确关联承诺但尚未挂载 lifeline 的行动也会跟随承诺出现
 - `/app/legacy` 提供旧移动 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；它保留处理工作台与旧 PWA 链路，但不再作为新功能主入口

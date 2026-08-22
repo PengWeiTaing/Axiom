@@ -3,7 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue';
 import {
   ArrowRight,
   Brain,
+  CalendarDays,
   Check,
+  Circle,
+  CircleCheck,
   Clock,
   FileText,
   GitFork,
@@ -16,6 +19,7 @@ import {
 import { ApiError } from '@/api/client';
 import { completeContextAction, getNowContext, submitContextFeedback } from '@/api/context';
 import { listDecisions, listMemories } from '@/api/knowledge';
+import { addWeeklyPlanTask, getWeeklyPlan, removeWeeklyPlanSelection } from '@/api/planning';
 import { getOverview } from '@/api/records';
 import type {
   ContextAction,
@@ -31,6 +35,8 @@ import type {
   ObjectTarget,
   OverviewPayload,
   Task,
+  WeeklyPlanItem,
+  WeeklyPlanPayload,
 } from '@/api/types';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
@@ -54,6 +60,9 @@ const completingId = ref<number | null>(null);
 const feedbackOutcome = ref<ContextOutcome | null>(null);
 const feedbackEffect = ref<string | null>(null);
 const feedbackSubmitting = ref(false);
+const weeklyPlan = ref<WeeklyPlanPayload | null>(null);
+const weekEditing = ref(false);
+const weekMutatingId = ref<number | null>(null);
 
 const feedbackOptions: { value: ContextFitFeedback; label: string }[] = [
   { value: 'right', label: '正合适' },
@@ -84,6 +93,12 @@ const primaryCues = computed(() => {
   return action.cues.filter((cue) => cue !== action.reason.label);
 });
 const nextActions = computed(() => nowContext.value?.alternatives ?? []);
+const weeklySelected = computed(() => weeklyPlan.value?.selected ?? []);
+const weeklyCandidates = computed(() => weeklyPlan.value?.candidates ?? []);
+const weekRangeLabel = computed(() => {
+  if (!weeklyPlan.value) return '';
+  return `${shortDate(weeklyPlan.value.week_start)} - ${shortDate(weeklyPlan.value.week_end)}`;
+});
 const goalAttention = computed(() => nowContext.value?.commitments.attention ?? []);
 const firstGoalAttention = computed(() => goalAttention.value[0] ?? null);
 const recentItems = computed(() => overview.value?.recent.items.slice(0, 5) ?? []);
@@ -104,6 +119,20 @@ function compact(value: string | null | undefined, fallback: string, limit = 92)
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 }
 
+function shortDate(value: string): string {
+  const [, month, day] = value.split('-').map(Number);
+  return `${month}月${day}日`;
+}
+
+function weeklyItemMeta(item: WeeklyPlanItem): string {
+  if (!item.task) return '原行动已删除';
+  if (item.state === 'completed') return '已完成';
+  if (item.state === 'unavailable') return '当前不可推进';
+  if (item.task.goal) return `推进「${compact(item.task.goal.title, '已确认目标', 28)}」`;
+  if (item.task.lifeline_name) return item.task.lifeline_name;
+  return item.task.estimated_minutes ? `预计 ${item.task.estimated_minutes} 分钟` : '本周已承诺';
+}
+
 function itemTitle(item: Item): string {
   return compact(item.content || item.derived_text || item.transcript_text || item.original_name, `记录 #${item.id}`);
 }
@@ -118,14 +147,16 @@ async function load() {
   feedbackOutcome.value = null;
   feedbackEffect.value = null;
   try {
-    const [overviewPayload, contextPayload, memoryPayload, decisionPayload] = await Promise.all([
+    const [overviewPayload, contextPayload, weeklyPayload, memoryPayload, decisionPayload] = await Promise.all([
       getOverview({ recent_limit: 6, preview_chars: 140 }),
       getNowContext(5),
+      getWeeklyPlan(),
       listMemories({ status: 'candidate', page: 1, page_size: 4 }),
       listDecisions({ status: 'pending', page: 1, page_size: 4 }),
     ]);
     overview.value = overviewPayload;
     nowContext.value = contextPayload;
+    weeklyPlan.value = weeklyPayload;
     candidateMemories.value = memoryPayload.memories;
     pendingDecisions.value = decisionPayload.decisions;
   } catch (err) {
@@ -144,10 +175,46 @@ async function finishTask(task: Task) {
     nowContext.value = result.now_context;
     feedbackOutcome.value = result.outcome;
     feedbackEffect.value = null;
+    try {
+      weeklyPlan.value = await getWeeklyPlan();
+    } catch {
+      error.value = '行动已完成，本周进度暂未刷新';
+    }
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '任务完成失败';
   } finally {
     completingId.value = null;
+  }
+}
+
+async function addToWeek(task: Task) {
+  if (weekMutatingId.value !== null) return;
+  weekMutatingId.value = task.id;
+  error.value = null;
+  try {
+    const result = await addWeeklyPlanTask(task.id);
+    weeklyPlan.value = result.week_plan;
+    nowContext.value = result.now_context;
+    if (result.week_plan.summary.capacity_remaining === 0) weekEditing.value = false;
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '加入本周失败';
+  } finally {
+    weekMutatingId.value = null;
+  }
+}
+
+async function removeFromWeek(item: WeeklyPlanItem) {
+  if (weekMutatingId.value !== null || item.state === 'completed') return;
+  weekMutatingId.value = item.id;
+  error.value = null;
+  try {
+    const result = await removeWeeklyPlanSelection(item.id);
+    weeklyPlan.value = result.week_plan;
+    nowContext.value = result.now_context;
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '移出本周失败';
+  } finally {
+    weekMutatingId.value = null;
   }
 }
 
@@ -301,6 +368,98 @@ watch(() => props.revision, load);
         </button>
       </section>
     </Transition>
+
+    <section class="week-section" aria-labelledby="week-title">
+      <header class="week-header">
+        <div class="week-heading">
+          <p class="eyebrow">Week</p>
+          <div class="week-title-row">
+            <h2 id="week-title">本周承诺</h2>
+            <span v-if="weekRangeLabel">{{ weekRangeLabel }}</span>
+          </div>
+        </div>
+        <div class="week-header-actions">
+          <span v-if="weeklyPlan?.summary.selected">
+            {{ weeklyPlan.summary.completed }} / {{ weeklyPlan.summary.selected }} 已完成
+          </span>
+          <span v-else>尚未选择</span>
+          <button
+            class="week-edit-button"
+            type="button"
+            :disabled="loading || weeklyPlan?.summary.capacity_remaining === 0"
+            @click="weekEditing = !weekEditing"
+          >
+            <CalendarDays :size="15" />
+            <span>{{ weekEditing ? '收起' : weeklySelected.length ? '调整' : '选择' }}</span>
+          </button>
+        </div>
+      </header>
+
+      <div v-if="weeklySelected.length" class="week-list">
+        <div
+          v-for="item in weeklySelected"
+          :key="item.id"
+          class="week-row"
+          :class="`is-${item.state}`"
+        >
+          <button
+            class="week-task"
+            type="button"
+            :disabled="!item.task"
+            @click="item.task && openTask(item.task)"
+          >
+            <span class="week-state" aria-hidden="true">
+              <CircleCheck v-if="item.state === 'completed'" :size="17" />
+              <Circle v-else :size="16" />
+            </span>
+            <span class="row-copy">
+              <strong>{{ item.title }}</strong>
+              <small>{{ weeklyItemMeta(item) }}</small>
+            </span>
+          </button>
+          <button
+            v-if="item.state !== 'completed'"
+            class="week-remove"
+            type="button"
+            :title="`将「${item.title}」移出本周`"
+            :aria-label="`将「${item.title}」移出本周`"
+            :disabled="weekMutatingId !== null"
+            @click="removeFromWeek(item)"
+          >
+            <X :size="15" />
+          </button>
+        </div>
+      </div>
+      <p v-else-if="!weekEditing" class="week-empty">本周还没有明确承诺。</p>
+
+      <div v-if="weekEditing" class="week-candidates">
+        <div class="week-candidate-header">
+          <span>从当前脉络中选择</span>
+          <small>还可选择 {{ weeklyPlan?.summary.capacity_remaining ?? 0 }} 项</small>
+        </div>
+        <div v-if="weeklyCandidates.length" class="week-candidate-list">
+          <div v-for="action in weeklyCandidates" :key="action.task.id" class="week-candidate-row">
+            <button class="week-candidate-task" type="button" @click="openTask(action.task)">
+              <span class="row-copy">
+                <strong>{{ action.task.title }}</strong>
+                <small>{{ actionMeta(action) }}</small>
+              </span>
+            </button>
+            <button
+              class="week-add"
+              type="button"
+              :title="`将「${action.task.title}」加入本周`"
+              :aria-label="`将「${action.task.title}」加入本周`"
+              :disabled="weekMutatingId !== null"
+              @click="addToWeek(action.task)"
+            >
+              <Plus :size="16" />
+            </button>
+          </div>
+        </div>
+        <p v-else class="week-empty">当前没有其他可加入的行动。</p>
+      </div>
+    </section>
 
     <div class="status-strip" aria-label="当前状态摘要">
       <span><strong>{{ nowContext?.signals.open_tasks ?? 0 }}</strong> 个开放行动</span>
@@ -681,6 +840,173 @@ h2 {
   transform: translateY(-4px);
 }
 
+.week-section {
+  padding: 32px 0 28px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.week-header,
+.week-title-row,
+.week-header-actions,
+.week-candidate-header {
+  display: flex;
+  align-items: center;
+}
+
+.week-header {
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+
+.week-heading .eyebrow {
+  margin-bottom: 3px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.week-title-row {
+  min-width: 0;
+  gap: 12px;
+}
+
+.week-title-row span,
+.week-header-actions > span {
+  color: var(--text-4);
+  font-size: var(--fs-2);
+  white-space: nowrap;
+}
+
+.week-header-actions {
+  flex: 0 0 auto;
+  gap: 14px;
+}
+
+.week-edit-button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  color: var(--text-3);
+  font-size: var(--fs-2);
+  border: 1px solid var(--line-1);
+  border-radius: 6px;
+}
+
+.week-edit-button:hover:not(:disabled) {
+  color: var(--text-1);
+  border-color: var(--line-2);
+}
+
+.week-list,
+.week-candidate-list {
+  border-top: 1px solid var(--line-1);
+}
+
+.week-row,
+.week-candidate-row {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.week-task {
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.week-state {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
+}
+
+.week-row.is-completed .week-state {
+  color: var(--success);
+}
+
+.week-row.is-completed .row-copy strong {
+  color: var(--text-3);
+}
+
+.week-row.is-unavailable .week-task {
+  opacity: 0.55;
+}
+
+.week-task:hover:not(:disabled) .row-copy strong,
+.week-candidate-task:hover .row-copy strong {
+  color: var(--text-1);
+}
+
+.week-remove,
+.week-add {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  color: var(--text-5);
+  border-radius: 5px;
+}
+
+.week-remove:hover:not(:disabled) {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+}
+
+.week-empty {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  color: var(--text-4);
+  font-size: var(--fs-3);
+  border-top: 1px solid var(--line-1);
+}
+
+.week-candidates {
+  margin-top: 20px;
+}
+
+.week-candidate-header {
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 36px;
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.week-candidate-header small {
+  color: var(--text-5);
+  font-size: var(--fs-1);
+}
+
+.week-candidate-task {
+  min-width: 0;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+
+.week-add {
+  color: var(--focus);
+}
+
+.week-add:hover:not(:disabled) {
+  color: var(--text-1);
+  background: color-mix(in srgb, var(--focus) 10%, transparent);
+}
+
 .status-strip {
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -877,6 +1203,22 @@ h2 {
 
   .feedback-options button {
     padding: 0 8px;
+  }
+
+  .week-header {
+    align-items: flex-end;
+  }
+
+  .week-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .week-header-actions {
+    align-items: flex-end;
+    flex-direction: column-reverse;
+    gap: 5px;
   }
 
   .today-columns {

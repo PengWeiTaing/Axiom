@@ -60,6 +60,7 @@ from core.routes.cosmos_import import register_routes as register_cosmos_import 
 from core.routes.atlas import register_routes as register_atlas  # noqa: E402
 from core.routes.boards import register_routes as register_boards  # noqa: E402
 from core.routes.context import register_routes as register_context  # noqa: E402
+from core.routes.planning import register_routes as register_planning  # noqa: E402
 
 register_core(app)
 register_items(app)
@@ -78,6 +79,7 @@ register_cosmos_import(app)
 register_atlas(app)
 register_boards(app)
 register_context(app)
+register_planning(app)
 
 # ===== 错误处理 =====
 @app.errorhandler(Exception)
@@ -162,7 +164,7 @@ def system_info():
     conn = get_db_connection()
     try:
         tables = {}
-        for t in ["items", "memories", "goal_commitments", "tasks", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
+        for t in ["items", "memories", "goal_commitments", "tasks", "weekly_plan_items", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
             try:
                 tables[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             except Exception:
@@ -343,13 +345,15 @@ def import_data():
             "memories": 0,
             "goal_commitments": 0,
             "tasks": 0,
+            "weekly_plan_items": 0,
             "decisions": 0,
             "context_action_outcomes": 0,
             "files": 0,
         }
         with zipfile.ZipFile(tmp.name, "r") as zf:
             for name in zf.namelist():
-                if name.endswith("items.json"):
+                archive_name = name.rsplit("/", 1)[-1]
+                if archive_name == "items.json":
                     data = json.loads(zf.read(name).decode("utf-8"))
                     conn = get_db_connection()
                     try:
@@ -361,7 +365,7 @@ def import_data():
                             except Exception: pass
                         conn.commit()
                     finally: conn.close()
-                if name.endswith("memories.json"):
+                if archive_name == "memories.json":
                     data = json.loads(zf.read(name).decode("utf-8"))
                     conn = get_db_connection()
                     try:
@@ -373,7 +377,7 @@ def import_data():
                             except Exception: pass
                         conn.commit()
                     finally: conn.close()
-                if name.endswith("goal_commitments.json"):
+                if archive_name == "goal_commitments.json":
                     data = json.loads(zf.read(name).decode("utf-8"))
                     conn = get_db_connection()
                     try:
@@ -412,7 +416,7 @@ def import_data():
                         conn.commit()
                     finally:
                         conn.close()
-                if name.endswith("tasks.json"):
+                if archive_name == "tasks.json":
                     data = json.loads(zf.read(name).decode("utf-8"))
                     conn = get_db_connection()
                     try:
@@ -424,7 +428,40 @@ def import_data():
                             except Exception: pass
                         conn.commit()
                     finally: conn.close()
-                if name.endswith("context_action_outcomes.json"):
+                if archive_name == "weekly_plan_items.json":
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for selection in data:
+                            try:
+                                conn.execute(
+                                    """
+                                    INSERT OR IGNORE INTO weekly_plan_items (
+                                        id, week_start, task_id, task_title, position,
+                                        selected_at, removed_at, removal_reason,
+                                        created_at, updated_at
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        selection.get("id"),
+                                        selection.get("week_start"),
+                                        selection.get("task_id"),
+                                        selection.get("task_title", "已导入行动"),
+                                        selection.get("position", 0),
+                                        selection.get("selected_at"),
+                                        selection.get("removed_at"),
+                                        selection.get("removal_reason"),
+                                        selection.get("created_at"),
+                                        selection.get("updated_at", selection.get("created_at")),
+                                    ),
+                                )
+                                imported["weekly_plan_items"] += 1
+                            except Exception:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
+                if archive_name == "context_action_outcomes.json":
                     data = json.loads(zf.read(name).decode("utf-8"))
                     conn = get_db_connection()
                     try:
@@ -445,7 +482,7 @@ def import_data():
                                         outcome.get("task_title", "已导入行动"),
                                         outcome.get("outcome", "completed"),
                                         outcome.get("fit_feedback"),
-                                        outcome.get("schema_version", "context.now.v4"),
+                                        outcome.get("schema_version", "context.now.v5"),
                                         outcome.get("reason_code", "available"),
                                         outcome.get("reason_label", "当前可推进"),
                                         outcome.get("score", 0),

@@ -12,12 +12,14 @@ from core.context_commitments import (
 )
 from core.database import get_db_connection
 from core.items import local_date_now, utc_now
+from core.weekly_plan import selected_week_task_ids
 
 
-CONTEXT_SCHEMA_VERSION = "context.now.v4"
+CONTEXT_SCHEMA_VERSION = "context.now.v5"
 MAX_CONTEXT_ACTIONS = 8
 FEEDBACK_WINDOW_DAYS = 7
 CONTEXT_FIT_FEEDBACK = {"right", "too_heavy", "wrong_time"}
+WEEKLY_COMMITMENT_FACTOR_POINTS = 22
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -255,6 +257,7 @@ def _primary_reason(
     goal_horizon_factor: dict[str, Any] | None,
     goal_horizon_delta: int | None,
     feedback_reason: dict[str, str] | None,
+    weekly_committed: bool,
     goal: dict[str, Any] | None,
     priority: str,
     minutes: int | None,
@@ -287,6 +290,12 @@ def _primary_reason(
         }
     if feedback_reason:
         return feedback_reason
+    if weekly_committed:
+        return {
+            "code": "weekly_commitment",
+            "label": "本周已承诺",
+            "detail": "你已经把它明确列入本周；在没有更紧迫期限时，此刻优先保护这项选择。",
+        }
     if goal:
         short_title = compact_goal_title(goal["title"])
         return {
@@ -325,6 +334,7 @@ def _rank_task(
     now: datetime,
     activity: dict[str, int],
     outcomes: list[Any],
+    weekly_task_ids: set[int],
 ) -> dict[str, Any]:
     task = _task_payload(row)
     factors: list[dict[str, Any]] = []
@@ -339,6 +349,16 @@ def _rank_task(
         task["priority"], "已设优先级"
     )
     factors.append(_factor("importance", priority_label, priority_points))
+
+    weekly_committed = int(task["id"]) in weekly_task_ids
+    if weekly_committed:
+        factors.append(
+            _factor(
+                "weekly_commitment",
+                "本周已承诺",
+                WEEKLY_COMMITMENT_FACTOR_POINTS,
+            )
+        )
 
     startability = _startability_factor(task["estimated_minutes"])
     if startability:
@@ -391,6 +411,7 @@ def _rank_task(
         goal_horizon_factor,
         goal_horizon_delta,
         feedback_reason,
+        weekly_committed,
         task["goal"],
         task["priority"],
         task["estimated_minutes"],
@@ -450,6 +471,7 @@ def build_now_context(
         activity = _read_lifeline_activity(conn, current_time)
         outcomes = _read_recent_outcomes(conn, current_time)
         commitments = read_commitments(conn, today=current_date, now=current_time)
+        weekly_task_ids = selected_week_task_ids(conn, current_date)
         rows = conn.execute(
             """
             SELECT
@@ -480,7 +502,14 @@ def build_now_context(
         conn.close()
 
     ranked = [
-        _rank_task(row, current_date, current_time, activity, outcomes)
+        _rank_task(
+            row,
+            current_date,
+            current_time,
+            activity,
+            outcomes,
+            weekly_task_ids,
+        )
         for row in rows
     ]
     ranked.sort(key=_sort_key)
@@ -514,6 +543,9 @@ def build_now_context(
             "overdue_tasks": overdue,
             "due_today_tasks": due_today,
             "undated_tasks": undated,
+            "weekly_committed_tasks": sum(
+                1 for action in ranked if int(action["task"]["id"]) in weekly_task_ids
+            ),
         },
         "learning": {
             "recent_outcomes": len(outcomes),

@@ -187,7 +187,7 @@ def main() -> None:
                 200,
                 "empty current context",
             )
-            assert empty_context["schema_version"] == "context.now.v4"
+            assert empty_context["schema_version"] == "context.now.v5"
             assert empty_context["mode"] == "empty"
             assert empty_context["focus"] is None
 
@@ -2482,6 +2482,27 @@ def main() -> None:
                     ),
                 )
                 portable_task_id = int(portable_task_cursor.lastrowid)
+                portable_week_start = (
+                    datetime.now(timezone.utc).date()
+                    - timedelta(days=datetime.now(timezone.utc).date().weekday())
+                ).isoformat()
+                portable_weekly_cursor = conn.execute(
+                    """
+                    INSERT INTO weekly_plan_items (
+                        week_start, task_id, task_title, position,
+                        selected_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, 1, ?, ?, ?)
+                    """,
+                    (
+                        portable_week_start,
+                        portable_task_id,
+                        "验证可移植目标行动",
+                        portable_created_at,
+                        portable_created_at,
+                        portable_created_at,
+                    ),
+                )
+                portable_weekly_id = int(portable_weekly_cursor.lastrowid)
                 conn.commit()
             finally:
                 conn.close()
@@ -2509,10 +2530,15 @@ def main() -> None:
                     name.endswith("goal_commitments.json")
                     for name in archive.namelist()
                 )
+                assert any(
+                    name.endswith("weekly_plan_items.json")
+                    for name in archive.namelist()
+                )
 
             conn = get_db_connection()
             try:
                 conn.execute("DELETE FROM context_action_outcomes WHERE id = ?", (outcome_id,))
+                conn.execute("DELETE FROM weekly_plan_items WHERE id = ?", (portable_weekly_id,))
                 conn.execute("DELETE FROM tasks WHERE id = ?", (portable_task_id,))
                 conn.execute("DELETE FROM memories WHERE id = ?", (portable_goal_id,))
                 conn.commit()
@@ -2530,6 +2556,7 @@ def main() -> None:
             )
             assert imported["imported"]["context_action_outcomes"] == 1
             assert imported["imported"]["goal_commitments"] >= 1
+            assert imported["imported"]["weekly_plan_items"] >= 1
             conn = get_db_connection()
             try:
                 imported_outcome = conn.execute(
@@ -2552,6 +2579,14 @@ def main() -> None:
                     "SELECT memory_id, lifeline_id FROM tasks WHERE id = ?",
                     (portable_task_id,),
                 ).fetchone()
+                imported_weekly = conn.execute(
+                    """
+                    SELECT task_id, task_title, removed_at
+                    FROM weekly_plan_items
+                    WHERE id = ?
+                    """,
+                    (portable_weekly_id,),
+                ).fetchone()
             finally:
                 conn.close()
             assert imported_outcome["fit_feedback"] == "right"
@@ -2561,6 +2596,9 @@ def main() -> None:
             assert imported_goal_profile["state"] == "active"
             assert imported_task["memory_id"] == portable_goal_id
             assert imported_task["lifeline_id"] == "portable-goal"
+            assert imported_weekly["task_id"] == portable_task_id
+            assert imported_weekly["task_title"] == "验证可移植目标行动"
+            assert imported_weekly["removed_at"] is None
 
             # 6. 分页
             for i in range(5):

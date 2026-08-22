@@ -166,13 +166,13 @@ export interface ContextTask extends Task {
 }
 
 export interface ContextFactor {
-  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness' | 'feedback' | 'commitment' | 'goal_horizon';
+  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness' | 'feedback' | 'commitment' | 'goal_horizon' | 'weekly_commitment';
   label: string;
   points: number;
 }
 
 export interface ContextReason {
-  code: 'overdue' | 'due_today' | 'due_soon' | 'feedback' | 'goal_progress' | 'goal_horizon' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
+  code: 'overdue' | 'due_today' | 'due_soon' | 'feedback' | 'weekly_commitment' | 'goal_progress' | 'goal_horizon' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
   label: string;
   detail: string;
 }
@@ -186,7 +186,7 @@ export interface ContextAction {
 }
 
 export interface NowContextPayload {
-  schema_version: 'context.now.v4';
+  schema_version: 'context.now.v5';
   generated_at: string;
   date: string;
   mode: 'focus' | 'empty';
@@ -197,6 +197,7 @@ export interface NowContextPayload {
     overdue_tasks: number;
     due_today_tasks: number;
     undated_tasks: number;
+    weekly_committed_tasks: number;
   };
   learning: {
     recent_outcomes: number;
@@ -243,6 +244,41 @@ export interface ContextCompletionPayload {
 
 export interface ContextFeedbackPayload extends ContextCompletionPayload {
   effect: string;
+}
+
+export type WeeklyPlanItemState = 'open' | 'completed' | 'unavailable';
+
+export interface WeeklyPlanItem {
+  id: number;
+  task_id: number | null;
+  title: string;
+  position: number;
+  selected_at: string;
+  state: WeeklyPlanItemState;
+  task: ContextTask | null;
+}
+
+export interface WeeklyPlanPayload {
+  schema_version: 'planning.week.v1';
+  week_start: string;
+  week_end: string;
+  status: 'empty' | 'active' | 'complete';
+  summary: {
+    selected: number;
+    open: number;
+    completed: number;
+    unavailable: number;
+    removed: number;
+    capacity: number;
+    capacity_remaining: number;
+  };
+  selected: WeeklyPlanItem[];
+  candidates: ContextAction[];
+}
+
+export interface WeeklyPlanMutationPayload {
+  week_plan: WeeklyPlanPayload;
+  now_context: NowContextPayload;
 }
 
 export type DecisionStatus = 'pending' | 'reviewed';
