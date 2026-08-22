@@ -203,7 +203,7 @@ def main() -> None:
             )
             check("context 200", response.status_code == 200, str(response.status_code))
             payload = response.get_json()
-            check("schema", payload["schema_version"] == "context.now.v5", str(payload))
+            check("schema", payload["schema_version"] == "context.now.v6", str(payload))
             check("focus mode", payload["mode"] == "focus", str(payload))
             check(
                 "important due-today focus",
@@ -303,7 +303,7 @@ def main() -> None:
                 conn.close()
             check("task completed", task_row["status"] == "done", str(dict(task_row)))
             snapshot = json.loads(outcome_row["snapshot_json"])
-            check("snapshot schema", snapshot["schema_version"] == "context.now.v5", str(snapshot))
+            check("snapshot schema", snapshot["schema_version"] == "context.now.v6", str(snapshot))
             check("snapshot reason", snapshot["reason"]["code"] == "due_today", str(snapshot))
             check(
                 "completion creates commitment gap",

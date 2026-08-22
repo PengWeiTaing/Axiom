@@ -15,6 +15,7 @@ from core.weekly_plan import (
     WeeklyPlanTaskNotFoundError,
     WeeklyPlanTaskUnavailableError,
     add_week_task,
+    context_week_task_ids,
     parse_week_anchor,
     read_week_plan,
     remove_week_selection,
@@ -33,15 +34,11 @@ def _build_week_payload(anchor):
     conn = get_db_connection()
     try:
         plan = read_week_plan(conn, anchor)
+        covered_task_ids = context_week_task_ids(conn, anchor)
     finally:
         conn.close()
 
     now_context = build_now_context(limit=MAX_CONTEXT_ACTIONS, today=anchor)
-    selected_ids = {
-        int(item["task_id"])
-        for item in plan["selected"]
-        if item["task_id"] is not None
-    }
     actions = ([now_context["focus"]] if now_context["focus"] else []) + now_context["alternatives"]
     plan["candidates"] = (
         []
@@ -49,7 +46,7 @@ def _build_week_payload(anchor):
         else [
             action
             for action in actions
-            if int(action["task"]["id"]) not in selected_ids
+            if int(action["task"]["id"]) not in covered_task_ids
         ]
     )
     return plan, now_context

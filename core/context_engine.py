@@ -12,10 +12,10 @@ from core.context_commitments import (
 )
 from core.database import get_db_connection
 from core.items import local_date_now, utc_now
-from core.weekly_plan import selected_week_task_ids
+from core.weekly_plan import context_week_task_ids
 
 
-CONTEXT_SCHEMA_VERSION = "context.now.v5"
+CONTEXT_SCHEMA_VERSION = "context.now.v6"
 MAX_CONTEXT_ACTIONS = 8
 FEEDBACK_WINDOW_DAYS = 7
 CONTEXT_FIT_FEEDBACK = {"right", "too_heavy", "wrong_time"}
@@ -95,6 +95,13 @@ def _read_recent_outcomes(conn, now: datetime) -> list[Any]:
 
 def _task_payload(row) -> dict[str, Any]:
     goal = confirmed_goal_from_task_row(row)
+    parent_task = None
+    if row["decomposition_parent_title"] is not None:
+        parent_task = {
+            "id": row["decomposition_parent_id"],
+            "title": row["current_parent_title"] or row["decomposition_parent_title"],
+            "available": row["decomposition_parent_id"] is not None,
+        }
     return {
         "id": row["id"],
         "title": row["title"],
@@ -110,6 +117,7 @@ def _task_payload(row) -> dict[str, Any]:
         "lifeline_id": row["lifeline_id"] or (goal["lifeline_id"] if goal else None),
         "lifeline_name": row["lifeline_name"] or (goal["lifeline_name"] if goal else None),
         "goal": goal,
+        "parent_task": parent_task,
     }
 
 
@@ -419,6 +427,9 @@ def _rank_task(
         task["lifeline_name"],
     )
     cues = [reason["label"]]
+    if task["parent_task"]:
+        parent_title = compact_goal_title(task["parent_task"]["title"])
+        cues.append(f"来自「{parent_title}」")
     for factor in factors:
         if (
             factor["label"] not in cues
@@ -471,7 +482,7 @@ def build_now_context(
         activity = _read_lifeline_activity(conn, current_time)
         outcomes = _read_recent_outcomes(conn, current_time)
         commitments = read_commitments(conn, today=current_date, now=current_time)
-        weekly_task_ids = selected_week_task_ids(conn, current_date)
+        weekly_task_ids = context_week_task_ids(conn, current_date)
         rows = conn.execute(
             """
             SELECT
@@ -484,17 +495,29 @@ def build_now_context(
                 gm.lifeline_id AS goal_lifeline_id,
                 gl.name AS goal_lifeline_name,
                 COALESCE(gc.state, 'active') AS goal_state,
-                gc.target_date AS goal_target_date
+                gc.target_date AS goal_target_date,
+                td.parent_task_id AS decomposition_parent_id,
+                td.parent_task_title AS decomposition_parent_title,
+                pt.title AS current_parent_title
             FROM tasks t
             LEFT JOIN lifelines l ON l.id = t.lifeline_id
             LEFT JOIN memories gm ON gm.id = t.memory_id
             LEFT JOIN goal_commitments gc ON gc.memory_id = gm.id
             LEFT JOIN lifelines gl ON gl.id = gm.lifeline_id
+            LEFT JOIN task_decomposition_links td ON td.child_task_id = t.id
+            LEFT JOIN tasks pt ON pt.id = td.parent_task_id
             WHERE t.status = 'todo'
               AND NOT (
                   gm.category = 'goal'
                   AND gm.status = 'confirmed'
                   AND COALESCE(gc.state, 'active') <> 'active'
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM task_decomposition_links child_link
+                  JOIN tasks child_task ON child_task.id = child_link.child_task_id
+                  WHERE child_link.parent_task_id = t.id
+                    AND child_task.status = 'todo'
               )
             """
         ).fetchall()

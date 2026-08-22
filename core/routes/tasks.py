@@ -5,9 +5,6 @@ from datetime import date
 from flask import request
 
 from core._common import (
-    DEEPSEEK_API_KEY,
-    DEEPSEEK_BASE_URL,
-    DEEPSEEK_MODEL,
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
     TASK_PRIORITIES,
@@ -22,6 +19,19 @@ from core._common import (
     require_key,
     utc_now,
     write_audit_log,
+)
+from core.task_decomposition import (
+    MAX_TASK_STEPS,
+    TASK_DECOMPOSITION_SCHEMA_VERSION,
+    TaskDecompositionInputError,
+    TaskDecompositionLimitError,
+    TaskDecompositionTaskNotFoundError,
+    TaskDecompositionUnavailableError,
+    create_task_steps,
+    has_open_subtasks,
+    read_parent_task,
+    read_subtask_rows,
+    subtask_progress,
 )
 
 def register_routes(app):
@@ -51,6 +61,23 @@ def register_routes(app):
             "updated_at": row["updated_at"],
             "lifeline_id": row["lifeline_id"],
         }
+
+
+    def task_detail_payload(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+        payload = row_to_task(row)
+        parent_task = read_parent_task(conn, int(row["id"]))
+        child_rows = read_subtask_rows(conn, int(row["id"]))
+        progress = subtask_progress(child_rows)
+        payload.update(
+            {
+                "decomposition_schema_version": TASK_DECOMPOSITION_SCHEMA_VERSION,
+                "parent_task": parent_task,
+                "subtasks": [row_to_task(child) for child in child_rows],
+                "subtask_progress": progress,
+                "decomposition_capacity_remaining": max(0, MAX_TASK_STEPS - progress["total"]),
+            }
+        )
+        return payload
 
 
     def read_task_filter_args() -> dict:
@@ -225,7 +252,7 @@ def register_routes(app):
                 return error_response(404, "not_found", "任务不存在")
 
             if request.method == "GET":
-                return ok_response({"task": row_to_task(row)})
+                return ok_response({"task": task_detail_payload(conn, row)})
 
             if request.method == "DELETE":
                 conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
@@ -245,6 +272,12 @@ def register_routes(app):
                 return error_response(400, "invalid_priority", f"priority 不支持: {priority}")
             if status not in TASK_STATUSES:
                 return error_response(400, "invalid_status", f"status 不支持: {status}")
+            if status in {"done", "cancelled"} and has_open_subtasks(conn, task_id):
+                return error_response(
+                    409,
+                    "task_has_open_steps",
+                    "这个行动还有未完成步骤，请先完成或取消这些步骤",
+                )
 
             completed_at = row["completed_at"]
             if status == "done" and row["status"] != "done":
@@ -260,7 +293,7 @@ def register_routes(app):
             conn.commit()
             write_audit_log("task_update", "task", task_id)
             row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
-            return ok_response({"task": row_to_task(row)})
+            return ok_response({"task": task_detail_payload(conn, row)})
         except ValueError as exc:
             return error_response(400, "invalid_input", str(exc))
         finally:
@@ -273,6 +306,12 @@ def register_routes(app):
             row = conn.execute("SELECT id, status FROM tasks WHERE id = ?", (task_id,)).fetchone()
             if row is None:
                 return error_response(404, "not_found", "任务不存在"), None
+            if status in {"done", "cancelled"} and has_open_subtasks(conn, task_id):
+                return error_response(
+                    409,
+                    "task_has_open_steps",
+                    "这个行动还有未完成步骤，请先完成或取消这些步骤",
+                ), None
             now = utc_now().isoformat(timespec="seconds")
             completed_at = now if status == "done" else None
             conn.execute(
@@ -282,7 +321,7 @@ def register_routes(app):
             conn.commit()
             write_audit_log(f"task_{status}", "task", task_id)
             row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
-            return None, row
+            return None, task_detail_payload(conn, row)
         finally:
             conn.close()
 
@@ -292,10 +331,10 @@ def register_routes(app):
         auth_error = require_key()
         if auth_error:
             return auth_error
-        err, row = _set_task_status(task_id, "done")
+        err, task = _set_task_status(task_id, "done")
         if err:
             return err
-        return ok_response({"task": row_to_task(row)})
+        return ok_response({"task": task})
 
 
     @app.route("/tasks/<int:task_id>/todo", methods=["POST"])
@@ -303,10 +342,10 @@ def register_routes(app):
         auth_error = require_key()
         if auth_error:
             return auth_error
-        err, row = _set_task_status(task_id, "todo")
+        err, task = _set_task_status(task_id, "todo")
         if err:
             return err
-        return ok_response({"task": row_to_task(row)})
+        return ok_response({"task": task})
 
 
     @app.route("/tasks/<int:task_id>/reschedule", methods=["POST"])
@@ -334,7 +373,7 @@ def register_routes(app):
             conn.commit()
             write_audit_log("task_reschedule", "task", task_id)
             row = conn.execute(f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?", (task_id,)).fetchone()
-            return ok_response({"task": row_to_task(row)})
+            return ok_response({"task": task_detail_payload(conn, row)})
         finally:
             conn.close()
 
@@ -344,48 +383,44 @@ def register_routes(app):
         auth_error = require_key()
         if auth_error:
             return auth_error
-        if not DEEPSEEK_API_KEY:
-            return error_response(503, "ai_unavailable", "未配置 AI API key")
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return error_response(400, "invalid_breakdown", "JSON body 必须是对象")
 
         conn = get_db_connection()
         try:
-            row = conn.execute("SELECT id, title, detail FROM tasks WHERE id = ?", (task_id,)).fetchone()
-            if row is None:
-                return error_response(404, "not_found", "任务不存在")
+            created_ids = create_task_steps(conn, task_id, body.get("steps"))
+            conn.commit()
+            row = conn.execute(
+                f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            task = task_detail_payload(conn, row)
+        except TaskDecompositionTaskNotFoundError as exc:
+            return error_response(404, "task_not_found", str(exc))
+        except TaskDecompositionLimitError as exc:
+            return error_response(409, "task_step_limit", str(exc))
+        except TaskDecompositionUnavailableError as exc:
+            return error_response(409, "task_breakdown_unavailable", str(exc))
+        except TaskDecompositionInputError as exc:
+            return error_response(400, "invalid_breakdown", str(exc))
         finally:
             conn.close()
 
-        prompt = f"把这个任务拆解成3-5个可执行的小步骤（每个5-15分钟能完成）：\n任务：{row['title']}\n"
-        if row["detail"]:
-            prompt += f"详情：{row['detail']}\n"
-        prompt += "每行一个步骤，以 '- ' 开头，简洁。用中文。"
-
-        try:
-            import openai
-            client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
-            resp = client.chat.completions.create(
-                model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
-                max_tokens=300, temperature=0.5,
-            )
-            steps_text = resp.choices[0].message.content.strip()
-        except Exception as exc:
-            return error_response(500, "ai_error", str(exc))
-
-        # Create subtasks
-        created = []
-        for line in steps_text.split("\n"):
-            line = line.strip().lstrip("- ").strip()
-            if line and len(line) > 2:
-                now = utc_now().isoformat(timespec="seconds")
-                cursor = conn.execute(
-                    "INSERT INTO tasks (title, status, priority, memory_id, created_at, updated_at) VALUES (?, 'todo', 'medium', ?, ?, ?)",
-                    (line, row["memory_id"] if "memory_id" in row.keys() else None, now, now),
-                )
-                conn.commit()
-                created.append({"id": cursor.lastrowid, "title": line})
-
-        write_audit_log("task_breakdown", "task", task_id)
-        return ok_response({"original_id": task_id, "subtasks": created})
+        write_audit_log(
+            "task_breakdown",
+            "task",
+            task_id,
+            f"created_steps={len(created_ids)} child_ids={','.join(str(value) for value in created_ids)}",
+        )
+        return ok_response(
+            {
+                "schema_version": TASK_DECOMPOSITION_SCHEMA_VERSION,
+                "task": task,
+                "created_task_ids": created_ids,
+            },
+            201,
+        )
 
 
     @app.route("/tasks/<int:task_id>/cancel", methods=["POST"])
@@ -393,9 +428,9 @@ def register_routes(app):
         auth_error = require_key()
         if auth_error:
             return auth_error
-        err, row = _set_task_status(task_id, "cancelled")
+        err, task = _set_task_status(task_id, "cancelled")
         if err:
             return err
-        return ok_response({"task": row_to_task(row)})
+        return ok_response({"task": task})
 
 

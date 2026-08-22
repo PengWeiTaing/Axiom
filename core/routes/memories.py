@@ -204,7 +204,18 @@ def register_routes(app):
 
             if request.method == "GET":
                 linked_tasks = conn.execute(
-                    "SELECT id, title, status, priority FROM tasks WHERE memory_id = ? ORDER BY created_at DESC LIMIT 20",
+                    """
+                    SELECT id, title, status, priority
+                    FROM tasks
+                    WHERE memory_id = ?
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM task_decomposition_links d
+                          WHERE d.parent_task_id = tasks.id
+                      )
+                    ORDER BY created_at DESC
+                    LIMIT 20
+                    """,
                     (memory_id,),
                 ).fetchall()
                 memory = row_to_memory(row)

@@ -69,6 +69,29 @@ def ensure_weekly_plan_table(conn: sqlite3.Connection) -> None:
     )
 
 
+def ensure_task_decomposition_table(conn: sqlite3.Connection) -> None:
+    """Keep executable steps attached to their source action without duplicating task data."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS task_decomposition_links (
+            child_task_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+            parent_task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+            parent_task_title TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            source TEXT NOT NULL DEFAULT 'manual_breakdown',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_task_decomposition_parent
+        ON task_decomposition_links(parent_task_id, position, child_task_id)
+        """
+    )
+
+
 def ensure_items_lifeline_id(conn: sqlite3.Connection) -> None:
     exists = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='items'"
@@ -293,6 +316,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
             "CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date)"
         )
         ensure_tasks_table_columns(conn)
+        ensure_task_decomposition_table(conn)
         ensure_weekly_plan_table(conn)
         conn.execute(
             """

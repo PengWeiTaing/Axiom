@@ -146,9 +146,36 @@ def read_commitments(
             COALESCE(gc.last_reviewed_at, m.updated_at) AS last_reviewed_at,
             gc.completed_at, gc.parent_goal_id,
             parent.content AS parent_goal_title,
-            COUNT(t.id) AS total_actions,
-            SUM(CASE WHEN t.status = 'todo' THEN 1 ELSE 0 END) AS open_actions,
-            SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS completed_actions
+            SUM(
+                CASE
+                    WHEN t.id IS NOT NULL
+                     AND NOT EXISTS (
+                        SELECT 1 FROM task_decomposition_links d
+                        WHERE d.parent_task_id = t.id
+                     )
+                    THEN 1 ELSE 0
+                END
+            ) AS total_actions,
+            SUM(
+                CASE
+                    WHEN t.status = 'todo'
+                     AND NOT EXISTS (
+                        SELECT 1 FROM task_decomposition_links d
+                        WHERE d.parent_task_id = t.id
+                     )
+                    THEN 1 ELSE 0
+                END
+            ) AS open_actions,
+            SUM(
+                CASE
+                    WHEN t.status = 'done'
+                     AND NOT EXISTS (
+                        SELECT 1 FROM task_decomposition_links d
+                        WHERE d.parent_task_id = t.id
+                     )
+                    THEN 1 ELSE 0
+                END
+            ) AS completed_actions
         FROM memories m
         LEFT JOIN goal_commitments gc ON gc.memory_id = m.id
         LEFT JOIN memories parent ON parent.id = gc.parent_goal_id

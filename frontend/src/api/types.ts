@@ -114,6 +114,23 @@ export interface MemoryStatsPayload {
 export type TaskStatus = 'todo' | 'done' | 'cancelled';
 export type TaskPriority = 'high' | 'medium' | 'low';
 
+export interface TaskParent {
+  id: number | null;
+  title: string;
+  status?: TaskStatus | null;
+  available: boolean;
+  position?: number;
+  source?: 'manual_breakdown' | string;
+  linked_at?: string;
+}
+
+export interface TaskProgress {
+  total: number;
+  todo: number;
+  done: number;
+  cancelled: number;
+}
+
 export interface Task {
   id: number;
   title: string;
@@ -128,6 +145,11 @@ export interface Task {
   updated_at: string;
   lifeline_id?: string | null;
   overdue_days?: number;
+  decomposition_schema_version?: 'task.decomposition.v1';
+  parent_task?: TaskParent | null;
+  subtasks?: Task[];
+  subtask_progress?: TaskProgress;
+  decomposition_capacity_remaining?: number;
 }
 
 export interface ContextGoal {
@@ -186,7 +208,7 @@ export interface ContextAction {
 }
 
 export interface NowContextPayload {
-  schema_version: 'context.now.v5';
+  schema_version: 'context.now.v6';
   generated_at: string;
   date: string;
   mode: 'focus' | 'empty';
@@ -256,6 +278,13 @@ export interface WeeklyPlanItem {
   selected_at: string;
   state: WeeklyPlanItemState;
   task: ContextTask | null;
+  subtask_progress: TaskProgress | null;
+}
+
+export interface TaskBreakdownPayload {
+  schema_version: 'task.decomposition.v1';
+  task: Task;
+  created_task_ids: number[];
 }
 
 export interface WeeklyPlanPayload {

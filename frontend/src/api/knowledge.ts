@@ -12,6 +12,7 @@ import type {
   MemoryStatsPayload,
   MemoryStatus,
   Task,
+  TaskBreakdownPayload,
   TaskList,
   TaskPriority,
   TaskStatus,
@@ -25,6 +26,12 @@ export const createTask = (data: {
   estimated_minutes?: number;
   memory_id?: number;
 }) => apiRequest<{ task: Task }>('/tasks', { method: 'POST', json: data });
+
+export const breakDownTask = (id: number, steps: { title: string; estimated_minutes: number }[]) =>
+  apiRequest<TaskBreakdownPayload>(`/tasks/${id}/breakdown`, {
+    method: 'POST',
+    json: { steps },
+  });
 
 export const listTasks = (params: {
   status?: TaskStatus | '';

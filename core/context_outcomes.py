@@ -12,6 +12,7 @@ from core.context_engine import (
 )
 from core.database import get_db_connection
 from core.items import utc_now
+from core.task_decomposition import has_open_subtasks
 
 
 class ContextTaskNotFoundError(LookupError):
@@ -95,6 +96,8 @@ def complete_current_action(task_id: int) -> dict[str, Any]:
             raise ContextTaskNotFoundError("任务不存在")
         if row["status"] != "todo":
             raise ContextActionUnavailableError("任务状态已经变化，请刷新后再试")
+        if has_open_subtasks(conn, task_id):
+            raise ContextActionUnavailableError("这个行动还有未完成步骤，请先推进具体步骤")
 
         conn.execute(
             """

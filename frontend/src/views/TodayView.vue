@@ -128,6 +128,9 @@ function weeklyItemMeta(item: WeeklyPlanItem): string {
   if (!item.task) return '原行动已删除';
   if (item.state === 'completed') return '已完成';
   if (item.state === 'unavailable') return '当前不可推进';
+  if (item.subtask_progress?.total) {
+    return `${item.subtask_progress.done} / ${item.subtask_progress.total} 个步骤已完成`;
+  }
   if (item.task.goal) return `推进「${compact(item.task.goal.title, '已确认目标', 28)}」`;
   if (item.task.lifeline_name) return item.task.lifeline_name;
   return item.task.estimated_minutes ? `预计 ${item.task.estimated_minutes} 分钟` : '本周已承诺';
@@ -244,6 +247,11 @@ function openTask(task: Task) {
   selectedObject.value = { kind: 'task', id: task.id };
 }
 
+function openTaskById(id: number) {
+  selectedObjectIntent.value = 'view';
+  selectedObject.value = { kind: 'task', id };
+}
+
 function openMemory(memory: Memory) {
   selectedObjectIntent.value = 'view';
   selectedObject.value = { kind: 'memory', id: memory.id };
@@ -309,6 +317,16 @@ watch(() => props.revision, load);
           <Target :size="15" />
           <span v-if="primaryAction.reason.code === 'goal_progress'">查看目标与进展</span>
           <span v-else>同时推进「{{ compact(primaryTask.goal.title, '已确认目标', 40) }}」</span>
+          <ArrowRight :size="14" />
+        </button>
+        <button
+          v-if="primaryTask.parent_task?.available && primaryTask.parent_task.id"
+          class="focus-goal focus-source"
+          type="button"
+          @click="openTaskById(primaryTask.parent_task.id)"
+        >
+          <GitFork :size="15" />
+          <span>来自「{{ compact(primaryTask.parent_task.title, '上层行动', 40) }}」</span>
           <ArrowRight :size="14" />
         </button>
         <div class="focus-footer">
@@ -755,6 +773,11 @@ h2 {
 
 .focus-goal:hover {
   color: var(--text-1);
+}
+
+.focus-source {
+  display: flex;
+  margin-top: 9px;
 }
 
 .feedback-strip {

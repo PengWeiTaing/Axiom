@@ -164,7 +164,7 @@ def system_info():
     conn = get_db_connection()
     try:
         tables = {}
-        for t in ["items", "memories", "goal_commitments", "tasks", "weekly_plan_items", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
+        for t in ["items", "memories", "goal_commitments", "tasks", "task_decomposition_links", "weekly_plan_items", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
             try:
                 tables[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             except Exception:
@@ -345,6 +345,7 @@ def import_data():
             "memories": 0,
             "goal_commitments": 0,
             "tasks": 0,
+            "task_decomposition_links": 0,
             "weekly_plan_items": 0,
             "decisions": 0,
             "context_action_outcomes": 0,
@@ -428,6 +429,35 @@ def import_data():
                             except Exception: pass
                         conn.commit()
                     finally: conn.close()
+                if archive_name == "task_decomposition_links.json":
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for link in data:
+                            try:
+                                conn.execute(
+                                    """
+                                    INSERT OR IGNORE INTO task_decomposition_links (
+                                        child_task_id, parent_task_id, parent_task_title,
+                                        position, source, created_at, updated_at
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        link.get("child_task_id"),
+                                        link.get("parent_task_id"),
+                                        link.get("parent_task_title", "已导入行动"),
+                                        link.get("position", 0),
+                                        link.get("source", "manual_breakdown"),
+                                        link.get("created_at"),
+                                        link.get("updated_at", link.get("created_at")),
+                                    ),
+                                )
+                                imported["task_decomposition_links"] += 1
+                            except Exception:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
                 if archive_name == "weekly_plan_items.json":
                     data = json.loads(zf.read(name).decode("utf-8"))
                     conn = get_db_connection()
@@ -482,7 +512,7 @@ def import_data():
                                         outcome.get("task_title", "已导入行动"),
                                         outcome.get("outcome", "completed"),
                                         outcome.get("fit_feedback"),
-                                        outcome.get("schema_version", "context.now.v5"),
+                                        outcome.get("schema_version", "context.now.v6"),
                                         outcome.get("reason_code", "available"),
                                         outcome.get("reason_label", "当前可推进"),
                                         outcome.get("score", 0),

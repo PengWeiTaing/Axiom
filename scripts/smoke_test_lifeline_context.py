@@ -76,6 +76,15 @@ def create_schema(conn: sqlite3.Connection) -> None:
             updated_at TEXT,
             lifeline_id TEXT
         );
+        CREATE TABLE task_decomposition_links (
+            child_task_id INTEGER PRIMARY KEY,
+            parent_task_id INTEGER,
+            parent_task_title TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
         CREATE TABLE decisions (
             id INTEGER PRIMARY KEY,
             title TEXT NOT NULL,

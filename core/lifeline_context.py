@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, Iterable
 
 from core.goals import read_goal_profile
+from core.task_decomposition import read_parent_tasks, read_subtask_summaries
 
 
 def entity_id(kind: str, row_id: int | str) -> str:
@@ -91,6 +92,10 @@ def list_lifeline_summaries(conn) -> list[dict[str, Any]]:
             SUM(
                 CASE
                     WHEN t.status = 'todo'
+                     AND NOT EXISTS (
+                        SELECT 1 FROM task_decomposition_links d
+                        WHERE d.parent_task_id = t.id
+                     )
                      AND (
                         m.id IS NULL
                         OR m.category != 'goal'
@@ -378,6 +383,9 @@ def read_lifeline_context(conn, requested_id: str) -> dict[str, Any] | None:
         goal_id: {"total": 0, "open": 0, "done": 0, "cancelled": 0}
         for goal_id in goal_ids
     }
+    task_ids = {int(row["id"]) for row in task_rows}
+    parent_tasks = read_parent_tasks(conn, task_ids)
+    subtask_summaries = read_subtask_summaries(conn, task_ids)
     tasks = []
     for row in task_rows:
         task_lifeline_id, task_lifeline_name = _lifeline_ref(row["lifeline_id"], names)
@@ -397,10 +405,12 @@ def read_lifeline_context(conn, requested_id: str) -> dict[str, Any] | None:
             "updated_at": row["updated_at"],
             "lifeline_id": task_lifeline_id,
             "lifeline_name": task_lifeline_name,
+            "parent_task": parent_tasks.get(int(row["id"])),
+            "subtask_progress": subtask_summaries.get(int(row["id"])),
         }
         tasks.append(task)
         memory_id = task["memory_id"]
-        if memory_id in progress_by_goal:
+        if memory_id in progress_by_goal and task["subtask_progress"] is None:
             progress = progress_by_goal[memory_id]
             progress["total"] += 1
             if task["status"] == "todo":
@@ -607,14 +617,22 @@ def read_lifeline_context(conn, requested_id: str) -> dict[str, Any] | None:
     open_actions = sum(
         1
         for task in tasks
-        if task["status"] == "todo" and task["goal_state"] in (None, "active")
+        if task["status"] == "todo"
+        and task["goal_state"] in (None, "active")
+        and task["subtask_progress"] is None
     )
     held_actions = sum(
         1
         for task in tasks
-        if task["status"] == "todo" and task["goal_state"] not in (None, "active")
+        if task["status"] == "todo"
+        and task["goal_state"] not in (None, "active")
+        and task["subtask_progress"] is None
     )
-    completed_actions = sum(1 for task in tasks if task["status"] == "done")
+    completed_actions = sum(
+        1
+        for task in tasks
+        if task["status"] == "done" and task["subtask_progress"] is None
+    )
     return {
         "schema_version": "lifeline.context.v1",
         "lifeline": {

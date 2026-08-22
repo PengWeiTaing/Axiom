@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from core.context_commitments import confirmed_goal_from_task_row
+from core.task_decomposition import read_subtask_summaries
 
 
 WEEKLY_PLAN_SCHEMA_VERSION = "planning.week.v1"
@@ -65,6 +66,23 @@ def selected_week_task_ids(conn: sqlite3.Connection, anchor: date) -> set[int]:
         (week_start.isoformat(),),
     ).fetchall()
     return {int(row["task_id"]) for row in rows}
+
+
+def context_week_task_ids(conn: sqlite3.Connection, anchor: date) -> set[int]:
+    """Return selected tasks plus their executable children for current-context ranking."""
+    selected = selected_week_task_ids(conn, anchor)
+    if not selected:
+        return set()
+    placeholders = ",".join("?" for _ in selected)
+    rows = conn.execute(
+        f"""
+        SELECT child_task_id
+        FROM task_decomposition_links
+        WHERE parent_task_id IN ({placeholders})
+        """,
+        sorted(selected),
+    ).fetchall()
+    return selected | {int(row["child_task_id"]) for row in rows}
 
 
 def _selection_task(row: sqlite3.Row) -> dict[str, Any] | None:
@@ -137,6 +155,13 @@ def read_week_plan(conn: sqlite3.Connection, anchor: date) -> dict[str, Any]:
         (week_start.isoformat(),),
     ).fetchall()
 
+    selected_parent_ids = {
+        int(row["selected_task_id"])
+        for row in rows
+        if row["selected_task_id"] is not None
+    }
+    decomposition_summaries = read_subtask_summaries(conn, selected_parent_ids)
+
     selected = []
     completed = 0
     open_count = 0
@@ -161,6 +186,11 @@ def read_week_plan(conn: sqlite3.Connection, anchor: date) -> dict[str, Any]:
                 "selected_at": row["selected_at"],
                 "state": state,
                 "task": task,
+                "subtask_progress": (
+                    decomposition_summaries.get(int(row["selected_task_id"]))
+                    if row["selected_task_id"] is not None
+                    else None
+                ),
             }
         )
 

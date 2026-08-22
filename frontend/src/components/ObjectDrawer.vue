@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Check, Pencil, Plus, X } from '@lucide/vue';
+import { Check, GitFork, ListTree, Pencil, Plus, X } from '@lucide/vue';
 import { ApiError } from '@/api/client';
 import {
   cancelTask,
+  breakDownTask,
   createTask,
   listMemories,
   reviewDecision,
@@ -56,6 +57,12 @@ const goalActionOpen = ref(false);
 const goalActionDraft = ref({ title: '', estimated_minutes: 25 });
 const goalProfileEditing = ref(false);
 const goalOptions = ref<Memory[]>([]);
+const taskBreakdownOpen = ref(false);
+const taskBreakdownDrafts = ref([
+  { title: '', estimated_minutes: 15 },
+  { title: '', estimated_minutes: 15 },
+  { title: '', estimated_minutes: 15 },
+]);
 const goalProfileDraft = ref({
   success_criteria: '',
   target_date: '',
@@ -101,6 +108,12 @@ watch(
     goalActionOpen.value = props.intent === 'add-goal-action';
     goalProfileEditing.value = props.intent === 'edit-goal';
     goalActionDraft.value = { title: '', estimated_minutes: 25 };
+    taskBreakdownOpen.value = false;
+    taskBreakdownDrafts.value = [
+      { title: '', estimated_minutes: 15 },
+      { title: '', estimated_minutes: 15 },
+      { title: '', estimated_minutes: 15 },
+    ];
     error.value = null;
     feedback.value = null;
   },
@@ -118,6 +131,20 @@ const isConfirmedGoal = computed(() => (
 const goalProfile = computed(() => memory.value?.goal_profile ?? null);
 const goalIsActive = computed(() => goalProfile.value?.state === 'active');
 const canAddGoalAction = computed(() => isConfirmedGoal.value && goalIsActive.value);
+const taskSubtasks = computed(() => task.value?.subtasks ?? []);
+const taskStepProgress = computed(() => task.value?.subtask_progress ?? {
+  total: 0,
+  todo: 0,
+  done: 0,
+  cancelled: 0,
+});
+const taskBreakdownCapacity = computed(() => task.value?.decomposition_capacity_remaining ?? 5);
+const canBreakDownTask = computed(() => (
+  task.value?.status === 'todo'
+  && !task.value.parent_task
+  && taskBreakdownCapacity.value > 0
+));
+const taskHasOpenSteps = computed(() => taskStepProgress.value.todo > 0);
 const availableParentGoals = computed(() => goalOptions.value.filter((goal) => goal.id !== memory.value?.id));
 const goalProgress = computed(() => {
   const linked = memory.value?.linked_tasks || [];
@@ -240,6 +267,52 @@ async function updateTask(action: 'done' | 'todo' | 'cancel') {
 
 function taskActionLabel(action: 'done' | 'todo' | 'cancel'): string {
   return { done: '任务已完成', todo: '任务已恢复', cancel: '任务已取消' }[action];
+}
+
+function startTaskBreakdown() {
+  if (!canBreakDownTask.value) return;
+  const rowCount = Math.min(3, taskBreakdownCapacity.value);
+  taskBreakdownDrafts.value = Array.from({ length: rowCount }, () => ({
+    title: '',
+    estimated_minutes: 15,
+  }));
+  taskBreakdownOpen.value = true;
+}
+
+function addTaskBreakdownRow() {
+  if (taskBreakdownDrafts.value.length >= taskBreakdownCapacity.value) return;
+  taskBreakdownDrafts.value.push({ title: '', estimated_minutes: 15 });
+}
+
+function removeTaskBreakdownRow(index: number) {
+  if (taskBreakdownDrafts.value.length <= 1) return;
+  taskBreakdownDrafts.value.splice(index, 1);
+}
+
+async function submitTaskBreakdown() {
+  if (!task.value || acting.value) return;
+  const steps = taskBreakdownDrafts.value
+    .map((step) => ({
+      title: step.title.trim(),
+      estimated_minutes: Math.round(Number(step.estimated_minutes)),
+    }))
+    .filter((step) => step.title);
+  if (!steps.length || steps.some((step) => !Number.isFinite(step.estimated_minutes))) return;
+
+  acting.value = true;
+  error.value = null;
+  feedback.value = null;
+  try {
+    const payload = await breakDownTask(task.value.id, steps);
+    setDetail(payload.task as unknown as ObjectDetail);
+    taskBreakdownOpen.value = false;
+    feedback.value = `已拆出 ${payload.created_task_ids.length} 个步骤，接下来会由“此刻”逐步推进`;
+    emit('changed');
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '行动拆解失败';
+  } finally {
+    acting.value = false;
+  }
 }
 
 async function updateMemory(action: 'confirm' | 'archive') {
@@ -421,11 +494,113 @@ useWindowEventListener('keydown', onKey);
               <span>详情</span>
               <p>{{ task.detail || '没有补充说明' }}</p>
             </article>
+            <button
+              v-if="task.parent_task?.available && task.parent_task.id"
+              class="source-card task-parent-source"
+              type="button"
+              @click="openLinkedTask(task.parent_task.id)"
+            >
+              <span>来自上层行动</span>
+              <strong>{{ task.parent_task.title }}</strong>
+              <small>这是从上层行动中拆出的第 {{ task.parent_task.position ?? '-' }} 步</small>
+            </button>
+            <article v-else-if="task.parent_task" class="detail-block task-parent-source-missing">
+              <span>原始行动已删除</span>
+              <p>{{ task.parent_task.title }}</p>
+            </article>
             <div class="meta-grid">
               <div><span>截止</span><strong>{{ task.due_date || '未设置' }}</strong></div>
               <div><span>预计</span><strong>{{ task.estimated_minutes ? `${task.estimated_minutes} 分钟` : '未设置' }}</strong></div>
               <div><span>完成</span><strong>{{ task.completed_at ? formatRelative(task.completed_at) : '未完成' }}</strong></div>
             </div>
+            <section v-if="taskSubtasks.length" class="task-steps">
+              <header class="task-steps-head">
+                <div>
+                  <span>执行步骤</span>
+                  <strong>{{ taskStepProgress.done }} / {{ taskStepProgress.total }} 已完成</strong>
+                </div>
+                <small v-if="taskHasOpenSteps">先推进步骤，再结束上层行动</small>
+                <small v-else>步骤已处理，可以结束上层行动</small>
+              </header>
+              <div class="linked-list task-step-list">
+                <button
+                  v-for="step in taskSubtasks"
+                  :key="step.id"
+                  class="linked-row"
+                  type="button"
+                  @click="openLinkedTask(step.id)"
+                >
+                  <strong>{{ step.title }}</strong>
+                  <small>
+                    {{ taskStatusLabel(step.status) }}
+                    <template v-if="step.estimated_minutes"> · {{ step.estimated_minutes }} 分钟</template>
+                  </small>
+                </button>
+              </div>
+            </section>
+            <form v-if="taskBreakdownOpen" class="task-breakdown-form" @submit.prevent="submitTaskBreakdown">
+              <header>
+                <div>
+                  <ListTree :size="17" />
+                  <span>拆成可以直接开始的步骤</span>
+                </div>
+                <small>最多 {{ taskBreakdownCapacity }} 步</small>
+              </header>
+              <div
+                v-for="(step, index) in taskBreakdownDrafts"
+                :key="index"
+                class="task-breakdown-row"
+              >
+                <span>{{ index + 1 }}</span>
+                <input
+                  v-model="step.title"
+                  type="text"
+                  maxlength="160"
+                  :aria-label="`第 ${index + 1} 步`"
+                  placeholder="写下一个可以直接开始的动作"
+                />
+                <label>
+                  <input
+                    v-model.number="step.estimated_minutes"
+                    type="number"
+                    min="5"
+                    max="480"
+                    step="5"
+                    :aria-label="`第 ${index + 1} 步预计分钟`"
+                  />
+                  <small>分钟</small>
+                </label>
+                <button
+                  type="button"
+                  title="移除这一步"
+                  aria-label="移除这一步"
+                  :disabled="taskBreakdownDrafts.length <= 1"
+                  @click="removeTaskBreakdownRow(index)"
+                >
+                  <X :size="14" />
+                </button>
+              </div>
+              <div class="task-breakdown-actions">
+                <button
+                  v-if="taskBreakdownDrafts.length < taskBreakdownCapacity"
+                  type="button"
+                  @click="addTaskBreakdownRow"
+                >
+                  <Plus :size="14" />
+                  <span>再加一步</span>
+                </button>
+                <span />
+                <button type="button" :disabled="acting" @click="taskBreakdownOpen = false">取消</button>
+                <button
+                  class="task-breakdown-submit"
+                  type="submit"
+                  :disabled="acting || !taskBreakdownDrafts.some((step) => step.title.trim())"
+                >
+                  <GitFork :size="15" />
+                  <span>{{ acting ? '保存中' : '保存步骤' }}</span>
+                </button>
+              </div>
+            </form>
           </template>
 
           <template v-else-if="memory">
@@ -640,7 +815,7 @@ useWindowEventListener('keydown', onKey);
         <footer class="object-actions">
           <template v-if="task">
             <button
-              v-if="task.status !== 'done'"
+              v-if="task.status !== 'done' && !taskHasOpenSteps"
               type="button"
               :disabled="acting"
               @click="updateTask('done')"
@@ -652,11 +827,17 @@ useWindowEventListener('keydown', onKey);
               @click="updateTask('todo')"
             >恢复</button>
             <button
-              v-if="task.status !== 'cancelled'"
+              v-if="task.status !== 'cancelled' && !taskHasOpenSteps"
               type="button"
               :disabled="acting"
               @click="updateTask('cancel')"
             >取消</button>
+            <button
+              v-if="canBreakDownTask && !taskBreakdownOpen"
+              type="button"
+              :disabled="acting"
+              @click="startTaskBreakdown"
+            >{{ taskSubtasks.length ? '补步骤' : '拆成步骤' }}</button>
           </template>
           <template v-if="memory">
             <button
@@ -1121,6 +1302,164 @@ useWindowEventListener('keydown', onKey);
   background: var(--surface-2);
 }
 
+.task-parent-source svg {
+  color: var(--accent-bright);
+}
+
+.task-parent-source-missing {
+  opacity: 0.68;
+}
+
+.task-steps {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.task-steps-head,
+.task-steps-head > div,
+.task-breakdown-form header,
+.task-breakdown-form header > div,
+.task-breakdown-actions,
+.task-breakdown-actions button {
+  display: flex;
+  align-items: center;
+}
+
+.task-steps-head,
+.task-breakdown-form header {
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.task-steps-head > div,
+.task-breakdown-form header > div {
+  gap: var(--s-2);
+}
+
+.task-steps-head span,
+.task-breakdown-form header span {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.task-steps-head strong {
+  color: var(--text-1);
+  font-size: var(--fs-3);
+  font-weight: 560;
+}
+
+.task-steps-head small,
+.task-breakdown-form header small {
+  max-width: 180px;
+  color: var(--text-4);
+  font-size: var(--fs-1);
+  line-height: var(--lh-base);
+  text-align: right;
+}
+
+.task-step-list {
+  gap: var(--s-2);
+}
+
+.task-breakdown-form {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.task-breakdown-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 82px 30px;
+  gap: var(--s-2);
+  align-items: center;
+}
+
+.task-breakdown-row > span {
+  color: var(--text-4);
+  font-size: var(--fs-2);
+  text-align: center;
+}
+
+.task-breakdown-row > input,
+.task-breakdown-row label {
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: rgba(7, 10, 15, 0.52);
+}
+
+.task-breakdown-row > input,
+.task-breakdown-row label input {
+  width: 100%;
+  color: var(--text-1);
+  font: inherit;
+}
+
+.task-breakdown-row > input {
+  padding: 0 var(--s-3);
+}
+
+.task-breakdown-row label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding-right: var(--s-2);
+}
+
+.task-breakdown-row label input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding-left: var(--s-2);
+}
+
+.task-breakdown-row label small {
+  color: var(--text-4);
+  font-size: var(--fs-1);
+}
+
+.task-breakdown-row > button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-2);
+  color: var(--text-4);
+}
+
+.task-breakdown-row > input:focus,
+.task-breakdown-row label:focus-within {
+  border-color: rgba(110, 231, 208, 0.3);
+  outline: none;
+}
+
+.task-breakdown-actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--s-2);
+}
+
+.task-breakdown-actions button {
+  justify-content: center;
+  gap: var(--s-1);
+  min-height: 34px;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  color: var(--text-2);
+}
+
+.task-breakdown-actions .task-breakdown-submit {
+  border-color: rgba(110, 231, 208, 0.25);
+  color: var(--accent-bright);
+}
+
 .empty-line {
   color: var(--text-3);
 }
@@ -1188,6 +1527,39 @@ useWindowEventListener('keydown', onKey);
 
   .goal-profile-wide {
     grid-column: 1;
+  }
+
+  .task-steps-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+
+  .task-steps-head small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .task-breakdown-row {
+    grid-template-columns: 20px minmax(0, 1fr) 30px;
+  }
+
+  .task-breakdown-row label {
+    grid-column: 2;
+    width: 104px;
+  }
+
+  .task-breakdown-row > button {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .task-breakdown-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .task-breakdown-actions > span {
+    display: none;
   }
 }
 </style>

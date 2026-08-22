@@ -76,6 +76,9 @@ def register_routes(app):
                 "SELECT * FROM goal_commitments ORDER BY memory_id"
             ).fetchall()
             tasks_rows = conn.execute("SELECT * FROM tasks ORDER BY id").fetchall()
+            task_decomposition_rows = conn.execute(
+                "SELECT * FROM task_decomposition_links ORDER BY parent_task_id, position, child_task_id"
+            ).fetchall()
             weekly_plan_rows = conn.execute(
                 "SELECT * FROM weekly_plan_items ORDER BY week_start, position, id"
             ).fetchall()
@@ -96,6 +99,11 @@ def register_routes(app):
             indent=2,
         )
         tasks_json = json.dumps([dict(r) for r in tasks_rows], ensure_ascii=False, indent=2)
+        task_decomposition_json = json.dumps(
+            [dict(r) for r in task_decomposition_rows],
+            ensure_ascii=False,
+            indent=2,
+        )
         weekly_plan_json = json.dumps(
             [dict(r) for r in weekly_plan_rows],
             ensure_ascii=False,
@@ -121,6 +129,7 @@ def register_routes(app):
             f"memories: {len(memories_rows)}\n"
             f"goal_commitments: {len(goal_commitment_rows)}\n"
             f"tasks: {len(tasks_rows)}\n"
+            f"task_decomposition_links: {len(task_decomposition_rows)}\n"
             f"weekly_plan_items: {len(weekly_plan_rows)}\n"
             f"context_action_outcomes: {len(context_outcome_rows)}\n"
             f"files: {file_count}\n"
@@ -136,6 +145,10 @@ def register_routes(app):
                 goal_commitments_json,
             )
             zf.writestr(f"{export_name}/tasks.json", tasks_json)
+            zf.writestr(
+                f"{export_name}/task_decomposition_links.json",
+                task_decomposition_json,
+            )
             zf.writestr(f"{export_name}/weekly_plan_items.json", weekly_plan_json)
             zf.writestr(
                 f"{export_name}/context_action_outcomes.json",
@@ -151,11 +164,12 @@ def register_routes(app):
         buf.seek(0)
         write_audit_log("export", "system")
         logger.info(
-            "exported %d items, %d memories, %d goal commitments, %d tasks, %d weekly plan items, %d context outcomes",
+            "exported %d items, %d memories, %d goal commitments, %d tasks, %d task decomposition links, %d weekly plan items, %d context outcomes",
             len(items_rows),
             len(memories_rows),
             len(goal_commitment_rows),
             len(tasks_rows),
+            len(task_decomposition_rows),
             len(weekly_plan_rows),
             len(context_outcome_rows),
         )

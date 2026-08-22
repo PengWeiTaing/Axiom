@@ -9,6 +9,7 @@ import {
   FileText,
   FolderTree,
   GitFork,
+  ListTree,
   ListTodo,
   Target,
 } from '@lucide/vue';
@@ -45,13 +46,20 @@ const loadingContextId = ref<string | null>(null);
 let contextRequest = 0;
 
 const activeId = computed(() => props.selectedId || context.value?.lifeline.id || null);
+const compositeTasks = computed(() => context.value?.tasks.filter((task) => (
+  Boolean(task.subtask_progress?.total)
+)) || []);
 const openTasks = computed(() => context.value?.tasks.filter((task) => (
   task.status === 'todo' && (!task.goal_state || task.goal_state === 'active')
+  && !task.subtask_progress?.total
 )) || []);
 const heldTasks = computed(() => context.value?.tasks.filter((task) => (
   task.status === 'todo' && Boolean(task.goal_state) && task.goal_state !== 'active'
+  && !task.subtask_progress?.total
 )) || []);
-const completedTasks = computed(() => context.value?.tasks.filter((task) => task.status === 'done') || []);
+const completedTasks = computed(() => context.value?.tasks.filter((task) => (
+  task.status === 'done' && !task.subtask_progress?.total
+)) || []);
 const visibleMaterials = computed(() => context.value?.materials.slice(0, 6) || []);
 const visibleMemories = computed(() => context.value?.memories.slice(0, 6) || []);
 const visibleDecisions = computed(() => context.value?.decisions.slice(0, 5) || []);
@@ -278,6 +286,33 @@ onMounted(loadIndex);
               </button>
             </section>
 
+            <section v-if="compositeTasks.length" class="context-section decompositions-section">
+              <header class="section-head">
+                <div>
+                  <ListTree :size="17" />
+                  <h3>行动脉络</h3>
+                </div>
+                <span>{{ compositeTasks.length }}</span>
+              </header>
+              <button
+                v-for="task in compositeTasks"
+                :key="task.id"
+                class="object-row task-row"
+                type="button"
+                @click="emit('openObject', { kind: 'task', id: task.id })"
+              >
+                <span class="object-icon"><ListTree :size="14" /></span>
+                <span class="object-copy">
+                  <strong>{{ task.title }}</strong>
+                  <small>
+                    {{ task.subtask_progress?.done || 0 }} / {{ task.subtask_progress?.total || 0 }} 个步骤完成
+                    <template v-if="task.goal_title"> · {{ task.goal_title }}</template>
+                  </small>
+                </span>
+                <span class="object-tail">{{ task.status === 'done' ? '已结束' : '推进中' }}</span>
+              </button>
+            </section>
+
             <section class="context-section actions-section">
               <header class="section-head">
                 <div>
@@ -301,6 +336,7 @@ onMounted(loadIndex);
                     {{ taskPriorityLabel(task.priority) }}
                     <template v-if="task.due_date"> · {{ task.due_date }}</template>
                     <template v-if="task.goal_title"> · {{ task.goal_title }}</template>
+                    <template v-if="task.parent_task"> · 来自 {{ task.parent_task.title }}</template>
                   </small>
                 </span>
                 <span v-if="task.estimated_minutes" class="object-tail">{{ task.estimated_minutes }} 分钟</span>
