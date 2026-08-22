@@ -4,6 +4,7 @@
 
 ## 2026-08-22
 
+- 生产环境已部署 `8175b0e`，部署前完成 SQLite/data 与原 `.env` 备份；DeepSeek API 已切换并在线验证 `deepseek-v4-flash / deepseek-v4-pro`，`/ping` 返回 `ok`，`context.now.v7` 与一致性检查通过，同时将 `/opt/axiom/.env` 权限从 `644` 收紧为 `600`。
 - “此刻”升级为 `context.now.v7`：对本周行动长期未启动、已拆步骤连续没有变化和周后半段承诺仍未收口进行确定性判断，最多显示两条带依据提示；提示只打开原任务或周复盘，可本周忽略，不自动调用 AI 或创建行动。
 - 新增 AI 拆解候选结果闭环：候选返回不透明 ID，确认时记录是否被编辑，放弃时记录明确结果；`task_ai_suggestion_events` 只保存模型、步数、总时长、指纹和结果，不保存候选正文。V4 Pro 只有在近 30 天积累足量结果后才做保守校准。
 - 新增 `context_nudge_dismissals`、候选/提示结果导出恢复和 `smoke_test_context_nudges.py`；拆解回归覆盖生成、修改后确认、放弃、上下文统计与隐私字段边界。
