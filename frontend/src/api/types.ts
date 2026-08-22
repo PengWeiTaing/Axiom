@@ -209,7 +209,7 @@ export interface ContextAction {
 }
 
 export interface NowContextPayload {
-  schema_version: 'context.now.v6';
+  schema_version: 'context.now.v7';
   generated_at: string;
   date: string;
   mode: 'focus' | 'empty';
@@ -226,6 +226,16 @@ export interface NowContextPayload {
     recent_outcomes: number;
     explicit_feedback: number;
     window_days: number;
+    ai_suggestions: {
+      window_days: number;
+      generated: number;
+      open: number;
+      confirmed: number;
+      modified: number;
+      discarded: number;
+      expired: number;
+      resolved: number;
+    };
   };
   commitments: {
     confirmed_goals: number;
@@ -240,6 +250,19 @@ export interface NowContextPayload {
     attention: ContextCommitmentAttention[];
     gaps: ContextCommitmentGoal[];
   };
+  nudges: ContextNudge[];
+}
+
+export type ContextNudgeType = 'stuck_steps' | 'long_unstarted' | 'weekly_stalled';
+
+export interface ContextNudge {
+  id: string;
+  type: ContextNudgeType;
+  title: string;
+  detail: string;
+  evidence: string[];
+  target: { kind: 'task'; id: number } | { kind: 'weekly_review' };
+  dismiss_label: string;
 }
 
 export type ContextFitFeedback = 'right' | 'too_heavy' | 'wrong_time';
@@ -287,10 +310,17 @@ export interface TaskBreakdownPayload {
   task: Task;
   created_task_ids: number[];
   source: TaskBreakdownSource;
+  suggestion_result: {
+    suggestion_id: string;
+    status: 'confirmed';
+    modified: boolean;
+    resolved_at: string;
+  } | null;
 }
 
 export interface TaskBreakdownSuggestionPayload {
-  schema_version: 'task.decomposition.suggestion.v1';
+  schema_version: 'task.decomposition.suggestion.v2';
+  suggestion_id: string;
   model: string;
   thinking_mode: 'enabled';
   generated_at: string;

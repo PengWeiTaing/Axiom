@@ -109,6 +109,56 @@ def ensure_task_decomposition_table(conn: sqlite3.Connection) -> None:
     )
 
 
+def ensure_task_ai_suggestion_events_table(conn: sqlite3.Connection) -> None:
+    """Keep only suggestion outcome metadata; candidate prose stays ephemeral."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS task_ai_suggestion_events (
+            suggestion_id TEXT PRIMARY KEY,
+            task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+            task_title TEXT NOT NULL,
+            model TEXT NOT NULL,
+            confidence TEXT NOT NULL,
+            suggested_step_count INTEGER NOT NULL,
+            suggested_total_minutes INTEGER NOT NULL,
+            candidate_fingerprint TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'open'
+                CHECK(status IN ('open', 'confirmed', 'discarded', 'expired')),
+            modified INTEGER,
+            created_at TEXT NOT NULL,
+            resolved_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_task_ai_suggestions_task_status
+        ON task_ai_suggestion_events(task_id, status, created_at)
+        """
+    )
+
+
+def ensure_context_nudge_dismissals_table(conn: sqlite3.Connection) -> None:
+    """Remember only the user's weekly dismissal, not a duplicate nudge body."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS context_nudge_dismissals (
+            nudge_id TEXT PRIMARY KEY,
+            nudge_type TEXT NOT NULL,
+            task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+            week_start TEXT NOT NULL,
+            dismissed_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_context_nudge_dismissals_week
+        ON context_nudge_dismissals(week_start, nudge_type)
+        """
+    )
+
+
 def ensure_items_lifeline_id(conn: sqlite3.Connection) -> None:
     exists = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='items'"
@@ -334,8 +384,10 @@ def init_db(db_path: Path = DB_PATH) -> None:
         )
         ensure_tasks_table_columns(conn)
         ensure_task_decomposition_table(conn)
+        ensure_task_ai_suggestion_events_table(conn)
         ensure_weekly_plan_table(conn)
         ensure_weekly_review_table(conn)
+        ensure_context_nudge_dismissals_table(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS context_action_outcomes (

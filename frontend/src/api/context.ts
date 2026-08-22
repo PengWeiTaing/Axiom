@@ -19,3 +19,9 @@ export const submitContextFeedback = (outcomeId: number, fitFeedback: ContextFit
     method: 'POST',
     json: { fit_feedback: fitFeedback },
   });
+
+export const dismissContextNudge = (nudgeId: string) =>
+  apiRequest<{ dismissed: string; now_context: NowContextPayload }>(
+    `/api/context/nudges/${encodeURIComponent(nudgeId)}/dismiss`,
+    { method: 'POST' },
+  );

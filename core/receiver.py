@@ -165,7 +165,7 @@ def system_info():
     conn = get_db_connection()
     try:
         tables = {}
-        for t in ["items", "memories", "goal_commitments", "tasks", "task_decomposition_links", "weekly_plan_items", "weekly_reviews", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
+        for t in ["items", "memories", "goal_commitments", "tasks", "task_decomposition_links", "task_ai_suggestion_events", "weekly_plan_items", "weekly_reviews", "context_nudge_dismissals", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
             try:
                 tables[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             except Exception:
@@ -365,6 +365,8 @@ def import_data():
             "task_decomposition_links": 0,
             "weekly_plan_items": 0,
             "weekly_reviews": 0,
+            "task_ai_suggestion_events": 0,
+            "context_nudge_dismissals": 0,
             "decisions": 0,
             "context_action_outcomes": 0,
             "files": 0,
@@ -564,7 +566,7 @@ def import_data():
                                         outcome.get("task_title", "已导入行动"),
                                         outcome.get("outcome", "completed"),
                                         outcome.get("fit_feedback"),
-                                        outcome.get("schema_version", "context.now.v6"),
+                                        outcome.get("schema_version", "context.now.v7"),
                                         outcome.get("reason_code", "available"),
                                         outcome.get("reason_label", "当前可推进"),
                                         outcome.get("score", 0),
@@ -576,6 +578,74 @@ def import_data():
                                     ),
                                 )
                                 imported["context_action_outcomes"] += 1
+                            except Exception:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
+                if archive_name == "task_ai_suggestion_events.json":
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for event in data:
+                            try:
+                                status = event.get("status", "expired")
+                                if status not in {"open", "confirmed", "discarded", "expired"}:
+                                    status = "expired"
+                                modified = event.get("modified")
+                                modified = None if modified is None else int(bool(modified))
+                                conn.execute(
+                                    """
+                                    INSERT OR IGNORE INTO task_ai_suggestion_events (
+                                        suggestion_id, task_id, task_title, model,
+                                        confidence, suggested_step_count,
+                                        suggested_total_minutes, candidate_fingerprint,
+                                        status, modified, created_at, resolved_at
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        event.get("suggestion_id"),
+                                        event.get("task_id"),
+                                        event.get("task_title", "已导入行动"),
+                                        event.get("model", "unknown"),
+                                        event.get("confidence", "low"),
+                                        max(0, int(event.get("suggested_step_count") or 0)),
+                                        max(0, int(event.get("suggested_total_minutes") or 0)),
+                                        event.get("candidate_fingerprint", "imported"),
+                                        status,
+                                        modified,
+                                        event.get("created_at"),
+                                        event.get("resolved_at"),
+                                    ),
+                                )
+                                imported["task_ai_suggestion_events"] += 1
+                            except Exception:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
+                if archive_name == "context_nudge_dismissals.json":
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for dismissal in data:
+                            try:
+                                conn.execute(
+                                    """
+                                    INSERT OR IGNORE INTO context_nudge_dismissals (
+                                        nudge_id, nudge_type, task_id,
+                                        week_start, dismissed_at
+                                    ) VALUES (?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        dismissal.get("nudge_id"),
+                                        dismissal.get("nudge_type", "unknown"),
+                                        dismissal.get("task_id"),
+                                        dismissal.get("week_start"),
+                                        dismissal.get("dismissed_at"),
+                                    ),
+                                )
+                                imported["context_nudge_dismissals"] += 1
                             except Exception:
                                 pass
                         conn.commit()

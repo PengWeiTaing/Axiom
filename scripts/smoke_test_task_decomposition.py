@@ -53,7 +53,7 @@ def main() -> None:
             row = conn.execute("SELECT title FROM tasks WHERE id = ?", (task_id,)).fetchone()
             check("suggestion sees task", row is not None, str(task_id))
             return {
-                "schema_version": "task.decomposition.suggestion.v1",
+                "schema_version": "task.decomposition.suggestion.v2",
                 "model": "deepseek-v4-pro",
                 "thinking_mode": "enabled",
                 "generated_at": utc_now().isoformat(timespec="seconds"),
@@ -135,18 +135,32 @@ def main() -> None:
             )
             check("AI suggestion generated", suggestion.status_code == 200, str(suggestion.status_code))
             suggestion_payload = suggestion.get_json()
+            suggestion_id = suggestion_payload["suggestion_id"]
             check("new DeepSeek model", suggestion_payload["model"] == "deepseek-v4-pro", str(suggestion_payload))
             check("suggestion is reversible", len(suggestion_payload["steps"]) == 3, str(suggestion_payload))
+            check("suggestion has opaque id", len(suggestion_id) == 32, suggestion_id)
             untouched = client.get(f"/tasks/{parent_id}", headers=headers).get_json()["task"]
             check("suggestion does not create tasks", untouched["subtask_progress"]["total"] == 0, str(untouched))
+            conn = get_db_connection()
+            try:
+                open_event = conn.execute(
+                    "SELECT * FROM task_ai_suggestion_events WHERE suggestion_id = ?",
+                    (suggestion_id,),
+                ).fetchone()
+                check("suggestion metadata recorded", open_event["status"] == "open", str(dict(open_event)))
+                event_columns = {row[1] for row in conn.execute("PRAGMA table_info(task_ai_suggestion_events)")}
+                check("candidate prose is not stored", not {"steps", "rationale", "candidate_json"}.intersection(event_columns), str(event_columns))
+            finally:
+                conn.close()
 
             breakdown = client.post(
                 f"/tasks/{parent_id}/breakdown",
                 headers=headers,
                 json={
                     "source": "ai_suggestion_confirmed",
+                    "suggestion_id": suggestion_id,
                     "steps": [
-                        {"title": "整理任务数据关系", "estimated_minutes": 20},
+                        {"title": "梳理任务数据关系", "estimated_minutes": 20},
                         {"title": "接入此刻排序", "estimated_minutes": 25},
                         {"title": "验证移动端交互", "estimated_minutes": 15},
                     ]
@@ -162,6 +176,20 @@ def main() -> None:
             child_ids = [int(value) for value in breakdown_payload["created_task_ids"]]
             check("three child tasks", len(child_ids) == 3, str(child_ids))
             check("confirmed AI source", breakdown_payload["source"] == "ai_suggestion_confirmed", str(breakdown_payload))
+            check("edited AI candidate learned", breakdown_payload["suggestion_result"]["modified"] is True, str(breakdown_payload))
+
+            second_suggestion = client.post(
+                f"/tasks/{parent_id}/breakdown/suggestion",
+                headers=headers,
+            )
+            check("second AI suggestion generated", second_suggestion.status_code == 200, str(second_suggestion.status_code))
+            second_suggestion_id = second_suggestion.get_json()["suggestion_id"]
+            discarded = client.post(
+                f"/tasks/{parent_id}/breakdown/suggestions/{second_suggestion_id}/discard",
+                headers=headers,
+            )
+            check("AI suggestion discarded", discarded.status_code == 200, str(discarded.status_code))
+            check("discard result", discarded.get_json()["suggestion_result"]["status"] == "discarded", str(discarded.get_json()))
 
             parent = client.get(f"/tasks/{parent_id}", headers=headers).get_json()["task"]
             check("parent progress", parent["subtask_progress"]["todo"] == 3, str(parent))
@@ -189,6 +217,15 @@ def main() -> None:
             check("open children block parent completion", blocked_parent.status_code == 409, str(blocked_parent.status_code))
 
             context = client.get("/api/context/now?limit=8", headers=headers).get_json()
+            suggestion_learning = context["learning"]["ai_suggestions"]
+            check(
+                "current context learns suggestion outcomes",
+                suggestion_learning["generated"] == 2
+                and suggestion_learning["confirmed"] == 1
+                and suggestion_learning["modified"] == 1
+                and suggestion_learning["discarded"] == 1,
+                str(suggestion_learning),
+            )
             context_actions = ([context["focus"]] if context["focus"] else []) + context["alternatives"]
             context_ids = {int(action["task"]["id"]) for action in context_actions}
             check("parent yields to children", parent_id not in context_ids, str(context_ids))
@@ -300,6 +337,17 @@ def main() -> None:
                 )
                 reviews = json.loads(archive.read(review_name).decode("utf-8"))
                 check("weekly review exported", reviews[0]["decomposition_fit"] == "too_coarse", str(reviews))
+                event_name = next(
+                    name for name in archive.namelist()
+                    if name.endswith("/task_ai_suggestion_events.json")
+                )
+                events = json.loads(archive.read(event_name).decode("utf-8"))
+                check("suggestion outcomes exported", len(events) == 2, str(events))
+                check(
+                    "suggestion export excludes candidate prose",
+                    all(not {"steps", "rationale", "candidate_json"}.intersection(event) for event in events),
+                    str(events),
+                )
 
             deleted = client.delete(f"/tasks/{parent_id}", headers=headers)
             check("delete parent", deleted.status_code == 200, str(deleted.status_code))

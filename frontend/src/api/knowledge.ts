@@ -33,14 +33,27 @@ export const breakDownTask = (
   id: number,
   steps: { title: string; estimated_minutes: number }[],
   source: TaskBreakdownSource = 'manual_breakdown',
+  suggestionId?: string,
 ) =>
   apiRequest<TaskBreakdownPayload>(`/tasks/${id}/breakdown`, {
     method: 'POST',
-    json: { steps, source },
+    json: { steps, source, suggestion_id: suggestionId },
   });
 
 export const suggestTaskBreakdown = (id: number) =>
   apiRequest<TaskBreakdownSuggestionPayload>(`/tasks/${id}/breakdown/suggestion`, {
+    method: 'POST',
+  });
+
+export const discardTaskBreakdownSuggestion = (id: number, suggestionId: string) =>
+  apiRequest<{
+    suggestion_result: {
+      suggestion_id: string;
+      status: 'discarded';
+      modified: null;
+      resolved_at: string;
+    };
+  }>(`/tasks/${id}/breakdown/suggestions/${encodeURIComponent(suggestionId)}/discard`, {
     method: 'POST',
   });
 

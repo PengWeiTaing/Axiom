@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import {
   ArrowRight,
   Brain,
@@ -19,7 +19,12 @@ import {
   X,
 } from '@lucide/vue';
 import { ApiError } from '@/api/client';
-import { completeContextAction, getNowContext, submitContextFeedback } from '@/api/context';
+import {
+  completeContextAction,
+  dismissContextNudge,
+  getNowContext,
+  submitContextFeedback,
+} from '@/api/context';
 import { listDecisions, listMemories } from '@/api/knowledge';
 import {
   addWeeklyPlanTask,
@@ -33,6 +38,7 @@ import type {
   ContextCommitmentAttention,
   ContextFitFeedback,
   ContextGoal,
+  ContextNudge,
   ContextCommitmentGoal,
   ContextOutcome,
   Decision,
@@ -74,6 +80,7 @@ const weekMutatingId = ref<number | null>(null);
 const weekReviewOpen = ref(false);
 const weekReviewSaving = ref(false);
 const weekReviewSaved = ref(false);
+const dismissingNudgeId = ref<string | null>(null);
 const weekReviewDraft = ref({
   decomposition_fit: 'right' as WeeklyDecompositionFit,
   reflection: '',
@@ -121,11 +128,13 @@ const weekRangeLabel = computed(() => {
   return `${shortDate(weeklyPlan.value.week_start)} - ${shortDate(weeklyPlan.value.week_end)}`;
 });
 const goalAttention = computed(() => nowContext.value?.commitments.attention ?? []);
+const contextNudges = computed(() => nowContext.value?.nudges ?? []);
 const firstGoalAttention = computed(() => goalAttention.value[0] ?? null);
 const recentItems = computed(() => overview.value?.recent.items.slice(0, 5) ?? []);
 const backlogTotal = computed(() => overview.value?.processing_backlog.total ?? 0);
 const judgementTotal = computed(() => (
   (nowContext.value?.commitments.attention_total ?? 0)
+  + contextNudges.value.length
   + candidateMemories.value.length
   + pendingDecisions.value.length
 ));
@@ -332,6 +341,31 @@ function openGoalAttention(goal: ContextCommitmentAttention) {
     return;
   }
   openGoal(goal, goal.attention_action === 'edit_commitment' ? 'edit-goal' : 'view');
+}
+
+async function openContextNudge(nudge: ContextNudge) {
+  if (nudge.target.kind === 'task') {
+    openTaskById(nudge.target.id);
+    return;
+  }
+  weekReviewOpen.value = true;
+  syncWeekReviewDraft(weeklyPlan.value);
+  await nextTick();
+  document.getElementById('week-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function dismissNudge(nudge: ContextNudge) {
+  if (dismissingNudgeId.value) return;
+  dismissingNudgeId.value = nudge.id;
+  error.value = null;
+  try {
+    const result = await dismissContextNudge(nudge.id);
+    nowContext.value = result.now_context;
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '提示暂时无法忽略';
+  } finally {
+    dismissingNudgeId.value = null;
+  }
 }
 
 function openObject(target: ObjectTarget) {
@@ -545,7 +579,7 @@ watch(() => props.revision, load);
         <p v-else class="week-empty">当前没有其他可加入的行动。</p>
       </div>
 
-      <div v-if="weekReviewOpen && weeklyPlan" class="week-review">
+      <div v-if="weekReviewOpen && weeklyPlan" id="week-review" class="week-review">
         <header class="week-review-header">
           <div>
             <span>本周回看</span>
@@ -643,7 +677,27 @@ watch(() => props.revision, load);
           </div>
         </header>
 
-        <div v-if="goalAttention.length || candidateMemories.length || pendingDecisions.length" class="row-list">
+        <div v-if="contextNudges.length || goalAttention.length || candidateMemories.length || pendingDecisions.length" class="row-list">
+          <div v-for="nudge in contextNudges" :key="`nudge-${nudge.id}`" class="content-row nudge-row">
+            <button class="nudge-main" type="button" @click="openContextNudge(nudge)">
+              <span class="row-icon nudge-icon"><History :size="16" /></span>
+              <span class="row-copy">
+                <strong>{{ nudge.title }}</strong>
+                <small>{{ nudge.evidence.join(' · ') }}</small>
+              </span>
+              <ArrowRight class="row-arrow" :size="15" />
+            </button>
+            <button
+              class="nudge-dismiss"
+              type="button"
+              :title="nudge.dismiss_label"
+              :aria-label="`${nudge.dismiss_label}：${nudge.title}`"
+              :disabled="dismissingNudgeId === nudge.id"
+              @click="dismissNudge(nudge)"
+            >
+              <X :size="14" />
+            </button>
+          </div>
           <button v-for="goal in goalAttention" :key="`goal-${goal.id}`" class="content-row" type="button" @click="openGoalAttention(goal)">
             <span class="row-icon goal-icon"><Target :size="16" /></span>
             <span class="row-copy">
@@ -1385,6 +1439,35 @@ h2 {
   background: rgba(255, 255, 255, 0.022);
 }
 
+.nudge-row {
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 4px;
+}
+
+.nudge-main {
+  min-width: 0;
+  min-height: 61px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.nudge-dismiss {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--text-5);
+  border-radius: 6px;
+}
+
+.nudge-dismiss:hover:not(:disabled) {
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.035);
+}
+
 .row-icon {
   width: 28px;
   height: 28px;
@@ -1394,6 +1477,7 @@ h2 {
 }
 
 .task-icon { color: var(--info); }
+.nudge-icon { color: var(--focus); }
 .memory-icon { color: var(--success); }
 .decision-icon { color: var(--focus); }
 

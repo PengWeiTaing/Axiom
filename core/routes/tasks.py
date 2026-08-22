@@ -5,6 +5,7 @@ from datetime import date
 from flask import request
 
 from core import task_decomposition_ai
+from core import task_decomposition_learning
 from core._common import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -33,10 +34,15 @@ from core.task_decomposition import (
     read_parent_task,
     read_subtask_rows,
     subtask_progress,
+    normalize_task_steps,
 )
 from core.task_decomposition_ai import (
     TaskDecompositionAIResponseError,
     TaskDecompositionAIUnavailableError,
+)
+from core.task_decomposition_learning import (
+    TaskSuggestionNotFoundError,
+    TaskSuggestionUnavailableError,
 )
 
 def register_routes(app):
@@ -395,6 +401,12 @@ def register_routes(app):
                 conn,
                 task_id,
             )
+            suggestion["suggestion_id"] = task_decomposition_learning.register_task_suggestion(
+                conn,
+                task_id,
+                suggestion,
+            )
+            conn.commit()
         except TaskDecompositionTaskNotFoundError as exc:
             return error_response(404, "task_not_found", str(exc))
         except TaskDecompositionLimitError as exc:
@@ -429,12 +441,27 @@ def register_routes(app):
         conn = get_db_connection()
         try:
             source = str(body.get("source", "manual_breakdown")).strip()
+            suggestion_id = str(body.get("suggestion_id", "")).strip() or None
+            normalized_steps = None
+            if source == "ai_suggestion_confirmed":
+                if not suggestion_id:
+                    raise TaskDecompositionInputError("确认 AI 候选时必须提供 suggestion_id")
+                normalized_steps = normalize_task_steps(body.get("steps"))
             created_ids = create_task_steps(
                 conn,
                 task_id,
                 body.get("steps"),
                 source=source,
             )
+            suggestion_result = None
+            if source == "ai_suggestion_confirmed" and suggestion_id and normalized_steps:
+                suggestion_result = task_decomposition_learning.resolve_task_suggestion(
+                    conn,
+                    task_id,
+                    suggestion_id,
+                    "confirmed",
+                    confirmed_steps=normalized_steps,
+                )
             conn.commit()
             row = conn.execute(
                 f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?",
@@ -449,6 +476,10 @@ def register_routes(app):
             return error_response(409, "task_breakdown_unavailable", str(exc))
         except TaskDecompositionInputError as exc:
             return error_response(400, "invalid_breakdown", str(exc))
+        except TaskSuggestionNotFoundError as exc:
+            return error_response(404, "task_suggestion_not_found", str(exc))
+        except TaskSuggestionUnavailableError as exc:
+            return error_response(409, "task_suggestion_unavailable", str(exc))
         finally:
             conn.close()
 
@@ -464,9 +495,44 @@ def register_routes(app):
                 "task": task,
                 "created_task_ids": created_ids,
                 "source": source,
+                "suggestion_result": suggestion_result,
             },
             201,
         )
+
+
+    @app.route(
+        "/tasks/<int:task_id>/breakdown/suggestions/<suggestion_id>/discard",
+        methods=["POST"],
+    )
+    def discard_task_breakdown_suggestion(task_id: int, suggestion_id: str):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        conn = get_db_connection()
+        try:
+            result = task_decomposition_learning.resolve_task_suggestion(
+                conn,
+                task_id,
+                suggestion_id,
+                "discarded",
+            )
+            conn.commit()
+        except TaskSuggestionNotFoundError as exc:
+            return error_response(404, "task_suggestion_not_found", str(exc))
+        except TaskSuggestionUnavailableError as exc:
+            return error_response(409, "task_suggestion_unavailable", str(exc))
+        finally:
+            conn.close()
+
+        write_audit_log(
+            "task_breakdown_suggestion_discarded",
+            "task",
+            task_id,
+            f"suggestion_id={suggestion_id}",
+        )
+        return ok_response({"suggestion_result": result})
 
 
     @app.route("/tasks/<int:task_id>/cancel", methods=["POST"])

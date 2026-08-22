@@ -88,6 +88,12 @@ def register_routes(app):
             context_outcome_rows = conn.execute(
                 "SELECT * FROM context_action_outcomes ORDER BY id"
             ).fetchall()
+            task_ai_suggestion_rows = conn.execute(
+                "SELECT * FROM task_ai_suggestion_events ORDER BY created_at, suggestion_id"
+            ).fetchall()
+            context_nudge_dismissal_rows = conn.execute(
+                "SELECT * FROM context_nudge_dismissals ORDER BY week_start, dismissed_at"
+            ).fetchall()
         finally:
             conn.close()
 
@@ -122,6 +128,16 @@ def register_routes(app):
             ensure_ascii=False,
             indent=2,
         )
+        task_ai_suggestions_json = json.dumps(
+            [dict(r) for r in task_ai_suggestion_rows],
+            ensure_ascii=False,
+            indent=2,
+        )
+        context_nudge_dismissals_json = json.dumps(
+            [dict(r) for r in context_nudge_dismissal_rows],
+            ensure_ascii=False,
+            indent=2,
+        )
 
         file_count = 0
         for r in items_rows:
@@ -141,6 +157,8 @@ def register_routes(app):
             f"weekly_plan_items: {len(weekly_plan_rows)}\n"
             f"weekly_reviews: {len(weekly_review_rows)}\n"
             f"context_action_outcomes: {len(context_outcome_rows)}\n"
+            f"task_ai_suggestion_events: {len(task_ai_suggestion_rows)}\n"
+            f"context_nudge_dismissals: {len(context_nudge_dismissal_rows)}\n"
             f"files: {file_count}\n"
         )
 
@@ -164,6 +182,14 @@ def register_routes(app):
                 f"{export_name}/context_action_outcomes.json",
                 context_outcomes_json,
             )
+            zf.writestr(
+                f"{export_name}/task_ai_suggestion_events.json",
+                task_ai_suggestions_json,
+            )
+            zf.writestr(
+                f"{export_name}/context_nudge_dismissals.json",
+                context_nudge_dismissals_json,
+            )
             for r in items_rows:
                 if r["file_path"]:
                     fp = resolve_stored_file_path(r["file_path"])
@@ -174,7 +200,7 @@ def register_routes(app):
         buf.seek(0)
         write_audit_log("export", "system")
         logger.info(
-            "exported %d items, %d memories, %d goal commitments, %d tasks, %d task decomposition links, %d weekly plan items, %d weekly reviews, %d context outcomes",
+            "exported %d items, %d memories, %d goal commitments, %d tasks, %d task decomposition links, %d weekly plan items, %d weekly reviews, %d context outcomes, %d AI suggestion events, %d nudge dismissals",
             len(items_rows),
             len(memories_rows),
             len(goal_commitment_rows),
@@ -183,6 +209,8 @@ def register_routes(app):
             len(weekly_plan_rows),
             len(weekly_review_rows),
             len(context_outcome_rows),
+            len(task_ai_suggestion_rows),
+            len(context_nudge_dismissal_rows),
         )
         return send_file(
             buf,

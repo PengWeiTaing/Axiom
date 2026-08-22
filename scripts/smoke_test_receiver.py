@@ -187,7 +187,7 @@ def main() -> None:
                 200,
                 "empty current context",
             )
-            assert empty_context["schema_version"] == "context.now.v6"
+            assert empty_context["schema_version"] == "context.now.v7"
             assert empty_context["mode"] == "empty"
             assert empty_context["focus"] is None
 
@@ -2549,6 +2549,40 @@ def main() -> None:
                         portable_created_at,
                     ),
                 )
+                portable_suggestion_id = "portable-ai-suggestion"
+                conn.execute(
+                    """
+                    INSERT INTO task_ai_suggestion_events (
+                        suggestion_id, task_id, task_title, model, confidence,
+                        suggested_step_count, suggested_total_minutes,
+                        candidate_fingerprint, status, modified,
+                        created_at, resolved_at
+                    ) VALUES (?, ?, ?, 'deepseek-v4-pro', 'high', 2, 35, ?,
+                              'confirmed', 1, ?, ?)
+                    """,
+                    (
+                        portable_suggestion_id,
+                        portable_task_id,
+                        "验证可移植目标行动",
+                        "a" * 64,
+                        portable_created_at,
+                        portable_created_at,
+                    ),
+                )
+                portable_nudge_id = "portable-context-nudge"
+                conn.execute(
+                    """
+                    INSERT INTO context_nudge_dismissals (
+                        nudge_id, nudge_type, task_id, week_start, dismissed_at
+                    ) VALUES (?, 'long_unstarted', ?, ?, ?)
+                    """,
+                    (
+                        portable_nudge_id,
+                        portable_task_id,
+                        portable_week_start,
+                        portable_created_at,
+                    ),
+                )
                 conn.commit()
             finally:
                 conn.close()
@@ -2588,6 +2622,14 @@ def main() -> None:
                     name.endswith("task_decomposition_links.json")
                     for name in archive.namelist()
                 )
+                assert any(
+                    name.endswith("task_ai_suggestion_events.json")
+                    for name in archive.namelist()
+                )
+                assert any(
+                    name.endswith("context_nudge_dismissals.json")
+                    for name in archive.namelist()
+                )
 
             conn = get_db_connection()
             try:
@@ -2597,6 +2639,14 @@ def main() -> None:
                 conn.execute(
                     "DELETE FROM task_decomposition_links WHERE child_task_id = ?",
                     (portable_child_id,),
+                )
+                conn.execute(
+                    "DELETE FROM task_ai_suggestion_events WHERE suggestion_id = ?",
+                    (portable_suggestion_id,),
+                )
+                conn.execute(
+                    "DELETE FROM context_nudge_dismissals WHERE nudge_id = ?",
+                    (portable_nudge_id,),
                 )
                 conn.execute("DELETE FROM tasks WHERE id = ?", (portable_child_id,))
                 conn.execute("DELETE FROM tasks WHERE id = ?", (portable_task_id,))
@@ -2619,6 +2669,8 @@ def main() -> None:
             assert imported["imported"]["weekly_plan_items"] >= 1
             assert imported["imported"]["weekly_reviews"] >= 1
             assert imported["imported"]["task_decomposition_links"] >= 1
+            assert imported["imported"]["task_ai_suggestion_events"] >= 1
+            assert imported["imported"]["context_nudge_dismissals"] >= 1
             conn = get_db_connection()
             try:
                 imported_outcome = conn.execute(
@@ -2665,6 +2717,22 @@ def main() -> None:
                     """,
                     (portable_child_id,),
                 ).fetchone()
+                imported_suggestion = conn.execute(
+                    """
+                    SELECT task_id, model, status, modified
+                    FROM task_ai_suggestion_events
+                    WHERE suggestion_id = ?
+                    """,
+                    (portable_suggestion_id,),
+                ).fetchone()
+                imported_nudge = conn.execute(
+                    """
+                    SELECT task_id, nudge_type, week_start
+                    FROM context_nudge_dismissals
+                    WHERE nudge_id = ?
+                    """,
+                    (portable_nudge_id,),
+                ).fetchone()
             finally:
                 conn.close()
             assert imported_outcome["fit_feedback"] == "right"
@@ -2683,6 +2751,13 @@ def main() -> None:
             assert imported_decomposition["parent_task_title"] == "验证可移植目标行动"
             assert imported_decomposition["position"] == 1
             assert imported_decomposition["source"] == "ai_suggestion_confirmed"
+            assert imported_suggestion["task_id"] == portable_task_id
+            assert imported_suggestion["model"] == "deepseek-v4-pro"
+            assert imported_suggestion["status"] == "confirmed"
+            assert imported_suggestion["modified"] == 1
+            assert imported_nudge["task_id"] == portable_task_id
+            assert imported_nudge["nudge_type"] == "long_unstarted"
+            assert imported_nudge["week_start"] == portable_week_start
 
             # 6. 分页
             for i in range(5):

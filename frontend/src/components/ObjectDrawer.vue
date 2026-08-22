@@ -6,6 +6,7 @@ import {
   cancelTask,
   breakDownTask,
   createTask,
+  discardTaskBreakdownSuggestion,
   listMemories,
   reviewDecision,
   reviewGoalCommitment,
@@ -311,10 +312,23 @@ async function requestTaskBreakdownSuggestion() {
   }
 }
 
-function dismissTaskBreakdown() {
+function resetTaskBreakdown() {
   taskBreakdownOpen.value = false;
   taskBreakdownSource.value = 'manual_breakdown';
   taskBreakdownSuggestion.value = null;
+}
+
+async function dismissTaskBreakdown() {
+  const currentTask = task.value;
+  const suggestion = taskBreakdownSuggestion.value;
+  resetTaskBreakdown();
+  if (!currentTask || !suggestion) return;
+  try {
+    await discardTaskBreakdownSuggestion(currentTask.id, suggestion.suggestion_id);
+    feedback.value = '已放弃这次候选';
+  } catch {
+    feedback.value = '候选已从当前页面移除';
+  }
 }
 
 function addTaskBreakdownRow() {
@@ -341,10 +355,15 @@ async function submitTaskBreakdown() {
   error.value = null;
   feedback.value = null;
   try {
-    const payload = await breakDownTask(task.value.id, steps, taskBreakdownSource.value);
+    const payload = await breakDownTask(
+      task.value.id,
+      steps,
+      taskBreakdownSource.value,
+      taskBreakdownSuggestion.value?.suggestion_id,
+    );
     setDetail(payload.task as unknown as ObjectDetail);
     const confirmedFromAI = payload.source === 'ai_suggestion_confirmed';
-    dismissTaskBreakdown();
+    resetTaskBreakdown();
     feedback.value = `${confirmedFromAI ? '已确认 AI 候选，' : ''}已创建 ${payload.created_task_ids.length} 个步骤，接下来会由“此刻”逐步推进`;
     emit('changed');
   } catch (err) {

@@ -20,9 +20,13 @@ from core.task_decomposition import (
     read_parent_task,
     read_subtask_rows,
 )
+from core.task_decomposition_learning import (
+    read_task_suggestion_learning,
+    task_suggestion_learning_guidance,
+)
 
 
-TASK_DECOMPOSITION_SUGGESTION_SCHEMA_VERSION = "task.decomposition.suggestion.v1"
+TASK_DECOMPOSITION_SUGGESTION_SCHEMA_VERSION = "task.decomposition.suggestion.v2"
 
 
 class TaskDecompositionAIUnavailableError(RuntimeError):
@@ -84,6 +88,7 @@ def build_task_decomposition_context(
         raise TaskDecompositionLimitError("这个行动已经达到五个步骤的上限")
 
     review = _latest_weekly_review(conn)
+    suggestion_learning = read_task_suggestion_learning(conn)
     feedback_rows = conn.execute(
         """
         SELECT fit_feedback, COUNT(*) AS count
@@ -144,6 +149,7 @@ def build_task_decomposition_context(
         ],
         "capacity_remaining": remaining,
         "weekly_review": review,
+        "suggestion_learning": suggestion_learning,
         "outcome_feedback": outcome_feedback,
         "basis": basis or ["行动标题"],
         "confidence": confidence,
@@ -169,6 +175,7 @@ def _build_prompt(context: dict[str, Any]) -> str:
         "capacity_remaining": context["capacity_remaining"],
         "recent_weekly_review": context["weekly_review"],
         "recent_action_feedback_counts": context["outcome_feedback"],
+        "recent_suggestion_outcomes": context["suggestion_learning"],
     }
     return (
         "请为下面的 Axiom 行动生成一层、可直接开始的执行步骤候选。\n"
@@ -176,6 +183,7 @@ def _build_prompt(context: dict[str, Any]) -> str:
         f"最多生成 {context['capacity_remaining']} 步，不要重复已有步骤，不要创建子树。\n"
         "每一步标题必须是明确动作，避免‘继续处理’‘推进一下’等空泛表达。\n"
         f"粒度约束：{_review_guidance(context['weekly_review'])}\n"
+        f"候选结果约束：{task_suggestion_learning_guidance(context['suggestion_learning'])}\n"
         "只返回 JSON 对象："
         '{"rationale":"不超过120字","steps":[{"title":"动作","estimated_minutes":15}]}。\n'
         f"上下文：{json.dumps(prompt_context, ensure_ascii=False, separators=(',', ':'))}"

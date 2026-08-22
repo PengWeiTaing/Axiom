@@ -11,11 +11,13 @@ from core.context_commitments import (
     read_commitments,
 )
 from core.database import get_db_connection
+from core.context_nudges import build_context_nudges
 from core.items import local_date_now, utc_now
+from core.task_decomposition_learning import read_task_suggestion_learning
 from core.weekly_plan import context_week_task_ids
 
 
-CONTEXT_SCHEMA_VERSION = "context.now.v6"
+CONTEXT_SCHEMA_VERSION = "context.now.v7"
 MAX_CONTEXT_ACTIONS = 8
 FEEDBACK_WINDOW_DAYS = 7
 CONTEXT_FIT_FEEDBACK = {"right", "too_heavy", "wrong_time"}
@@ -485,6 +487,12 @@ def build_now_context(
         outcomes = _read_recent_outcomes(conn, current_time)
         commitments = read_commitments(conn, today=current_date, now=current_time)
         weekly_task_ids = context_week_task_ids(conn, current_date)
+        nudges = build_context_nudges(
+            conn,
+            today=current_date,
+            now=current_time,
+        )
+        suggestion_learning = read_task_suggestion_learning(conn, now=current_time)
         rows = conn.execute(
             """
             SELECT
@@ -580,6 +588,8 @@ def build_now_context(
                 1 for outcome in outcomes if outcome["fit_feedback"] in CONTEXT_FIT_FEEDBACK
             ),
             "window_days": FEEDBACK_WINDOW_DAYS,
+            "ai_suggestions": suggestion_learning,
         },
         "commitments": commitments,
+        "nudges": nudges,
     }

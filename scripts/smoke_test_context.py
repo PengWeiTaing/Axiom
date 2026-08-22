@@ -203,7 +203,7 @@ def main() -> None:
             )
             check("context 200", response.status_code == 200, str(response.status_code))
             payload = response.get_json()
-            check("schema", payload["schema_version"] == "context.now.v6", str(payload))
+            check("schema", payload["schema_version"] == "context.now.v7", str(payload))
             check("focus mode", payload["mode"] == "focus", str(payload))
             check(
                 "important due-today focus",
@@ -239,7 +239,21 @@ def main() -> None:
             check(
                 "learning starts empty",
                 payload["learning"]
-                == {"recent_outcomes": 0, "explicit_feedback": 0, "window_days": 7},
+                == {
+                    "recent_outcomes": 0,
+                    "explicit_feedback": 0,
+                    "window_days": 7,
+                    "ai_suggestions": {
+                        "window_days": 30,
+                        "generated": 0,
+                        "open": 0,
+                        "confirmed": 0,
+                        "modified": 0,
+                        "discarded": 0,
+                        "expired": 0,
+                        "resolved": 0,
+                    },
+                },
                 str(payload["learning"]),
             )
             check(
@@ -303,7 +317,7 @@ def main() -> None:
                 conn.close()
             check("task completed", task_row["status"] == "done", str(dict(task_row)))
             snapshot = json.loads(outcome_row["snapshot_json"])
-            check("snapshot schema", snapshot["schema_version"] == "context.now.v6", str(snapshot))
+            check("snapshot schema", snapshot["schema_version"] == "context.now.v7", str(snapshot))
             check("snapshot reason", snapshot["reason"]["code"] == "due_today", str(snapshot))
             check(
                 "completion creates commitment gap",

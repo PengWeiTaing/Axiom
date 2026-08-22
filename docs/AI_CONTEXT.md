@@ -77,8 +77,10 @@ core/
   weekly_plan.py       # 本周承诺引用、容量、完成保留和可撤销历史
   task_decomposition.py # 一层行动拆解、父行动快照和步骤继承规则
   task_decomposition_ai.py # DeepSeek V4 Pro 可撤回拆解候选与证据上下文
+  task_decomposition_learning.py # 不保存候选正文的确认、修改、放弃结果学习
   lifeline_context.py  # 项目/生活线的层级汇总与统一上下文读取
   context_engine.py    # 此刻的确定性、可解释行动判断
+  context_nudges.py    # 本周高摩擦卡点的确定性证据与忽略规则
   context_commitments.py # 承诺状态、待判断原因和目标行动摘要
   context_outcomes.py  # 推荐完成证据、适配反馈与审计
   init_db.py
@@ -194,10 +196,12 @@ logs/
 - `/memories` / `/memories/<id>` — 记忆 CRUD + confirm/archive
 - `/memories/stats` — 分类统计
 - `/tasks` / `/tasks/<id>` — 任务 CRUD + done/todo/cancel
-- `POST /tasks/<id>/breakdown/suggestion` — 使用 DeepSeek V4 Pro 生成临时拆解候选；只返回可编辑预览，不写入 task 或拆解关系
-- `POST /tasks/<id>/breakdown` — 用户确认后创建最多五个执行步骤，保留父行动关系、标题快照和 `manual_breakdown / ai_suggestion_confirmed` 来源
+- `POST /tasks/<id>/breakdown/suggestion` — 使用 DeepSeek V4 Pro 生成临时拆解候选；只返回可编辑预览和不透明候选 ID，不写入 task 或拆解关系
+- `POST /tasks/<id>/breakdown` — 用户确认后创建最多五个执行步骤，保留父行动关系、标题快照和 `manual_breakdown / ai_suggestion_confirmed` 来源；AI 候选确认同时记录是否被编辑
+- `POST /tasks/<id>/breakdown/suggestions/<suggestion_id>/discard` — 明确放弃临时候选，只记录处理结果
 - `/tasks/today` — 今日任务
-- `/api/context/now` — 此刻的主要行动、备选行动、判断理由、任务信号与承诺断点
+- `/api/context/now` — 此刻的主要行动、备选行动、判断理由、任务信号、承诺断点与最多两条有证据卡点提示
+- `POST /api/context/nudges/<nudge_id>/dismiss` — 本周忽略一条卡点提示，不改动原行动
 - `GET /api/planning/week` — 当前周承诺、步骤与结果汇总、用户周复盘以及从当前脉络产生的候选行动
 - `POST /api/planning/week/tasks/<task_id>` / `DELETE /api/planning/week/selections/<id>` — 明确加入或移出本周
 - `PUT /api/planning/week/review` — 保存用户对本周拆解粒度的判断和可选短说明；复盘继续嵌在“此刻”中
@@ -236,14 +240,16 @@ logs/
 - `/overview/text` 返回中文纯文本总览，适合 iPhone 快捷指令直接显示
 - `/processing/backlog` 会把待补正文、待补转写、待补说明的条目按类型聚合起来，并返回每组的最近样本、快速过滤参数，以及可直接打开的 `next_item`
 - `/processing/next` 会返回当前“下一条待处理记录”，可选按 `type` 过滤，适合作为 Web 端和后续快捷入口的统一直达接口
-- `/api/context/now` 使用 `context.now.v6` 契约，根据行动期限、显式优先级、预估启动成本、生活线近期活动、搁置时长、近期显式反馈、本周明确选择、承诺关联和可选目标日期给出稳定排序，同时返回判断理由、因子、承诺摘要、父行动来源与待判断原因
+- `/api/context/now` 使用 `context.now.v7` 契约，根据行动期限、显式优先级、预估启动成本、生活线近期活动、搁置时长、近期显式反馈、本周明确选择、承诺关联和可选目标日期给出稳定排序，同时返回判断理由、因子、承诺摘要、父行动来源、候选结果统计与最多两条卡点提示
 - 只有 `category=goal AND status=confirmed` 的记忆可以成为承诺；`goal_commitments` 保存完成定义、目标日期、父目标、复盘节奏和 `active / paused / achieved / released` 生命周期。candidate / archived 目标不参与排序，非 active 承诺的 todo 行动保留但退出“此刻”
 - 推进中目标没有 `todo` 行动时进入 `commitments.gaps`；缺行动、临近/逾期、缺完成定义或复盘到期会按优先级进入 `commitments.attention`。前端从“此刻”或目标详情补下一步时，新任务通过 `memory_id` 关联目标并继承目标 `lifeline_id`
 - 推荐完成会写入 `context_action_outcomes`，保留推荐快照与任务结果；显式反馈只在 7 天窗口内衰减生效，紧迫期限优先，没有时长或生活线依据时不得跨任务外推
 - `weekly_plan_items` 只引用现有 task，并保存选择时标题、顺序和移出历史；每周最多五项，完成项保留到周末，本周选择只能作为有界辅助信号，不能覆盖行动自身期限。`weekly_reviews` 保存用户对 `right / too_coarse / too_fine` 的判断和短说明，周计划契约为 `planning.week.v2`
 - `task_decomposition_links` 把子行动绑定到一层父行动并保存父标题快照与来源；子行动继承父行动的 `memory_id / lifeline_id / priority / due_date`，父行动有开放步骤时不进入“此刻”且不能提前完成。周承诺选择父行动后，其执行步骤继承周意图信号并在周计划中汇总真实进度
-- AI 常规调用默认 `deepseek-v4-flash` 并显式关闭思考模式，任务拆解推理默认 `deepseek-v4-pro` 且使用 `high` 思考强度；旧环境值 `deepseek-chat / deepseek-reasoner` 会迁移到对应 V4 模型。拆解候选使用目标、完成定义、已有步骤、近期结果和最近一次用户周复盘，候选本身不持久化
-- `/export` 会包含 `context_action_outcomes.json`、`goal_commitments.json`、`weekly_plan_items.json`、`weekly_reviews.json` 与 `task_decomposition_links.json`；行动结果、反馈、承诺档案、周意图、用户复盘、拆解关系、目标记忆和关联行动可一起恢复，并保留 `lifeline_id`
+- AI 常规调用默认 `deepseek-v4-flash` 并显式关闭思考模式，任务拆解推理默认 `deepseek-v4-pro` 且使用 `high` 思考强度；旧环境值 `deepseek-chat / deepseek-reasoner` 会迁移到对应 V4 模型。拆解候选使用目标、完成定义、已有步骤、近期结果、用户周复盘和足量的候选结果汇总；候选正文不持久化
+- `task_ai_suggestion_events` 只保存模型、置信度、建议步数/总时长、候选指纹和 `open / confirmed / discarded / expired` 结果；`context_nudge_dismissals` 只保存本周忽略记录，均不复制候选或提示正文
+- 卡点提示只来自当前周承诺的可核对事实：大行动连续未变化、拆解步骤全部停滞，或周后半段仍无承诺收口。提示最多两条，可忽略，只打开原任务或周复盘，不触发 DeepSeek
+- `/export` 会包含 `context_action_outcomes.json`、`goal_commitments.json`、`weekly_plan_items.json`、`weekly_reviews.json`、`task_decomposition_links.json`、`task_ai_suggestion_events.json` 与 `context_nudge_dismissals.json`；行动结果、反馈、承诺档案、周意图、用户复盘、拆解关系和轻量学习元数据可一起恢复
 - `/app` 提供当前主前端入口，一级目的地为“此刻 / 资料库 / Atlas”，记录是全局动作；`/atlas` 是同一套前端的 Atlas 深链接
 - 资料库内部有“查找 / 项目脉络”两种查看方式；项目脉络读取现有 lifeline、goal、task、item、memory 和 decision，不创建平行数据。父生活线汇总子线，明确关联承诺但尚未挂载 lifeline 的行动也会跟随承诺出现
 - `/app/legacy` 提供旧移动 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；它保留处理工作台与旧 PWA 链路，但不再作为新功能主入口
