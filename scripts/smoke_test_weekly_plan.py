@@ -120,7 +120,8 @@ def main() -> None:
             empty = empty_response.get_json()
             expected_start = (today - timedelta(days=today.weekday())).isoformat()
             check("week starts monday", empty["week_start"] == expected_start, str(empty))
-            check("weekly schema", empty["schema_version"] == "planning.week.v1", str(empty))
+            check("weekly schema", empty["schema_version"] == "planning.week.v2", str(empty))
+            check("empty review", empty["review"]["state"] == "empty", str(empty["review"]))
             check("weekly capacity", empty["summary"]["capacity"] == 5, str(empty["summary"]))
             check("weekly candidates", len(empty["candidates"]) >= 5, str(empty["candidates"]))
 

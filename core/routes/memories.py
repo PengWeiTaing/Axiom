@@ -7,6 +7,7 @@ from flask import request
 from core._common import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
+    DEEPSEEK_FAST_EXTRA_BODY,
     DEEPSEEK_MODEL,
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -367,6 +368,7 @@ def register_routes(app):
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=400,
                 temperature=0.5,
+                extra_body=DEEPSEEK_FAST_EXTRA_BODY,
             )
             text = response.choices[0].message.content.strip()
         except Exception as exc:

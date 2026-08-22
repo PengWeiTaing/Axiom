@@ -10,16 +10,23 @@ import {
   Clock,
   FileText,
   GitFork,
+  History,
   Inbox,
   Plus,
   RefreshCw,
+  Save,
   Target,
   X,
 } from '@lucide/vue';
 import { ApiError } from '@/api/client';
 import { completeContextAction, getNowContext, submitContextFeedback } from '@/api/context';
 import { listDecisions, listMemories } from '@/api/knowledge';
-import { addWeeklyPlanTask, getWeeklyPlan, removeWeeklyPlanSelection } from '@/api/planning';
+import {
+  addWeeklyPlanTask,
+  getWeeklyPlan,
+  removeWeeklyPlanSelection,
+  saveWeeklyReview,
+} from '@/api/planning';
 import { getOverview } from '@/api/records';
 import type {
   ContextAction,
@@ -37,6 +44,7 @@ import type {
   Task,
   WeeklyPlanItem,
   WeeklyPlanPayload,
+  WeeklyDecompositionFit,
 } from '@/api/types';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
@@ -63,11 +71,24 @@ const feedbackSubmitting = ref(false);
 const weeklyPlan = ref<WeeklyPlanPayload | null>(null);
 const weekEditing = ref(false);
 const weekMutatingId = ref<number | null>(null);
+const weekReviewOpen = ref(false);
+const weekReviewSaving = ref(false);
+const weekReviewSaved = ref(false);
+const weekReviewDraft = ref({
+  decomposition_fit: 'right' as WeeklyDecompositionFit,
+  reflection: '',
+});
 
 const feedbackOptions: { value: ContextFitFeedback; label: string }[] = [
   { value: 'right', label: '正合适' },
   { value: 'too_heavy', label: '有点重' },
   { value: 'wrong_time', label: '时机不对' },
+];
+
+const weekReviewOptions: { value: WeeklyDecompositionFit; label: string }[] = [
+  { value: 'right', label: '粒度合适' },
+  { value: 'too_coarse', label: '步骤偏大' },
+  { value: 'too_fine', label: '步骤偏碎' },
 ];
 
 const dateLabel = new Intl.DateTimeFormat('zh-CN', {
@@ -136,6 +157,15 @@ function weeklyItemMeta(item: WeeklyPlanItem): string {
   return item.task.estimated_minutes ? `预计 ${item.task.estimated_minutes} 分钟` : '本周已承诺';
 }
 
+function syncWeekReviewDraft(plan: WeeklyPlanPayload | null) {
+  const saved = plan?.review.saved_feedback;
+  weekReviewDraft.value = {
+    decomposition_fit: saved?.decomposition_fit ?? 'right',
+    reflection: saved?.reflection ?? '',
+  };
+  weekReviewSaved.value = false;
+}
+
 function itemTitle(item: Item): string {
   return compact(item.content || item.derived_text || item.transcript_text || item.original_name, `记录 #${item.id}`);
 }
@@ -160,6 +190,7 @@ async function load() {
     overview.value = overviewPayload;
     nowContext.value = contextPayload;
     weeklyPlan.value = weeklyPayload;
+    syncWeekReviewDraft(weeklyPayload);
     candidateMemories.value = memoryPayload.memories;
     pendingDecisions.value = decisionPayload.decisions;
   } catch (err) {
@@ -218,6 +249,31 @@ async function removeFromWeek(item: WeeklyPlanItem) {
     error.value = err instanceof ApiError ? err.message : '移出本周失败';
   } finally {
     weekMutatingId.value = null;
+  }
+}
+
+function toggleWeekReview() {
+  weekReviewOpen.value = !weekReviewOpen.value;
+  if (weekReviewOpen.value) syncWeekReviewDraft(weeklyPlan.value);
+}
+
+async function submitWeekReview() {
+  if (!weeklyPlan.value || weekReviewSaving.value) return;
+  weekReviewSaving.value = true;
+  weekReviewSaved.value = false;
+  error.value = null;
+  try {
+    const plan = await saveWeeklyReview(
+      weekReviewDraft.value.decomposition_fit,
+      weekReviewDraft.value.reflection.trim(),
+    );
+    weeklyPlan.value = plan;
+    syncWeekReviewDraft(plan);
+    weekReviewSaved.value = true;
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '本周复盘保存失败';
+  } finally {
+    weekReviewSaving.value = false;
   }
 }
 
@@ -401,15 +457,26 @@ watch(() => props.revision, load);
             {{ weeklyPlan.summary.completed }} / {{ weeklyPlan.summary.selected }} 已完成
           </span>
           <span v-else>尚未选择</span>
-          <button
-            class="week-edit-button"
-            type="button"
-            :disabled="loading || weeklyPlan?.summary.capacity_remaining === 0"
-            @click="weekEditing = !weekEditing"
-          >
-            <CalendarDays :size="15" />
-            <span>{{ weekEditing ? '收起' : weeklySelected.length ? '调整' : '选择' }}</span>
-          </button>
+          <div class="week-button-group">
+            <button
+              class="week-edit-button"
+              type="button"
+              :disabled="loading || !weeklyPlan?.summary.selected"
+              @click="toggleWeekReview"
+            >
+              <History :size="15" />
+              <span>{{ weekReviewOpen ? '收起回看' : '回看' }}</span>
+            </button>
+            <button
+              class="week-edit-button"
+              type="button"
+              :disabled="loading || weeklyPlan?.summary.capacity_remaining === 0"
+              @click="weekEditing = !weekEditing"
+            >
+              <CalendarDays :size="15" />
+              <span>{{ weekEditing ? '收起' : weeklySelected.length ? '调整' : '选择' }}</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -476,6 +543,62 @@ watch(() => props.revision, load);
           </div>
         </div>
         <p v-else class="week-empty">当前没有其他可加入的行动。</p>
+      </div>
+
+      <div v-if="weekReviewOpen && weeklyPlan" class="week-review">
+        <header class="week-review-header">
+          <div>
+            <span>本周回看</span>
+            <small>{{ weeklyPlan.review.state === 'saved' ? '已形成可供下次拆解使用的判断' : '基于这周真实行动证据' }}</small>
+          </div>
+          <small>{{ weeklyPlan.review.review_window_open ? '适合完成复盘' : '可以先记下阶段判断' }}</small>
+        </header>
+        <div class="week-review-stats">
+          <div>
+            <strong>{{ weeklyPlan.review.commitments.resolved }} / {{ weeklyPlan.review.commitments.selected }}</strong>
+            <span>承诺已处理</span>
+          </div>
+          <div>
+            <strong>{{ weeklyPlan.review.steps.done }} / {{ weeklyPlan.review.steps.total }}</strong>
+            <span>步骤已完成</span>
+          </div>
+          <div>
+            <strong>{{ weeklyPlan.review.outcomes.rated }} / {{ weeklyPlan.review.outcomes.completed }}</strong>
+            <span>完成后有反馈</span>
+          </div>
+        </div>
+        <p class="week-review-recommendation">{{ weeklyPlan.review.recommendation }}</p>
+        <form class="week-review-form" @submit.prevent="submitWeekReview">
+          <div class="week-review-fit" role="group" aria-label="评价本周拆解粒度">
+            <button
+              v-for="option in weekReviewOptions"
+              :key="option.value"
+              type="button"
+              :class="{ active: weekReviewDraft.decomposition_fit === option.value }"
+              :aria-pressed="weekReviewDraft.decomposition_fit === option.value"
+              :disabled="weekReviewSaving"
+              @click="weekReviewDraft.decomposition_fit = option.value; weekReviewSaved = false"
+            >{{ option.label }}</button>
+          </div>
+          <textarea
+            v-model="weekReviewDraft.reflection"
+            maxlength="1000"
+            rows="3"
+            placeholder="这周哪一步最容易开始，哪一步仍然卡住？"
+            @input="weekReviewSaved = false"
+          />
+          <div class="week-review-save">
+            <span v-if="weekReviewSaved">本周判断已保存</span>
+            <span v-else-if="weeklyPlan.review.saved_feedback">
+              上次保存：{{ formatRelative(weeklyPlan.review.saved_feedback.reviewed_at) }}
+            </span>
+            <span v-else />
+            <button type="submit" :disabled="weekReviewSaving">
+              <Save :size="15" />
+              <span>{{ weekReviewSaving ? '保存中' : '保存本周判断' }}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </section>
 
@@ -905,6 +1028,12 @@ h2 {
   gap: 14px;
 }
 
+.week-button-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .week-edit-button {
   min-height: 32px;
   display: inline-flex;
@@ -1028,6 +1157,152 @@ h2 {
 .week-add:hover:not(:disabled) {
   color: var(--text-1);
   background: color-mix(in srgb, var(--focus) 10%, transparent);
+}
+
+.week-review {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-1);
+}
+
+.week-review-header,
+.week-review-header > div,
+.week-review-save {
+  display: flex;
+  align-items: center;
+}
+
+.week-review-header {
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.week-review-header > div {
+  min-width: 0;
+  gap: 10px;
+}
+
+.week-review-header span {
+  color: var(--text-2);
+  font-size: var(--fs-3);
+  font-weight: 560;
+}
+
+.week-review-header small,
+.week-review-save > span {
+  color: var(--text-5);
+  font-size: var(--fs-1);
+}
+
+.week-review-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.week-review-stats > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-left: 1px solid var(--line-1);
+}
+
+.week-review-stats > div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.week-review-stats strong {
+  color: var(--text-1);
+  font-size: var(--fs-4);
+  font-weight: 560;
+}
+
+.week-review-stats span {
+  color: var(--text-4);
+  font-size: var(--fs-1);
+}
+
+.week-review-recommendation {
+  margin: 0;
+  padding-left: 12px;
+  color: var(--text-3);
+  font-size: var(--fs-3);
+  line-height: 1.65;
+  border-left: 2px solid rgba(224, 170, 93, 0.35);
+}
+
+.week-review-form {
+  display: grid;
+  gap: 12px;
+}
+
+.week-review-fit {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--line-1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.week-review-fit button {
+  min-height: 36px;
+  padding: 0 10px;
+  color: var(--text-4);
+  font-size: var(--fs-2);
+  border-left: 1px solid var(--line-1);
+}
+
+.week-review-fit button:first-child {
+  border-left: 0;
+}
+
+.week-review-fit button.active {
+  color: var(--text-1);
+  background: rgba(224, 170, 93, 0.09);
+}
+
+.week-review-form textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  padding: 12px;
+  color: var(--text-1);
+  font: inherit;
+  line-height: 1.6;
+  border: 1px solid var(--line-1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.week-review-form textarea:focus {
+  border-color: var(--line-2);
+  outline: none;
+}
+
+.week-review-save {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.week-review-save button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  color: var(--text-2);
+  font-size: var(--fs-2);
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+}
+
+.week-review-save button:hover:not(:disabled) {
+  color: var(--text-1);
 }
 
 .status-strip {
@@ -1242,6 +1517,48 @@ h2 {
     align-items: flex-end;
     flex-direction: column-reverse;
     gap: 5px;
+  }
+
+  .week-button-group {
+    gap: 6px;
+  }
+
+  .week-edit-button {
+    padding: 0 7px;
+  }
+
+  .week-review-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .week-review-header > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .week-review-stats > div {
+    padding: 12px 9px;
+  }
+
+  .week-review-stats > div:first-child {
+    padding-left: 0;
+  }
+
+  .week-review-fit button {
+    min-height: 42px;
+    padding: 0 6px;
+  }
+
+  .week-review-save {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .week-review-save button {
+    justify-content: center;
   }
 
   .today-columns {

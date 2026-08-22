@@ -225,8 +225,24 @@ AUTOMATION_IMAGE_DESCRIBE_TIMEOUT_SECONDS = int(
     os.environ.get("AXIOM_IMAGE_DESCRIBE_TIMEOUT_SECONDS", "300")
 )
 DEEPSEEK_API_KEY = os.environ.get("AXIOM_DEEPSEEK_API_KEY", "")
-DEEPSEEK_MODEL = os.environ.get("AXIOM_DEEPSEEK_MODEL", "deepseek-chat")
+_DEEPSEEK_MODEL_ALIASES = {
+    "deepseek-chat": "deepseek-v4-flash",
+    "deepseek-reasoner": "deepseek-v4-pro",
+}
+
+
+def _deepseek_model(env_name: str, default: str) -> str:
+    configured = os.environ.get(env_name, "").strip() or default
+    return _DEEPSEEK_MODEL_ALIASES.get(configured, configured)
+
+
+DEEPSEEK_MODEL = _deepseek_model("AXIOM_DEEPSEEK_MODEL", "deepseek-v4-flash")
+DEEPSEEK_REASONING_MODEL = _deepseek_model(
+    "AXIOM_DEEPSEEK_REASONING_MODEL",
+    "deepseek-v4-pro",
+)
 DEEPSEEK_BASE_URL = os.environ.get("AXIOM_DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+DEEPSEEK_FAST_EXTRA_BODY = {"thinking": {"type": "disabled"}}
 SUGGESTIONS_CACHE: dict = {"text": "", "generated_at": "", "ttl_seconds": 300}
 AUTOMATION_JOBS = {
     "review_day": {

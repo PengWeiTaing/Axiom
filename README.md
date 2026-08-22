@@ -125,7 +125,7 @@ Axiom 的理想工作流是：
 - 后端：Python / Flask / gunicorn
 - 存储：SQLite + FTS5 + 文件系统
 - 前端：Vite + Vue 3，另有 React Learning Board
-- AI：OpenAI SDK，当前可接 DeepSeek 等模型用于解析、转写、描述、分类和聊天
+- AI：OpenAI SDK + DeepSeek V4；V4 Flash 负责日常解析与分类，V4 Pro 负责需要更强推理的可撤回建议
 - 部署：Nginx 反代 + systemd services/timers
 - 桌面端：Tauri v2 基础应用
 - 测试：compileall、receiver/web app/inbox smoke tests、consistency check
@@ -157,8 +157,8 @@ Axiom 已经越过“能不能收集记录”的阶段，正在进入“把个�
 仍在推进的主线：
 
 - Atlas 交互与图谱编辑能力。
-- 在现有“承诺档案 -> 本周选择 -> 行动拆解 -> 下一步 -> 结果 -> 复盘”闭环上继续发展可确认、可撤回的 AI 建议与周复盘。
-- AI 主动建议与长期推理层。
+- “承诺档案 -> 本周选择 -> AI/手动拆解 -> 下一步 -> 结果 -> 周复盘”闭环已形成，下一步用真实使用校准候选接受率和步骤粒度。
+- 在高摩擦且证据充分的时刻试做可忽略、可追溯的主动提示，再逐步发展长期推理层。
 - 个体差异适配：能量、注意力、启动困难和节奏反馈。
 - 白板能力与图谱/对象系统的连接。
 

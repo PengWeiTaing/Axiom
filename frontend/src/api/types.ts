@@ -113,6 +113,7 @@ export interface MemoryStatsPayload {
 
 export type TaskStatus = 'todo' | 'done' | 'cancelled';
 export type TaskPriority = 'high' | 'medium' | 'low';
+export type TaskBreakdownSource = 'manual_breakdown' | 'ai_suggestion_confirmed';
 
 export interface TaskParent {
   id: number | null;
@@ -120,7 +121,7 @@ export interface TaskParent {
   status?: TaskStatus | null;
   available: boolean;
   position?: number;
-  source?: 'manual_breakdown' | string;
+  source?: TaskBreakdownSource | string;
   linked_at?: string;
 }
 
@@ -285,10 +286,53 @@ export interface TaskBreakdownPayload {
   schema_version: 'task.decomposition.v1';
   task: Task;
   created_task_ids: number[];
+  source: TaskBreakdownSource;
+}
+
+export interface TaskBreakdownSuggestionPayload {
+  schema_version: 'task.decomposition.suggestion.v1';
+  model: string;
+  thinking_mode: 'enabled';
+  generated_at: string;
+  scope: string;
+  confidence: 'low' | 'medium' | 'high';
+  basis: string[];
+  rationale: string;
+  steps: { title: string; estimated_minutes: number }[];
+}
+
+export type WeeklyDecompositionFit = 'right' | 'too_coarse' | 'too_fine';
+
+export interface WeeklyReviewPayload {
+  schema_version: 'planning.week.review.v1';
+  state: 'empty' | 'ready' | 'saved';
+  review_window_open: boolean;
+  evidence_level: 'low' | 'medium' | 'high';
+  commitments: {
+    selected: number;
+    resolved: number;
+    completed: number;
+    open: number;
+    removed: number;
+    decomposed: number;
+  };
+  steps: TaskProgress;
+  outcomes: {
+    completed: number;
+    rated: number;
+    feedback: Record<ContextFitFeedback, number>;
+  };
+  recommendation: string;
+  saved_feedback: {
+    decomposition_fit: WeeklyDecompositionFit;
+    decomposition_fit_label: string;
+    reflection: string | null;
+    reviewed_at: string;
+  } | null;
 }
 
 export interface WeeklyPlanPayload {
-  schema_version: 'planning.week.v1';
+  schema_version: 'planning.week.v2';
   week_start: string;
   week_end: string;
   status: 'empty' | 'active' | 'complete';
@@ -303,6 +347,7 @@ export interface WeeklyPlanPayload {
   };
   selected: WeeklyPlanItem[];
   candidates: ContextAction[];
+  review: WeeklyReviewPayload;
 }
 
 export interface WeeklyPlanMutationPayload {

@@ -19,12 +19,18 @@ def run_command(args: list[str]) -> str:
     result = subprocess.run(
         args,
         cwd=str(REPO_ROOT),
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         encoding="utf-8",
         env=env,
     )
+    if result.returncode != 0:
+        command = " ".join(args)
+        raise AssertionError(
+            f"command failed ({result.returncode}): {command}\n"
+            f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
     return result.stdout
 
 
@@ -93,6 +99,14 @@ def insert_item(
             VALUES (?, ?, ?, ?, ?)
             """,
             (item_type, content, str(file_path), source, created_at),
+        )
+        conn.execute(
+            """
+            INSERT INTO items_fts (
+                rowid, content, original_name, derived_text, transcript_text
+            ) VALUES (?, ?, NULL, NULL, NULL)
+            """,
+            (int(cursor.lastrowid), content),
         )
         conn.commit()
         return int(cursor.lastrowid)

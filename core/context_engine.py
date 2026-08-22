@@ -101,6 +101,8 @@ def _task_payload(row) -> dict[str, Any]:
             "id": row["decomposition_parent_id"],
             "title": row["current_parent_title"] or row["decomposition_parent_title"],
             "available": row["decomposition_parent_id"] is not None,
+            "position": row["decomposition_position"],
+            "source": row["decomposition_source"],
         }
     return {
         "id": row["id"],
@@ -498,6 +500,8 @@ def build_now_context(
                 gc.target_date AS goal_target_date,
                 td.parent_task_id AS decomposition_parent_id,
                 td.parent_task_title AS decomposition_parent_title,
+                td.position AS decomposition_position,
+                td.source AS decomposition_source,
                 pt.title AS current_parent_title
             FROM tasks t
             LEFT JOIN lifelines l ON l.id = t.lifeline_id

@@ -704,16 +704,18 @@ def main() -> None:
                         vue_search_date = vue_search_created_at[:10] or current_local_date_iso()
                         vue_page.goto(f"{base_url}/app", wait_until="networkidle")
                         vue_file_note = "Vue smart input attachment"
-                        vue_page.locator(".smart-input textarea").fill(vue_file_note)
+                        vue_page.get_by_role("button", name="记录", exact=True).click()
+                        capture_dialog = vue_page.get_by_role("dialog", name="记录")
+                        capture_dialog.locator("textarea").fill(vue_file_note)
                         vue_page.set_input_files(
-                            "#smart-file-input",
+                            ".quick-card .file-input",
                             {
                                 "name": "vue-smart-input.png",
                                 "mimeType": "image/png",
                                 "buffer": PNG_1X1_BYTES,
                             },
                         )
-                        vue_page.locator(".smart-input .chip").filter(
+                        capture_dialog.locator(".file-row").filter(
                             has_text="vue-smart-input.png"
                         ).wait_for(timeout=15_000)
                         with vue_page.expect_response(
@@ -721,15 +723,19 @@ def main() -> None:
                             and response.request.method == "POST"
                             and response.status == 200
                         ) as vue_upload_info:
-                            vue_page.get_by_label("提交").click()
+                            capture_dialog.get_by_role("button", name="记录", exact=True).click()
                         vue_upload_payload = vue_upload_info.value.json()
                         vue_file_item_id = vue_upload_payload["item"]["id"]
-                        vue_page.locator(".smart-input").get_by_text("文件", exact=False).wait_for(timeout=15_000)
+                        vue_page.locator(".recent-list .recent-row").filter(
+                            has_text=vue_file_note
+                        ).first.wait_for(timeout=15_000)
                         with vue_page.expect_response(
                             lambda response: response.url.endswith(f"/file/{vue_file_item_id}")
                             and response.status == 200
                         ):
-                            vue_page.locator(".timeline .entry").filter(has_text=vue_file_note).first.click()
+                            vue_page.locator(".recent-list .recent-row").filter(
+                                has_text=vue_file_note
+                            ).first.click()
                         vue_page.locator(".drawer-panel img.preview-img").wait_for(timeout=15_000)
                         with vue_page.expect_download() as vue_file_download_info:
                             vue_page.get_by_role("button", name="下载文件").click()
@@ -739,18 +745,8 @@ def main() -> None:
                                 f"unexpected Vue item download filename: {vue_file_download.suggested_filename}"
                             )
                         vue_page.get_by_label("关闭").click()
-                        vue_page.locator(".brand .action-btn").click()
-                        vue_page.locator(".search-overlay").wait_for(timeout=15_000)
-                        with vue_page.expect_response(
-                            lambda response: "/search/all" in response.url and response.status == 200
-                        ):
-                            vue_page.locator(".search-overlay input").fill(vue_search_text)
-                            vue_page.wait_for_timeout(260)
-                        vue_page.locator(".search-overlay .result").filter(has_text=vue_search_text).first.click()
-                        vue_page.locator(".drawer-panel").get_by_text(vue_search_text, exact=False).wait_for(timeout=15_000)
-                        vue_page.get_by_label("关闭").click()
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
-                        vue_page.get_by_role("heading", name="搜索").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="资料库").wait_for(timeout=15_000)
                         vue_page.get_by_label("搜索查询").fill(vue_search_text)
                         with vue_page.expect_response(
                             lambda response: "/search/all" in response.url and response.status == 200
@@ -869,7 +865,6 @@ def main() -> None:
                         vue_page.get_by_text("导出已开始", exact=False).wait_for(timeout=15_000)
                         vue_page.goto(f"{base_url}/app?mode=cosmos", wait_until="networkidle")
                         vue_page.locator(".cosmos-view").wait_for(timeout=15_000)
-                        vue_page.locator(".mode-tab.active").filter(has_text="Cosmos").wait_for(timeout=15_000)
                         vue_page.wait_for_function(
                             """
                             () => document.querySelector(".cosmos-canvas")
@@ -953,8 +948,9 @@ def main() -> None:
                             raise AssertionError(f"Vue recent action restore missed smoke image ids: {restored_ids}")
 
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
-                        vue_page.get_by_role("heading", name="搜索").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="资料库").wait_for(timeout=15_000)
                         vue_page.get_by_label("搜索查询").fill("pending-shot.png")
+                        vue_page.get_by_role("button", name="筛选").click()
                         vue_page.get_by_label("记录类型").select_option("image")
                         vue_page.get_by_label("处理状态").select_option("pending")
                         with vue_page.expect_response(
@@ -1041,7 +1037,7 @@ def main() -> None:
                             timeout=15_000,
                         )
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
-                        vue_page.get_by_role("heading", name="搜索").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="资料库").wait_for(timeout=15_000)
                         vue_page.get_by_label("搜索查询").fill(vue_task_title)
                         with vue_page.expect_response(
                             lambda response: "/search/all" in response.url and response.status == 200

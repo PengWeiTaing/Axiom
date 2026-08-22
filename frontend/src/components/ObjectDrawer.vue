@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Check, GitFork, ListTree, Pencil, Plus, X } from '@lucide/vue';
+import { Check, GitFork, ListTree, Pencil, Plus, Sparkles, X } from '@lucide/vue';
 import { ApiError } from '@/api/client';
 import {
   cancelTask,
@@ -9,6 +9,7 @@ import {
   listMemories,
   reviewDecision,
   reviewGoalCommitment,
+  suggestTaskBreakdown,
   updateGoalCommitment,
 } from '@/api/knowledge';
 import {
@@ -33,6 +34,8 @@ import type {
   ObjectKind,
   ObjectTarget,
   Task,
+  TaskBreakdownSource,
+  TaskBreakdownSuggestionPayload,
 } from '@/api/types';
 
 const props = withDefaults(defineProps<{
@@ -63,6 +66,8 @@ const taskBreakdownDrafts = ref([
   { title: '', estimated_minutes: 15 },
   { title: '', estimated_minutes: 15 },
 ]);
+const taskBreakdownSource = ref<TaskBreakdownSource>('manual_breakdown');
+const taskBreakdownSuggestion = ref<TaskBreakdownSuggestionPayload | null>(null);
 const goalProfileDraft = ref({
   success_criteria: '',
   target_date: '',
@@ -109,6 +114,8 @@ watch(
     goalProfileEditing.value = props.intent === 'edit-goal';
     goalActionDraft.value = { title: '', estimated_minutes: 25 };
     taskBreakdownOpen.value = false;
+    taskBreakdownSource.value = 'manual_breakdown';
+    taskBreakdownSuggestion.value = null;
     taskBreakdownDrafts.value = [
       { title: '', estimated_minutes: 15 },
       { title: '', estimated_minutes: 15 },
@@ -145,6 +152,11 @@ const canBreakDownTask = computed(() => (
   && taskBreakdownCapacity.value > 0
 ));
 const taskHasOpenSteps = computed(() => taskStepProgress.value.todo > 0);
+const taskSuggestionConfidenceLabel = computed(() => ({
+  high: '依据较完整',
+  medium: '依据有限',
+  low: '仅供起步',
+}[taskBreakdownSuggestion.value?.confidence || 'low']));
 const availableParentGoals = computed(() => goalOptions.value.filter((goal) => goal.id !== memory.value?.id));
 const goalProgress = computed(() => {
   const linked = memory.value?.linked_tasks || [];
@@ -276,7 +288,33 @@ function startTaskBreakdown() {
     title: '',
     estimated_minutes: 15,
   }));
+  taskBreakdownSource.value = 'manual_breakdown';
+  taskBreakdownSuggestion.value = null;
   taskBreakdownOpen.value = true;
+}
+
+async function requestTaskBreakdownSuggestion() {
+  if (!task.value || !canBreakDownTask.value || acting.value) return;
+  acting.value = true;
+  error.value = null;
+  feedback.value = null;
+  try {
+    const suggestion = await suggestTaskBreakdown(task.value.id);
+    taskBreakdownDrafts.value = suggestion.steps.map((step) => ({ ...step }));
+    taskBreakdownSource.value = 'ai_suggestion_confirmed';
+    taskBreakdownSuggestion.value = suggestion;
+    taskBreakdownOpen.value = true;
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : 'AI 拆解候选生成失败';
+  } finally {
+    acting.value = false;
+  }
+}
+
+function dismissTaskBreakdown() {
+  taskBreakdownOpen.value = false;
+  taskBreakdownSource.value = 'manual_breakdown';
+  taskBreakdownSuggestion.value = null;
 }
 
 function addTaskBreakdownRow() {
@@ -303,10 +341,11 @@ async function submitTaskBreakdown() {
   error.value = null;
   feedback.value = null;
   try {
-    const payload = await breakDownTask(task.value.id, steps);
+    const payload = await breakDownTask(task.value.id, steps, taskBreakdownSource.value);
     setDetail(payload.task as unknown as ObjectDetail);
-    taskBreakdownOpen.value = false;
-    feedback.value = `已拆出 ${payload.created_task_ids.length} 个步骤，接下来会由“此刻”逐步推进`;
+    const confirmedFromAI = payload.source === 'ai_suggestion_confirmed';
+    dismissTaskBreakdown();
+    feedback.value = `${confirmedFromAI ? '已确认 AI 候选，' : ''}已创建 ${payload.created_task_ids.length} 个步骤，接下来会由“此刻”逐步推进`;
     emit('changed');
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '行动拆解失败';
@@ -502,7 +541,10 @@ useWindowEventListener('keydown', onKey);
             >
               <span>来自上层行动</span>
               <strong>{{ task.parent_task.title }}</strong>
-              <small>这是从上层行动中拆出的第 {{ task.parent_task.position ?? '-' }} 步</small>
+              <small>
+                {{ task.parent_task.source === 'ai_suggestion_confirmed' ? '由 AI 候选确认' : '由用户手动拆解' }}
+                · 第 {{ task.parent_task.position ?? '-' }} 步
+              </small>
             </button>
             <article v-else-if="task.parent_task" class="detail-block task-parent-source-missing">
               <span>原始行动已删除</span>
@@ -541,11 +583,23 @@ useWindowEventListener('keydown', onKey);
             <form v-if="taskBreakdownOpen" class="task-breakdown-form" @submit.prevent="submitTaskBreakdown">
               <header>
                 <div>
-                  <ListTree :size="17" />
-                  <span>拆成可以直接开始的步骤</span>
+                  <Sparkles v-if="taskBreakdownSuggestion" :size="17" />
+                  <ListTree v-else :size="17" />
+                  <span>{{ taskBreakdownSuggestion ? '检查 AI 拆解候选' : '拆成可以直接开始的步骤' }}</span>
                 </div>
-                <small>最多 {{ taskBreakdownCapacity }} 步</small>
+                <small>{{ taskBreakdownSuggestion ? '尚未写入行动' : `最多 ${taskBreakdownCapacity} 步` }}</small>
               </header>
+              <div v-if="taskBreakdownSuggestion" class="task-ai-suggestion">
+                <div>
+                  <strong>{{ taskBreakdownSuggestion.model }}</strong>
+                  <span>{{ taskSuggestionConfidenceLabel }}</span>
+                </div>
+                <p>{{ taskBreakdownSuggestion.rationale }}</p>
+                <small>{{ taskBreakdownSuggestion.scope }}</small>
+                <ul>
+                  <li v-for="basis in taskBreakdownSuggestion.basis" :key="basis">{{ basis }}</li>
+                </ul>
+              </div>
               <div
                 v-for="(step, index) in taskBreakdownDrafts"
                 :key="index"
@@ -590,14 +644,16 @@ useWindowEventListener('keydown', onKey);
                   <span>再加一步</span>
                 </button>
                 <span />
-                <button type="button" :disabled="acting" @click="taskBreakdownOpen = false">取消</button>
+                <button type="button" :disabled="acting" @click="dismissTaskBreakdown">
+                  {{ taskBreakdownSuggestion ? '放弃候选' : '取消' }}
+                </button>
                 <button
                   class="task-breakdown-submit"
                   type="submit"
                   :disabled="acting || !taskBreakdownDrafts.some((step) => step.title.trim())"
                 >
                   <GitFork :size="15" />
-                  <span>{{ acting ? '保存中' : '保存步骤' }}</span>
+                  <span>{{ acting ? '保存中' : taskBreakdownSuggestion ? '确认并创建' : '保存步骤' }}</span>
                 </button>
               </div>
             </form>
@@ -834,10 +890,20 @@ useWindowEventListener('keydown', onKey);
             >取消</button>
             <button
               v-if="canBreakDownTask && !taskBreakdownOpen"
+              class="ai-action-button"
+              type="button"
+              :disabled="acting"
+              @click="requestTaskBreakdownSuggestion"
+            >
+              <Sparkles :size="15" />
+              <span>{{ acting ? '生成候选中' : 'AI 建议' }}</span>
+            </button>
+            <button
+              v-if="canBreakDownTask && !taskBreakdownOpen"
               type="button"
               :disabled="acting"
               @click="startTaskBreakdown"
-            >{{ taskSubtasks.length ? '补步骤' : '拆成步骤' }}</button>
+            >{{ taskSubtasks.length ? '手动补步骤' : '手动拆解' }}</button>
           </template>
           <template v-if="memory">
             <button
@@ -1372,6 +1438,53 @@ useWindowEventListener('keydown', onKey);
   border-bottom: 1px solid var(--line-1);
 }
 
+.task-ai-suggestion {
+  display: grid;
+  gap: var(--s-2);
+  padding-left: var(--s-3);
+  border-left: 2px solid rgba(110, 231, 208, 0.3);
+}
+
+.task-ai-suggestion > div,
+.task-ai-suggestion ul {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.task-ai-suggestion strong {
+  color: var(--accent-bright);
+  font-size: var(--fs-2);
+  font-weight: 560;
+}
+
+.task-ai-suggestion span,
+.task-ai-suggestion small,
+.task-ai-suggestion li {
+  color: var(--text-4);
+  font-size: var(--fs-1);
+}
+
+.task-ai-suggestion p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-3);
+  line-height: var(--lh-base);
+}
+
+.task-ai-suggestion ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-ai-suggestion li + li::before {
+  content: "·";
+  margin-right: var(--s-2);
+  color: var(--text-5);
+}
+
 .task-breakdown-row {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) 82px 30px;
@@ -1493,6 +1606,15 @@ useWindowEventListener('keydown', onKey);
 .object-actions button:hover {
   border-color: rgba(110, 231, 208, 0.25);
   color: var(--text-1);
+}
+
+.object-actions .ai-action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  border-color: rgba(110, 231, 208, 0.25);
+  color: var(--accent-bright);
 }
 
 .object-drawer-enter-active,

@@ -34,6 +34,7 @@ def main() -> None:
             local_date_now,
             utc_now,
         )
+        from core import task_decomposition_ai  # noqa: WPS433
         from core.routes.context import register_routes as register_context  # noqa: WPS433
         from core.routes.governance import register_routes as register_governance  # noqa: WPS433
         from core.routes.lifelines import register_routes as register_lifelines  # noqa: WPS433
@@ -47,6 +48,27 @@ def main() -> None:
         register_lifelines(app)
         register_planning(app)
         register_tasks(app)
+
+        def fake_suggestion(conn, task_id):
+            row = conn.execute("SELECT title FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            check("suggestion sees task", row is not None, str(task_id))
+            return {
+                "schema_version": "task.decomposition.suggestion.v1",
+                "model": "deepseek-v4-pro",
+                "thinking_mode": "enabled",
+                "generated_at": utc_now().isoformat(timespec="seconds"),
+                "scope": "仅用于当前行动的一层拆解，确认后才创建步骤",
+                "confidence": "high",
+                "basis": ["行动详情", "承诺完成定义"],
+                "rationale": "先澄清数据关系，再验证真实交互。",
+                "steps": [
+                    {"title": "整理任务数据关系", "estimated_minutes": 20},
+                    {"title": "接入此刻排序", "estimated_minutes": 25},
+                    {"title": "验证移动端交互", "estimated_minutes": 15},
+                ],
+            }
+
+        task_decomposition_ai.generate_task_decomposition_suggestion = fake_suggestion
 
         now = utc_now().isoformat(timespec="seconds")
         due_date = (local_date_now() + timedelta(days=2)).isoformat()
@@ -107,10 +129,22 @@ def main() -> None:
             )
             check("empty decomposition rejected", invalid.status_code == 400, str(invalid.status_code))
 
+            suggestion = client.post(
+                f"/tasks/{parent_id}/breakdown/suggestion",
+                headers=headers,
+            )
+            check("AI suggestion generated", suggestion.status_code == 200, str(suggestion.status_code))
+            suggestion_payload = suggestion.get_json()
+            check("new DeepSeek model", suggestion_payload["model"] == "deepseek-v4-pro", str(suggestion_payload))
+            check("suggestion is reversible", len(suggestion_payload["steps"]) == 3, str(suggestion_payload))
+            untouched = client.get(f"/tasks/{parent_id}", headers=headers).get_json()["task"]
+            check("suggestion does not create tasks", untouched["subtask_progress"]["total"] == 0, str(untouched))
+
             breakdown = client.post(
                 f"/tasks/{parent_id}/breakdown",
                 headers=headers,
                 json={
+                    "source": "ai_suggestion_confirmed",
                     "steps": [
                         {"title": "整理任务数据关系", "estimated_minutes": 20},
                         {"title": "接入此刻排序", "estimated_minutes": 25},
@@ -127,6 +161,7 @@ def main() -> None:
             )
             child_ids = [int(value) for value in breakdown_payload["created_task_ids"]]
             check("three child tasks", len(child_ids) == 3, str(child_ids))
+            check("confirmed AI source", breakdown_payload["source"] == "ai_suggestion_confirmed", str(breakdown_payload))
 
             parent = client.get(f"/tasks/{parent_id}", headers=headers).get_json()["task"]
             check("parent progress", parent["subtask_progress"]["todo"] == 3, str(parent))
@@ -163,6 +198,11 @@ def main() -> None:
                 "child keeps parent source",
                 child_action["task"]["parent_task"]["id"] == parent_id,
                 str(child_action),
+            )
+            check(
+                "child records AI-confirmed provenance",
+                child_action["task"]["parent_task"]["source"] == "ai_suggestion_confirmed",
+                str(child_action["task"]["parent_task"]),
             )
             check(
                 "weekly intent reaches children",
@@ -203,6 +243,35 @@ def main() -> None:
             )
             check("complete child from current context", completed.status_code == 200, str(completed.status_code))
             check("child completion records outcome", completed.get_json()["outcome"]["task_id"] == completed_child_id)
+            outcome_id = int(completed.get_json()["outcome"]["id"])
+            feedback_response = client.post(
+                f"/api/context/outcomes/{outcome_id}/feedback",
+                headers=headers,
+                json={"fit_feedback": "too_heavy"},
+            )
+            check("step feedback recorded", feedback_response.status_code == 200, str(feedback_response.status_code))
+
+            review_ready = client.get("/api/planning/week", headers=headers).get_json()["review"]
+            check("review sees decomposition", review_ready["commitments"]["decomposed"] == 1, str(review_ready))
+            check("review sees steps", review_ready["steps"]["total"] == 3, str(review_ready))
+            check("review sees completion feedback", review_ready["outcomes"]["feedback"]["too_heavy"] == 1, str(review_ready))
+
+            saved_review = client.put(
+                "/api/planning/week/review",
+                headers=headers,
+                json={
+                    "decomposition_fit": "too_coarse",
+                    "reflection": "第一步仍然太大，下周先缩短到二十分钟以内。",
+                },
+            )
+            check("weekly review saved", saved_review.status_code == 200, str(saved_review.status_code))
+            saved_review_payload = saved_review.get_json()["review"]
+            check("weekly review state", saved_review_payload["state"] == "saved", str(saved_review_payload))
+            check(
+                "weekly review feeds next suggestion",
+                "步骤偏大" in saved_review_payload["recommendation"],
+                str(saved_review_payload),
+            )
 
             parent_after_one = client.get(f"/tasks/{parent_id}", headers=headers).get_json()["task"]
             check("parent progress updates", parent_after_one["subtask_progress"]["done"] == 1, str(parent_after_one))
@@ -225,6 +294,12 @@ def main() -> None:
                 )
                 links = json.loads(archive.read(link_name).decode("utf-8"))
                 check("all links exported", len(links) == 3, str(links))
+                review_name = next(
+                    name for name in archive.namelist()
+                    if name.endswith("/weekly_reviews.json")
+                )
+                reviews = json.loads(archive.read(review_name).decode("utf-8"))
+                check("weekly review exported", reviews[0]["decomposition_fit"] == "too_coarse", str(reviews))
 
             deleted = client.delete(f"/tasks/{parent_id}", headers=headers)
             check("delete parent", deleted.status_code == 200, str(deleted.status_code))

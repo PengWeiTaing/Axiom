@@ -10,6 +10,7 @@ TASK_DECOMPOSITION_SCHEMA_VERSION = "task.decomposition.v1"
 MAX_TASK_STEPS = 5
 MIN_STEP_MINUTES = 5
 MAX_STEP_MINUTES = 480
+TASK_DECOMPOSITION_SOURCES = {"manual_breakdown", "ai_suggestion_confirmed"}
 
 
 class TaskDecompositionTaskNotFoundError(LookupError):
@@ -32,7 +33,7 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _normalize_steps(steps: Any) -> list[dict[str, Any]]:
+def normalize_task_steps(steps: Any) -> list[dict[str, Any]]:
     if not isinstance(steps, list) or not steps:
         raise TaskDecompositionInputError("steps 必须是非空数组")
     if len(steps) > MAX_TASK_STEPS:
@@ -191,9 +192,12 @@ def create_task_steps(
     parent_task_id: int,
     steps: Any,
     *,
+    source: str = "manual_breakdown",
     now: datetime | None = None,
 ) -> list[int]:
-    normalized = _normalize_steps(steps)
+    if source not in TASK_DECOMPOSITION_SOURCES:
+        raise TaskDecompositionInputError("source 不支持")
+    normalized = normalize_task_steps(steps)
     parent = conn.execute(
         """
         SELECT
@@ -257,13 +261,14 @@ def create_task_steps(
             INSERT INTO task_decomposition_links (
                 child_task_id, parent_task_id, parent_task_title,
                 position, source, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'manual_breakdown', ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 child_id,
                 parent_task_id,
                 parent["title"],
                 first_position + offset,
+                source,
                 timestamp,
                 timestamp,
             ),

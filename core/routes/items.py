@@ -11,6 +11,7 @@ from core._common import (
     AXIOM_ROOT,
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
+    DEEPSEEK_FAST_EXTRA_BODY,
     DEEPSEEK_MODEL,
     DEFAULT_SOURCE,
     INBOX_PATH,
@@ -112,6 +113,7 @@ def register_routes(app):
                         messages=[{"role": "user", "content": f"请用 3-5 句中文总结以下内容：\n\n{text[:3000]}"}],
                         max_tokens=300,
                         temperature=0.5,
+                        extra_body=DEEPSEEK_FAST_EXTRA_BODY,
                     )
                     summary = resp.choices[0].message.content.strip()
                 except Exception:

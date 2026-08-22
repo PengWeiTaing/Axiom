@@ -1,5 +1,9 @@
 import { apiRequest } from './client';
-import type { WeeklyPlanMutationPayload, WeeklyPlanPayload } from './types';
+import type {
+  WeeklyDecompositionFit,
+  WeeklyPlanMutationPayload,
+  WeeklyPlanPayload,
+} from './types';
 
 export const getWeeklyPlan = (date?: string) =>
   apiRequest<WeeklyPlanPayload>('/api/planning/week', {
@@ -17,3 +21,16 @@ export const removeWeeklyPlanSelection = (selectionId: number, date?: string) =>
     method: 'DELETE',
     json: date ? { date } : {},
   });
+
+export const saveWeeklyReview = (
+  decomposition_fit: WeeklyDecompositionFit,
+  reflection: string,
+  date?: string,
+) => apiRequest<WeeklyPlanPayload>('/api/planning/week/review', {
+  method: 'PUT',
+  json: {
+    decomposition_fit,
+    reflection,
+    ...(date ? { date } : {}),
+  },
+});

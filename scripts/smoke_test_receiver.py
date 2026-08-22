@@ -2503,7 +2503,7 @@ def main() -> None:
                     INSERT INTO task_decomposition_links (
                         child_task_id, parent_task_id, parent_task_title,
                         position, source, created_at, updated_at
-                    ) VALUES (?, ?, ?, 1, 'manual_breakdown', ?, ?)
+                    ) VALUES (?, ?, ?, 1, 'ai_suggestion_confirmed', ?, ?)
                     """,
                     (
                         portable_child_id,
@@ -2534,6 +2534,21 @@ def main() -> None:
                     ),
                 )
                 portable_weekly_id = int(portable_weekly_cursor.lastrowid)
+                conn.execute(
+                    """
+                    INSERT INTO weekly_reviews (
+                        week_start, decomposition_fit, reflection,
+                        reviewed_at, created_at, updated_at
+                    ) VALUES (?, 'too_coarse', ?, ?, ?, ?)
+                    """,
+                    (
+                        portable_week_start,
+                        "可移植周复盘",
+                        portable_created_at,
+                        portable_created_at,
+                        portable_created_at,
+                    ),
+                )
                 conn.commit()
             finally:
                 conn.close()
@@ -2566,6 +2581,10 @@ def main() -> None:
                     for name in archive.namelist()
                 )
                 assert any(
+                    name.endswith("weekly_reviews.json")
+                    for name in archive.namelist()
+                )
+                assert any(
                     name.endswith("task_decomposition_links.json")
                     for name in archive.namelist()
                 )
@@ -2573,6 +2592,7 @@ def main() -> None:
             conn = get_db_connection()
             try:
                 conn.execute("DELETE FROM context_action_outcomes WHERE id = ?", (outcome_id,))
+                conn.execute("DELETE FROM weekly_reviews WHERE week_start = ?", (portable_week_start,))
                 conn.execute("DELETE FROM weekly_plan_items WHERE id = ?", (portable_weekly_id,))
                 conn.execute(
                     "DELETE FROM task_decomposition_links WHERE child_task_id = ?",
@@ -2597,6 +2617,7 @@ def main() -> None:
             assert imported["imported"]["context_action_outcomes"] == 1
             assert imported["imported"]["goal_commitments"] >= 1
             assert imported["imported"]["weekly_plan_items"] >= 1
+            assert imported["imported"]["weekly_reviews"] >= 1
             assert imported["imported"]["task_decomposition_links"] >= 1
             conn = get_db_connection()
             try:
@@ -2628,6 +2649,14 @@ def main() -> None:
                     """,
                     (portable_weekly_id,),
                 ).fetchone()
+                imported_weekly_review = conn.execute(
+                    """
+                    SELECT decomposition_fit, reflection
+                    FROM weekly_reviews
+                    WHERE week_start = ?
+                    """,
+                    (portable_week_start,),
+                ).fetchone()
                 imported_decomposition = conn.execute(
                     """
                     SELECT parent_task_id, parent_task_title, position, source
@@ -2648,10 +2677,12 @@ def main() -> None:
             assert imported_weekly["task_id"] == portable_task_id
             assert imported_weekly["task_title"] == "验证可移植目标行动"
             assert imported_weekly["removed_at"] is None
+            assert imported_weekly_review["decomposition_fit"] == "too_coarse"
+            assert imported_weekly_review["reflection"] == "可移植周复盘"
             assert imported_decomposition["parent_task_id"] == portable_task_id
             assert imported_decomposition["parent_task_title"] == "验证可移植目标行动"
             assert imported_decomposition["position"] == 1
-            assert imported_decomposition["source"] == "manual_breakdown"
+            assert imported_decomposition["source"] == "ai_suggestion_confirmed"
 
             # 6. 分页
             for i in range(5):

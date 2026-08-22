@@ -69,6 +69,23 @@ def ensure_weekly_plan_table(conn: sqlite3.Connection) -> None:
     )
 
 
+def ensure_weekly_review_table(conn: sqlite3.Connection) -> None:
+    """Persist the user's weekly judgement without storing generated prose."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS weekly_reviews (
+            week_start TEXT PRIMARY KEY,
+            decomposition_fit TEXT NOT NULL
+                CHECK(decomposition_fit IN ('right', 'too_coarse', 'too_fine')),
+            reflection TEXT,
+            reviewed_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+
 def ensure_task_decomposition_table(conn: sqlite3.Connection) -> None:
     """Keep executable steps attached to their source action without duplicating task data."""
     conn.execute(
@@ -318,6 +335,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
         ensure_tasks_table_columns(conn)
         ensure_task_decomposition_table(conn)
         ensure_weekly_plan_table(conn)
+        ensure_weekly_review_table(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS context_action_outcomes (

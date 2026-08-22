@@ -4,6 +4,7 @@ from datetime import date
 
 from flask import request
 
+from core import task_decomposition_ai
 from core._common import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -32,6 +33,10 @@ from core.task_decomposition import (
     read_parent_task,
     read_subtask_rows,
     subtask_progress,
+)
+from core.task_decomposition_ai import (
+    TaskDecompositionAIResponseError,
+    TaskDecompositionAIUnavailableError,
 )
 
 def register_routes(app):
@@ -378,6 +383,40 @@ def register_routes(app):
             conn.close()
 
 
+    @app.route("/tasks/<int:task_id>/breakdown/suggestion", methods=["POST"])
+    def task_breakdown_suggestion(task_id: int):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        conn = get_db_connection()
+        try:
+            suggestion = task_decomposition_ai.generate_task_decomposition_suggestion(
+                conn,
+                task_id,
+            )
+        except TaskDecompositionTaskNotFoundError as exc:
+            return error_response(404, "task_not_found", str(exc))
+        except TaskDecompositionLimitError as exc:
+            return error_response(409, "task_step_limit", str(exc))
+        except TaskDecompositionUnavailableError as exc:
+            return error_response(409, "task_breakdown_unavailable", str(exc))
+        except TaskDecompositionAIUnavailableError as exc:
+            return error_response(503, "ai_unavailable", str(exc))
+        except TaskDecompositionAIResponseError as exc:
+            return error_response(502, "ai_suggestion_failed", str(exc))
+        finally:
+            conn.close()
+
+        write_audit_log(
+            "task_breakdown_suggested",
+            "task",
+            task_id,
+            f"model={suggestion['model']} confidence={suggestion['confidence']}",
+        )
+        return ok_response(suggestion)
+
+
     @app.route("/tasks/<int:task_id>/breakdown", methods=["POST"])
     def task_breakdown(task_id: int):
         auth_error = require_key()
@@ -389,7 +428,13 @@ def register_routes(app):
 
         conn = get_db_connection()
         try:
-            created_ids = create_task_steps(conn, task_id, body.get("steps"))
+            source = str(body.get("source", "manual_breakdown")).strip()
+            created_ids = create_task_steps(
+                conn,
+                task_id,
+                body.get("steps"),
+                source=source,
+            )
             conn.commit()
             row = conn.execute(
                 f"SELECT {TASK_SELECT_FIELDS} FROM tasks WHERE id = ?",
@@ -418,6 +463,7 @@ def register_routes(app):
                 "schema_version": TASK_DECOMPOSITION_SCHEMA_VERSION,
                 "task": task,
                 "created_task_ids": created_ids,
+                "source": source,
             },
             201,
         )

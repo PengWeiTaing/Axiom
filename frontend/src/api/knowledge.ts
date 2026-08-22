@@ -13,6 +13,8 @@ import type {
   MemoryStatus,
   Task,
   TaskBreakdownPayload,
+  TaskBreakdownSource,
+  TaskBreakdownSuggestionPayload,
   TaskList,
   TaskPriority,
   TaskStatus,
@@ -27,10 +29,19 @@ export const createTask = (data: {
   memory_id?: number;
 }) => apiRequest<{ task: Task }>('/tasks', { method: 'POST', json: data });
 
-export const breakDownTask = (id: number, steps: { title: string; estimated_minutes: number }[]) =>
+export const breakDownTask = (
+  id: number,
+  steps: { title: string; estimated_minutes: number }[],
+  source: TaskBreakdownSource = 'manual_breakdown',
+) =>
   apiRequest<TaskBreakdownPayload>(`/tasks/${id}/breakdown`, {
     method: 'POST',
-    json: { steps },
+    json: { steps, source },
+  });
+
+export const suggestTaskBreakdown = (id: number) =>
+  apiRequest<TaskBreakdownSuggestionPayload>(`/tasks/${id}/breakdown/suggestion`, {
+    method: 'POST',
   });
 
 export const listTasks = (params: {

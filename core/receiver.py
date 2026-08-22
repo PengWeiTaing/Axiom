@@ -34,7 +34,8 @@ from core._common import (  # noqa: E402
     vector_search, rebuild_all_vectors,
     learn_user_patterns, get_preference,
     execute_logged_automation_job,
-    DEEPSEEK_API_KEY, DEEPSEEK_MODEL, DEEPSEEK_BASE_URL,
+    DEEPSEEK_API_KEY, DEEPSEEK_MODEL, DEEPSEEK_REASONING_MODEL, DEEPSEEK_BASE_URL,
+    DEEPSEEK_FAST_EXTRA_BODY,
     AUTOMATION_JOBS,
 )
 
@@ -164,7 +165,7 @@ def system_info():
     conn = get_db_connection()
     try:
         tables = {}
-        for t in ["items", "memories", "goal_commitments", "tasks", "task_decomposition_links", "weekly_plan_items", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
+        for t in ["items", "memories", "goal_commitments", "tasks", "task_decomposition_links", "weekly_plan_items", "weekly_reviews", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
             try:
                 tables[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             except Exception:
@@ -285,14 +286,30 @@ def ai_ping():
     if auth_error:
         return auth_error
     if not DEEPSEEK_API_KEY:
-        return ok_response({"ai": "unconfigured", "latency_ms": 0})
+        return ok_response({
+            "ai": "unconfigured",
+            "model": DEEPSEEK_MODEL,
+            "reasoning_model": DEEPSEEK_REASONING_MODEL,
+            "latency_ms": 0,
+        })
     import time as _t
     start = _t.time()
     try:
         import openai
         client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
-        client.chat.completions.create(model=DEEPSEEK_MODEL, messages=[{"role":"user","content":"ping"}], max_tokens=1, temperature=0)
-        return ok_response({"ai": "ok", "model": DEEPSEEK_MODEL, "latency_ms": int((_t.time() - start) * 1000)})
+        client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+            temperature=0,
+            extra_body=DEEPSEEK_FAST_EXTRA_BODY,
+        )
+        return ok_response({
+            "ai": "ok",
+            "model": DEEPSEEK_MODEL,
+            "reasoning_model": DEEPSEEK_REASONING_MODEL,
+            "latency_ms": int((_t.time() - start) * 1000),
+        })
     except Exception as exc:
         return ok_response({"ai": "error", "error": str(exc)[:200], "latency_ms": int((_t.time() - start) * 1000)})
 
@@ -347,6 +364,7 @@ def import_data():
             "tasks": 0,
             "task_decomposition_links": 0,
             "weekly_plan_items": 0,
+            "weekly_reviews": 0,
             "decisions": 0,
             "context_action_outcomes": 0,
             "files": 0,
@@ -486,6 +504,40 @@ def import_data():
                                     ),
                                 )
                                 imported["weekly_plan_items"] += 1
+                            except Exception:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
+                if archive_name == "weekly_reviews.json":
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for review in data:
+                            try:
+                                fit = review.get("decomposition_fit")
+                                if fit not in {"right", "too_coarse", "too_fine"}:
+                                    continue
+                                reflection = str(review.get("reflection") or "").strip() or None
+                                if reflection:
+                                    reflection = reflection[:1000]
+                                conn.execute(
+                                    """
+                                    INSERT OR IGNORE INTO weekly_reviews (
+                                        week_start, decomposition_fit, reflection,
+                                        reviewed_at, created_at, updated_at
+                                    ) VALUES (?, ?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        review.get("week_start"),
+                                        fit,
+                                        reflection,
+                                        review.get("reviewed_at"),
+                                        review.get("created_at"),
+                                        review.get("updated_at", review.get("created_at")),
+                                    ),
+                                )
+                                imported["weekly_reviews"] += 1
                             except Exception:
                                 pass
                         conn.commit()

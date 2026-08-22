@@ -12,6 +12,7 @@ from typing import Any
 
 from core._common import (
     DEEPSEEK_API_KEY, DEEPSEEK_MODEL, DEEPSEEK_BASE_URL,
+    DEEPSEEK_FAST_EXTRA_BODY,
     get_db_connection, logger,
 )
 from core.boards.mastery import now_iso
@@ -122,6 +123,7 @@ def _call_llm(system: str, user_prompt: str, temperature: float = 0.1) -> str:
         ],
         temperature=temperature,
         response_format={"type": "json_object"},
+        extra_body=DEEPSEEK_FAST_EXTRA_BODY,
     )
     return resp.choices[0].message.content or "{}"
 

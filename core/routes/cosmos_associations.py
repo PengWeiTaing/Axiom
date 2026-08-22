@@ -8,6 +8,7 @@ from flask import request
 from core._common import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
+    DEEPSEEK_FAST_EXTRA_BODY,
     DEEPSEEK_MODEL,
     error_response,
     get_db_connection,
@@ -271,6 +272,7 @@ def generate_associations(lifeline_id: str | None = None, max_candidates: int = 
                     ],
                     max_tokens=2000,
                     temperature=0.3,
+                    extra_body=DEEPSEEK_FAST_EXTRA_BODY,
                 )
                 raw = resp.choices[0].message.content.strip()
                 if raw.startswith("```"):

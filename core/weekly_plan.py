@@ -9,8 +9,15 @@ from core.context_commitments import confirmed_goal_from_task_row
 from core.task_decomposition import read_subtask_summaries
 
 
-WEEKLY_PLAN_SCHEMA_VERSION = "planning.week.v1"
+WEEKLY_PLAN_SCHEMA_VERSION = "planning.week.v2"
+WEEKLY_REVIEW_SCHEMA_VERSION = "planning.week.review.v1"
 MAX_WEEKLY_COMMITMENTS = 5
+MAX_WEEKLY_REFLECTION_CHARS = 1000
+WEEKLY_DECOMPOSITION_FIT_LABELS = {
+    "right": "粒度合适",
+    "too_coarse": "步骤偏大",
+    "too_fine": "步骤偏碎",
+}
 
 
 class WeeklyPlanTaskNotFoundError(LookupError):
@@ -30,6 +37,10 @@ class WeeklyPlanFullError(ValueError):
 
 
 class WeeklyPlanCompletedSelectionError(ValueError):
+    pass
+
+
+class WeeklyReviewInputError(ValueError):
     pass
 
 
@@ -105,6 +116,194 @@ def _selection_task(row: sqlite3.Row) -> dict[str, Any] | None:
         "lifeline_name": row["lifeline_name"] or (goal["lifeline_name"] if goal else None),
         "goal": goal,
     }
+
+
+def _review_recommendation(
+    *,
+    selected_count: int,
+    decomposed_commitments: int,
+    step_summary: dict[str, int],
+    feedback_summary: dict[str, int],
+    saved_fit: str | None,
+) -> str:
+    if selected_count == 0:
+        return "这周没有明确承诺，暂时没有足够依据判断拆解粒度。"
+    if decomposed_commitments == 0:
+        return "这周还没有行动拆解证据；下次遇到难以启动的大行动时，再比较拆解前后的变化。"
+    if saved_fit == "too_coarse":
+        return "已记住步骤偏大；下次 AI 候选会优先降低单步启动成本。"
+    if saved_fit == "too_fine":
+        return "已记住步骤偏碎；下次 AI 候选会减少步骤数量和切换。"
+    if saved_fit == "right":
+        return "已记住当前粒度合适；下次 AI 候选会沿用相近节奏。"
+    if feedback_summary.get("too_heavy", 0) > feedback_summary.get("right", 0):
+        return "完成反馈里“有点重”更多，建议下周把步骤再缩小一些。"
+    handled = step_summary["done"] + step_summary["cancelled"]
+    if step_summary["total"] and handled / step_summary["total"] >= 0.7:
+        return "大部分步骤已经得到处理，这周的拆解基本帮助了行动启动。"
+    return "仍有较多步骤未处理，复盘时重点判断是步骤偏大，还是本周承诺过多。"
+
+
+def read_week_review(
+    conn: sqlite3.Connection,
+    anchor: date,
+    selected: list[dict[str, Any]],
+    plan_summary: dict[str, int],
+) -> dict[str, Any]:
+    week_start, week_end = week_bounds(anchor)
+    selected_task_ids = {
+        int(item["task_id"])
+        for item in selected
+        if item["task_id"] is not None
+    }
+    child_task_ids: set[int] = set()
+    if selected_task_ids:
+        placeholders = ",".join("?" for _ in selected_task_ids)
+        child_task_ids = {
+            int(row["child_task_id"])
+            for row in conn.execute(
+                f"""
+                SELECT child_task_id
+                FROM task_decomposition_links
+                WHERE parent_task_id IN ({placeholders})
+                """,
+                sorted(selected_task_ids),
+            ).fetchall()
+        }
+
+    step_summary = {"total": 0, "todo": 0, "done": 0, "cancelled": 0}
+    decomposed_commitments = 0
+    resolved_commitments = 0
+    for item in selected:
+        progress = item.get("subtask_progress")
+        if progress and int(progress.get("total", 0)) > 0:
+            decomposed_commitments += 1
+            for key in step_summary:
+                step_summary[key] += int(progress.get(key, 0))
+            if int(progress.get("todo", 0)) == 0:
+                resolved_commitments += 1
+            continue
+        task = item.get("task")
+        if task is None:
+            continue
+        step_summary["total"] += 1
+        status = str(task.get("status", "todo"))
+        if status in step_summary:
+            step_summary[status] += 1
+        if status in {"done", "cancelled"}:
+            resolved_commitments += 1
+
+    evidence_task_ids = selected_task_ids | child_task_ids
+    feedback_summary = {"right": 0, "too_heavy": 0, "wrong_time": 0}
+    completed_outcomes = 0
+    if evidence_task_ids:
+        placeholders = ",".join("?" for _ in evidence_task_ids)
+        rows = conn.execute(
+            f"""
+            SELECT fit_feedback
+            FROM context_action_outcomes
+            WHERE task_id IN ({placeholders})
+              AND created_at >= ?
+              AND created_at < ?
+            """,
+            [
+                *sorted(evidence_task_ids),
+                f"{week_start.isoformat()}T00:00:00",
+                f"{(week_end + timedelta(days=1)).isoformat()}T00:00:00",
+            ],
+        ).fetchall()
+        completed_outcomes = len(rows)
+        for row in rows:
+            feedback = row["fit_feedback"]
+            if feedback in feedback_summary:
+                feedback_summary[str(feedback)] += 1
+
+    saved_row = conn.execute(
+        "SELECT * FROM weekly_reviews WHERE week_start = ?",
+        (week_start.isoformat(),),
+    ).fetchone()
+    saved_feedback = None
+    saved_fit = None
+    if saved_row is not None:
+        saved_fit = str(saved_row["decomposition_fit"])
+        saved_feedback = {
+            "decomposition_fit": saved_fit,
+            "decomposition_fit_label": WEEKLY_DECOMPOSITION_FIT_LABELS[saved_fit],
+            "reflection": saved_row["reflection"],
+            "reviewed_at": saved_row["reviewed_at"],
+        }
+
+    rated_outcomes = sum(feedback_summary.values())
+    evidence_level = (
+        "high"
+        if decomposed_commitments > 0 and step_summary["total"] >= 3 and rated_outcomes > 0
+        else "medium"
+        if decomposed_commitments > 0 and step_summary["total"] >= 2
+        else "low"
+    )
+    return {
+        "schema_version": WEEKLY_REVIEW_SCHEMA_VERSION,
+        "state": "saved" if saved_feedback else "ready" if selected else "empty",
+        "review_window_open": anchor.weekday() >= 4,
+        "evidence_level": evidence_level,
+        "commitments": {
+            "selected": int(plan_summary["selected"]),
+            "resolved": resolved_commitments,
+            "completed": int(plan_summary["completed"]),
+            "open": int(plan_summary["open"]),
+            "removed": int(plan_summary["removed"]),
+            "decomposed": decomposed_commitments,
+        },
+        "steps": step_summary,
+        "outcomes": {
+            "completed": completed_outcomes,
+            "rated": rated_outcomes,
+            "feedback": feedback_summary,
+        },
+        "recommendation": _review_recommendation(
+            selected_count=int(plan_summary["selected"]),
+            decomposed_commitments=decomposed_commitments,
+            step_summary=step_summary,
+            feedback_summary=feedback_summary,
+            saved_fit=saved_fit,
+        ),
+        "saved_feedback": saved_feedback,
+    }
+
+
+def save_week_review(
+    conn: sqlite3.Connection,
+    anchor: date,
+    decomposition_fit: Any,
+    reflection: Any = None,
+    *,
+    now: datetime | None = None,
+) -> str:
+    fit = str(decomposition_fit or "").strip()
+    if fit not in WEEKLY_DECOMPOSITION_FIT_LABELS:
+        raise WeeklyReviewInputError("decomposition_fit 必须是 right、too_coarse 或 too_fine")
+    note = str(reflection or "").strip() or None
+    if note and len(note) > MAX_WEEKLY_REFLECTION_CHARS:
+        raise WeeklyReviewInputError(
+            f"reflection 不能超过 {MAX_WEEKLY_REFLECTION_CHARS} 字"
+        )
+    week_start, _ = week_bounds(anchor)
+    timestamp = (now or _utc_now()).isoformat(timespec="seconds")
+    conn.execute(
+        """
+        INSERT INTO weekly_reviews (
+            week_start, decomposition_fit, reflection,
+            reviewed_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(week_start) DO UPDATE SET
+            decomposition_fit = excluded.decomposition_fit,
+            reflection = excluded.reflection,
+            reviewed_at = excluded.reviewed_at,
+            updated_at = excluded.updated_at
+        """,
+        (week_start.isoformat(), fit, note, timestamp, timestamp, timestamp),
+    )
+    return week_start.isoformat()
 
 
 def read_week_plan(conn: sqlite3.Connection, anchor: date) -> dict[str, Any]:
@@ -205,6 +404,15 @@ def read_week_plan(conn: sqlite3.Connection, anchor: date) -> dict[str, Any]:
         ).fetchone()[0]
     )
     selected_count = len(selected)
+    summary = {
+        "selected": selected_count,
+        "open": open_count,
+        "completed": completed,
+        "unavailable": unavailable,
+        "removed": removed_count,
+        "capacity": MAX_WEEKLY_COMMITMENTS,
+        "capacity_remaining": max(0, MAX_WEEKLY_COMMITMENTS - selected_count),
+    }
     return {
         "schema_version": WEEKLY_PLAN_SCHEMA_VERSION,
         "week_start": week_start.isoformat(),
@@ -216,16 +424,9 @@ def read_week_plan(conn: sqlite3.Connection, anchor: date) -> dict[str, Any]:
             if open_count == 0 and unavailable == 0
             else "active"
         ),
-        "summary": {
-            "selected": selected_count,
-            "open": open_count,
-            "completed": completed,
-            "unavailable": unavailable,
-            "removed": removed_count,
-            "capacity": MAX_WEEKLY_COMMITMENTS,
-            "capacity_remaining": max(0, MAX_WEEKLY_COMMITMENTS - selected_count),
-        },
+        "summary": summary,
         "selected": selected,
+        "review": read_week_review(conn, anchor, selected, summary),
     }
 
 

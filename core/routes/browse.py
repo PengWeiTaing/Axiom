@@ -8,6 +8,7 @@ from flask import request
 from core._common import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
+    DEEPSEEK_FAST_EXTRA_BODY,
     DEEPSEEK_MODEL,
     ITEM_JOIN_SELECT_FIELDS,
     ITEM_LIST_SELECT_FIELDS,
@@ -287,6 +288,7 @@ def register_routes(app):
                             messages=[{"role": "user", "content": "\n".join(lines)}],
                             max_tokens=200,
                             temperature=0.3,
+                            extra_body=DEEPSEEK_FAST_EXTRA_BODY,
                         )
                         ai_text = resp.choices[0].message.content.strip()
                         matched_ids = set()

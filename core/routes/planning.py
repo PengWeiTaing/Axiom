@@ -14,12 +14,14 @@ from core.weekly_plan import (
     WeeklyPlanSelectionNotFoundError,
     WeeklyPlanTaskNotFoundError,
     WeeklyPlanTaskUnavailableError,
+    WeeklyReviewInputError,
     add_week_task,
     context_week_task_ids,
     parse_week_anchor,
     read_week_plan,
     remove_week_selection,
     remove_week_task,
+    save_week_review,
 )
 
 
@@ -135,3 +137,39 @@ def register_routes(app):
         write_audit_log("weekly_plan_remove", "weekly_plan_item", removed_id)
         plan, now_context = _build_week_payload(anchor)
         return ok_response({"week_plan": plan, "now_context": now_context})
+
+    @app.route("/api/planning/week/review", methods=["PUT"])
+    def update_week_review():
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return error_response(400, "invalid_week_review", "JSON body 必须是对象")
+        try:
+            anchor = _request_anchor(body)
+        except ValueError as exc:
+            return error_response(400, "invalid_week_date", str(exc))
+
+        conn = get_db_connection()
+        try:
+            week_start = save_week_review(
+                conn,
+                anchor,
+                body.get("decomposition_fit"),
+                body.get("reflection"),
+            )
+            conn.commit()
+        except WeeklyReviewInputError as exc:
+            return error_response(400, "invalid_week_review", str(exc))
+        finally:
+            conn.close()
+
+        write_audit_log(
+            "weekly_review_save",
+            "weekly_review",
+            detail=f"week_start={week_start} decomposition_fit={body.get('decomposition_fit')}",
+        )
+        plan, _ = _build_week_payload(anchor)
+        return ok_response(plan)

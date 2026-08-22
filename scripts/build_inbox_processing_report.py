@@ -97,12 +97,19 @@ def ai_classify_items(items: list[dict]) -> dict[int, tuple[str, list[str]]]:
 
     try:
         import openai
-        client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        base_url = os.environ.get("AXIOM_DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+        model = os.environ.get("AXIOM_DEEPSEEK_MODEL", "").strip() or "deepseek-v4-flash"
+        if model == "deepseek-chat":
+            model = "deepseek-v4-flash"
+        elif model == "deepseek-reasoner":
+            model = "deepseek-v4-pro"
+        client = openai.OpenAI(api_key=api_key, base_url=base_url)
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=400,
             temperature=0.3,
+            extra_body={"thinking": {"type": "disabled"}},
         )
         text = response.choices[0].message.content.strip()
     except Exception:

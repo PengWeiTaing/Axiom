@@ -450,7 +450,11 @@ def generate_ai_analysis(
     if not api_key:
         return None
 
-    model = os.environ.get("AXIOM_DEEPSEEK_MODEL", "deepseek-chat")
+    model = os.environ.get("AXIOM_DEEPSEEK_MODEL", "").strip() or "deepseek-v4-flash"
+    if model == "deepseek-chat":
+        model = "deepseek-v4-flash"
+    elif model == "deepseek-reasoner":
+        model = "deepseek-v4-pro"
     base_url = os.environ.get("AXIOM_DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
     type_counter = Counter(r["type"] or "unknown" for r in rows)
@@ -503,6 +507,7 @@ def generate_ai_analysis(
             messages=[{"role": "user", "content": prompt}],
             max_tokens=500 if is_weekly else 300,
             temperature=0.7,
+            extra_body={"thinking": {"type": "disabled"}},
         )
         return response.choices[0].message.content.strip()
     except Exception as exc:

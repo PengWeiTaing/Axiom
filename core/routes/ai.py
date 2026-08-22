@@ -7,6 +7,7 @@ from flask import Response, request
 from core._common import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
+    DEEPSEEK_FAST_EXTRA_BODY,
     DEEPSEEK_MODEL,
     SUGGESTIONS_CACHE,
     compute_streak,
@@ -167,6 +168,7 @@ def register_routes(app):
             resp = client.chat.completions.create(
                 model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
                 max_tokens=500, temperature=0.7,
+                extra_body=DEEPSEEK_FAST_EXTRA_BODY,
             )
             report = resp.choices[0].message.content.strip()
         except Exception as exc:
@@ -266,6 +268,7 @@ def register_routes(app):
             resp = client.chat.completions.create(
                 model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
                 max_tokens=2000, temperature=0.1,
+                extra_body=DEEPSEEK_FAST_EXTRA_BODY,
             )
             result_text = (resp.choices[0].message.content or "").strip()
             if not result_text and hasattr(resp.choices[0].message, "reasoning"):
@@ -396,6 +399,7 @@ def register_routes(app):
             resp = client.chat.completions.create(
                 model=DEEPSEEK_MODEL, messages=[{"role":"user","content":prompt}],
                 max_tokens=300, temperature=0.7,
+                extra_body=DEEPSEEK_FAST_EXTRA_BODY,
             )
             brief = resp.choices[0].message.content.strip()
         except Exception as exc:
@@ -497,6 +501,7 @@ def register_routes(app):
                 messages=messages,
                 max_tokens=600,
                 temperature=0.7,
+                extra_body=DEEPSEEK_FAST_EXTRA_BODY,
             )
             reply = response.choices[0].message.content.strip()
         except Exception as exc:
@@ -573,6 +578,7 @@ def register_routes(app):
                     max_tokens=600,
                     temperature=0.7,
                     stream=True,
+                    extra_body=DEEPSEEK_FAST_EXTRA_BODY,
                 )
                 for chunk in response:
                     delta = chunk.choices[0].delta
@@ -701,6 +707,7 @@ def register_routes(app):
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500,
                 temperature=0.7,
+                extra_body=DEEPSEEK_FAST_EXTRA_BODY,
             )
             text = response.choices[0].message.content.strip()
         except Exception as exc:

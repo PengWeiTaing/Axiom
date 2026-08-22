@@ -82,6 +82,9 @@ def register_routes(app):
             weekly_plan_rows = conn.execute(
                 "SELECT * FROM weekly_plan_items ORDER BY week_start, position, id"
             ).fetchall()
+            weekly_review_rows = conn.execute(
+                "SELECT * FROM weekly_reviews ORDER BY week_start"
+            ).fetchall()
             context_outcome_rows = conn.execute(
                 "SELECT * FROM context_action_outcomes ORDER BY id"
             ).fetchall()
@@ -109,6 +112,11 @@ def register_routes(app):
             ensure_ascii=False,
             indent=2,
         )
+        weekly_reviews_json = json.dumps(
+            [dict(r) for r in weekly_review_rows],
+            ensure_ascii=False,
+            indent=2,
+        )
         context_outcomes_json = json.dumps(
             [dict(r) for r in context_outcome_rows],
             ensure_ascii=False,
@@ -131,6 +139,7 @@ def register_routes(app):
             f"tasks: {len(tasks_rows)}\n"
             f"task_decomposition_links: {len(task_decomposition_rows)}\n"
             f"weekly_plan_items: {len(weekly_plan_rows)}\n"
+            f"weekly_reviews: {len(weekly_review_rows)}\n"
             f"context_action_outcomes: {len(context_outcome_rows)}\n"
             f"files: {file_count}\n"
         )
@@ -150,6 +159,7 @@ def register_routes(app):
                 task_decomposition_json,
             )
             zf.writestr(f"{export_name}/weekly_plan_items.json", weekly_plan_json)
+            zf.writestr(f"{export_name}/weekly_reviews.json", weekly_reviews_json)
             zf.writestr(
                 f"{export_name}/context_action_outcomes.json",
                 context_outcomes_json,
@@ -164,13 +174,14 @@ def register_routes(app):
         buf.seek(0)
         write_audit_log("export", "system")
         logger.info(
-            "exported %d items, %d memories, %d goal commitments, %d tasks, %d task decomposition links, %d weekly plan items, %d context outcomes",
+            "exported %d items, %d memories, %d goal commitments, %d tasks, %d task decomposition links, %d weekly plan items, %d weekly reviews, %d context outcomes",
             len(items_rows),
             len(memories_rows),
             len(goal_commitment_rows),
             len(tasks_rows),
             len(task_decomposition_rows),
             len(weekly_plan_rows),
+            len(weekly_review_rows),
             len(context_outcome_rows),
         )
         return send_file(
