@@ -21,6 +21,7 @@ export interface Item {
   processing_override_label?: string | null;
   processing_is_overridden?: boolean;
   file_sha256: string | null;
+  lifeline_id?: string | null;
 }
 
 export interface ItemDetail extends Item {
@@ -42,6 +43,7 @@ export interface Memory {
   source_text: string | null;
   created_at: string;
   updated_at: string;
+  lifeline_id?: string | null;
 }
 
 export type ObjectKind = 'task' | 'memory' | 'decision';
@@ -66,10 +68,34 @@ export interface MemorySourceItem {
   created_at: string;
 }
 
+export type GoalCommitmentState = 'active' | 'paused' | 'achieved' | 'released';
+
+export interface GoalParent {
+  id: number;
+  title: string;
+}
+
+export interface GoalProfile {
+  memory_id: number;
+  state: GoalCommitmentState;
+  state_label: string;
+  success_criteria: string | null;
+  target_date: string | null;
+  review_cadence_days: number;
+  last_reviewed_at: string | null;
+  next_review_at: string | null;
+  review_due: boolean;
+  completed_at: string | null;
+  parent_goal: GoalParent | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MemoryDetail extends Memory {
   linked_tasks: MemoryLinkedTask[];
   task_progress: { total: number; done: number; todo?: number } | null;
   source_item: MemorySourceItem | null;
+  goal_profile: GoalProfile | null;
 }
 
 export interface MemoryStatsCategory {
@@ -109,6 +135,8 @@ export interface ContextGoal {
   title: string;
   lifeline_id: string | null;
   lifeline_name: string | null;
+  state: 'active';
+  target_date: string | null;
 }
 
 export interface ContextCommitmentGoal extends ContextGoal {
@@ -116,6 +144,19 @@ export interface ContextCommitmentGoal extends ContextGoal {
   total_actions: number;
   open_actions: number;
   completed_actions: number;
+  state_label: string;
+  success_criteria: string | null;
+  review_cadence_days: number;
+  last_reviewed_at: string | null;
+  completed_at: string | null;
+  parent_goal: GoalParent | null;
+}
+
+export interface ContextCommitmentAttention extends ContextCommitmentGoal {
+  attention_code: 'missing_action' | 'target_overdue' | 'target_due' | 'missing_success_criteria' | 'review_due';
+  attention_label: string;
+  attention_detail: string;
+  attention_action: 'add_action' | 'edit_commitment' | 'review';
 }
 
 export interface ContextTask extends Task {
@@ -125,13 +166,13 @@ export interface ContextTask extends Task {
 }
 
 export interface ContextFactor {
-  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness' | 'feedback' | 'commitment';
+  key: 'urgency' | 'importance' | 'startability' | 'momentum' | 'staleness' | 'feedback' | 'commitment' | 'goal_horizon';
   label: string;
   points: number;
 }
 
 export interface ContextReason {
-  code: 'overdue' | 'due_today' | 'due_soon' | 'feedback' | 'goal_progress' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
+  code: 'overdue' | 'due_today' | 'due_soon' | 'feedback' | 'goal_progress' | 'goal_horizon' | 'high_priority' | 'quick_start' | 'active_context' | 'available';
   label: string;
   detail: string;
 }
@@ -145,7 +186,7 @@ export interface ContextAction {
 }
 
 export interface NowContextPayload {
-  schema_version: 'context.now.v3';
+  schema_version: 'context.now.v4';
   generated_at: string;
   date: string;
   mode: 'focus' | 'empty';
@@ -164,10 +205,15 @@ export interface NowContextPayload {
   };
   commitments: {
     confirmed_goals: number;
+    active_goals: number;
+    paused_goals: number;
+    completed_goals: number;
     with_open_actions: number;
     without_open_actions: number;
     linked_open_actions: number;
     unlinked_open_actions: number;
+    attention_total: number;
+    attention: ContextCommitmentAttention[];
     gaps: ContextCommitmentGoal[];
   };
 }
@@ -213,6 +259,124 @@ export interface Decision {
   status_label?: string;
   created_at: string;
   updated_at: string;
+  lifeline_id?: string | null;
+}
+
+export interface LifelineCounts {
+  entities: number;
+  materials: number;
+  memories: number;
+  tasks: number;
+  open_actions: number;
+  decisions: number;
+  active_goals: number;
+}
+
+export interface LifelineSummary {
+  id: string;
+  raw_id: string;
+  name: string;
+  parent_id: string | null;
+  order_index: number;
+  depth: number;
+  has_children: boolean;
+  direct_counts: LifelineCounts;
+  counts: LifelineCounts;
+  last_activity_at: string | null;
+}
+
+export interface LifelineContextGoal {
+  id: number;
+  title: string;
+  detail: string | null;
+  status: MemoryStatus;
+  created_at: string;
+  updated_at: string;
+  lifeline_id: string | null;
+  lifeline_name: string | null;
+  profile: GoalProfile | null;
+  progress: {
+    total: number;
+    open: number;
+    done: number;
+    cancelled: number;
+  };
+}
+
+export interface LifelineContextTask extends Task {
+  lifeline_id: string | null;
+  lifeline_name: string | null;
+  goal_title: string | null;
+  goal_state: GoalCommitmentState | null;
+}
+
+export interface LifelineContextMaterial {
+  id: number;
+  type: ItemType;
+  title: string;
+  summary: string | null;
+  source: string;
+  created_at: string;
+  lifeline_id: string | null;
+  lifeline_name: string | null;
+}
+
+export interface LifelineContextMemory {
+  id: number;
+  category: MemoryCategory;
+  title: string;
+  detail: string | null;
+  status: MemoryStatus;
+  created_at: string;
+  updated_at: string;
+  lifeline_id: string | null;
+  lifeline_name: string | null;
+}
+
+export interface LifelineContextDecision extends Decision {
+  lifeline_id: string | null;
+  lifeline_name: string | null;
+}
+
+export interface LifelineContextActivity {
+  kind: 'item' | ObjectKind;
+  id: number;
+  title: string;
+  summary: string | null;
+  status: string | null;
+  timestamp: string;
+  lifeline_id: string | null;
+  lifeline_name: string | null;
+}
+
+export interface LifelineContextPayload {
+  schema_version: 'lifeline.context.v1';
+  lifeline: LifelineSummary & {
+    ancestors: Array<{ id: string; name: string }>;
+    children: LifelineSummary[];
+  };
+  scope: {
+    lifeline_ids: string[];
+    descendant_count: number;
+  };
+  summary: {
+    active_goals: number;
+    paused_goals: number;
+    completed_goals: number;
+    open_actions: number;
+    held_actions: number;
+    completed_actions: number;
+    materials: number;
+    memories: number;
+    decisions: number;
+    last_activity_at: string | null;
+  };
+  goals: LifelineContextGoal[];
+  tasks: LifelineContextTask[];
+  materials: LifelineContextMaterial[];
+  memories: LifelineContextMemory[];
+  decisions: LifelineContextDecision[];
+  activity: LifelineContextActivity[];
 }
 
 // /parse 返回 — 智能路由的核心

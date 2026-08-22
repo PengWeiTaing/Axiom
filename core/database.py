@@ -72,6 +72,35 @@ def ensure_memories_lifeline_id(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_lifeline_id ON memories(lifeline_id)")
 
 
+def ensure_goal_commitments_table(conn: sqlite3.Connection) -> None:
+    """Store commitment-specific metadata without overloading memory rows."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS goal_commitments (
+            memory_id INTEGER PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
+            parent_goal_id INTEGER REFERENCES memories(id) ON DELETE SET NULL,
+            success_criteria TEXT,
+            target_date TEXT,
+            review_cadence_days INTEGER NOT NULL DEFAULT 14,
+            last_reviewed_at TEXT,
+            state TEXT NOT NULL DEFAULT 'active',
+            completed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_goal_commitments_parent ON goal_commitments(parent_goal_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_goal_commitments_state ON goal_commitments(state)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_goal_commitments_target_date ON goal_commitments(target_date)"
+    )
+
+
 def ensure_decisions_lifeline_id(conn: sqlite3.Connection) -> None:
     exists = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='decisions'"
@@ -203,6 +232,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at)"
         )
+        ensure_goal_commitments_table(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS tasks (

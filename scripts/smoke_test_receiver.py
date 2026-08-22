@@ -187,7 +187,7 @@ def main() -> None:
                 200,
                 "empty current context",
             )
-            assert empty_context["schema_version"] == "context.now.v3"
+            assert empty_context["schema_version"] == "context.now.v4"
             assert empty_context["mode"] == "empty"
             assert empty_context["focus"] is None
 
@@ -2450,6 +2450,23 @@ def main() -> None:
                     ),
                 )
                 portable_goal_id = int(portable_goal_cursor.lastrowid)
+                conn.execute(
+                    """
+                    INSERT INTO goal_commitments (
+                        memory_id, success_criteria, target_date,
+                        review_cadence_days, last_reviewed_at, state,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, 14, ?, 'active', ?, ?)
+                    """,
+                    (
+                        portable_goal_id,
+                        "目标、行动和承诺档案都能完整恢复",
+                        "2027-01-31",
+                        portable_created_at,
+                        portable_created_at,
+                        portable_created_at,
+                    ),
+                )
                 portable_task_cursor = conn.execute(
                     """
                     INSERT INTO tasks (
@@ -2488,6 +2505,10 @@ def main() -> None:
                     name.endswith("context_action_outcomes.json")
                     for name in archive.namelist()
                 )
+                assert any(
+                    name.endswith("goal_commitments.json")
+                    for name in archive.namelist()
+                )
 
             conn = get_db_connection()
             try:
@@ -2508,6 +2529,7 @@ def main() -> None:
                 "context outcome import",
             )
             assert imported["imported"]["context_action_outcomes"] == 1
+            assert imported["imported"]["goal_commitments"] >= 1
             conn = get_db_connection()
             try:
                 imported_outcome = conn.execute(
@@ -2518,6 +2540,14 @@ def main() -> None:
                     "SELECT lifeline_id FROM memories WHERE id = ?",
                     (portable_goal_id,),
                 ).fetchone()
+                imported_goal_profile = conn.execute(
+                    """
+                    SELECT success_criteria, target_date, state
+                    FROM goal_commitments
+                    WHERE memory_id = ?
+                    """,
+                    (portable_goal_id,),
+                ).fetchone()
                 imported_task = conn.execute(
                     "SELECT memory_id, lifeline_id FROM tasks WHERE id = ?",
                     (portable_task_id,),
@@ -2526,6 +2556,9 @@ def main() -> None:
                 conn.close()
             assert imported_outcome["fit_feedback"] == "right"
             assert imported_goal["lifeline_id"] == "portable-goal"
+            assert imported_goal_profile["success_criteria"] == "目标、行动和承诺档案都能完整恢复"
+            assert imported_goal_profile["target_date"] == "2027-01-31"
+            assert imported_goal_profile["state"] == "active"
             assert imported_task["memory_id"] == portable_goal_id
             assert imported_task["lifeline_id"] == "portable-goal"
 

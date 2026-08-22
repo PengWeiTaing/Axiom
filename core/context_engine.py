@@ -14,7 +14,7 @@ from core.database import get_db_connection
 from core.items import local_date_now, utc_now
 
 
-CONTEXT_SCHEMA_VERSION = "context.now.v3"
+CONTEXT_SCHEMA_VERSION = "context.now.v4"
 MAX_CONTEXT_ACTIONS = 8
 FEEDBACK_WINDOW_DAYS = 7
 CONTEXT_FIT_FEEDBACK = {"right", "too_heavy", "wrong_time"}
@@ -145,6 +145,29 @@ def _startability_factor(minutes: int | None) -> dict[str, Any] | None:
     return None
 
 
+def _goal_horizon_factor(
+    goal: dict[str, Any] | None,
+    today: date,
+) -> tuple[dict[str, Any] | None, int | None]:
+    if not goal:
+        return None, None
+    target = _parse_date(goal.get("target_date"))
+    if target is None:
+        return None, None
+    delta = (target - today).days
+    if delta < 0:
+        return _factor("goal_horizon", f"目标已过期 {abs(delta)} 天", 18), delta
+    if delta == 0:
+        return _factor("goal_horizon", "目标今天到期", 16), delta
+    if delta <= 3:
+        return _factor("goal_horizon", f"目标还有 {delta} 天", 12), delta
+    if delta <= 7:
+        return _factor("goal_horizon", f"目标还有 {delta} 天", 8), delta
+    if delta <= 14:
+        return _factor("goal_horizon", f"目标还有 {delta} 天", 4), delta
+    return None, delta
+
+
 def _feedback_adjustment(
     task: dict[str, Any],
     outcomes: list[Any],
@@ -229,6 +252,8 @@ def _feedback_adjustment(
 def _primary_reason(
     due_factor: dict[str, Any] | None,
     due_delta: int | None,
+    goal_horizon_factor: dict[str, Any] | None,
+    goal_horizon_delta: int | None,
     feedback_reason: dict[str, str] | None,
     goal: dict[str, Any] | None,
     priority: str,
@@ -253,6 +278,12 @@ def _primary_reason(
             "code": "due_soon",
             "label": due_factor["label"],
             "detail": "时间窗口正在收窄，现在推进能避免临期堆积。",
+        }
+    if goal_horizon_factor and goal_horizon_delta is not None:
+        return {
+            "code": "goal_horizon",
+            "label": goal_horizon_factor["label"],
+            "detail": "这一步属于一项有明确时间边界的承诺，现在推进能保护目标的完成窗口。",
         }
     if feedback_reason:
         return feedback_reason
@@ -350,9 +381,15 @@ def _rank_task(
             )
         )
 
+    goal_horizon_factor, goal_horizon_delta = _goal_horizon_factor(task["goal"], today)
+    if goal_horizon_factor:
+        factors.append(goal_horizon_factor)
+
     reason = _primary_reason(
         due_factor,
         due_delta,
+        goal_horizon_factor,
+        goal_horizon_delta,
         feedback_reason,
         task["goal"],
         task["priority"],
@@ -412,7 +449,7 @@ def build_now_context(
     try:
         activity = _read_lifeline_activity(conn, current_time)
         outcomes = _read_recent_outcomes(conn, current_time)
-        commitments = read_commitments(conn)
+        commitments = read_commitments(conn, today=current_date, now=current_time)
         rows = conn.execute(
             """
             SELECT
@@ -423,12 +460,20 @@ def build_now_context(
                 gm.id AS goal_id, gm.category AS goal_category,
                 gm.status AS goal_status, gm.content AS goal_title,
                 gm.lifeline_id AS goal_lifeline_id,
-                gl.name AS goal_lifeline_name
+                gl.name AS goal_lifeline_name,
+                COALESCE(gc.state, 'active') AS goal_state,
+                gc.target_date AS goal_target_date
             FROM tasks t
             LEFT JOIN lifelines l ON l.id = t.lifeline_id
             LEFT JOIN memories gm ON gm.id = t.memory_id
+            LEFT JOIN goal_commitments gc ON gc.memory_id = gm.id
             LEFT JOIN lifelines gl ON gl.id = gm.lifeline_id
             WHERE t.status = 'todo'
+              AND NOT (
+                  gm.category = 'goal'
+                  AND gm.status = 'confirmed'
+                  AND COALESCE(gc.state, 'active') <> 'active'
+              )
             """
         ).fetchall()
     finally:

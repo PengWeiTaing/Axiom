@@ -24,13 +24,14 @@ from core._common import (
     utc_now,
     write_audit_log,
 )
+from core.goals import ensure_goal_profile, read_goal_profile
 
 def register_routes(app):
     # ===== 记忆路由 =====
 
     MEMORY_SELECT_FIELDS = """
         id, category, content, detail, status,
-        source_item_id, source_text, created_at, updated_at
+        source_item_id, source_text, created_at, updated_at, lifeline_id
     """
 
 
@@ -47,8 +48,10 @@ def register_routes(app):
             "source_text": row["source_text"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "lifeline_id": row["lifeline_id"],
             "linked_tasks": [],
             "task_progress": None,
+            "goal_profile": None,
         }
 
 
@@ -235,6 +238,8 @@ def register_routes(app):
                             "created_at": item_row["created_at"],
                         }
                 memory["source_item"] = source_item
+                if row["category"] == "goal" and row["status"] == "confirmed":
+                    memory["goal_profile"] = read_goal_profile(conn, memory_id)
 
                 return ok_response({"memory": memory})
 
@@ -262,6 +267,10 @@ def register_routes(app):
                 "UPDATE memories SET category = ?, content = ?, detail = ?, status = ?, updated_at = ? WHERE id = ?",
                 (category, content, detail, status, now, memory_id),
             )
+            if category == "goal" and status == "confirmed":
+                ensure_goal_profile(conn, memory_id)
+            elif category != "goal":
+                conn.execute("DELETE FROM goal_commitments WHERE memory_id = ?", (memory_id,))
             conn.commit()
             write_audit_log("memory_update", "memory", memory_id)
             row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
@@ -280,15 +289,20 @@ def register_routes(app):
 
         conn = get_db_connection()
         try:
-            row = conn.execute("SELECT id FROM memories WHERE id = ?", (memory_id,)).fetchone()
+            row = conn.execute("SELECT id, category FROM memories WHERE id = ?", (memory_id,)).fetchone()
             if row is None:
                 return error_response(404, "not_found", "记忆不存在")
             now = utc_now().isoformat(timespec="seconds")
             conn.execute("UPDATE memories SET status = 'confirmed', updated_at = ? WHERE id = ?", (now, memory_id))
+            if row["category"] == "goal":
+                ensure_goal_profile(conn, memory_id)
             conn.commit()
             write_audit_log("memory_confirm", "memory", memory_id)
             row = conn.execute(f"SELECT {MEMORY_SELECT_FIELDS} FROM memories WHERE id = ?", (memory_id,)).fetchone()
-            return ok_response({"memory": row_to_memory(row)})
+            memory = row_to_memory(row)
+            if row["category"] == "goal":
+                memory["goal_profile"] = read_goal_profile(conn, memory_id)
+            return ok_response({"memory": memory})
         finally:
             conn.close()
 

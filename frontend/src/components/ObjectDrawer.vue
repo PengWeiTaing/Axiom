@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { Check, Pencil, Plus, X } from '@lucide/vue';
 import { ApiError } from '@/api/client';
-import { cancelTask, createTask, reviewDecision } from '@/api/knowledge';
+import {
+  cancelTask,
+  createTask,
+  listMemories,
+  reviewDecision,
+  reviewGoalCommitment,
+  updateGoalCommitment,
+} from '@/api/knowledge';
 import {
   decisionStatusLabel,
   memoryCategoryLabel,
@@ -13,12 +21,22 @@ import {
 import { useObjectDetail, type ObjectDetail } from '@/composables/useObjectDetail';
 import { formatRelative } from '@/composables/useRelativeTime';
 import { useWindowEventListener } from '@/composables/useEventListener';
+import { navigateToPath } from '@/composables/useAppNavigation';
 import { useModeStore } from '@/stores/mode';
-import type { Decision, MemoryDetail, ObjectKind, ObjectTarget, Task } from '@/api/types';
+import type {
+  Decision,
+  GoalCommitmentState,
+  GoalProfile,
+  Memory,
+  MemoryDetail,
+  ObjectKind,
+  ObjectTarget,
+  Task,
+} from '@/api/types';
 
 const props = withDefaults(defineProps<{
   target: ObjectTarget | null;
-  intent?: 'view' | 'add-goal-action';
+  intent?: 'view' | 'add-goal-action' | 'edit-goal';
 }>(), {
   intent: 'view',
 });
@@ -36,6 +54,29 @@ const feedback = ref<string | null>(null);
 const decisionReviewDraft = ref('');
 const goalActionOpen = ref(false);
 const goalActionDraft = ref({ title: '', estimated_minutes: 25 });
+const goalProfileEditing = ref(false);
+const goalOptions = ref<Memory[]>([]);
+const goalProfileDraft = ref({
+  success_criteria: '',
+  target_date: '',
+  review_cadence_days: 14,
+  parent_goal_id: null as number | null,
+  state: 'active' as GoalCommitmentState,
+});
+
+const goalStateOptions: { value: GoalCommitmentState; label: string }[] = [
+  { value: 'active', label: '推进中' },
+  { value: 'paused', label: '暂停' },
+  { value: 'achieved', label: '已达成' },
+  { value: 'released', label: '已放下' },
+];
+
+const reviewCadenceOptions = [
+  { value: 7, label: '每周' },
+  { value: 14, label: '每两周' },
+  { value: 30, label: '每月' },
+  { value: 90, label: '每季度' },
+];
 
 const detailTarget = computed(() => (
   props.target ? { id: `${props.target.kind}:${props.target.id}` } : null
@@ -58,6 +99,7 @@ watch(
   () => {
     decisionReviewDraft.value = '';
     goalActionOpen.value = props.intent === 'add-goal-action';
+    goalProfileEditing.value = props.intent === 'edit-goal';
     goalActionDraft.value = { title: '', estimated_minutes: 25 };
     error.value = null;
     feedback.value = null;
@@ -73,6 +115,10 @@ const displayError = computed(() => error.value || (detailError.value ? '对象�
 const isConfirmedGoal = computed(() => (
   memory.value?.category === 'goal' && memory.value.status === 'confirmed'
 ));
+const goalProfile = computed(() => memory.value?.goal_profile ?? null);
+const goalIsActive = computed(() => goalProfile.value?.state === 'active');
+const canAddGoalAction = computed(() => isConfirmedGoal.value && goalIsActive.value);
+const availableParentGoals = computed(() => goalOptions.value.filter((goal) => goal.id !== memory.value?.id));
 const goalProgress = computed(() => {
   const linked = memory.value?.linked_tasks || [];
   return {
@@ -87,6 +133,43 @@ watch(
   (nextDecision) => {
     decisionReviewDraft.value = nextDecision?.actual_outcome || '';
   },
+);
+
+watch(
+  goalProfile,
+  (profile) => {
+    if (!profile) return;
+    goalProfileDraft.value = {
+      success_criteria: profile.success_criteria || '',
+      target_date: profile.target_date || '',
+      review_cadence_days: profile.review_cadence_days,
+      parent_goal_id: profile.parent_goal?.id ?? null,
+      state: profile.state,
+    };
+  },
+  { immediate: true },
+);
+
+watch(
+  [isConfirmedGoal, () => memory.value?.id],
+  async ([confirmed]) => {
+    if (!confirmed) {
+      goalOptions.value = [];
+      return;
+    }
+    try {
+      const payload = await listMemories({
+        category: 'goal',
+        status: 'confirmed',
+        page: 1,
+        page_size: 100,
+      });
+      goalOptions.value = payload.memories;
+    } catch {
+      goalOptions.value = [];
+    }
+  },
+  { immediate: true },
 );
 
 const title = computed(() => {
@@ -104,11 +187,24 @@ const subtitle = computed(() => {
 });
 
 const createdAt = computed(() => task.value?.created_at || memory.value?.created_at || decision.value?.created_at || '');
+const objectLifelineId = computed(() => (
+  task.value?.lifeline_id
+  || memory.value?.lifeline_id
+  || decision.value?.lifeline_id
+  || null
+));
+const collectionLabel = computed(() => {
+  if (objectLifelineId.value) return '打开所属项目 / 生活线';
+  return '在资料库中打开';
+});
 
 function openWorkspace() {
-  if (kind.value === 'task') mode.set('tasks');
-  if (kind.value === 'memory') mode.set('memories');
-  if (kind.value === 'decision') mode.set('decisions');
+  if (objectLifelineId.value) {
+    const raw = String(objectLifelineId.value).replace(/^lifeline:/, '');
+    navigateToPath(`/app?mode=library&view=context&lifeline=${encodeURIComponent(`lifeline:${raw}`)}`);
+    return;
+  }
+  mode.set('library');
   emit('close');
 }
 
@@ -190,7 +286,7 @@ async function submitDecisionReview() {
 }
 
 async function submitGoalAction() {
-  if (!memory.value || !isConfirmedGoal.value || acting.value) return;
+  if (!memory.value || !canAddGoalAction.value || acting.value) return;
   const title = goalActionDraft.value.title.trim();
   const estimatedMinutes = Number(goalActionDraft.value.estimated_minutes);
   if (!title || !Number.isFinite(estimatedMinutes) || estimatedMinutes < 5) return;
@@ -217,6 +313,77 @@ async function submitGoalAction() {
   }
 }
 
+function applyGoalProfile(profile: GoalProfile) {
+  if (!memory.value) return;
+  setDetail({ ...memory.value, goal_profile: profile } as unknown as ObjectDetail);
+}
+
+async function saveGoalProfile() {
+  if (!memory.value || !goalProfile.value || acting.value) return;
+  acting.value = true;
+  error.value = null;
+  feedback.value = null;
+  try {
+    const payload = await updateGoalCommitment(memory.value.id, {
+      success_criteria: goalProfileDraft.value.success_criteria.trim() || null,
+      target_date: goalProfileDraft.value.target_date || null,
+      review_cadence_days: Number(goalProfileDraft.value.review_cadence_days),
+      parent_goal_id: goalProfileDraft.value.parent_goal_id,
+      state: goalProfileDraft.value.state,
+    });
+    applyGoalProfile(payload.goal_profile);
+    goalProfileEditing.value = false;
+    goalActionOpen.value = false;
+    feedback.value = '承诺已更新';
+    emit('changed');
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '承诺更新失败';
+  } finally {
+    acting.value = false;
+  }
+}
+
+async function confirmGoalReview() {
+  if (!memory.value || !goalProfile.value || acting.value) return;
+  acting.value = true;
+  error.value = null;
+  feedback.value = null;
+  try {
+    const payload = await reviewGoalCommitment(memory.value.id);
+    applyGoalProfile(payload.goal_profile);
+    feedback.value = '已确认继续推进';
+    emit('changed');
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '目标复盘失败';
+  } finally {
+    acting.value = false;
+  }
+}
+
+function cancelGoalProfileEdit() {
+  const profile = goalProfile.value;
+  if (profile) {
+    goalProfileDraft.value = {
+      success_criteria: profile.success_criteria || '',
+      target_date: profile.target_date || '',
+      review_cadence_days: profile.review_cadence_days,
+      parent_goal_id: profile.parent_goal?.id ?? null,
+      state: profile.state,
+    };
+  }
+  goalProfileEditing.value = false;
+}
+
+function startGoalProfileEdit() {
+  goalActionOpen.value = false;
+  goalProfileEditing.value = true;
+}
+
+function startGoalAction() {
+  goalProfileEditing.value = false;
+  goalActionOpen.value = true;
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.target) {
     e.preventDefault();
@@ -239,7 +406,9 @@ useWindowEventListener('keydown', onKey);
             <h2>{{ title }}</h2>
             <span>{{ subtitle }}<template v-if="createdAt"> · {{ formatRelative(createdAt) }}</template></span>
           </div>
-          <button class="close-btn" type="button" aria-label="关闭" @click="emit('close')">&times;</button>
+          <button class="close-btn" type="button" title="关闭" aria-label="关闭" @click="emit('close')">
+            <X :size="17" />
+          </button>
         </header>
 
         <section class="object-body">
@@ -273,16 +442,127 @@ useWindowEventListener('keydown', onKey);
               <strong>{{ memory.source_item.snippet || `#${memory.source_item.id}` }}</strong>
               <small>{{ formatRelative(memory.source_item.created_at) }}</small>
             </button>
+            <section v-if="isConfirmedGoal && goalProfile" class="goal-commitment">
+              <header class="goal-commitment-head">
+                <div>
+                  <span>当前承诺</span>
+                  <strong :class="`goal-state goal-state-${goalProfile.state}`">{{ goalProfile.state_label }}</strong>
+                </div>
+                <button
+                  v-if="!goalProfileEditing"
+                  class="small-icon-button"
+                  type="button"
+                  title="编辑承诺"
+                  aria-label="编辑承诺"
+                  @click="startGoalProfileEdit"
+                >
+                  <Pencil :size="15" />
+                </button>
+              </header>
+
+              <form v-if="goalProfileEditing" class="goal-profile-form" @submit.prevent="saveGoalProfile">
+                <label class="goal-profile-wide">
+                  <span>怎样算完成</span>
+                  <textarea
+                    v-model="goalProfileDraft.success_criteria"
+                    rows="3"
+                    maxlength="2000"
+                    placeholder="写下一个可以判断是否完成的结果"
+                  />
+                </label>
+                <label>
+                  <span>目标日期</span>
+                  <input v-model="goalProfileDraft.target_date" type="date" />
+                </label>
+                <label>
+                  <span>复盘节奏</span>
+                  <select v-model.number="goalProfileDraft.review_cadence_days">
+                    <option v-for="option in reviewCadenceOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+                <label>
+                  <span>上层目标</span>
+                  <select v-model="goalProfileDraft.parent_goal_id">
+                    <option :value="null">无上层目标</option>
+                    <option v-for="option in availableParentGoals" :key="option.id" :value="option.id">
+                      {{ option.content }}
+                    </option>
+                  </select>
+                </label>
+                <label>
+                  <span>推进状态</span>
+                  <select v-model="goalProfileDraft.state">
+                    <option v-for="option in goalStateOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+                <div class="goal-profile-actions goal-profile-wide">
+                  <button type="submit" :disabled="acting">
+                    <Check :size="15" />
+                    <span>{{ acting ? '保存中' : '保存' }}</span>
+                  </button>
+                  <button type="button" :disabled="acting" @click="cancelGoalProfileEdit">
+                    <X :size="15" />
+                    <span>取消</span>
+                  </button>
+                </div>
+              </form>
+
+              <div v-else class="goal-profile-readout">
+                <div class="goal-criteria">
+                  <span>怎样算完成</span>
+                  <p>{{ goalProfile.success_criteria || '尚未定义' }}</p>
+                </div>
+                <div class="goal-profile-meta">
+                  <div>
+                    <span>目标日期</span>
+                    <strong>{{ goalProfile.target_date || '不设期限' }}</strong>
+                  </div>
+                  <div>
+                    <span>复盘节奏</span>
+                    <strong>每 {{ goalProfile.review_cadence_days }} 天</strong>
+                  </div>
+                </div>
+                <button
+                  v-if="goalProfile.parent_goal"
+                  class="goal-parent-link"
+                  type="button"
+                  @click="emit('openObject', { kind: 'memory', id: goalProfile.parent_goal.id })"
+                >
+                  <span>上层目标</span>
+                  <strong>{{ goalProfile.parent_goal.title }}</strong>
+                </button>
+                <div class="goal-review-line" :class="{ due: goalProfile.review_due }">
+                  <div>
+                    <span>{{ goalProfile.review_due ? '复盘已到期' : '最近确认' }}</span>
+                    <strong>{{ formatRelative(goalProfile.last_reviewed_at || goalProfile.updated_at) }}</strong>
+                  </div>
+                  <button
+                    v-if="goalProfile.state === 'active' || goalProfile.state === 'paused'"
+                    type="button"
+                    :disabled="acting"
+                    @click="confirmGoalReview"
+                  >
+                    <Check :size="14" />
+                    <span>{{ goalProfile.state === 'paused' ? '确认暂停' : '确认继续' }}</span>
+                  </button>
+                </div>
+              </div>
+            </section>
             <article v-if="isConfirmedGoal" class="goal-progress">
               <span>承诺进展</span>
               <strong v-if="goalProgress.total">
                 {{ goalProgress.done }} / {{ goalProgress.total }} 已完成
               </strong>
               <strong v-else>还没有下一步</strong>
-              <p v-if="goalProgress.open">{{ goalProgress.open }} 个行动仍在推进</p>
+              <p v-if="goalProfile?.state !== 'active'">行动仍被保留，但不会进入“此刻”。</p>
+              <p v-else-if="goalProgress.open">{{ goalProgress.open }} 个行动仍在推进</p>
               <p v-else>目标仍然有效，需要补一个可以开始的动作。</p>
             </article>
-            <form v-if="isConfirmedGoal && goalActionOpen" class="goal-action-form" @submit.prevent="submitGoalAction">
+            <form v-if="canAddGoalAction && goalActionOpen" class="goal-action-form" @submit.prevent="submitGoalAction">
               <label>
                 <span>下一步</span>
                 <input
@@ -306,7 +586,8 @@ useWindowEventListener('keydown', onKey);
               </label>
               <div class="goal-action-buttons">
                 <button type="submit" :disabled="acting || !goalActionDraft.title.trim()">
-                  {{ acting ? '添加中' : '添加下一步' }}
+                  <Plus :size="15" />
+                  <span>{{ acting ? '添加中' : '添加下一步' }}</span>
                 </button>
                 <button type="button" :disabled="acting" @click="goalActionOpen = false">取消</button>
               </div>
@@ -379,10 +660,10 @@ useWindowEventListener('keydown', onKey);
           </template>
           <template v-if="memory">
             <button
-              v-if="isConfirmedGoal && !goalActionOpen"
+              v-if="canAddGoalAction && !goalActionOpen"
               type="button"
               :disabled="acting"
-              @click="goalActionOpen = true"
+              @click="startGoalAction"
             >补下一步</button>
             <button
               v-if="memory.status === 'candidate'"
@@ -404,7 +685,7 @@ useWindowEventListener('keydown', onKey);
               @click="submitDecisionReview"
             >标记已回顾</button>
           </template>
-          <button type="button" @click="openWorkspace">打开工作台</button>
+          <button type="button" @click="openWorkspace">{{ collectionLabel }}</button>
         </footer>
       </div>
     </aside>
@@ -531,6 +812,180 @@ useWindowEventListener('keydown', onKey);
   gap: var(--s-1);
 }
 
+.goal-commitment {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.goal-commitment-head,
+.goal-commitment-head > div,
+.goal-review-line,
+.goal-profile-actions button,
+.goal-action-buttons button {
+  display: flex;
+  align-items: center;
+}
+
+.goal-commitment-head,
+.goal-review-line {
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.goal-commitment-head > div {
+  gap: var(--s-2);
+}
+
+.goal-commitment-head span,
+.goal-profile-form label > span,
+.goal-criteria > span,
+.goal-profile-meta span,
+.goal-parent-link span,
+.goal-review-line span {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.goal-state {
+  padding-left: var(--s-2);
+  border-left: 2px solid var(--line-2);
+  color: var(--text-2);
+  font-size: var(--fs-2);
+  font-weight: 560;
+}
+
+.goal-state-active { border-color: var(--accent); color: var(--accent-bright); }
+.goal-state-paused { border-color: var(--focus); color: var(--focus); }
+.goal-state-achieved { border-color: var(--success); color: var(--success); }
+.goal-state-released { border-color: var(--text-4); color: var(--text-3); }
+
+.small-icon-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  color: var(--text-3);
+}
+
+.small-icon-button:hover {
+  border-color: var(--line-2);
+  color: var(--text-1);
+}
+
+.goal-profile-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+
+.goal-profile-form label,
+.goal-criteria,
+.goal-profile-meta > div,
+.goal-review-line > div {
+  display: grid;
+  gap: var(--s-1);
+}
+
+.goal-profile-wide {
+  grid-column: 1 / -1;
+}
+
+.goal-profile-form input,
+.goal-profile-form select,
+.goal-profile-form textarea {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: rgba(7, 10, 15, 0.52);
+  color: var(--text-1);
+  font: inherit;
+  padding: 0 var(--s-3);
+}
+
+.goal-profile-form textarea {
+  min-height: 82px;
+  resize: vertical;
+  line-height: var(--lh-base);
+  padding-block: var(--s-2);
+}
+
+.goal-profile-form input:focus,
+.goal-profile-form select:focus,
+.goal-profile-form textarea:focus {
+  border-color: rgba(110, 231, 208, 0.3);
+  outline: none;
+}
+
+.goal-profile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+}
+
+.goal-profile-actions button,
+.goal-review-line button {
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 36px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  color: var(--text-2);
+}
+
+.goal-profile-readout {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.goal-criteria p,
+.goal-profile-meta strong,
+.goal-parent-link strong,
+.goal-review-line strong {
+  color: var(--text-1);
+  font-size: var(--fs-3);
+  font-weight: 500;
+  line-height: var(--lh-base);
+  overflow-wrap: anywhere;
+}
+
+.goal-profile-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+
+.goal-parent-link {
+  display: grid;
+  gap: var(--s-1);
+  text-align: left;
+}
+
+.goal-parent-link:hover strong {
+  color: var(--accent-bright);
+}
+
+.goal-review-line {
+  min-height: 44px;
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--line-1);
+}
+
+.goal-review-line.due strong {
+  color: var(--focus);
+}
+
+.goal-review-line button {
+  display: inline-flex;
+  padding: 0 var(--s-3);
+}
+
 .goal-progress > span,
 .goal-action-form label > span {
   color: var(--text-3);
@@ -587,6 +1042,8 @@ useWindowEventListener('keydown', onKey);
 }
 
 .goal-action-buttons button {
+  justify-content: center;
+  gap: var(--s-2);
   min-height: 38px;
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
@@ -722,6 +1179,15 @@ useWindowEventListener('keydown', onKey);
 @media (max-width: 560px) {
   .meta-grid {
     grid-template-columns: 1fr;
+  }
+
+  .goal-profile-form,
+  .goal-profile-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-profile-wide {
+    grid-column: 1;
   }
 }
 </style>

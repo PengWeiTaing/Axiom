@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Search, SlidersHorizontal } from '@lucide/vue';
+import { FolderTree, Search, SlidersHorizontal } from '@lucide/vue';
 import { getRecent, markProcessingPending, markProcessingReady } from '@/api/records';
 import { searchAll, searchVector } from '@/api/search';
 import { ApiError } from '@/api/client';
 import ItemDrawer from '@/components/ItemDrawer.vue';
+import LibraryContextView from '@/components/LibraryContextView.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
 import {
   decisionStatusLabel,
@@ -19,6 +20,7 @@ import { typeAccent } from '@/composables/useTypeAccent';
 import type { Decision, Item, ItemType, Memory, ObjectTarget, Task } from '@/api/types';
 
 type SearchMode = 'all' | 'vector';
+type LibraryPane = 'search' | 'context';
 type ResultKind = 'item' | 'task' | 'memory' | 'decision';
 type ProcessingStateFilter = '' | 'ready' | 'pending';
 type ProcessingOverrideFilter = '' | 'ready';
@@ -31,6 +33,9 @@ type SearchResult =
   | { kind: 'decision'; data: Decision };
 
 const query = ref('');
+const libraryPane = ref<LibraryPane>('search');
+const selectedLifelineId = ref<string | null>(null);
+const contextRevision = ref(0);
 const searchMode = ref<SearchMode>('all');
 const itemTypeFilter = ref<ItemType | ''>('');
 const sourceFilter = ref('');
@@ -153,6 +158,8 @@ function selectMode(next: SearchMode) {
 function syncSearchUrl(q: string) {
   const canUseRecordFilters = searchMode.value === 'all';
   replaceRouteQuery('library', {
+    view: '',
+    lifeline: '',
     q,
     search_mode: searchMode.value === 'vector' ? 'vector' : '',
     type: canUseRecordFilters ? itemTypeFilter.value : '',
@@ -160,6 +167,28 @@ function syncSearchUrl(q: string) {
     processing_state: canUseRecordFilters ? processingStateFilter.value : '',
     processing_override: canUseRecordFilters ? processingOverrideFilter.value : '',
   });
+}
+
+function selectLibraryPane(next: LibraryPane) {
+  libraryPane.value = next;
+  if (next === 'search') {
+    replaceRouteQuery('library', { view: '', lifeline: '' });
+    return;
+  }
+  replaceRouteQuery('library', {
+    view: 'context',
+    q: '',
+    search_mode: '',
+    type: '',
+    source: '',
+    processing_state: '',
+    processing_override: '',
+  });
+}
+
+function selectLifeline(id: string) {
+  selectedLifelineId.value = id;
+  replaceRouteQuery('library', { view: 'context', lifeline: id });
 }
 
 function openResult(result: SearchResult) {
@@ -283,6 +312,10 @@ async function loadInitialItems() {
 }
 
 async function refreshContent() {
+  if (libraryPane.value === 'context') {
+    contextRevision.value += 1;
+    return;
+  }
   if (query.value.trim()) {
     await runSearch();
     return;
@@ -292,6 +325,10 @@ async function refreshContent() {
 
 onMounted(() => {
   const params = currentRouteParams();
+  libraryPane.value = params.get('view') === 'context' || Boolean(params.get('lifeline'))
+    ? 'context'
+    : 'search';
+  selectedLifelineId.value = params.get('lifeline');
   const initialMode = params.get('search_mode');
   const initialType = params.get('type');
   const initialProcessingState = params.get('processing_state');
@@ -314,10 +351,10 @@ onMounted(() => {
     || processingOverrideFilter.value
     || sourceFilter.value,
   );
-  loadInitialItems();
+  if (libraryPane.value === 'search') loadInitialItems();
 
   const initial = params.get('q');
-  if (initial) {
+  if (initial && libraryPane.value === 'search') {
     query.value = initial;
     runSearch();
   }
@@ -331,13 +368,39 @@ onMounted(() => {
         <p class="eyebrow">Library</p>
         <h1>资料库</h1>
       </div>
-      <button class="refresh-btn" type="button" :disabled="loading || !query.trim()" @click="runSearch()">
-        <Search :size="16" />
-        <span>{{ loading ? '搜索中' : '搜索' }}</span>
-      </button>
+      <div class="topbar-actions">
+        <div class="library-pane-switch" aria-label="资料库视图">
+          <button
+            type="button"
+            :class="{ active: libraryPane === 'search' }"
+            @click="selectLibraryPane('search')"
+          >
+            <Search :size="15" />
+            <span>查找</span>
+          </button>
+          <button
+            type="button"
+            :class="{ active: libraryPane === 'context' }"
+            @click="selectLibraryPane('context')"
+          >
+            <FolderTree :size="15" />
+            <span>项目脉络</span>
+          </button>
+        </div>
+        <button
+          v-if="libraryPane === 'search'"
+          class="refresh-btn"
+          type="button"
+          :disabled="loading || !query.trim()"
+          @click="runSearch()"
+        >
+          <Search :size="16" />
+          <span>{{ loading ? '搜索中' : '搜索' }}</span>
+        </button>
+      </div>
     </header>
 
-    <section class="search-shell">
+    <section v-if="libraryPane === 'search'" class="search-shell">
       <aside class="panel query-panel">
         <form class="query-form" @submit.prevent="runSearch()">
           <label>
@@ -526,6 +589,15 @@ onMounted(() => {
       </section>
     </section>
 
+    <LibraryContextView
+      v-else
+      :key="contextRevision"
+      :selected-id="selectedLifelineId"
+      @select-lifeline="selectLifeline"
+      @open-item="selectedItemId = $event"
+      @open-object="selectedObject = $event"
+    />
+
     <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="refreshContent" />
     <ObjectDrawer
       :target="selectedObject"
@@ -550,6 +622,37 @@ onMounted(() => {
   gap: var(--s-4);
   align-items: flex-start;
   margin-bottom: var(--s-5);
+}
+
+.topbar-actions,
+.library-pane-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.library-pane-switch {
+  padding: 3px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+}
+
+.library-pane-switch button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-1);
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+
+.library-pane-switch button:hover,
+.library-pane-switch button.active {
+  background: var(--surface-2);
+  color: var(--text-1);
 }
 
 h1,
@@ -943,9 +1046,36 @@ input::placeholder {
   .result-meta {
     grid-column: 2;
   }
+
+  .topbar {
+    display: grid;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 @media (max-width: 560px) {
+  .topbar-actions {
+    align-items: stretch;
+  }
+
+  .library-pane-switch {
+    flex: 1;
+  }
+
+  .library-pane-switch button {
+    flex: 1;
+    justify-content: center;
+    padding: 0 var(--s-2);
+  }
+
+  .refresh-btn span {
+    display: none;
+  }
+
   .mode-pills button {
     min-width: 0;
     flex: 1;

@@ -385,6 +385,8 @@ def row_to_item(row: sqlite3.Row, include_score: bool = False) -> dict:
     )
     if include_score and "score" in row.keys():
         item["score"] = row["score"]
+    if "lifeline_id" in row_keys:
+        item["lifeline_id"] = row["lifeline_id"]
     return item
 
 

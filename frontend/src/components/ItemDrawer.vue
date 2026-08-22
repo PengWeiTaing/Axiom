@@ -24,6 +24,7 @@ import { humanSize } from '@/composables/useHumanSize'
 import { formatRelative } from '@/composables/useRelativeTime'
 import { downloadBlob, triggerDownloadUrl } from '@/composables/useDownload'
 import { useTimeout } from '@/composables/useTimeout'
+import { navigateToPath } from '@/composables/useAppNavigation'
 import { ApiError } from '@/api/client'
 import type { ItemDetail } from '@/api/types'
 
@@ -130,6 +131,12 @@ function startEdit() {
   resetEditForm(detail.value)
   editFeedback.value = null
   editing.value = true
+}
+
+function openLifeline() {
+  if (!detail.value?.lifeline_id) return
+  const raw = String(detail.value.lifeline_id).replace(/^lifeline:/, '')
+  navigateToPath(`/app?mode=library&view=context&lifeline=${encodeURIComponent(`lifeline:${raw}`)}`)
 }
 
 function cancelEdit() {
@@ -582,6 +589,15 @@ onBeforeUnmount(() => {
             @click="doMarkPending"
           >
             退回待处理
+          </button>
+          <button
+            v-if="!editing && detail.lifeline_id"
+            class="action-btn archive-btn"
+            type="button"
+            :disabled="acting"
+            @click="openLifeline"
+          >
+            打开所属项目 / 生活线
           </button>
           <button
             v-if="!editing && detail.file_url"

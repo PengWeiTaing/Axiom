@@ -20,7 +20,7 @@ def register_routes(app):
 
     DECISION_SELECT_FIELDS = """
         id, title, context, decision, reasoning,
-        expected_outcome, actual_outcome, status, created_at, updated_at
+        expected_outcome, actual_outcome, status, created_at, updated_at, lifeline_id
     """
 
     DECISION_STATUS_LABELS = {"pending": "待回顾", "reviewed": "已回顾"}
@@ -39,6 +39,7 @@ def register_routes(app):
             "status_label": DECISION_STATUS_LABELS.get(row["status"], row["status"]),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "lifeline_id": row["lifeline_id"],
         }
 
 

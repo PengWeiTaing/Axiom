@@ -1,11 +1,22 @@
 import { apiRequest } from './client';
 import type { AtlasGraphPayload } from '@/atlas/types';
 import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
+import type { LifelineContextPayload, LifelineSummary } from '@/api/types';
 
 export const getCosmos = () => apiRequest<CosmosData>('/cosmos');
 
 export const getAtlasGraph = (params: { max_nodes?: number } = {}) =>
   apiRequest<AtlasGraphPayload>('/api/atlas/graph', { query: params });
+
+export const getLifelineIndex = () => apiRequest<{
+  schema_version: 'lifeline.index.v1';
+  lifelines: LifelineSummary[];
+}>('/api/lifelines');
+
+export const getLifelineContext = (id: string) =>
+  apiRequest<LifelineContextPayload>(
+    `/api/lifelines/${encodeURIComponent(id)}/context`,
+  );
 
 export const createLifeline = (data: {
   id: string;

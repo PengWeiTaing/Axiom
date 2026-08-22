@@ -19,6 +19,7 @@ import { listDecisions, listMemories } from '@/api/knowledge';
 import { getOverview } from '@/api/records';
 import type {
   ContextAction,
+  ContextCommitmentAttention,
   ContextFitFeedback,
   ContextGoal,
   ContextCommitmentGoal,
@@ -48,7 +49,7 @@ const candidateMemories = ref<Memory[]>([]);
 const pendingDecisions = ref<Decision[]>([]);
 const selectedItemId = ref<number | null>(null);
 const selectedObject = ref<ObjectTarget | null>(null);
-const selectedObjectIntent = ref<'view' | 'add-goal-action'>('view');
+const selectedObjectIntent = ref<'view' | 'add-goal-action' | 'edit-goal'>('view');
 const completingId = ref<number | null>(null);
 const feedbackOutcome = ref<ContextOutcome | null>(null);
 const feedbackEffect = ref<string | null>(null);
@@ -83,12 +84,14 @@ const primaryCues = computed(() => {
   return action.cues.filter((cue) => cue !== action.reason.label);
 });
 const nextActions = computed(() => nowContext.value?.alternatives ?? []);
-const goalGaps = computed(() => nowContext.value?.commitments.gaps ?? []);
-const firstGoalGap = computed(() => goalGaps.value[0] ?? null);
+const goalAttention = computed(() => nowContext.value?.commitments.attention ?? []);
+const firstGoalAttention = computed(() => goalAttention.value[0] ?? null);
 const recentItems = computed(() => overview.value?.recent.items.slice(0, 5) ?? []);
 const backlogTotal = computed(() => overview.value?.processing_backlog.total ?? 0);
 const judgementTotal = computed(() => (
-  goalGaps.value.length + candidateMemories.value.length + pendingDecisions.value.length
+  (nowContext.value?.commitments.attention_total ?? 0)
+  + candidateMemories.value.length
+  + pendingDecisions.value.length
 ));
 
 function actionMeta(action: ContextAction): string {
@@ -184,9 +187,25 @@ function openDecision(decision: Decision) {
   selectedObject.value = { kind: 'decision', id: decision.id };
 }
 
-function openGoal(goal: ContextGoal | ContextCommitmentGoal, addAction = false) {
-  selectedObjectIntent.value = addAction ? 'add-goal-action' : 'view';
+function openGoal(
+  goal: ContextGoal | ContextCommitmentGoal,
+  intent: 'view' | 'add-goal-action' | 'edit-goal' = 'view',
+) {
+  selectedObjectIntent.value = intent;
   selectedObject.value = { kind: 'memory', id: goal.id };
+}
+
+function openGoalAttention(goal: ContextCommitmentAttention) {
+  if (goal.attention_action === 'add_action') {
+    openGoal(goal, 'add-goal-action');
+    return;
+  }
+  openGoal(goal, goal.attention_action === 'edit_commitment' ? 'edit-goal' : 'view');
+}
+
+function openObject(target: ObjectTarget) {
+  selectedObjectIntent.value = 'view';
+  selectedObject.value = target;
 }
 
 onMounted(load);
@@ -237,12 +256,14 @@ watch(() => props.revision, load);
       </template>
 
       <div v-else-if="!loading" class="empty-focus">
-        <template v-if="firstGoalGap">
-          <h2 id="focus-title">目标还在，下一步还没落下来</h2>
-          <p>先为「{{ compact(firstGoalGap.title, '已确认目标', 40) }}」补一个可以开始的动作。</p>
-          <button class="capture-button" type="button" @click="openGoal(firstGoalGap, true)">
+        <template v-if="firstGoalAttention">
+          <h2 id="focus-title">
+            {{ firstGoalAttention.attention_code === 'missing_action' ? '目标还在，下一步还没落下来' : '有一项承诺需要重新确认' }}
+          </h2>
+          <p>「{{ compact(firstGoalAttention.title, '已确认目标', 40) }}」{{ firstGoalAttention.attention_detail }}</p>
+          <button class="capture-button" type="button" @click="openGoalAttention(firstGoalAttention)">
             <Target :size="18" />
-            <span>补下一步</span>
+            <span>{{ firstGoalAttention.attention_action === 'add_action' ? '补下一步' : '查看承诺' }}</span>
           </button>
         </template>
         <template v-else>
@@ -322,12 +343,12 @@ watch(() => props.revision, load);
           </div>
         </header>
 
-        <div v-if="goalGaps.length || candidateMemories.length || pendingDecisions.length" class="row-list">
-          <button v-for="goal in goalGaps" :key="`goal-${goal.id}`" class="content-row" type="button" @click="openGoal(goal, true)">
+        <div v-if="goalAttention.length || candidateMemories.length || pendingDecisions.length" class="row-list">
+          <button v-for="goal in goalAttention" :key="`goal-${goal.id}`" class="content-row" type="button" @click="openGoalAttention(goal)">
             <span class="row-icon goal-icon"><Target :size="16" /></span>
             <span class="row-copy">
               <strong>{{ goal.title }}</strong>
-              <small>已确认目标 · 还没有下一步</small>
+              <small>当前承诺 · {{ goal.attention_label }}</small>
             </span>
             <ArrowRight class="row-arrow" :size="15" />
           </button>
@@ -383,7 +404,7 @@ watch(() => props.revision, load);
       @close="selectedObject = null"
       @changed="load"
       @open-item="selectedItemId = $event"
-      @open-object="selectedObject = $event"
+      @open-object="openObject"
     />
   </main>
 </template>

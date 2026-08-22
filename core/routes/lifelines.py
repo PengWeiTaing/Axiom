@@ -4,6 +4,11 @@ import re
 from flask import request
 
 from core._common import error_response, get_db_connection, ok_response, require_key
+from core.lifeline_context import (
+    list_lifeline_summaries,
+    normalize_lifeline_id,
+    read_lifeline_context,
+)
 from core.routes.cosmos import PREFIX_TO_TABLE, entity_id
 
 LIFELINE_ID_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
@@ -26,6 +31,36 @@ def _lifeline_output(row) -> dict:
 
 def register_routes(app):
 
+    @app.route("/api/lifelines", methods=["GET"])
+    def lifelines_index():
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        conn = get_db_connection()
+        try:
+            return ok_response({
+                "schema_version": "lifeline.index.v1",
+                "lifelines": list_lifeline_summaries(conn),
+            })
+        finally:
+            conn.close()
+
+    @app.route("/api/lifelines/<path:requested_id>/context", methods=["GET"])
+    def lifeline_context(requested_id: str):
+        auth_error = require_key()
+        if auth_error:
+            return auth_error
+
+        conn = get_db_connection()
+        try:
+            payload = read_lifeline_context(conn, requested_id)
+            if payload is None:
+                return error_response(404, "lifeline_not_found", "项目或生活线不存在")
+            return ok_response(payload)
+        finally:
+            conn.close()
+
     # === 创建 lifeline ===
     @app.route("/lifelines", methods=["POST"])
     def lifelines_create():
@@ -34,7 +69,7 @@ def register_routes(app):
             return auth_error
 
         body = request.get_json(silent=True) or {}
-        raw_id = str(body.get("id", "")).strip()
+        raw_id = normalize_lifeline_id(body.get("id"))
         name = str(body.get("name", "")).strip()
         parent_id_raw = body.get("parent_id")
         order_index = int(body.get("order_index", 0) or 0)
@@ -53,7 +88,7 @@ def register_routes(app):
         if parent_id_raw is None or str(parent_id_raw).strip() == "ROOT" or str(parent_id_raw).strip() == "":
             parent_id_db = None
         else:
-            parent_id_db = str(parent_id_raw).strip()
+            parent_id_db = normalize_lifeline_id(parent_id_raw)
 
         conn = get_db_connection()
         try:
@@ -87,6 +122,7 @@ def register_routes(app):
         if auth_error:
             return auth_error
 
+        raw_id = normalize_lifeline_id(raw_id)
         conn = get_db_connection()
         try:
             row = _get_lifeline(conn, raw_id)
@@ -107,7 +143,7 @@ def register_routes(app):
                 if raw_parent in ("ROOT", ""):
                     new_parent_id_db = None
                 else:
-                    new_parent_id_db = raw_parent
+                    new_parent_id_db = normalize_lifeline_id(raw_parent)
                     if new_parent_id_db == raw_id:
                         return error_response(400, "invalid_parent", "不能将 lifeline 设为自身的父节点")
                     if not _get_lifeline(conn, new_parent_id_db):
@@ -136,6 +172,7 @@ def register_routes(app):
         if auth_error:
             return auth_error
 
+        raw_id = normalize_lifeline_id(raw_id)
         conn = get_db_connection()
         try:
             row = _get_lifeline(conn, raw_id)
@@ -191,7 +228,7 @@ def register_routes(app):
 
             # 校验 lifeline 存在（非 null 时）
             if lifeline_id_raw is not None:
-                lifeline_id_str = str(lifeline_id_raw).strip()
+                lifeline_id_str = normalize_lifeline_id(lifeline_id_raw)
                 if not lifeline_id_str:
                     lifeline_id_raw = None
                 else:

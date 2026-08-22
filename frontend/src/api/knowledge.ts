@@ -3,6 +3,8 @@ import type {
   Decision,
   DecisionList,
   DecisionStatus,
+  GoalCommitmentState,
+  GoalProfile,
   Memory,
   MemoryCategory,
   MemoryDetail,
@@ -102,6 +104,22 @@ export const confirmMemory = (id: number) =>
 
 export const archiveMemory = (id: number) =>
   apiRequest<{ memory: Memory }>(`/memories/${id}/archive`, { method: 'POST' });
+
+export const updateGoalCommitment = (id: number, data: {
+  success_criteria?: string | null;
+  target_date?: string | null;
+  review_cadence_days?: number;
+  parent_goal_id?: number | null;
+  state?: GoalCommitmentState;
+}) => apiRequest<{ goal_profile: GoalProfile }>(`/api/goals/${id}/commitment`, {
+  method: 'PUT',
+  json: data,
+});
+
+export const reviewGoalCommitment = (id: number) =>
+  apiRequest<{ goal_profile: GoalProfile }>(`/api/goals/${id}/review`, {
+    method: 'POST',
+  });
 
 export const reviewDecision = (id: number, actual_outcome: string) =>
   apiRequest<{ decision: Decision }>(`/decisions/${id}/review`, {

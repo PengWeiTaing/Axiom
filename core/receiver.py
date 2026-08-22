@@ -49,6 +49,7 @@ from core.routes.browse import register_routes as register_browse  # noqa: E402
 from core.routes.automation import register_routes as register_automation  # noqa: E402
 from core.routes.tasks import register_routes as register_tasks  # noqa: E402
 from core.routes.memories import register_routes as register_memories  # noqa: E402
+from core.routes.goals import register_routes as register_goals  # noqa: E402
 from core.routes.decisions import register_routes as register_decisions  # noqa: E402
 from core.routes.ai import register_routes as register_ai  # noqa: E402
 from core.routes.governance import register_routes as register_governance  # noqa: E402
@@ -66,6 +67,7 @@ register_browse(app)
 register_automation(app)
 register_tasks(app)
 register_memories(app)
+register_goals(app)
 register_decisions(app)
 register_ai(app)
 register_governance(app)
@@ -160,7 +162,7 @@ def system_info():
     conn = get_db_connection()
     try:
         tables = {}
-        for t in ["items", "memories", "tasks", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
+        for t in ["items", "memories", "goal_commitments", "tasks", "decisions", "context_action_outcomes", "audit_log", "automation_runs", "module_state", "schema_migrations"]:
             try:
                 tables[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             except Exception:
@@ -339,6 +341,7 @@ def import_data():
         imported = {
             "items": 0,
             "memories": 0,
+            "goal_commitments": 0,
             "tasks": 0,
             "decisions": 0,
             "context_action_outcomes": 0,
@@ -370,6 +373,45 @@ def import_data():
                             except Exception: pass
                         conn.commit()
                     finally: conn.close()
+                if name.endswith("goal_commitments.json"):
+                    data = json.loads(zf.read(name).decode("utf-8"))
+                    conn = get_db_connection()
+                    try:
+                        for goal in data:
+                            try:
+                                state = goal.get("state", "active")
+                                if state not in {"active", "paused", "achieved", "released"}:
+                                    state = "active"
+                                cadence = int(goal.get("review_cadence_days") or 14)
+                                cadence = max(1, min(cadence, 365))
+                                conn.execute(
+                                    """
+                                    INSERT OR IGNORE INTO goal_commitments (
+                                        memory_id, parent_goal_id, success_criteria,
+                                        target_date, review_cadence_days,
+                                        last_reviewed_at, state, completed_at,
+                                        created_at, updated_at
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        goal.get("memory_id"),
+                                        goal.get("parent_goal_id"),
+                                        goal.get("success_criteria"),
+                                        goal.get("target_date"),
+                                        cadence,
+                                        goal.get("last_reviewed_at"),
+                                        state,
+                                        goal.get("completed_at"),
+                                        goal.get("created_at"),
+                                        goal.get("updated_at", goal.get("created_at")),
+                                    ),
+                                )
+                                imported["goal_commitments"] += 1
+                            except Exception:
+                                pass
+                        conn.commit()
+                    finally:
+                        conn.close()
                 if name.endswith("tasks.json"):
                     data = json.loads(zf.read(name).decode("utf-8"))
                     conn = get_db_connection()
@@ -403,7 +445,7 @@ def import_data():
                                         outcome.get("task_title", "已导入行动"),
                                         outcome.get("outcome", "completed"),
                                         outcome.get("fit_feedback"),
-                                        outcome.get("schema_version", "context.now.v3"),
+                                        outcome.get("schema_version", "context.now.v4"),
                                         outcome.get("reason_code", "available"),
                                         outcome.get("reason_label", "当前可推进"),
                                         outcome.get("score", 0),

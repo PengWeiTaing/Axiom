@@ -35,12 +35,14 @@ def main() -> None:
             utc_now,
         )
         from core.routes.context import register_routes  # noqa: WPS433
+        from core.routes.goals import register_routes as register_goals  # noqa: WPS433
         from core.routes.governance import register_routes as register_governance  # noqa: WPS433
         from core.routes.tasks import register_routes as register_tasks  # noqa: WPS433
 
         app.config["TESTING"] = True
         init_app_storage()
         register_routes(app)
+        register_goals(app)
         register_governance(app)
         register_tasks(app)
 
@@ -149,6 +151,49 @@ def main() -> None:
             conn.close()
 
         with app.test_client() as client:
+            goal_update_no_key = client.put(
+                f"/api/goals/{active_goal_id}/commitment",
+                json={"success_criteria": "形成可持续使用的核心闭环"},
+            )
+            check("goal update requires key", goal_update_no_key.status_code == 403)
+
+            active_profile = client.put(
+                f"/api/goals/{active_goal_id}/commitment",
+                headers={"X-Axiom-Key": "test-key"},
+                json={
+                    "success_criteria": "核心闭环连续稳定运行",
+                    "target_date": (today + timedelta(days=5)).isoformat(),
+                    "review_cadence_days": 7,
+                },
+            )
+            check("goal profile update", active_profile.status_code == 200, str(active_profile.status_code))
+            active_profile_payload = active_profile.get_json()["goal_profile"]
+            check(
+                "goal profile fields",
+                active_profile_payload["state"] == "active"
+                and active_profile_payload["target_date"] == (today + timedelta(days=5)).isoformat()
+                and active_profile_payload["review_cadence_days"] == 7,
+                str(active_profile_payload),
+            )
+
+            gap_profile = client.put(
+                f"/api/goals/{gap_goal_id}/commitment",
+                headers={"X-Axiom-Key": "test-key"},
+                json={"parent_goal_id": active_goal_id},
+            )
+            check("goal parent update", gap_profile.status_code == 200, str(gap_profile.status_code))
+            check(
+                "goal parent returned",
+                gap_profile.get_json()["goal_profile"]["parent_goal"]["id"] == active_goal_id,
+                str(gap_profile.get_json()),
+            )
+            cycle = client.put(
+                f"/api/goals/{active_goal_id}/commitment",
+                headers={"X-Axiom-Key": "test-key"},
+                json={"parent_goal_id": gap_goal_id},
+            )
+            check("goal hierarchy rejects cycle", cycle.status_code == 400, str(cycle.status_code))
+
             response = client.get("/api/context/now")
             check("403 without key", response.status_code == 403, str(response.status_code))
 
@@ -158,7 +203,7 @@ def main() -> None:
             )
             check("context 200", response.status_code == 200, str(response.status_code))
             payload = response.get_json()
-            check("schema", payload["schema_version"] == "context.now.v3", str(payload))
+            check("schema", payload["schema_version"] == "context.now.v4", str(payload))
             check("focus mode", payload["mode"] == "focus", str(payload))
             check(
                 "important due-today focus",
@@ -210,6 +255,13 @@ def main() -> None:
                 [entry["id"] for entry in payload["commitments"]["gaps"]] == [gap_goal_id],
                 str(payload["commitments"]["gaps"]),
             )
+            check(
+                "commitment attention is prioritized",
+                payload["commitments"]["attention"][0]["id"] == gap_goal_id
+                and payload["commitments"]["attention"][0]["attention_code"] == "missing_action"
+                and payload["commitments"]["attention_total"] == 2,
+                str(payload["commitments"]["attention"]),
+            )
 
             focus_task_id = payload["focus"]["task"]["id"]
             no_key_complete = client.post(f"/api/context/actions/{focus_task_id}/complete")
@@ -250,7 +302,7 @@ def main() -> None:
                 conn.close()
             check("task completed", task_row["status"] == "done", str(dict(task_row)))
             snapshot = json.loads(outcome_row["snapshot_json"])
-            check("snapshot schema", snapshot["schema_version"] == "context.now.v3", str(snapshot))
+            check("snapshot schema", snapshot["schema_version"] == "context.now.v4", str(snapshot))
             check("snapshot reason", snapshot["reason"]["code"] == "due_today", str(snapshot))
             check(
                 "completion creates commitment gap",
@@ -297,11 +349,23 @@ def main() -> None:
                     if name.endswith("context_action_outcomes.json")
                 )
                 exported_outcomes = json.loads(archive.read(outcome_name).decode("utf-8"))
+                goal_profile_name = next(
+                    name for name in archive.namelist() if name.endswith("goal_commitments.json")
+                )
+                exported_goal_profiles = json.loads(
+                    archive.read(goal_profile_name).decode("utf-8")
+                )
             check("feedback exported", len(exported_outcomes) == 1, str(exported_outcomes))
             check(
                 "export keeps feedback",
                 exported_outcomes[0]["fit_feedback"] == "too_heavy",
                 str(exported_outcomes[0]),
+            )
+            check(
+                "goal profiles exported",
+                {entry["memory_id"] for entry in exported_goal_profiles}
+                == {active_goal_id, gap_goal_id},
+                str(exported_goal_profiles),
             )
 
             conn = get_db_connection()
@@ -380,6 +444,34 @@ def main() -> None:
                 committed["focus"]["reason"]["code"] == "goal_progress",
                 str(committed["focus"]["reason"]),
             )
+
+            paused = client.put(
+                f"/api/goals/{gap_goal_id}/commitment",
+                headers={"X-Axiom-Key": "test-key"},
+                json={"state": "paused"},
+            )
+            check("goal can pause", paused.status_code == 200, str(paused.status_code))
+            paused_context = client.get(
+                "/api/context/now?limit=3",
+                headers={"X-Axiom-Key": "test-key"},
+            ).get_json()
+            check(
+                "paused goal actions leave current context",
+                paused_context["focus"]["task"]["title"] == "普通同级任务"
+                and paused_context["commitments"]["paused_goals"] == 1,
+                str(paused_context),
+            )
+            resumed = client.put(
+                f"/api/goals/{gap_goal_id}/commitment",
+                headers={"X-Axiom-Key": "test-key"},
+                json={"state": "active"},
+            )
+            check("goal can resume", resumed.status_code == 200, str(resumed.status_code))
+            reviewed = client.post(
+                f"/api/goals/{gap_goal_id}/review",
+                headers={"X-Axiom-Key": "test-key"},
+            )
+            check("goal review", reviewed.status_code == 200, str(reviewed.status_code))
 
             bad_limit = client.get(
                 "/api/context/now?limit=0",
