@@ -70,6 +70,7 @@ const graphScale = ref(1)
 const focusMode = ref(false)
 const projectedLabels = ref<ProjectedLabel[]>([])
 const selectedRelationId = ref<string | null>(null)
+const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 
 const nodes = computed(() => store.data?.nodes || [])
 const edges = computed(() => store.visibleEdges || [])
@@ -268,6 +269,27 @@ const localNodes = computed<LocalNode[]>(() => {
 
   relaxLocalLayout(result, localEdges.value, center.id)
   return result
+})
+
+const localViewBox = computed(() => {
+  if (!localNodes.value.length) return '-170 -150 340 300'
+
+  const bounds = localNodes.value.reduce(
+    (current, entry) => ({
+      minX: Math.min(current.minX, entry.x - entry.radius),
+      maxX: Math.max(current.maxX, entry.x + entry.radius),
+      minY: Math.min(current.minY, entry.y - entry.radius),
+      maxY: Math.max(current.maxY, entry.y + entry.radius + (localLabelVisible(entry) ? 18 : 0)),
+    }),
+    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
+  )
+  const centerX = (bounds.minX + bounds.maxX) / 2
+  const centerY = (bounds.minY + bounds.maxY) / 2
+  const compact = viewportWidth.value <= 760
+  const width = Math.max(compact ? 310 : 640, bounds.maxX - bounds.minX + (compact ? 112 : 180))
+  const height = Math.max(compact ? 290 : 500, bounds.maxY - bounds.minY + (compact ? 104 : 160))
+
+  return `${centerX - width / 2} ${centerY - height / 2} ${width} ${height}`
 })
 
 function seededAngle(id: string, index: number): number {
@@ -577,6 +599,7 @@ function disposeObject(object: Object3D) {
 }
 
 function onResize() {
+  viewportWidth.value = window.innerWidth
   if (!sceneHost.value || !camera || !renderer) return
   const rect = sceneHost.value.getBoundingClientRect()
   camera.aspect = Math.max(1, rect.width) / Math.max(1, rect.height)
@@ -1153,7 +1176,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
         </div>
       </div>
 
-      <svg class="local-map" viewBox="-400 -270 800 540" preserveAspectRatio="xMidYMid meet">
+      <svg class="local-map" :viewBox="localViewBox" preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient
             v-for="entry in localEdges"

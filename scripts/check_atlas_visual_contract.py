@@ -16,6 +16,7 @@ def main() -> int:
     required = (
         "fitCameraToGraph",
         "relaxLocalLayout",
+        "localViewBox",
         "selectedLocalRelation",
         'data-testid="atlas-3d-scene"',
         'data-testid="local-atlas-2d"',
@@ -29,6 +30,7 @@ def main() -> int:
         "frontend_atlas_affinity_mesh",
         'class="local-grid"',
         'class="zoom-range"',
+        'viewBox="-400 -270 800 540"',
         "3D Skeleton Atlas",
     )
     for fragment in retired:
