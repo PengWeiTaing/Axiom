@@ -30,7 +30,6 @@ export const useAtlasGraphStore = defineStore('atlasGraph', () => {
 
   const visibleEdges = computed(() => {
     if (!data.value) return []
-    const focusId = selectedId.value || hoveredId.value
     return data.value.edges.filter(edge => {
       if (edge.edge_class === 'structural' && !showStructural.value) return false
       if (edge.edge_class === 'semantic' && !showSemantic.value) return false
@@ -40,10 +39,10 @@ export const useAtlasGraphStore = defineStore('atlasGraph', () => {
         if (edge.edge_class === 'structural') return edge.visible_by_default
         return edge.visible_by_default && edge.strength >= 0.9
       }
-      if (lod.value === 'semantic' && edge.edge_class === 'structural' && !focusId) {
+      if (lod.value === 'semantic' && edge.edge_class === 'structural') {
         return edge.visible_by_default && edge.strength >= 0.9
       }
-      if (lod.value === 'overview' && edge.edge_class === 'semantic' && !focusId) {
+      if (lod.value === 'overview' && edge.edge_class === 'semantic') {
         return edge.visible_by_default && edge.confidence >= 0.88
       }
       return true

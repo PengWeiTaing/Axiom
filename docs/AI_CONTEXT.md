@@ -251,6 +251,7 @@ logs/
 - 卡点提示只来自当前周承诺的可核对事实：大行动连续未变化、拆解步骤全部停滞，或周后半段仍无承诺收口。提示最多两条，可忽略，只打开原任务或周复盘，不触发 DeepSeek
 - `/export` 会包含 `context_action_outcomes.json`、`goal_commitments.json`、`weekly_plan_items.json`、`weekly_reviews.json`、`task_decomposition_links.json`、`task_ai_suggestion_events.json` 与 `context_nudge_dismissals.json`；行动结果、反馈、承诺档案、周意图、用户复盘、拆解关系和轻量学习元数据可一起恢复
 - `/app` 提供当前主前端入口，一级目的地为“此刻 / 资料库 / Atlas”，记录是全局动作；`/atlas` 是同一套前端的 Atlas 深链接
+- Atlas 主线采用全屏 3D 全局图和 2D 局部语境：全局镜头只按真实主线自适应取景，未归类 bucket 不劫持构图；前端不补伪造关系，不使用调试网格或固定环形局部布局。节点标签带碰撞收束，2D 节点通过关系强度、层级距离、连边弹力和节点避让形成稳定力场
 - 资料库内部有“查找 / 项目脉络”两种查看方式；项目脉络读取现有 lifeline、goal、task、item、memory 和 decision，不创建平行数据。父生活线汇总子线，明确关联承诺但尚未挂载 lifeline 的行动也会跟随承诺出现
 - `/app/legacy` 提供旧移动 Web App，覆盖写入、上传、总览、最近记录、搜索、记录编辑、手动触发安全自动化、运行历史回看和自动化产物浏览；它保留处理工作台与旧 PWA 链路，但不再作为新功能主入口
 - `/automation/jobs` 返回当前允许手动触发的任务清单，当前开放 review、inbox report、dry-run、`audio_transcribe_day` 和 `image_describe_day`

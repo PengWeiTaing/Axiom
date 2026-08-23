@@ -1,0 +1,1 @@
+import{e as o}from"./index-CxhGfDEl.js";import"./vue-Cz4gHNf9.js";const a=(e,r=20,c={})=>o("/search/all",{query:{q:e,limit:r,...c}}).then(t=>{const s=t.results??t;return{items:s.items??[],memories:s.memories??[],tasks:s.tasks??[],decisions:s.decisions??[]}}),n=(e,r=20)=>o("/search/vector",{query:{q:e,limit:r}});export{a as searchAll,n as searchVector};

@@ -2,13 +2,10 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   AdditiveBlending,
-  AmbientLight,
   BufferGeometry,
   CanvasTexture,
   Color,
-  DirectionalLight,
   Float32BufferAttribute,
-  GridHelper,
   Group,
   Line,
   LineBasicMaterial,
@@ -16,7 +13,6 @@ import {
   MeshBasicMaterial,
   NormalBlending,
   PerspectiveCamera,
-  PointLight,
   Raycaster,
   Scene,
   SphereGeometry,
@@ -31,6 +27,7 @@ import {
   type Object3D,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { ArrowLeft, ArrowUpRight, Crosshair, RefreshCw } from '@lucide/vue'
 import { useAtlasGraphStore } from '@/stores/atlasGraph'
 import { listenToElementEvent, useWindowEventListener } from '@/composables/useEventListener'
 import type { AtlasEdge, AtlasNode } from '@/atlas/types'
@@ -56,6 +53,14 @@ interface ProjectedLabel {
   x: number
   y: number
   muted: boolean
+  priority: number
+}
+
+interface NodeVisual {
+  node: AtlasNode
+  dot: Sprite
+  halo: Sprite
+  hit: Mesh
 }
 
 const store = useAtlasGraphStore()
@@ -64,11 +69,11 @@ const sceneReady = ref(false)
 const graphScale = ref(1)
 const focusMode = ref(false)
 const projectedLabels = ref<ProjectedLabel[]>([])
+const selectedRelationId = ref<string | null>(null)
 
 const nodes = computed(() => store.data?.nodes || [])
 const edges = computed(() => store.visibleEdges || [])
-const ambientEdges = computed<AtlasEdge[]>(() => buildAmbientEdges())
-const renderEdges = computed<AtlasEdge[]>(() => [...edges.value, ...ambientEdges.value])
+const renderEdges = computed<AtlasEdge[]>(() => edges.value)
 const nodeMap = computed(() => store.nodeMap)
 
 let scene: Scene | null = null
@@ -81,10 +86,13 @@ let raycaster: Raycaster | null = null
 let pointer = new Vector2()
 const nodeObjects = new Map<string, Mesh>()
 const nodePositions = new Map<string, Vector3>()
+const nodeVisuals = new Map<string, NodeVisual>()
+const edgeObjects = new Map<string, Line>()
 const energyNodeSprites = new Map<string, Sprite>()
 let haloTexture: CanvasTexture | null = null
 let dotTexture: CanvasTexture | null = null
 let energyDotTexture: CanvasTexture | null = null
+let hasFittedScene = false
 const stopCanvasListeners: Array<() => void> = []
 
 onMounted(async () => {
@@ -103,8 +111,6 @@ watch(
   () => [
     store.data,
     renderEdges.value.length,
-    store.selectedId,
-    store.hoveredId,
     store.lod,
     store.showSemantic,
     store.showStructural,
@@ -112,8 +118,16 @@ watch(
   ],
   () => {
     updateScene()
+    if (!hasFittedScene && nodes.value.length) {
+      requestAnimationFrame(() => fitCameraToGraph())
+    }
   },
   { deep: true },
+)
+
+watch(
+  () => [store.selectedId, store.hoveredId],
+  () => refreshVisualState(),
 )
 
 const relatedIds = computed(() => {
@@ -128,12 +142,6 @@ const relatedIds = computed(() => {
 })
 
 const relatedEdgeIds = computed(() => new Set(store.focusedEdges.map(edge => edge.id)))
-
-const typeStats = computed(() => {
-  const stats: Record<string, number> = {}
-  for (const node of nodes.value) stats[node.type] = (stats[node.type] || 0) + 1
-  return stats
-})
 
 const localEdges = computed<LocalEdge[]>(() => {
   const center = store.selectedNode
@@ -190,30 +198,42 @@ const localNodeIds = computed(() => {
 
 const localRelationRows = computed(() => primaryLocalEdges.value
   .map(entry => entry.edge)
-    .sort((a, b) => b.confidence - a.confidence || b.strength - a.strength)
+    .sort((a, b) => {
+      const classOrder = Number(b.edge_class === 'semantic') - Number(a.edge_class === 'semantic')
+      return classOrder || b.confidence - a.confidence || b.strength - a.strength
+    })
 )
+
+const selectedLocalRelation = computed(() => {
+  if (!localRelationRows.value.length) return null
+  return localRelationRows.value.find(edge => edge.id === selectedRelationId.value) || localRelationRows.value[0]
+})
 
 const localNodes = computed<LocalNode[]>(() => {
   const center = store.selectedNode
   if (!center) return []
-  const result: LocalNode[] = [{ node: center, x: 0, y: 0, radius: localNodeRadius(center, 'center'), role: 'center' }]
+  const result: LocalNode[] = [{ node: center, x: -48, y: 0, radius: localNodeRadius(center, 'center'), role: 'center' }]
   const placed = new Set<string>([center.id])
-  const primary = primaryLocalEdges.value
+  const primaryCandidates = primaryLocalEdges.value
     .map(entry => {
       const id = entry.edge.source === center.id ? entry.edge.target : entry.edge.source
       return { edge: entry, node: nodeById(id) }
     })
     .filter((entry): entry is { edge: LocalEdge, node: AtlasNode } => Boolean(entry.node))
+    .sort((a, b) => b.edge.edge.strength - a.edge.edge.strength || a.node.id.localeCompare(b.node.id))
 
-  const count = Math.max(primary.length, 1)
-  primary.forEach((entry, index) => {
-    if (placed.has(entry.node.id)) return
+  const primary = primaryCandidates.filter(entry => {
+    if (placed.has(entry.node.id)) return false
     placed.add(entry.node.id)
+    return true
+  })
+
+  primary.forEach((entry, index) => {
     const distance = localPrimaryDistance(entry.edge.edge, entry.node, center)
-    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / count
+    const angle = seededAngle(entry.node.id, index)
     result.push({
       node: entry.node,
-      x: Math.cos(angle) * distance,
+      x: -48 + Math.cos(angle) * distance,
       y: Math.sin(angle) * distance,
       radius: localNodeRadius(entry.node, 'primary'),
       role: 'primary',
@@ -231,8 +251,8 @@ const localNodes = computed<LocalNode[]>(() => {
       const anchor = byId.get(anchorId)
       if (!node || !anchor) continue
       placed.add(nodeId)
-      const angle = Math.atan2(anchor.y, anchor.x) + (placed.size % 2 === 0 ? 0.45 : -0.45)
-      const distance = 24 + (1 - entry.edge.strength) * 34
+      const angle = Math.atan2(anchor.y, anchor.x + 48) + seededOffset(node.id)
+      const distance = 32 + (1 - entry.edge.strength) * 38
       const localNode = {
         node,
         x: anchor.x + Math.cos(angle) * distance,
@@ -245,8 +265,103 @@ const localNodes = computed<LocalNode[]>(() => {
       byId.set(nodeId, localNode)
     }
   }
+
+  relaxLocalLayout(result, localEdges.value, center.id)
   return result
 })
+
+function seededAngle(id: string, index: number): number {
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5))
+  return -Math.PI / 2 + index * goldenAngle + seededUnit(id) * 0.38
+}
+
+function seededOffset(id: string): number {
+  return (seededUnit(id) - 0.5) * 1.25
+}
+
+function seededUnit(id: string): number {
+  let hash = 2166136261
+  for (let index = 0; index < id.length; index += 1) {
+    hash ^= id.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0) / 4294967295
+}
+
+function relaxLocalLayout(layout: LocalNode[], layoutEdges: LocalEdge[], centerId: string) {
+  if (layout.length <= 2) return
+  const byId = new Map(layout.map(entry => [entry.node.id, entry]))
+  const movable = layout.filter(entry => entry.node.id !== centerId)
+
+  for (let iteration = 0; iteration < 96; iteration += 1) {
+    const force = new Map(movable.map(entry => [entry.node.id, { x: 0, y: 0 }]))
+
+    for (let leftIndex = 0; leftIndex < movable.length; leftIndex += 1) {
+      const left = movable[leftIndex]
+      for (let rightIndex = leftIndex + 1; rightIndex < movable.length; rightIndex += 1) {
+        const right = movable[rightIndex]
+        let dx = right.x - left.x
+        let dy = right.y - left.y
+        let distance = Math.hypot(dx, dy)
+        if (distance < 0.01) {
+          dx = seededUnit(left.node.id) - 0.5
+          dy = seededUnit(right.node.id) - 0.5
+          distance = Math.max(0.01, Math.hypot(dx, dy))
+        }
+        const comfort = 30 + (left.radius + right.radius) * 2.4
+        if (distance >= comfort * 2.1) continue
+        const push = Math.min(2.4, (comfort * 2.1 - distance) * 0.016)
+        const nx = dx / distance
+        const ny = dy / distance
+        force.get(left.node.id)!.x -= nx * push
+        force.get(left.node.id)!.y -= ny * push
+        force.get(right.node.id)!.x += nx * push
+        force.get(right.node.id)!.y += ny * push
+      }
+    }
+
+    for (const entry of layoutEdges) {
+      const source = byId.get(entry.edge.source)
+      const target = byId.get(entry.edge.target)
+      if (!source || !target) continue
+      const dx = target.x - source.x
+      const dy = target.y - source.y
+      const distance = Math.max(0.01, Math.hypot(dx, dy))
+      const centerLinked = source.node.id === centerId || target.node.id === centerId
+      const other = source.node.id === centerId ? target.node : source.node
+      const desired = centerLinked
+        ? localPrimaryDistance(entry.edge, other, byId.get(centerId)!.node)
+        : 38 + (1 - entry.edge.strength) * 42
+      const pull = (distance - desired) * (entry.role === 'primary' ? 0.026 : 0.014)
+      const nx = dx / distance
+      const ny = dy / distance
+      if (source.node.id !== centerId) {
+        force.get(source.node.id)!.x += nx * pull
+        force.get(source.node.id)!.y += ny * pull
+      }
+      if (target.node.id !== centerId) {
+        force.get(target.node.id)!.x -= nx * pull
+        force.get(target.node.id)!.y -= ny * pull
+      }
+    }
+
+    const cooling = 0.56 - iteration / 260
+    for (const entry of movable) {
+      const next = force.get(entry.node.id)!
+      next.x += (-48 - entry.x) * 0.0014
+      next.y += -entry.y * 0.0014
+      entry.x += Math.max(-3.2, Math.min(3.2, next.x)) * cooling
+      entry.y += Math.max(-3.2, Math.min(3.2, next.y)) * cooling
+      const dx = entry.x + 48
+      const dy = entry.y
+      const radius = Math.hypot(dx, dy)
+      if (radius > 214) {
+        entry.x = -48 + dx / radius * 214
+        entry.y = dy / radius * 214
+      }
+    }
+  }
+}
 
 const localNodeById = computed(() => new Map(localNodes.value.map(entry => [entry.node.id, entry])))
 
@@ -289,16 +404,19 @@ function shortLabel(label: string, max = 12): string {
 }
 
 function reload() {
+  hasFittedScene = false
   store.load(true)
 }
 
 function enterFocus(node: AtlasNode) {
   store.selectNode(node)
+  selectedRelationId.value = null
   focusMode.value = true
 }
 
 function exitFocus() {
   focusMode.value = false
+  selectedRelationId.value = null
 }
 
 function clearSelection() {
@@ -308,121 +426,74 @@ function clearSelection() {
 
 function selectLocalNode(node: AtlasNode) {
   store.selectNode(node)
+  selectedRelationId.value = null
   focusMode.value = true
 }
 
-function buildAmbientEdges(): AtlasEdge[] {
-  if (!nodes.value.length) return []
-  const output: AtlasEdge[] = []
-  const existing = new Set(edges.value.map(edge => edgePairKey(edge.source, edge.target)))
-  const add = (source: AtlasNode | undefined, target: AtlasNode | undefined, strength = 0.56) => {
-    if (!source || !target || source.id === target.id || isFallbackNode(source) || isFallbackNode(target)) return
-    const key = edgePairKey(source.id, target.id)
-    if (existing.has(key) || output.some(edge => edgePairKey(edge.source, edge.target) === key)) return
-    output.push(makeAmbientEdge(source, target, strength))
-  }
-
-  const clustersByLifeline = new Map<string, AtlasNode[]>()
-  const entitiesByCluster = new Map<string, AtlasNode[]>()
-  for (const node of nodes.value) {
-    if (isFallbackNode(node)) continue
-    if (node.type === 'cluster' && node.lifeline_id) {
-      clustersByLifeline.set(node.lifeline_id, [...(clustersByLifeline.get(node.lifeline_id) || []), node])
-    }
-    if (node.cluster_id && ['memory', 'task', 'decision', 'item'].includes(node.type)) {
-      entitiesByCluster.set(node.cluster_id, [...(entitiesByCluster.get(node.cluster_id) || []), node])
-    }
-  }
-
-  for (const clusters of clustersByLifeline.values()) {
-    const ordered = [...clusters].sort((a, b) => b.weight - a.weight || a.label.localeCompare(b.label))
-    for (let index = 0; index < ordered.length - 1; index += 1) add(ordered[index], ordered[index + 1], 0.5)
-    if (ordered.length > 2) add(ordered[0], ordered[ordered.length - 1], 0.42)
-  }
-
-  for (const [clusterId, entities] of entitiesByCluster.entries()) {
-    const cluster = nodeById(clusterId)
-    const ordered = [...entities].sort((a, b) => b.weight - a.weight || a.label.localeCompare(b.label)).slice(0, 8)
-    for (let index = 0; index < ordered.length; index += 1) {
-      add(ordered[index], ordered[(index + 1) % ordered.length], 0.48)
-      if (index < 3) add(cluster, ordered[index], 0.44)
-      if (index + 2 < ordered.length && index < 4) add(ordered[index], ordered[index + 2], 0.36)
-    }
-    if (output.length >= 72) break
-  }
-
-  const eligible = nodes.value.filter(node => node.type !== 'root' && !isFallbackNode(node))
-  for (const node of eligible) {
-    const neighbors = eligible
-      .filter(other => other.id !== node.id && ambientNeighborAllowed(node, other))
-      .map(other => ({ node: other, distance: layoutDistanceSq(node, other) }))
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, node.type === 'lifeline' ? 1 : 2)
-    for (const neighbor of neighbors) add(node, neighbor.node, 0.32)
-    if (output.length >= 120) break
-  }
-
-  return output.slice(0, 120)
+function inspectLocalRelation(edge: AtlasEdge) {
+  selectedRelationId.value = edge.id
 }
 
-function edgePairKey(source: string, target: string): string {
-  return source < target ? `${source}::${target}` : `${target}::${source}`
+function relationTarget(edge: AtlasEdge): AtlasNode | undefined {
+  return nodeById(edge.source === store.selectedId ? edge.target : edge.source)
 }
 
-function makeAmbientEdge(source: AtlasNode, target: AtlasNode, strength: number): AtlasEdge {
-  return {
-    id: `ambient:${source.id}:${target.id}`,
-    source: source.id,
-    target: target.id,
-    edge_class: 'semantic',
-    relation_type: 'ambient_context',
-    strength,
-    confidence: strength,
-    layer_delta: Math.abs(source.layer - target.layer),
-    evidence: '同一主题邻近关系',
-    generated_by: 'frontend_atlas_affinity_mesh',
-    visible_by_default: true,
-    distance: 0,
-    width: 0.45,
-    opacity: 0.13,
-    color_from: '#b46a63',
-    color_to: '#5f7fa6',
-    line_style: 'solid',
-  }
+function navigateRelation(edge: AtlasEdge) {
+  store.selectNeighbor(edge)
+  selectedRelationId.value = null
 }
 
-function ambientNeighborAllowed(source: AtlasNode, target: AtlasNode): boolean {
-  if (source.cluster_id && source.cluster_id === target.cluster_id) return true
-  if (source.lifeline_id && source.lifeline_id === target.lifeline_id) return Math.abs(source.layer - target.layer) <= 2
-  return source.semantic_level === target.semantic_level && Math.abs(source.layer - target.layer) <= 1
-}
-
-function layoutDistanceSq(source: AtlasNode, target: AtlasNode): number {
-  const dx = (source.layout.x || 0) - (target.layout.x || 0)
-  const dy = (source.layout.y || 0) - (target.layout.y || 0)
-  const dz = (source.layout.z || 0) - (target.layout.z || 0)
-  return dx * dx + dy * dy + dz * dz
+function relationOriginLabel(edge: AtlasEdge): string {
+  if (edge.edge_class === 'structural') return '结构归属'
+  if (edge.generated_by === 'associations') return '关系库'
+  if (edge.generated_by === 'rule') return '规则推断'
+  if (edge.generated_by === 'manual') return '人工确认'
+  return '系统关系'
 }
 
 function resetCamera() {
-  if (!camera || !controls) return
-  camera.position.set(0, 185, 360)
-  camera.lookAt(0, 0, 0)
-  controls.target.set(0, 0, 0)
+  fitCameraToGraph(true)
+}
+
+function fitCameraToGraph(force = false) {
+  if (!camera || !controls || nodePositions.size === 0 || (!force && hasFittedScene)) return
+  const primaryNodes = nodes.value.filter(node => !isFallbackNode(node))
+  const framingNodes = primaryNodes.length > 1 ? primaryNodes : nodes.value
+  const points = framingNodes
+    .map(node => nodePositions.get(node.id))
+    .filter((point): point is Vector3 => Boolean(point))
+    .map(point => point.clone().multiplyScalar(graphScale.value))
+  if (!points.length) return
+  const center = points.reduce((sum, point) => sum.add(point), new Vector3()).multiplyScalar(1 / points.length)
+  let radius = 1
+  for (const point of points) radius = Math.max(radius, point.distanceTo(center))
+
+  const verticalFov = camera.fov * Math.PI / 180
+  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect)
+  const limitingFov = Math.min(verticalFov, horizontalFov)
+  const distance = Math.max(112, radius / Math.sin(limitingFov / 2) * 0.94)
+  const direction = new Vector3(0.72, 0.46, 1).normalize()
+
+  controls.target.copy(center)
+  camera.position.copy(center).add(direction.multiplyScalar(distance))
+  camera.lookAt(center)
+  controls.minDistance = Math.max(54, radius * 0.46)
+  controls.maxDistance = Math.max(520, radius * 4.5)
   controls.update()
+  hasFittedScene = true
 }
 
 function initScene() {
   if (!sceneHost.value || renderer) return
   scene = new Scene()
-  scene.background = new Color(0x07090d)
+  scene.background = new Color(0x08090c)
   graphGroup = new Group()
   scene.add(graphGroup)
 
   const host = sceneHost.value
   const rect = host.getBoundingClientRect()
   camera = new PerspectiveCamera(45, Math.max(1, rect.width) / Math.max(1, rect.height), 0.1, 4000)
-  camera.position.set(0, 185, 360)
+  camera.position.set(0, 120, 280)
   camera.lookAt(0, 0, 0)
 
   renderer = new WebGLRenderer({ antialias: true, alpha: false })
@@ -437,39 +508,18 @@ function initScene() {
   controls.rotateSpeed = 0.48
   controls.zoomSpeed = 0.72
   controls.panSpeed = 0.42
-  controls.minDistance = 125
+  controls.minDistance = 54
   controls.maxDistance = 780
+  controls.enablePan = false
 
   raycaster = new Raycaster()
   listenCanvasEvent('pointermove', onPointerMove)
   listenCanvasEvent('click', onPointerClick)
 
-  addSceneLights()
-  addGlobalGrid()
   updateScene()
+  requestAnimationFrame(() => fitCameraToGraph())
   sceneReady.value = true
   animate()
-}
-
-function addSceneLights() {
-  if (!scene) return
-  scene.add(new AmbientLight(0xc6d4df, 0.52))
-  const key = new DirectionalLight(0xcffdf5, 1.35)
-  key.position.set(-180, 360, 240)
-  scene.add(key)
-  const fill = new PointLight(0x5f7fa6, 2.3, 980)
-  fill.position.set(220, 120, 260)
-  scene.add(fill)
-}
-
-function addGlobalGrid() {
-  if (!scene) return
-  const grid = new GridHelper(900, 16, 0x25303a, 0x101820)
-  grid.position.y = -120
-  const gridMaterial = grid.material as Material
-  gridMaterial.transparent = true
-  gridMaterial.opacity = 0.22
-  scene.add(grid)
 }
 
 function teardownScene() {
@@ -493,7 +543,10 @@ function teardownScene() {
   raycaster = null
   nodeObjects.clear()
   nodePositions.clear()
+  nodeVisuals.clear()
+  edgeObjects.clear()
   energyNodeSprites.clear()
+  hasFittedScene = false
 }
 
 function listenCanvasEvent<K extends keyof HTMLElementEventMap>(
@@ -548,11 +601,14 @@ function updateScene() {
   }
   nodeObjects.clear()
   nodePositions.clear()
+  nodeVisuals.clear()
+  edgeObjects.clear()
   energyNodeSprites.clear()
   graphGroup.scale.setScalar(graphScale.value)
 
   for (const edge of renderEdges.value) addEdgeObject(edge)
   for (const node of nodes.value) addNodeObject(node)
+  refreshVisualState()
 }
 
 function addNodeObject(node: AtlasNode) {
@@ -579,7 +635,6 @@ function addNodeObject(node: AtlasNode) {
   dot.userData.baseSize = size
   dot.userData.energy = energy
   graphGroup.add(dot)
-  if (energy) energyNodeSprites.set(node.id, dot)
 
   const hitRadius = Math.max(size * 2.5, 6)
   const hitGeometry = new SphereGeometry(hitRadius, 8, 6)
@@ -594,8 +649,9 @@ function addNodeObject(node: AtlasNode) {
   graphGroup.add(hitMesh)
   nodeObjects.set(node.id, hitMesh)
 
-  const halo = nodeHaloOpacity(node)
-  if (halo > 0) graphGroup.add(createHaloSprite(position, nodeSpriteColor(node, color, energy), size, halo))
+  const halo = createHaloSprite(position, nodeSpriteColor(node, color, energy), size, 0)
+  graphGroup.add(halo)
+  nodeVisuals.set(node.id, { node, dot, halo, hit: hitMesh })
 }
 
 function createHaloSprite(
@@ -717,8 +773,8 @@ function addEdgeObject(edge: AtlasEdge) {
   const geometry = new BufferGeometry().setFromPoints([start, end])
 
   const startIsInner = start.lengthSq() <= end.lengthSq()
-  const inner = new Color(0xb46a63)
-  const outer = new Color(0x5f7fa6)
+  const inner = new Color(edge.edge_class === 'structural' ? 0x6d747d : 0xb46a63)
+  const outer = new Color(edge.edge_class === 'structural' ? 0x35404d : 0x5f7fa6)
   const colors = startIsInner
     ? [inner.r, inner.g, inner.b, outer.r, outer.g, outer.b]
     : [outer.r, outer.g, outer.b, inner.r, inner.g, inner.b]
@@ -734,6 +790,7 @@ function addEdgeObject(edge: AtlasEdge) {
   const line = new Line(geometry, material)
   line.userData.edgeId = edge.id
   graphGroup.add(line)
+  edgeObjects.set(edge.id, line)
 }
 
 function scenePoint(node: AtlasNode): Vector3 {
@@ -745,25 +802,25 @@ function scenePoint(node: AtlasNode): Vector3 {
 
 function nodeSize3d(node: AtlasNode): number {
   const active = store.selectedId === node.id || store.hoveredId === node.id
-  const boost = active ? 1.22 : 1
-  if (node.type === 'root') return 3.8 * boost
-  if (node.type === 'lifeline') return (isFallbackNode(node) ? 1.8 : 2.65) * boost
-  if (node.type === 'cluster') return (isFallbackNode(node) ? 1.55 : 2.15) * boost
-  if (node.type === 'decision') return 1.9 * boost
-  if (node.type === 'task' || node.type === 'memory') return 1.7 * boost
-  return 0.95 * boost
+  const boost = active ? 1.16 : 1
+  if (node.type === 'root') return 4.6 * boost
+  if (node.type === 'lifeline') return (isFallbackNode(node) ? 1.7 : 2.9) * boost
+  if (node.type === 'cluster') return (isFallbackNode(node) ? 1.4 : 2.15) * boost
+  if (node.type === 'decision') return 1.72 * boost
+  if (node.type === 'task' || node.type === 'memory') return 1.5 * boost
+  return 0.82 * boost
 }
 
 function nodeColor(node: AtlasNode): ColorRepresentation {
   if (isFallbackNode(node)) return 0x46505b
   const colors: Record<string, number> = {
-    root: 0xd8fffb,
-    lifeline: 0x72c3b2,
-    cluster: 0x7d92aa,
-    memory: 0x72839a,
-    task: 0x72a996,
-    decision: 0x8b7aa8,
-    item: 0x596270,
+    root: 0xf0ad55,
+    lifeline: 0x83c6b9,
+    cluster: 0x8194aa,
+    memory: 0x8592a6,
+    task: 0x7fb29c,
+    decision: 0x9b88ae,
+    item: 0x69727f,
   }
   return colors[node.type] || 0x77808f
 }
@@ -778,8 +835,43 @@ function nodeSpriteColor(
   energy: boolean,
 ): ColorRepresentation {
   if (!energy) return baseColor
-  if (node.type === 'root' || store.selectedId === node.id || store.hoveredId === node.id) return 0xf4b15e
+  if (node.type === 'root' || store.selectedId === node.id || store.hoveredId === node.id) return 0xf3ad52
   return baseColor
+}
+
+function refreshVisualState() {
+  energyNodeSprites.clear()
+  for (const [id, visual] of nodeVisuals) {
+    const { node, dot, halo } = visual
+    const energy = nodeEnergyVisible(node)
+    const baseColor = nodeColor(node)
+    const color = nodeSpriteColor(node, baseColor, energy)
+    const dotMaterial = dot.material as SpriteMaterial
+    dotMaterial.map = energy ? energyDotTexture : dotTexture
+    dotMaterial.color.set(color)
+    dotMaterial.opacity = nodeOpacity(node)
+    dotMaterial.blending = energy ? AdditiveBlending : NormalBlending
+    dotMaterial.needsUpdate = true
+    dot.userData.energy = energy
+    const baseSize = Number(dot.userData.baseSize || 1)
+    const active = store.selectedId === id || store.hoveredId === id
+    const scale = baseSize * (active ? 1.16 : 1)
+    dot.scale.set(scale, scale, 1)
+
+    const haloMaterial = halo.material as SpriteMaterial
+    haloMaterial.color.set(color)
+    haloMaterial.opacity = nodeHaloOpacity(node)
+    haloMaterial.needsUpdate = true
+    if (energy) energyNodeSprites.set(id, dot)
+  }
+
+  for (const edge of renderEdges.value) {
+    const line = edgeObjects.get(edge.id)
+    if (!line) continue
+    const material = line.material as LineBasicMaterial
+    material.opacity = edgeOpacity(edge)
+    material.needsUpdate = true
+  }
 }
 
 function updateEnergyNodeSprites() {
@@ -806,15 +898,14 @@ function energyPhase(id: string): number {
 
 function nodeOpacity(node: AtlasNode): number {
   const fallback = isFallbackNode(node)
-  if (!store.selectedId && !store.hoveredId) return fallback ? 0.34 : 0.92
-  return relatedIds.value.has(node.id) ? (fallback ? 0.58 : 1) : 0.14
+  if (!store.selectedId && !store.hoveredId) return fallback ? 0.24 : node.type === 'item' ? 0.74 : 0.94
+  return relatedIds.value.has(node.id) ? (fallback ? 0.48 : 1) : 0.1
 }
 
 function edgeOpacity(edge: AtlasEdge): number {
   const hasFocus = Boolean(store.selectedId || store.hoveredId)
-  if (edge.relation_type === 'ambient_context') return hasFocus ? 0.022 : 0.082
-  if (!hasFocus) return edge.edge_class === 'structural' ? Math.min(edge.opacity, 0.105) : Math.min(edge.opacity, 0.36)
-  return relatedEdgeIds.value.has(edge.id) ? Math.min(0.58, edge.opacity + 0.22) : Math.min(edge.opacity, 0.045)
+  if (!hasFocus) return edge.edge_class === 'structural' ? Math.min(0.2, edge.opacity + 0.035) : Math.min(edge.opacity, 0.42)
+  return relatedEdgeIds.value.has(edge.id) ? Math.min(0.68, edge.opacity + 0.26) : Math.min(edge.opacity, 0.032)
 }
 
 function labelVisible(node: AtlasNode): boolean {
@@ -828,10 +919,10 @@ function labelVisible(node: AtlasNode): boolean {
 }
 
 function nodeHaloOpacity(node: AtlasNode): number {
-  if (store.selectedId === node.id) return 0.26
-  if (store.hoveredId === node.id) return 0.22
-  if (node.type === 'root') return 0.055
-  if (node.weight >= 0.94 && !isFallbackNode(node)) return 0.026
+  if (store.selectedId === node.id) return 0.34
+  if (store.hoveredId === node.id) return 0.27
+  if (node.type === 'root') return 0.12
+  if (node.weight >= 0.94 && !isFallbackNode(node)) return 0.035
   return 0
 }
 
@@ -842,23 +933,55 @@ function isFallbackNode(node: AtlasNode): boolean {
 function updateProjectedLabels() {
   if (!camera || !sceneHost.value) return
   const rect = sceneHost.value.getBoundingClientRect()
-  const labels: ProjectedLabel[] = []
+  const candidates: ProjectedLabel[] = []
   for (const node of nodes.value) {
     if (!labelVisible(node)) continue
     const position = nodePositions.get(node.id)
     if (!position) continue
     const projected = position.clone().multiplyScalar(graphScale.value).project(camera)
     if (projected.z < -1 || projected.z > 1) continue
-    labels.push({
+    candidates.push({
       id: node.id,
       label: shortLabel(node.label, node.layer <= 2 ? 12 : 18),
       type: node.type,
       x: (projected.x * 0.5 + 0.5) * rect.width,
-      y: (-projected.y * 0.5 + 0.5) * rect.height + 12,
+      y: (-projected.y * 0.5 + 0.5) * rect.height + (node.type === 'root' ? 15 : 11),
       muted: nodeOpacity(node) < 0.5,
+      priority: labelPriority(node),
     })
   }
+  candidates.sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id))
+  const placed: Array<{ left: number, right: number, top: number, bottom: number }> = []
+  const labels: ProjectedLabel[] = []
+  for (const candidate of candidates) {
+    const width = Math.min(180, Math.max(38, Array.from(candidate.label).length * 7.2 + 12))
+    const box = {
+      left: candidate.x - width / 2,
+      right: candidate.x + width / 2,
+      top: candidate.y - 2,
+      bottom: candidate.y + 16,
+    }
+    if (box.right < 8 || box.left > rect.width - 8 || box.bottom < 8 || box.top > rect.height - 8) continue
+    const collides = placed.some(other => !(
+      box.right + 7 < other.left
+      || box.left - 7 > other.right
+      || box.bottom + 4 < other.top
+      || box.top - 4 > other.bottom
+    ))
+    if (collides && candidate.priority < 95) continue
+    placed.push(box)
+    labels.push(candidate)
+  }
   projectedLabels.value = labels
+}
+
+function labelPriority(node: AtlasNode): number {
+  if (store.selectedId === node.id) return 120
+  if (store.hoveredId === node.id) return 110
+  if (node.type === 'root') return 100
+  if (node.type === 'lifeline') return 80 + node.weight * 10
+  if (node.type === 'cluster') return 55 + node.weight * 10
+  return 20 + node.weight * 10
 }
 
 function onPointerMove(event: PointerEvent) {
@@ -966,31 +1089,40 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
     <div v-if="!focusMode" class="label-layer" aria-hidden="true">
       <span
-        v-for="label in projectedLabels"
-        :key="label.id"
-        class="scene-label"
-        :class="[`type-${label.type}`, { muted: label.muted }]"
-        :style="{ transform: `translate(${label.x}px, ${label.y}px)` }"
-      >{{ label.label }}</span>
+      v-for="label in projectedLabels"
+      :key="label.id"
+      class="scene-label"
+      :class="[`type-${label.type}`, { muted: label.muted }]"
+      :style="{ left: `${label.x}px`, top: `${label.y}px` }"
+    >{{ label.label }}</span>
     </div>
 
-    <div v-if="!focusMode" class="atlas-toolbar">
+    <header v-if="!focusMode" class="atlas-toolbar">
       <div class="toolbar-title">
-        <span class="mark" />
-        <span>Atlas v1</span>
-        <em>3D 全局</em>
-      </div>
-        <div class="segmented atlas-tabs">
-          <button :class="{ active: store.lod === 'overview' }" @click="store.lod = 'overview'">总览</button>
-          <button :class="{ active: store.lod === 'semantic' }" @click="store.lod = 'semantic'">语义</button>
-          <button :class="{ active: store.lod === 'tags' }" @click="store.lod = 'tags'">标签</button>
-          <button :class="{ active: store.lod === 'structure' }" @click="store.lod = 'structure'">结构</button>
-          <button :class="{ active: store.lod === 'relations' }" @click="store.lod = 'relations'">关系</button>
+        <span class="mark" aria-hidden="true" />
+        <div>
+          <strong>Atlas</strong>
+          <small>
+            全局 · {{ store.data?.view.node_count || 0 }} 节点 · {{ store.data?.view.edge_count || 0 }} 关系
+          </small>
         </div>
-      <input v-model.number="graphScale" class="zoom-range" type="range" min="0.72" max="1.5" step="0.04" />
-      <button class="icon-btn" title="重置视角" @click="resetCamera">⌖</button>
-      <button class="icon-btn" title="刷新" @click="reload">↻</button>
-    </div>
+      </div>
+      <nav class="segmented atlas-tabs" aria-label="Atlas 视图">
+        <button :class="{ active: store.lod === 'overview' }" @click="store.lod = 'overview'">总览</button>
+        <button :class="{ active: store.lod === 'semantic' }" @click="store.lod = 'semantic'">语义</button>
+        <button :class="{ active: store.lod === 'tags' }" @click="store.lod = 'tags'">标签</button>
+        <button :class="{ active: store.lod === 'structure' }" @click="store.lod = 'structure'">结构</button>
+        <button :class="{ active: store.lod === 'relations' }" @click="store.lod = 'relations'">关系</button>
+      </nav>
+      <div class="toolbar-actions">
+        <button class="icon-btn" type="button" title="重置视角" aria-label="重置视角" @click="resetCamera">
+          <Crosshair :size="17" :stroke-width="1.7" />
+        </button>
+        <button class="icon-btn" type="button" title="刷新 Atlas" aria-label="刷新 Atlas" @click="reload">
+          <RefreshCw :size="17" :stroke-width="1.7" />
+        </button>
+      </div>
+    </header>
 
     <div v-if="store.loading || !sceneReady" class="atlas-state">
       <div class="loader-ring" />
@@ -1001,45 +1133,27 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
       <button class="retry-btn" @click="reload">重试</button>
     </div>
 
-    <aside v-if="!focusMode" class="atlas-panel">
-      <template v-if="store.selectedNode">
-        <div class="panel-kicker">{{ typeLabel(store.selectedNode.type) }} · L{{ store.selectedNode.layer }}</div>
-        <h2>{{ store.selectedNode.label }}</h2>
-        <p v-if="store.selectedNode.summary" class="summary">{{ store.selectedNode.summary }}</p>
-        <div class="metric-grid">
-          <div><span>权重</span><strong>{{ Math.round(store.selectedNode.weight * 100) }}%</strong></div>
-          <div><span>关联</span><strong>{{ store.focusedEdges.length }}</strong></div>
-          <div><span>层级</span><strong>{{ store.selectedNode.semantic_level }}</strong></div>
-        </div>
-        <button class="focus-btn" @click="focusMode = true">进入 2D 局部图</button>
-      </template>
-      <template v-else>
-        <div class="panel-kicker">全局图谱</div>
-        <h2>3D Skeleton Atlas</h2>
-        <div class="metric-grid">
-          <div><span>节点</span><strong>{{ store.data?.view.node_count || 0 }}</strong></div>
-          <div><span>边</span><strong>{{ store.data?.view.edge_count || 0 }}</strong></div>
-          <div><span>隐藏</span><strong>{{ (store.data?.view.hidden_nodes || 0) + (store.data?.view.hidden_edges || 0) }}</strong></div>
-        </div>
-        <div v-if="store.data?.view.unclassified_count" class="fallback-note">
-          未归类 {{ store.data.view.unclassified_count }} · 隐藏 {{ store.data.view.hidden_unclassified_items || 0 }}
-        </div>
-        <div class="type-breakdown">
-          <span v-for="(count, type) in typeStats" :key="type">{{ typeLabel(type) }} {{ count }}</span>
-        </div>
-      </template>
-    </aside>
+    <div v-if="!focusMode && store.data" class="atlas-footnote">
+      <span>3D 全局</span>
+      <span v-if="store.data.view.hidden_nodes || store.data.view.hidden_edges">
+        已收束 {{ (store.data.view.hidden_nodes || 0) + (store.data.view.hidden_edges || 0) }} 条低优先信息
+      </span>
+      <span v-if="store.data.view.unclassified_count">未归类 {{ store.data.view.unclassified_count }}</span>
+    </div>
 
     <section v-if="focusMode && store.selectedNode" class="local-atlas" data-testid="local-atlas-2d">
       <div class="local-toolbar">
-        <button class="back-btn" @click="exitFocus">返回 3D</button>
+        <button class="back-btn" type="button" @click="exitFocus">
+          <ArrowLeft :size="17" :stroke-width="1.8" />
+          <span>全局</span>
+        </button>
         <div>
-          <span>2D Local Atlas</span>
+          <span>Atlas · 局部语境</span>
           <strong>{{ store.selectedNode.label }}</strong>
         </div>
       </div>
 
-      <svg class="local-map" viewBox="-360 -260 720 520" preserveAspectRatio="xMidYMid meet" @click="clearSelection">
+      <svg class="local-map" viewBox="-400 -270 800 540" preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient
             v-for="entry in localEdges"
@@ -1052,19 +1166,13 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
             <stop offset="100%" stop-color="#5f7fa6" />
           </linearGradient>
         </defs>
-        <g class="local-grid">
-          <circle cx="0" cy="0" r="54" />
-          <circle cx="0" cy="0" r="104" />
-          <line x1="-300" y1="0" x2="300" y2="0" />
-          <line x1="0" y1="-210" x2="0" y2="210" />
-        </g>
         <g class="local-edges">
           <path
             v-for="entry in localEdges"
             :key="entry.edge.id"
             :d="localEdgePath(entry)"
             :class="localEdgeClass(entry)"
-            :stroke="`url(#local-grad-${entry.edge.id})`"
+            :stroke="entry.edge.edge_class === 'structural' ? 'rgba(154, 164, 174, 0.34)' : `url(#local-grad-${entry.edge.id})`"
             :stroke-width="entry.role === 'primary' ? Math.min(1.25, Math.max(0.75, entry.edge.width * 0.68)) : Math.min(0.68, Math.max(0.32, entry.edge.width * 0.38))"
             :stroke-opacity="entry.role === 'primary' ? Math.min(0.52, entry.edge.opacity + 0.1) : Math.min(0.22, entry.edge.opacity * 0.42)"
           />
@@ -1087,25 +1195,38 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
       </svg>
 
       <aside class="local-panel">
-        <div class="panel-kicker">{{ typeLabel(store.selectedNode.type) }} · Local Focus</div>
+        <div class="panel-kicker">{{ typeLabel(store.selectedNode.type) }} · 局部焦点</div>
         <h2>{{ store.selectedNode.label }}</h2>
         <p v-if="store.selectedNode.summary" class="summary">{{ store.selectedNode.summary }}</p>
-        <div class="metric-grid">
-          <div><span>节点</span><strong>{{ localNodes.length }}</strong></div>
-          <div><span>边</span><strong>{{ primaryLocalEdges.length }}+{{ secondaryLocalEdges.length }}</strong></div>
-          <div><span>权重</span><strong>{{ Math.round(store.selectedNode.weight * 100) }}%</strong></div>
+        <div class="focus-metrics">
+          <span>{{ localNodes.length }} 个节点</span>
+          <span>{{ primaryLocalEdges.length }} 条直接关系</span>
+          <span>{{ secondaryLocalEdges.length }} 条语境关系</span>
         </div>
         <div v-if="localRelationRows.length > 0" class="relation-list">
           <button
             v-for="edge in localRelationRows"
             :key="edge.id"
             class="relation-row"
-            @click="store.selectNeighbor(edge)"
+            :class="{ active: selectedLocalRelation?.id === edge.id }"
+            type="button"
+            @click="inspectLocalRelation(edge)"
           >
             <span>{{ relationLabel(edge.relation_type) }}</span>
+            <small>{{ relationTarget(edge)?.label }}</small>
             <strong>{{ Math.round(edge.confidence * 100) }}%</strong>
-            <small>{{ nodeById(edge.source === store.selectedId ? edge.target : edge.source)?.label }}</small>
-            <em v-if="edge.evidence">{{ edge.evidence }}</em>
+          </button>
+        </div>
+
+        <div v-if="selectedLocalRelation" class="relation-insight">
+          <div class="relation-insight-meta">
+            <span>{{ relationLabel(selectedLocalRelation.relation_type) }}</span>
+            <span>{{ relationOriginLabel(selectedLocalRelation) }}</span>
+          </div>
+          <p>{{ selectedLocalRelation.evidence || '这是一条结构关系，没有额外语义证据。' }}</p>
+          <button type="button" @click="navigateRelation(selectedLocalRelation)">
+            <span>聚焦 {{ relationTarget(selectedLocalRelation)?.label }}</span>
+            <ArrowUpRight :size="15" :stroke-width="1.7" />
           </button>
         </div>
       </aside>
@@ -1145,14 +1266,15 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .scene-label {
   position: absolute;
-  left: 0;
-  top: 0;
   color: var(--text-2);
-  font-size: 10px;
-  font-weight: 520;
-  text-shadow: 0 1px 6px #07090d, 0 0 2px #07090d;
+  font-size: 11px;
+  font-weight: 540;
+  line-height: 1;
+  text-shadow: 0 1px 8px #08090c, 0 0 3px #08090c;
   white-space: nowrap;
-  opacity: 0.78;
+  opacity: 0.84;
+  transform: translateX(-50%);
+  transition: opacity 140ms var(--ease), color 140ms var(--ease);
 }
 
 .scene-label.muted {
@@ -1165,73 +1287,78 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   color: var(--text-1);
 }
 
-.atlas-toolbar,
-.atlas-panel,
-.local-toolbar,
-.local-panel {
-  background: var(--glass-bg);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
-  backdrop-filter: var(--glass-blur);
-  box-shadow: var(--shadow-1);
+.scene-label.type-root {
+  color: #f1c078;
+  font-size: 12px;
 }
 
 .atlas-toolbar {
   position: absolute;
-  top: var(--s-4);
-  left: var(--s-4);
+  top: 0;
+  right: 0;
+  left: 0;
   z-index: 32;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) auto minmax(88px, 1fr);
   align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-2);
+  gap: var(--s-4);
+  min-height: 68px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  background: rgba(8, 9, 12, 0.78);
+  backdrop-filter: blur(14px);
 }
 
 .toolbar-title {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
+  gap: 10px;
   color: var(--text-1);
-  font-size: var(--fs-3);
-  font-weight: 600;
 }
 
-.toolbar-title em {
+.toolbar-title > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toolbar-title strong {
+  font-size: var(--fs-4);
+  font-weight: 650;
+}
+
+.toolbar-title small {
   color: var(--text-4);
   font-size: var(--fs-1);
-  font-style: normal;
-  font-weight: 500;
+  font-weight: 450;
 }
 
 .mark {
-  width: 10px;
-  height: 10px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 14px var(--accent-glow);
+  background: #f0ad55;
+  box-shadow: 0 0 10px rgba(240, 173, 85, 0.34);
 }
 
-.segmented,
-.edge-toggles {
+.segmented {
   display: flex;
   gap: 2px;
   padding: 2px;
-  background: var(--surface-0);
+  background: rgba(255, 255, 255, 0.035);
   border-radius: var(--r-1);
-  border: 1px solid var(--line-1);
+  border: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .atlas-tabs {
-  flex-wrap: wrap;
+  justify-self: center;
 }
 
 .segmented button,
-.edge-toggles button,
 .icon-btn,
 .retry-btn,
-.focus-btn,
 .back-btn {
-  min-height: 28px;
+  min-height: 30px;
   border: 1px solid transparent;
   border-radius: var(--r-1);
   background: transparent;
@@ -1241,34 +1368,44 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   cursor: pointer;
 }
 
-.segmented button.active,
-.edge-toggles button.active {
+.segmented button.active {
   color: var(--text-1);
-  background: var(--surface-3);
-  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.075);
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.toolbar-actions {
+  justify-self: end;
+  display: flex;
+  gap: 5px;
 }
 
 .icon-btn {
-  width: 30px;
+  width: 32px;
+  display: grid;
+  place-items: center;
   padding: 0;
-  background: var(--surface-1);
-  border-color: var(--line-2);
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(255, 255, 255, 0.055);
 }
 
-.zoom-range {
-  width: 120px;
-  accent-color: var(--accent);
+.icon-btn:hover {
+  color: var(--text-1);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
-.atlas-panel {
+.atlas-footnote {
   position: absolute;
-  top: 72px;
-  right: var(--s-4);
-  z-index: 31;
-  width: min(340px, calc(100vw - 32px));
-  max-height: calc(100vh - 96px);
-  overflow: auto;
-  padding: var(--s-3);
+  bottom: 18px;
+  left: 20px;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 10px;
 }
 
 .panel-kicker {
@@ -1277,7 +1414,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   margin-bottom: var(--s-1);
 }
 
-.atlas-panel h2,
 .local-panel h2 {
   margin: 0;
   color: var(--text-1);
@@ -1292,64 +1428,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   line-height: var(--lh-base);
 }
 
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--s-2);
-  margin-top: var(--s-3);
-}
-
-.metric-grid div {
-  min-width: 0;
-  padding: var(--s-2);
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
-}
-
-.metric-grid span,
-.metric-grid strong {
-  display: block;
-}
-
-.metric-grid span {
-  color: var(--text-4);
-  font-size: var(--fs-1);
-}
-
-.metric-grid strong {
-  margin-top: 2px;
-  color: var(--text-1);
-  font-size: var(--fs-3);
-  overflow-wrap: anywhere;
-}
-
-.focus-btn,
 .back-btn {
-  margin-top: var(--s-3);
-  color: var(--surface-0);
-  background: var(--accent);
-}
-
-.fallback-note {
-  margin-top: var(--s-2);
-  color: var(--text-4);
-  font-size: var(--fs-1);
-}
-
-.type-breakdown {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-1);
-  margin-top: var(--s-3);
-}
-
-.type-breakdown span {
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-pill);
-  color: var(--text-3);
-  font-size: var(--fs-1);
-  padding: 3px var(--s-2);
+  color: var(--text-2);
 }
 
 .atlas-state {
@@ -1383,22 +1463,23 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   inset: 0;
   z-index: 40;
   overflow: hidden;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    rgba(7, 9, 13, 0.94);
-  background-size: 48px 48px, 48px 48px, auto;
+  background: #08090c;
 }
 
 .local-toolbar {
   position: absolute;
-  top: var(--s-4);
-  left: var(--s-4);
+  top: 0;
+  right: 0;
+  left: 0;
   z-index: 45;
   display: flex;
   align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-2) var(--s-3);
+  gap: 14px;
+  min-height: 68px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  background: rgba(8, 9, 12, 0.82);
+  backdrop-filter: blur(14px);
 }
 
 .local-toolbar div {
@@ -1414,34 +1495,32 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .local-toolbar strong {
   color: var(--text-1);
-  font-size: var(--fs-3);
+  font-size: var(--fs-4);
   overflow-wrap: anywhere;
 }
 
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px 0 7px;
+  border-color: rgba(255, 255, 255, 0.065);
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.back-btn:hover {
+  color: var(--text-1);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 .local-map {
-  width: 100%;
+  width: calc(100% - 350px);
   height: 100%;
   display: block;
 }
 
-.local-grid circle,
-.local-grid line,
 .local-edges path {
   fill: none;
-}
-
-.local-grid circle,
-.local-grid line {
-  stroke: rgba(255, 255, 255, 0.04);
-  stroke-width: 0.7;
-}
-
-.local-grid circle {
-  opacity: 0.22;
-}
-
-.local-grid line {
-  opacity: 0.5;
 }
 
 .local-edges path {
@@ -1476,21 +1555,23 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 }
 
 .local-node.role-center .local-core {
-  stroke-width: 1.1;
-  filter: drop-shadow(0 0 8px rgba(110, 231, 208, 0.18));
+  fill: #f0ad55;
+  stroke: #f3c37f;
+  stroke-width: 0.9;
+  filter: drop-shadow(0 0 7px rgba(240, 173, 85, 0.26));
 }
 
 .local-node.role-secondary {
   opacity: 0.66;
 }
 
-.local-node.type-root .local-core { fill: #d8fffb; }
-.local-node.type-lifeline .local-core { fill: #6fb8a8; }
-.local-node.type-cluster .local-core { fill: #566f8a; }
-.local-node.type-memory .local-core { fill: #72839a; }
-.local-node.type-task .local-core { fill: #72a996; }
-.local-node.type-decision .local-core { fill: #8b7aa8; }
-.local-node.type-item .local-core { fill: #596270; }
+.local-node.type-root .local-core { fill: #f0ad55; }
+.local-node.type-lifeline .local-core { fill: #83c6b9; }
+.local-node.type-cluster .local-core { fill: #8194aa; }
+.local-node.type-memory .local-core { fill: #8592a6; }
+.local-node.type-task .local-core { fill: #7fb29c; }
+.local-node.type-decision .local-core { fill: #9b88ae; }
+.local-node.type-item .local-core { fill: #69727f; }
 
 .local-node text {
   fill: var(--text-2);
@@ -1514,39 +1595,53 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .local-panel {
   position: absolute;
-  top: 72px;
-  right: var(--s-4);
+  top: 68px;
+  right: 0;
+  bottom: 0;
   z-index: 45;
-  width: min(360px, calc(100vw - 32px));
-  max-height: calc(100vh - 96px);
+  width: 350px;
   overflow: auto;
-  padding: var(--s-3);
+  padding: 28px 24px 32px;
+  border-left: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(12, 14, 18, 0.88);
+  backdrop-filter: blur(18px);
+}
+
+.focus-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-top: 16px;
+  color: var(--text-4);
+  font-size: var(--fs-1);
 }
 
 .relation-list {
   display: flex;
   flex-direction: column;
-  gap: var(--s-1);
-  margin-top: var(--s-3);
+  margin-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .relation-row {
   display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: var(--s-1);
+  grid-template-columns: 54px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   text-align: left;
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-1);
-  background: rgba(255, 255, 255, 0.03);
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-2);
-  padding: var(--s-2);
+  padding: 10px 2px;
   cursor: pointer;
 }
 
-.relation-row:hover {
-  border-color: var(--line-3);
-  background: rgba(255, 255, 255, 0.055);
+.relation-row:hover,
+.relation-row.active {
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .relation-row span {
@@ -1557,6 +1652,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 .relation-row strong {
   color: #5f7fa6;
   font-size: var(--fs-1);
+  text-align: right;
 }
 
 .relation-row small {
@@ -1567,40 +1663,117 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   white-space: nowrap;
 }
 
-.relation-row em {
-  grid-column: 1 / -1;
+.relation-insight {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.relation-insight-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
   color: var(--text-4);
   font-size: var(--fs-1);
-  font-style: normal;
-  line-height: var(--lh-base);
+}
+
+.relation-insight p {
+  margin: 10px 0 0;
+  color: var(--text-2);
+  font-size: var(--fs-3);
+  line-height: 1.6;
+}
+
+.relation-insight button {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 0 2px;
+  color: var(--text-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.relation-insight button:hover {
+  color: var(--text-1);
 }
 
 @media (max-width: 760px) {
   .atlas-toolbar {
-    top: calc(var(--s-4) + 48px);
-    right: var(--s-3);
-    left: var(--s-3);
-    flex-wrap: wrap;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+    min-height: 104px;
+    padding: 10px 12px 8px;
   }
 
-  .zoom-range {
-    width: 100%;
+  .toolbar-title small {
+    max-width: 230px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .atlas-panel,
-  .local-panel {
-    top: auto;
-    right: var(--s-3);
-    bottom: calc(var(--s-3) + 76px);
-    left: var(--s-3);
-    width: auto;
-    max-height: 30vh;
+  .atlas-tabs {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    overflow-x: auto;
+  }
+
+  .atlas-tabs button {
+    flex: 1 0 auto;
+  }
+
+  .atlas-footnote {
+    display: none;
   }
 
   .local-toolbar {
-    top: calc(var(--s-4) + 48px);
-    right: var(--s-3);
-    left: var(--s-3);
+    min-height: 64px;
+    padding: 10px 12px;
+  }
+
+  .local-toolbar strong {
+    display: block;
+    max-width: calc(100vw - 120px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .local-map {
+    width: 100%;
+    height: 68%;
+    margin-top: 34px;
+  }
+
+  .local-panel {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    height: 34%;
+    padding: 18px 16px 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.065);
+    border-left: 0;
+  }
+
+  .local-panel h2 {
+    font-size: var(--fs-5);
+  }
+
+  .summary {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .relation-list {
+    margin-top: 14px;
   }
 }
 </style>
