@@ -1,12 +1,6 @@
 <script setup lang="ts">
-/*
- * KeyGate — 首次进入或 key 失效时的门禁
- *
- * 视觉上要"克制庄重"，不要花哨。
- * 单一输入框，单一动作。
- */
-
 import { ref } from 'vue';
+import { ArrowRight, CircleDot } from '@lucide/vue';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
@@ -23,13 +17,20 @@ async function submit() {
 </script>
 
 <template>
-  <div class="gate">
-    <div class="gate-card">
+  <main class="gate">
+    <div class="gate-field" aria-hidden="true">
+      <i v-for="index in 9" :key="index" />
+      <span />
+    </div>
+    <p class="gate-coordinate">PRIVATE COGNITIVE SYSTEM · 01</p>
+
+    <section class="gate-card" aria-labelledby="gate-title">
       <div class="gate-mark">
-        <span class="mark-dot" />
-        <span class="mark-text">Axiom</span>
+        <CircleDot :size="30" :stroke-width="1.2" />
+        <span>AX / 01</span>
       </div>
-      <p class="gate-line">个人外脑 · 输入访问密钥</p>
+      <h1 id="gate-title">Axiom</h1>
+      <p class="gate-line">个人外脑 · 私有入口</p>
 
       <form @submit.prevent="submit">
         <input
@@ -41,74 +42,162 @@ async function submit() {
           tabindex="-1"
           aria-hidden="true"
         />
-        <input
-          v-model="input"
-          type="password"
-          name="axiom-key"
-          autocomplete="current-password"
-          placeholder="X-Axiom-Key"
-          autofocus
-          spellcheck="false"
-        />
-        <button type="submit" :disabled="!input.trim() || checking">
-          {{ checking ? '验证中…' : '进入' }}
+        <label>
+          <span>访问密钥</span>
+          <input
+            v-model="input"
+            type="password"
+            name="axiom-key"
+            autocomplete="current-password"
+            placeholder="X-Axiom-Key"
+            autofocus
+            spellcheck="false"
+          />
+        </label>
+        <button type="submit" :disabled="!input.trim() || checking" :title="checking ? '验证中' : '进入'" aria-label="进入 Axiom">
+          <ArrowRight :size="20" :class="{ checking }" />
         </button>
       </form>
 
       <p v-if="auth.lastError" class="gate-err">{{ auth.lastError }}</p>
-      <p class="gate-hint">密钥仅保存在本机浏览器，用于所有 API 请求的 X-Axiom-Key 头。</p>
-    </div>
-  </div>
+      <p class="gate-hint">密钥只保留在当前设备。</p>
+    </section>
+  </main>
 </template>
 
 <style scoped>
 .gate {
-  flex: 1;
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
   display: grid;
-  place-items: center;
-  padding: var(--s-5);
+  grid-template-columns: minmax(260px, 0.82fr) minmax(420px, 1.18fr);
+  align-items: stretch;
+  background: var(--surface-0);
+}
+
+.gate::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 38%;
+  width: 1px;
+  background: var(--line-1);
+}
+
+.gate::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  left: calc(38% - 1px);
+  width: 3px;
+  height: 19%;
+  background: var(--vermilion);
+}
+
+.gate-field {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.gate-field i {
+  position: absolute;
+  right: 10%;
+  width: 72%;
+  height: 1px;
+  background: rgba(242, 237, 225, 0.055);
+  transform-origin: right center;
+}
+
+.gate-field i:nth-child(1) { top: 18%; transform: rotate(-4deg); }
+.gate-field i:nth-child(2) { top: 26%; transform: rotate(3deg); width: 58%; }
+.gate-field i:nth-child(3) { top: 35%; transform: rotate(-8deg); width: 82%; }
+.gate-field i:nth-child(4) { top: 45%; transform: rotate(5deg); width: 66%; }
+.gate-field i:nth-child(5) { top: 55%; transform: rotate(-2deg); width: 92%; }
+.gate-field i:nth-child(6) { top: 65%; transform: rotate(7deg); width: 76%; }
+.gate-field i:nth-child(7) { top: 73%; transform: rotate(-5deg); width: 54%; }
+.gate-field i:nth-child(8) { top: 81%; transform: rotate(2deg); width: 84%; }
+.gate-field i:nth-child(9) { top: 88%; transform: rotate(-3deg); width: 62%; }
+
+.gate-field span {
+  position: absolute;
+  top: 34%;
+  right: 18%;
+  width: 88px;
+  height: 88px;
+  border: 1px solid rgba(225, 165, 88, 0.22);
+  transform: rotate(45deg);
+  animation: field-turn 24s linear infinite;
+}
+
+.gate-coordinate {
+  position: absolute;
+  left: 24px;
+  bottom: 22px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
 }
 
 .gate-card {
-  width: min(360px, 92vw);
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-4);
-  text-align: center;
+  width: min(570px, calc(100% - 72px));
+  align-self: center;
+  justify-self: center;
+  padding: 56px 0;
 }
 
 .gate-mark {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--s-2);
-  margin-bottom: var(--s-3);
+  gap: 14px;
+  color: var(--focus-bright);
+  margin-bottom: 64px;
 }
 
-.mark-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent);
+.gate-mark svg {
+  filter: drop-shadow(0 0 10px rgba(225, 165, 88, 0.22));
 }
 
-.mark-text {
-  font-size: var(--fs-7);
-  font-weight: 500;
+.gate-mark span {
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+h1 {
   color: var(--text-1);
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-size: 64px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .gate-line {
+  margin-top: 15px;
   color: var(--text-3);
   font-size: var(--fs-3);
-  margin-bottom: var(--s-4);
 }
 
 form {
-  display: flex;
-  gap: var(--s-2);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: end;
+  gap: 16px;
+  margin-top: 72px;
+}
+
+form label {
+  display: grid;
+  gap: 9px;
+}
+
+form label > span {
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
 }
 
 .visually-hidden {
@@ -123,52 +212,115 @@ form {
   border: 0;
 }
 
-form input {
-  flex: 1;
-  padding: var(--s-3) var(--s-4);
-  background: var(--surface-2);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+form input:not(.visually-hidden) {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--line-3);
   color: var(--text-1);
-  font-size: var(--fs-4);
   font-family: var(--font-mono);
-  transition: all var(--t-fast) var(--ease);
+  transition: border-color var(--t-base) var(--ease);
 }
 
-form input:focus {
-  border-color: var(--line-3);
-  box-shadow: 0 0 0 4px var(--accent-glow);
+form input:not(.visually-hidden):focus {
+  border-color: var(--focus-bright);
+}
+
+form input::placeholder {
+  color: var(--text-5);
 }
 
 form button {
-  padding: 0 var(--s-4);
-  background: var(--accent);
-  color: var(--surface-0);
-  border-radius: var(--r-2);
-  font-size: var(--fs-3);
-  font-weight: 500;
-  transition: all var(--t-fast) var(--ease);
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-warm);
+  border-radius: 50%;
+  color: var(--focus-bright);
+  transition: color var(--t-base) var(--ease), background var(--t-base) var(--ease), transform var(--t-base) var(--ease);
 }
 
 form button:hover:not(:disabled) {
-  background: var(--accent-bright);
+  color: var(--surface-0);
+  background: var(--focus);
+  transform: translateX(3px);
 }
 
-form button:disabled {
-  background: var(--surface-3);
-  color: var(--text-4);
-  cursor: not-allowed;
+.checking {
+  animation: checking 1s var(--ease) infinite alternate;
 }
 
-.gate-err {
-  color: var(--error);
-  font-size: var(--fs-2);
-}
-
+.gate-err,
 .gate-hint {
-  margin-top: var(--s-3);
-  color: var(--text-4);
+  margin-top: 18px;
   font-size: var(--fs-2);
-  line-height: var(--lh-base);
+}
+
+.gate-err { color: var(--error); }
+.gate-hint { color: var(--text-5); }
+
+@keyframes field-turn {
+  to { transform: rotate(405deg); }
+}
+
+@keyframes checking {
+  to { opacity: 0.35; transform: translateX(5px); }
+}
+
+@media (max-width: 760px) {
+  .gate {
+    grid-template-columns: 1fr;
+  }
+
+  .gate::before {
+    left: 18px;
+  }
+
+  .gate::after {
+    top: 8%;
+    left: 17px;
+    height: 16%;
+  }
+
+  .gate-field {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+    opacity: 0.75;
+  }
+
+  .gate-field i {
+    right: -16%;
+  }
+
+  .gate-field span {
+    top: 17%;
+    right: 10%;
+    width: 64px;
+    height: 64px;
+  }
+
+  .gate-coordinate {
+    display: none;
+  }
+
+  .gate-card {
+    position: relative;
+    width: calc(100% - 56px);
+    padding: 36px 0 90px;
+  }
+
+  .gate-mark {
+    margin-bottom: 72px;
+  }
+
+  h1 {
+    font-size: 52px;
+  }
+
+  form {
+    margin-top: 58px;
+  }
 }
 </style>

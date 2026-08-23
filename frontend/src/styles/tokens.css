@@ -1,53 +1,54 @@
 /*
- * Axiom Design Tokens
+ * Axiom / Ink & Light
  *
- * 方向：中性表面 + 克制的语义色 + 紧凑几何。
- * 色彩只承担导航、焦点、成功和风险等明确语义。
+ * A cognitive instrument made from ink, warm paper, mineral colour and light.
+ * Amber marks intention, jade marks continuity, blue marks recall, and
+ * vermilion marks tension or intervention.
  */
 
 :root {
   color-scheme: dark;
 
-  /* ---------- 表面层次（从底到顶 4 层） ---------- */
-  --surface-0: #0b0c0f;
-  --surface-1: #111318;
-  --surface-2: #171a20;
-  --surface-3: #20242b;
-  --surface-4: #2a3039;
+  --surface-0: #0a0a09;
+  --surface-1: #11110f;
+  --surface-2: #181713;
+  --surface-3: #22201a;
+  --surface-4: #302c24;
+  --surface-raised: rgba(19, 18, 15, 0.88);
 
-  /* ---------- 文字层次 ---------- */
-  --text-1: #f0eee9;
-  --text-2: #c5c3bd;
-  --text-3: #8b8d91;
-  --text-4: #5f646c;
-  --text-5: #3e434b;
+  --text-1: #f2ede1;
+  --text-2: #d2cabb;
+  --text-3: #9d978c;
+  --text-4: #706d66;
+  --text-5: #4b4a45;
 
-  /* ---------- 边线 ---------- */
-  --line-1: rgba(255, 255, 255, 0.04);   /* 主分隔 */
-  --line-2: rgba(255, 255, 255, 0.08);   /* hover 后的边 */
-  --line-3: rgba(255, 255, 255, 0.14);   /* 聚焦边 */
+  --line-1: rgba(242, 237, 225, 0.065);
+  --line-2: rgba(242, 237, 225, 0.125);
+  --line-3: rgba(242, 237, 225, 0.22);
+  --line-warm: rgba(227, 167, 89, 0.28);
 
-  /* ---------- 语义色 ---------- */
-  --accent: #8fb6c8;
-  --accent-bright: #bad6df;
-  --accent-dim: rgba(143, 182, 200, 0.18);
-  --accent-glow: rgba(143, 182, 200, 0.10);
-  --focus: #deaa5f;
-  --success: #7eaf8e;
-  --info: #7da4c5;
+  --accent: #86ad9e;
+  --accent-bright: #bdd8cc;
+  --accent-dim: rgba(134, 173, 158, 0.16);
+  --accent-glow: rgba(134, 173, 158, 0.1);
+  --focus: #e1a558;
+  --focus-bright: #f0c47f;
+  --focus-dim: rgba(225, 165, 88, 0.13);
+  --success: #91b99a;
+  --info: #7d9fb5;
+  --cobalt: #7388ad;
+  --vermilion: #c66f58;
+  --violet: #9a83a2;
 
-  /* ---------- 状态色（克制使用） ---------- */
-  --warm: #deaa5f;
-  --warn: #c9826f;
-  --error: #d36f6f;
+  --warm: var(--focus);
+  --warn: #c88c58;
+  --error: #cf7667;
 
-  /* ---------- 圆角（紧凑，不软糖） ---------- */
-  --r-1: 4px;
-  --r-2: 8px;
-  --r-3: 12px;
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 8px;
   --r-pill: 999px;
 
-  /* ---------- 间距（8 倍数） ---------- */
   --s-1: 4px;
   --s-2: 8px;
   --s-3: 12px;
@@ -57,42 +58,41 @@
   --s-7: 48px;
   --s-8: 64px;
 
-  /* ---------- 字体 ---------- */
   --font-sans:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable",
-    "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+    "Segoe UI Variable", "PingFang SC", "Microsoft YaHei UI",
+    "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-display:
+    "Iowan Old Style", "Source Han Serif SC", "Noto Serif CJK SC",
+    "Songti SC", "STSong", Georgia, serif;
   --font-mono:
-    "JetBrains Mono", "SF Mono", "Cascadia Code", ui-monospace, monospace;
+    "Cascadia Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
 
-  --fs-1: 11px;     /* eyebrow / 标签 */
-  --fs-2: 12px;     /* meta */
-  --fs-3: 13px;     /* 次正文 */
-  --fs-4: 14px;     /* 正文 */
-  --fs-5: 16px;     /* 输入框主字号 */
-  --fs-6: 20px;     /* 小标题 */
-  --fs-7: 28px;     /* 主标题（克制使用） */
+  --fs-1: 11px;
+  --fs-2: 12px;
+  --fs-3: 13px;
+  --fs-4: 14px;
+  --fs-5: 16px;
+  --fs-6: 20px;
+  --fs-7: 30px;
+  --fs-display: 48px;
 
-  --lh-tight: 1.3;
-  --lh-base: 1.55;
+  --lh-tight: 1.22;
+  --lh-base: 1.62;
 
-  /* ---------- 动效（极快，单一曲线） ---------- */
-  --ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --t-fast: 120ms;
-  --t-base: 180ms;
-  --t-slow: 280ms;
-  --t-drawer: 240ms;  /* 抽屉滑入 */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.64, 0, 0.78, 0);
+  --t-fast: 140ms;
+  --t-base: 260ms;
+  --t-slow: 520ms;
+  --t-drawer: 360ms;
 
-  /* ---------- 玻璃（极薄，靠 backdrop-filter） ---------- */
-  --glass-blur: blur(20px) saturate(140%);
-  --glass-bg: rgba(13, 17, 22, 0.72);
+  --glass-blur: blur(24px) saturate(115%);
+  --glass-bg: rgba(15, 15, 13, 0.84);
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.025) inset, 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.035) inset, 0 28px 80px rgba(0, 0, 0, 0.58);
 
-  /* ---------- 阴影（用于浮层，几乎不可见） ---------- */
-  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 48px rgba(0, 0, 0, 0.6);
-
-  /* ---------- 布局 ---------- */
-  --content-max: 720px;          /* Capture 模式刻意窄一点，逼近"一栏阅读" */
-  --content-wide: 1100px;        /* Atlas 模式才用宽栏 */
-  --app-rail-width: 72px;
-  --app-mobile-nav-height: 70px;
+  --content-max: 780px;
+  --content-wide: 1240px;
+  --app-rail-width: 88px;
+  --app-mobile-nav-height: 76px;
 }

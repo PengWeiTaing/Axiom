@@ -74,7 +74,9 @@ onBeforeUnmount(() => {
 <template>
   <nav class="app-navigation" aria-label="主要导航">
     <button class="brand-mark" type="button" title="Axiom" aria-label="Axiom" @click="select('today')">
-      <CircleDot :size="22" :stroke-width="1.7" />
+      <CircleDot :size="23" :stroke-width="1.35" />
+      <span class="brand-word">Axiom</span>
+      <small>01</small>
     </button>
 
     <div class="primary-navigation">
@@ -83,15 +85,16 @@ onBeforeUnmount(() => {
         :key="item.key"
         class="nav-item"
         :class="{ active: mode.mode === item.key }"
+        :data-mode="item.key"
         type="button"
         @click="select(item.key)"
       >
-        <component :is="item.icon" :size="20" :stroke-width="1.7" />
+        <component :is="item.icon" :size="20" :stroke-width="1.45" />
         <span>{{ item.label }}</span>
       </button>
 
-      <button class="nav-item capture-item" type="button" @click="emit('capture')">
-        <span class="capture-icon"><Plus :size="21" :stroke-width="2" /></span>
+      <button class="nav-item capture-item" type="button" data-mode="capture" @click="emit('capture')">
+        <span class="capture-icon"><Plus :size="21" :stroke-width="1.75" /></span>
         <span>记录</span>
       </button>
 
@@ -100,10 +103,11 @@ onBeforeUnmount(() => {
         :key="item.key"
         class="nav-item"
         :class="{ active: mode.mode === item.key }"
+        :data-mode="item.key"
         type="button"
         @click="select(item.key)"
       >
-        <component :is="item.icon" :size="20" :stroke-width="1.7" />
+        <component :is="item.icon" :size="20" :stroke-width="1.45" />
         <span>{{ item.label }}</span>
       </button>
     </div>
@@ -116,17 +120,20 @@ onBeforeUnmount(() => {
       :aria-expanded="menuOpen"
       @click.stop="menuOpen = !menuOpen"
     >
-      <Ellipsis :size="20" :stroke-width="1.7" />
+      <Ellipsis :size="20" :stroke-width="1.45" />
       <span>更多</span>
     </button>
   </nav>
 
   <Transition name="menu">
     <aside v-if="menuOpen" class="more-menu" role="menu" aria-label="其他视图">
-      <div class="menu-brand">
-        <span>Axiom</span>
-        <small>上下文与管理</small>
-      </div>
+      <header class="menu-brand">
+        <div>
+          <span>Axiom</span>
+          <small>Context index</small>
+        </div>
+        <i aria-hidden="true" />
+      </header>
       <p class="menu-label">整理与回顾</p>
       <button
         v-for="item in contextItems"
@@ -137,10 +144,10 @@ onBeforeUnmount(() => {
         role="menuitem"
         @click="select(item.key)"
       >
-        <component :is="item.icon" :size="17" :stroke-width="1.7" />
+        <component :is="item.icon" :size="17" :stroke-width="1.45" />
         <span>{{ item.label }}</span>
       </button>
-      <p class="menu-label admin-label">管理</p>
+      <p class="menu-label admin-label">系统与治理</p>
       <button
         v-for="item in adminItems"
         :key="item.key"
@@ -150,7 +157,7 @@ onBeforeUnmount(() => {
         role="menuitem"
         @click="select(item.key)"
       >
-        <component :is="item.icon" :size="17" :stroke-width="1.7" />
+        <component :is="item.icon" :size="17" :stroke-width="1.45" />
         <span>{{ item.label }}</span>
       </button>
     </aside>
@@ -166,19 +173,55 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 18px 8px 12px;
-  background: rgba(10, 12, 16, 0.92);
+  padding: 14px 0 13px;
+  background: rgba(10, 10, 9, 0.86);
   border-right: 1px solid var(--line-1);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(22px) saturate(105%);
+}
+
+.app-navigation::after {
+  content: '';
+  position: absolute;
+  top: 112px;
+  bottom: 88px;
+  left: 43px;
+  z-index: -1;
+  width: 1px;
+  background: var(--line-1);
 }
 
 .brand-mark {
-  width: 44px;
-  height: 44px;
+  position: relative;
+  width: 64px;
+  min-height: 76px;
   display: grid;
-  place-items: center;
+  grid-template-columns: 25px 1fr;
+  grid-template-rows: 28px 18px;
+  align-content: center;
+  align-items: center;
   color: var(--text-1);
-  margin-bottom: 26px;
+  text-align: left;
+  margin-bottom: 22px;
+}
+
+.brand-mark svg {
+  grid-row: 1 / -1;
+  color: var(--focus-bright);
+  filter: drop-shadow(0 0 7px rgba(225, 165, 88, 0.25));
+}
+
+.brand-word {
+  align-self: end;
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.brand-mark small {
+  align-self: start;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 8px;
 }
 
 .primary-navigation {
@@ -186,8 +229,9 @@ onBeforeUnmount(() => {
 }
 
 .nav-item {
-  width: 56px;
-  min-height: 54px;
+  position: relative;
+  width: 72px;
+  min-height: 62px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -195,30 +239,81 @@ onBeforeUnmount(() => {
   gap: 5px;
   color: var(--text-4);
   font-size: 10px;
-  border-radius: 6px;
-  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+  transition: color var(--t-base) var(--ease), background var(--t-base) var(--ease), transform var(--t-base) var(--ease);
 }
 
-.nav-item:hover,
+.nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18px;
+  width: 1px;
+  height: 26px;
+  background: transparent;
+  transition: width var(--t-base) var(--ease), background var(--t-base) var(--ease);
+}
+
+.nav-item:hover {
+  color: var(--text-1);
+  background: rgba(242, 237, 225, 0.025);
+}
+
+.nav-item:focus-visible {
+  outline: none;
+  color: var(--text-1);
+  background: rgba(242, 237, 225, 0.025);
+}
+
+.nav-item:focus-visible::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-top: 1px solid var(--focus-bright);
+  border-right: 1px solid var(--focus-bright);
+}
+
 .nav-item.active {
   color: var(--text-1);
-  background: rgba(255, 255, 255, 0.045);
+}
+
+.nav-item.active::before {
+  width: 3px;
+  background: var(--focus);
+}
+
+.nav-item[data-mode='library'].active::before {
+  background: var(--accent);
+}
+
+.nav-item[data-mode='atlas'].active::before {
+  background: var(--cobalt);
 }
 
 .capture-item {
-  margin: 10px 0;
-  color: var(--text-2);
+  min-height: 76px;
+  color: var(--text-3);
 }
 
 .capture-icon {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
+  border: 1px solid var(--line-warm);
   border-radius: 50%;
+  background: var(--focus-dim);
+  color: var(--focus-bright);
+  box-shadow: 0 0 28px rgba(225, 165, 88, 0.08);
+  transition: transform var(--t-base) var(--ease), background var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+
+.capture-item:hover .capture-icon {
+  transform: rotate(90deg);
   background: var(--focus);
-  color: #111318;
-  box-shadow: 0 4px 18px rgba(222, 170, 95, 0.16);
+  color: var(--surface-0);
 }
 
 .more-trigger {
@@ -227,72 +322,95 @@ onBeforeUnmount(() => {
 
 .more-menu {
   position: fixed;
-  left: calc(var(--app-rail-width) + 10px);
-  bottom: 12px;
+  left: calc(var(--app-rail-width) + 14px);
+  bottom: 14px;
   z-index: 55;
-  width: 230px;
-  max-height: calc(100vh - 24px);
+  width: 272px;
+  max-height: calc(100vh - 28px);
   overflow-y: auto;
-  padding: 10px;
-  background: rgba(20, 23, 29, 0.97);
+  padding: 16px;
+  background: rgba(16, 16, 14, 0.96);
   border: 1px solid var(--line-2);
-  border-radius: 8px;
+  border-radius: var(--r-3);
   box-shadow: var(--shadow-2);
-  backdrop-filter: blur(20px);
+  backdrop-filter: var(--glass-blur);
 }
 
 .menu-brand {
+  min-height: 64px;
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 6px 8px 12px;
   border-bottom: 1px solid var(--line-1);
+}
+
+.menu-brand > div {
+  display: grid;
+  gap: 3px;
+}
+
+.menu-brand span {
   color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 20px;
 }
 
 .menu-brand small,
 .menu-label {
-  color: var(--text-4);
-  font-size: 10px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.menu-brand i {
+  width: 20px;
+  height: 20px;
+  border-top: 1px solid var(--focus);
+  border-right: 1px solid var(--focus);
 }
 
 .menu-label {
-  padding: 12px 8px 5px;
+  padding: 18px 8px 6px;
 }
 
 .admin-label {
   border-top: 1px solid var(--line-1);
-  margin-top: 6px;
+  margin-top: 10px;
 }
 
 .menu-item {
   width: 100%;
-  min-height: 36px;
-  display: flex;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 26px 1fr;
   align-items: center;
-  gap: 10px;
-  padding: 0 9px;
-  border-radius: 5px;
+  gap: 8px;
+  padding: 0 8px;
   color: var(--text-3);
   font-size: var(--fs-3);
   text-align: left;
+  border-bottom: 1px solid transparent;
 }
 
 .menu-item:hover,
 .menu-item.active {
-  background: rgba(255, 255, 255, 0.05);
   color: var(--text-1);
+  border-bottom-color: var(--line-2);
+}
+
+.menu-item.active svg {
+  color: var(--focus-bright);
 }
 
 .menu-enter-active,
 .menu-leave-active {
-  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+  transition: opacity var(--t-base) var(--ease), transform var(--t-base) var(--ease);
 }
 
 .menu-enter-from,
 .menu-leave-to {
   opacity: 0;
-  transform: translateX(-6px);
+  transform: translateX(-10px);
 }
 
 @media (max-width: 760px) {
@@ -302,11 +420,12 @@ onBeforeUnmount(() => {
     height: var(--app-mobile-nav-height);
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    padding: 6px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+    padding: 5px max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
     border-right: 0;
     border-top: 1px solid var(--line-1);
   }
 
+  .app-navigation::after,
   .brand-mark {
     display: none;
   }
@@ -317,35 +436,47 @@ onBeforeUnmount(() => {
 
   .nav-item {
     width: 100%;
-    min-height: 52px;
+    min-height: 60px;
+  }
+
+  .nav-item::before {
+    top: 0;
+    right: 22%;
+    left: 22%;
+    width: auto;
+    height: 1px;
+  }
+
+  .nav-item.active::before {
+    width: auto;
+    height: 2px;
   }
 
   .capture-item {
-    margin: 0;
     grid-column: 3;
   }
 
   .capture-icon {
-    width: 36px;
-    height: 36px;
+    width: 39px;
+    height: 39px;
   }
 
   .more-trigger {
-    margin: 0;
     grid-column: 5;
+    margin: 0;
   }
 
   .more-menu {
-    left: 12px;
-    right: 12px;
+    left: 10px;
+    right: 10px;
     bottom: calc(var(--app-mobile-nav-height) + 10px);
     width: auto;
-    max-height: min(62vh, 520px);
+    max-height: min(68vh, 560px);
   }
 
   .menu-enter-from,
   .menu-leave-to {
-    transform: translateY(6px);
+    transform: translateY(10px);
   }
 }
 </style>

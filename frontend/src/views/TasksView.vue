@@ -474,7 +474,7 @@ onMounted(() => {
 }
 
 .topbar h1 {
-  font-size: clamp(2rem, 3vw, 3rem);
+  font-size: 2.75rem;
 }
 
 .eyebrow,

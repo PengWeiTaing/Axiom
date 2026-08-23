@@ -736,8 +736,8 @@ function fitCameraToGraph(force = false) {
   const verticalFov = camera.fov * Math.PI / 180
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect)
   const limitingFov = Math.min(verticalFov, horizontalFov)
-  const distance = Math.max(112, radius / Math.sin(limitingFov / 2) * 0.94)
-  const direction = new Vector3(0.72, 0.46, 1).normalize()
+  const distance = Math.max(78, radius / Math.sin(limitingFov / 2) * 0.6)
+  const direction = new Vector3(0.72, 0.58, 1).normalize()
 
   controls.target.copy(center)
   camera.position.copy(center).add(direction.multiplyScalar(distance))
@@ -751,7 +751,7 @@ function fitCameraToGraph(force = false) {
 function initScene() {
   if (!sceneHost.value || renderer) return
   scene = new Scene()
-  scene.background = new Color(0x08090c)
+  scene.background = new Color(0x090a08)
   graphGroup = new Group()
   scene.add(graphGroup)
 
@@ -948,18 +948,12 @@ function makeDotTexture(): CanvasTexture {
   canvas.height = 64
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    const gradient = ctx.createRadialGradient(30, 29, 1, 32, 32, 27)
+    const gradient = ctx.createRadialGradient(31, 31, 0, 32, 32, 20)
     gradient.addColorStop(0, 'rgba(255,255,255,1)')
-    gradient.addColorStop(0.38, 'rgba(255,255,255,0.94)')
-    gradient.addColorStop(0.62, 'rgba(255,255,255,0.20)')
+    gradient.addColorStop(0.2, 'rgba(255,255,255,0.96)')
+    gradient.addColorStop(0.46, 'rgba(255,255,255,0.18)')
     gradient.addColorStop(1, 'rgba(255,255,255,0)')
     ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, 64, 64)
-
-    const glint = ctx.createRadialGradient(24, 23, 0, 24, 23, 12)
-    glint.addColorStop(0, 'rgba(255,255,255,0.42)')
-    glint.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = glint
     ctx.fillRect(0, 0, 64, 64)
   }
   const texture = new CanvasTexture(canvas)
@@ -975,32 +969,32 @@ function makeEnergyDotTexture(): CanvasTexture {
   if (ctx) {
     ctx.clearRect(0, 0, 96, 96)
 
-    const halo = ctx.createRadialGradient(48, 48, 5, 48, 48, 46)
-    halo.addColorStop(0, 'rgba(255,255,255,0.92)')
-    halo.addColorStop(0.28, 'rgba(255,255,255,0.56)')
-    halo.addColorStop(0.6, 'rgba(255,255,255,0.12)')
+    const halo = ctx.createRadialGradient(48, 48, 2, 48, 48, 40)
+    halo.addColorStop(0, 'rgba(255,255,255,0.78)')
+    halo.addColorStop(0.2, 'rgba(255,255,255,0.26)')
+    halo.addColorStop(0.55, 'rgba(255,255,255,0.055)')
     halo.addColorStop(1, 'rgba(255,255,255,0)')
     ctx.fillStyle = halo
     ctx.fillRect(0, 0, 96, 96)
 
     ctx.save()
     ctx.translate(48, 48)
-    ctx.lineCap = 'round'
+    ctx.lineCap = 'square'
     ctx.globalCompositeOperation = 'lighter'
-    for (let index = 0; index < 4; index += 1) {
-      const radius = 10 + index * 4.6
-      ctx.rotate(0.74 + index * 0.8)
+    for (let index = 0; index < 3; index += 1) {
+      const radius = 10 + index * 5.5
+      ctx.rotate(0.56 + index * 0.94)
       ctx.beginPath()
-      ctx.strokeStyle = `rgba(255,255,255,${0.48 - index * 0.08})`
-      ctx.lineWidth = Math.max(1.1, 3.2 - index * 0.45)
-      ctx.arc(0, 0, radius, 0.05 * Math.PI, (0.92 + index * 0.06) * Math.PI)
+      ctx.strokeStyle = `rgba(255,255,255,${0.31 - index * 0.07})`
+      ctx.lineWidth = 1.15
+      ctx.arc(0, 0, radius, 0.12 * Math.PI, (0.62 + index * 0.08) * Math.PI)
       ctx.stroke()
     }
     ctx.restore()
 
-    const core = ctx.createRadialGradient(44, 42, 0, 44, 42, 17)
+    const core = ctx.createRadialGradient(46, 45, 0, 46, 45, 12)
     core.addColorStop(0, 'rgba(255,255,255,1)')
-    core.addColorStop(0.38, 'rgba(255,255,255,0.82)')
+    core.addColorStop(0.32, 'rgba(255,255,255,0.86)')
     core.addColorStop(1, 'rgba(255,255,255,0)')
     ctx.fillStyle = core
     ctx.fillRect(18, 18, 60, 60)
@@ -1068,27 +1062,27 @@ function scenePoint(node: AtlasNode): Vector3 {
 
 function nodeSize3d(node: AtlasNode): number {
   const active = store.selectedId === node.id || store.hoveredId === node.id
-  const boost = active ? 1.16 : 1
-  if (node.type === 'root') return 4.6 * boost
-  if (node.type === 'lifeline') return (isFallbackNode(node) ? 1.7 : 2.9) * boost
-  if (node.type === 'cluster') return (isFallbackNode(node) ? 1.4 : 2.15) * boost
-  if (node.type === 'decision') return 1.72 * boost
-  if (node.type === 'task' || node.type === 'memory') return 1.5 * boost
-  return 0.82 * boost
+  const boost = (active ? 1.16 : 1) * (viewportWidth.value <= 760 ? 1.42 : 1)
+  if (node.type === 'root') return 3.5 * boost
+  if (node.type === 'lifeline') return (isFallbackNode(node) ? 1.35 : 2.35) * boost
+  if (node.type === 'cluster') return (isFallbackNode(node) ? 1.05 : 1.78) * boost
+  if (node.type === 'decision') return 1.4 * boost
+  if (node.type === 'task' || node.type === 'memory') return 1.22 * boost
+  return 0.7 * boost
 }
 
 function nodeColor(node: AtlasNode): ColorRepresentation {
-  if (isFallbackNode(node)) return 0x46505b
+  if (isFallbackNode(node)) return 0x474943
   const colors: Record<string, number> = {
-    root: 0xf0ad55,
-    lifeline: 0x83c6b9,
-    cluster: 0x8194aa,
-    memory: 0x8592a6,
-    task: 0x7fb29c,
-    decision: 0x9b88ae,
-    item: 0x69727f,
+    root: 0xe1a558,
+    lifeline: 0x86ad9e,
+    cluster: 0x7388ad,
+    memory: 0x8b93a7,
+    task: 0x91b99a,
+    decision: 0x9a83a2,
+    item: 0x77756d,
   }
-  return colors[node.type] || 0x77808f
+  return colors[node.type] || 0x817e75
 }
 
 function nodeEnergyVisible(node: AtlasNode): boolean {
@@ -1101,7 +1095,7 @@ function nodeSpriteColor(
   energy: boolean,
 ): ColorRepresentation {
   if (!energy) return baseColor
-  if (node.type === 'root' || store.selectedId === node.id || store.hoveredId === node.id) return 0xf3ad52
+  if (node.type === 'root' || store.selectedId === node.id || store.hoveredId === node.id) return 0xf0c47f
   return baseColor
 }
 
@@ -1170,8 +1164,11 @@ function nodeOpacity(node: AtlasNode): number {
 
 function edgeOpacity(edge: AtlasEdge): number {
   const hasFocus = Boolean(store.selectedId || store.hoveredId)
-  if (!hasFocus) return edge.edge_class === 'structural' ? Math.min(0.2, edge.opacity + 0.035) : Math.min(edge.opacity, 0.42)
-  return relatedEdgeIds.value.has(edge.id) ? Math.min(0.68, edge.opacity + 0.26) : Math.min(edge.opacity, 0.032)
+  const compactBoost = viewportWidth.value <= 760 ? 0.11 : 0
+  if (!hasFocus) return edge.edge_class === 'structural'
+    ? Math.min(0.36, edge.opacity + 0.055 + compactBoost)
+    : Math.min(edge.opacity + 0.035 + compactBoost, 0.6)
+  return relatedEdgeIds.value.has(edge.id) ? Math.min(0.74, edge.opacity + 0.3) : Math.min(edge.opacity, 0.032)
 }
 
 function labelVisible(node: AtlasNode): boolean {
@@ -1444,9 +1441,9 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
             :key="entry.edge.id"
             :d="localEdgePath(entry)"
             :class="localEdgeClass(entry)"
-            :stroke="entry.edge.edge_class === 'structural' ? 'rgba(154, 164, 174, 0.34)' : `url(#local-grad-${entry.edge.id})`"
-            :stroke-width="entry.role === 'primary' ? Math.min(1.25, Math.max(0.75, entry.edge.width * 0.68)) : Math.min(0.68, Math.max(0.32, entry.edge.width * 0.38))"
-            :stroke-opacity="entry.role === 'primary' ? Math.min(0.52, entry.edge.opacity + 0.1) : Math.min(0.22, entry.edge.opacity * 0.42)"
+            :stroke="entry.edge.edge_class === 'structural' ? 'rgba(154, 164, 174, 0.9)' : `url(#local-grad-${entry.edge.id})`"
+            :stroke-width="entry.role === 'primary' ? Math.min(1.8, Math.max(1.15, entry.edge.width * 0.9)) : Math.min(1, Math.max(0.65, entry.edge.width * 0.58))"
+            :stroke-opacity="entry.role === 'primary' ? Math.min(0.74, Math.max(0.58, entry.edge.opacity + 0.34)) : Math.min(0.3, Math.max(0.16, entry.edge.opacity * 0.8))"
           />
         </g>
         <g class="local-nodes">
@@ -1974,13 +1971,14 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .local-edges path {
   fill: none;
+  vector-effect: non-scaling-stroke;
 }
 
 .local-edges path {
   stroke-linecap: round;
 }
 
-.local-edges path.structural {
+.local-edges path.structural.secondary {
   stroke-dasharray: 4 7;
 }
 
@@ -2436,6 +2434,411 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
   .relation-list {
     margin-top: 14px;
+  }
+}
+</style>
+
+<style scoped>
+/* Ink & Light: the map owns the viewport; controls read like museum captions. */
+.atlas-view,
+.local-atlas {
+  background: #090a08;
+}
+
+.scene-label {
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 480;
+  text-shadow: 0 1px 9px #090a08, 0 0 4px #090a08;
+}
+
+.scene-label.type-root,
+.scene-label.type-lifeline,
+.scene-label.type-cluster {
+  color: var(--text-1);
+}
+
+.scene-label.type-root {
+  color: var(--focus-bright);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.atlas-toolbar {
+  inset: 0;
+  min-height: 0;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.toolbar-title,
+.atlas-tabs,
+.toolbar-actions {
+  position: absolute;
+  top: 24px;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.toolbar-title {
+  left: 28px;
+  gap: 13px;
+  padding: 8px 0 8px 15px;
+  border-left: 1px solid var(--line-warm);
+}
+
+.toolbar-title::after {
+  content: '03';
+  position: absolute;
+  top: -4px;
+  right: -30px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+
+.toolbar-title strong {
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 400;
+}
+
+.toolbar-title small {
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 0;
+  background: var(--focus);
+  box-shadow: 0 0 16px rgba(225, 165, 88, 0.28);
+  transform: rotate(45deg);
+}
+
+.atlas-tabs {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.segmented {
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: rgba(9, 10, 8, 0.48);
+  backdrop-filter: blur(12px);
+}
+
+.segmented button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.segmented button.active {
+  border-color: var(--cobalt);
+  background: rgba(115, 136, 173, 0.09);
+}
+
+.toolbar-actions {
+  right: 28px;
+}
+
+.icon-btn {
+  width: 38px;
+  min-height: 38px;
+  border-color: var(--line-1);
+  border-radius: 50%;
+  background: rgba(9, 10, 8, 0.48);
+  backdrop-filter: blur(12px);
+}
+
+.atlas-footnote {
+  bottom: 24px;
+  left: 28px;
+  gap: 18px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.atlas-footnote::before {
+  content: '';
+  width: 38px;
+  height: 1px;
+  background: var(--cobalt);
+}
+
+.atlas-state {
+  background: rgba(9, 10, 8, 0.9);
+}
+
+.loader-ring {
+  width: 30px;
+  height: 30px;
+  border-width: 1px;
+  border-top-color: var(--focus);
+}
+
+.local-toolbar {
+  top: 24px;
+  right: 414px;
+  left: 28px;
+  width: fit-content;
+  min-height: 50px;
+  gap: 16px;
+  padding: 0 0 0 14px;
+  border: 0;
+  border-left: 1px solid var(--line-warm);
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.local-toolbar strong {
+  max-width: 420px;
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 400;
+}
+
+.local-toolbar span {
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.back-btn {
+  width: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(9, 10, 8, 0.48);
+  backdrop-filter: blur(12px);
+}
+
+.back-btn span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.local-map {
+  width: calc(100% - 390px);
+}
+
+.local-panel {
+  top: 0;
+  width: 390px;
+  padding: 72px 32px 42px;
+  border-left-color: var(--line-2);
+  background: rgba(13, 13, 11, 0.91);
+  backdrop-filter: blur(28px) saturate(105%);
+}
+
+.panel-kicker {
+  color: var(--cobalt);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.local-panel h2 {
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 400;
+}
+
+.summary {
+  margin-top: 14px;
+  line-height: 1.72;
+}
+
+.focus-metrics {
+  padding: 12px 0;
+  border-top: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-1);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.relation-list {
+  margin-top: 28px;
+  border-top-color: var(--line-2);
+}
+
+.relation-row {
+  min-height: 54px;
+  padding: 12px 4px;
+  transition: padding var(--t-base) var(--ease), background var(--t-base) var(--ease);
+}
+
+.relation-row:hover,
+.relation-row.active {
+  padding-right: 8px;
+  padding-left: 8px;
+  background: rgba(242, 237, 225, 0.025);
+}
+
+.relation-row span {
+  color: var(--vermilion);
+}
+
+.relation-row strong {
+  color: var(--cobalt);
+}
+
+.relation-command,
+.relation-editor-title button,
+.relation-cancel-delete {
+  border-radius: 50%;
+}
+
+.local-node .local-core {
+  stroke: rgba(242, 237, 225, 0.24);
+}
+
+.local-node.role-center .local-core,
+.local-node.type-root .local-core {
+  fill: var(--focus);
+  stroke: var(--focus-bright);
+}
+
+.local-node.type-lifeline .local-core { fill: var(--accent); }
+.local-node.type-cluster .local-core { fill: var(--cobalt); }
+.local-node.type-memory .local-core { fill: #8b93a7; }
+.local-node.type-task .local-core { fill: var(--success); }
+.local-node.type-decision .local-core { fill: var(--violet); }
+.local-node.type-item .local-core { fill: #77756d; }
+
+.local-node text {
+  fill: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 9px;
+  stroke: rgba(9, 10, 8, 0.96);
+}
+
+.local-node.role-center text {
+  fill: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+@media (max-width: 760px) {
+  .atlas-toolbar {
+    inset: 0 0 auto;
+    height: 110px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+    min-height: 110px;
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid var(--line-1);
+    background: rgba(9, 10, 8, 0.78);
+    backdrop-filter: blur(16px);
+    pointer-events: auto;
+  }
+
+  .toolbar-title,
+  .atlas-tabs,
+  .toolbar-actions {
+    position: static;
+    transform: none;
+  }
+
+  .toolbar-title {
+    grid-column: 1;
+    grid-row: 1;
+    padding-left: 11px;
+  }
+
+  .toolbar-title::after {
+    display: none;
+  }
+
+  .toolbar-title strong {
+    font-size: 21px;
+  }
+
+  .scene-label {
+    color: var(--text-2);
+    font-size: 10px;
+    text-shadow: 0 1px 8px #090a08, 0 0 5px #090a08;
+  }
+
+  .toolbar-actions {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .atlas-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .atlas-tabs button {
+    flex: 1 0 auto;
+  }
+
+  .local-toolbar {
+    top: 0;
+    right: 0;
+    left: 0;
+    width: auto;
+    min-height: 68px;
+    padding: 10px 14px;
+    border-left: 0;
+    border-bottom: 1px solid var(--line-1);
+    background: rgba(9, 10, 8, 0.82);
+    backdrop-filter: blur(16px);
+  }
+
+  .local-toolbar strong {
+    max-width: calc(100vw - 92px);
+    font-size: 17px;
+  }
+
+  .local-map {
+    width: 100%;
+    height: calc(64% - 68px);
+    margin-top: 68px;
+  }
+
+  .local-panel {
+    top: auto;
+    width: auto;
+    height: 36%;
+    padding: 20px 18px 30px;
+    border-top-color: var(--line-2);
+  }
+
+  .local-atlas.relation-editor-open .local-map {
+    height: calc(48% - 68px);
+  }
+
+  .local-atlas.relation-editor-open .local-panel {
+    height: 52%;
   }
 }
 </style>

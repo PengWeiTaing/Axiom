@@ -7,8 +7,8 @@
   "scope": "/app/legacy",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#060b14",
-  "background_color": "#060b14",
+  "theme_color": "#0a0a09",
+  "background_color": "#0a0a09",
   "icons": [
     {
       "src": "/static/icons/axiom-mark.svg",

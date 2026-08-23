@@ -324,7 +324,7 @@ p {
 }
 
 h1 {
-  font-size: clamp(1.9rem, 3vw, 2.8rem);
+  font-size: 2.6rem;
   font-weight: 700;
 }
 

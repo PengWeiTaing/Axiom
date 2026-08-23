@@ -368,6 +368,7 @@ onMounted(() => {
         <p class="eyebrow">Library</p>
         <h1>资料库</h1>
       </div>
+      <span class="library-index" aria-hidden="true">ARCHIVE / 02</span>
       <div class="topbar-actions">
         <div class="library-pane-switch" aria-label="资料库视图">
           <button
@@ -1083,6 +1084,373 @@ input::placeholder {
 
   .filter-grid {
     grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<style scoped>
+/* Ink & Light: recall is treated as an index room, not a form dashboard. */
+.search-view {
+  width: min(1240px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 58px 0 120px;
+}
+
+.topbar {
+  min-height: 116px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: 30px;
+  margin-bottom: 0;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.topbar .eyebrow {
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+
+.topbar h1 {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 400;
+}
+
+.library-index {
+  align-self: center;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  writing-mode: vertical-rl;
+}
+
+.topbar-actions {
+  align-self: center;
+}
+
+.library-pane-switch {
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
+}
+
+.library-pane-switch button {
+  min-height: 39px;
+  padding: 0 14px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+
+.library-pane-switch button:hover,
+.library-pane-switch button.active {
+  color: var(--text-1);
+  background: transparent;
+  border-bottom-color: var(--accent);
+}
+
+.refresh-btn {
+  min-height: 40px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  padding: 0;
+  width: 40px;
+  justify-content: center;
+}
+
+.refresh-btn span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.query-panel {
+  position: relative;
+  padding: 54px 0 38px;
+  border-bottom-color: var(--line-2);
+}
+
+.query-panel::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  width: 31%;
+  height: 3px;
+  background: var(--accent);
+}
+
+.query-form {
+  gap: 22px;
+}
+
+.query-form > label:first-child {
+  gap: 12px;
+}
+
+.query-form > label:first-child > span {
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.query-form > label:first-child input {
+  min-height: 78px;
+  padding: 0 2px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line-3);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 30px;
+}
+
+.query-form > label:first-child input:focus {
+  border-bottom-color: var(--accent-bright);
+}
+
+.mode-pills {
+  gap: 0;
+}
+
+.mode-pills button {
+  min-width: 102px;
+  min-height: 36px;
+  border-color: var(--line-1);
+  border-radius: 0;
+  background: rgba(242, 237, 225, 0.014);
+}
+
+.mode-pills button + button {
+  border-left: 0;
+}
+
+.mode-pills button.active,
+.mode-pills button:hover {
+  border-color: var(--line-2);
+  color: var(--text-1);
+  background: var(--accent-dim);
+}
+
+.filter-grid {
+  padding-top: 18px;
+  border-top: 1px solid var(--line-1);
+}
+
+.filter-grid input,
+.filter-grid select {
+  min-height: 42px;
+  border-radius: 0;
+  background: rgba(242, 237, 225, 0.018);
+}
+
+.reset-filter-btn {
+  justify-self: start;
+  padding: 0 12px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.metrics {
+  gap: 0;
+  margin-top: 30px;
+  border-top: 1px solid var(--line-1);
+}
+
+.metrics article {
+  min-width: 130px;
+  min-height: 58px;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-right: 1px solid var(--line-1);
+}
+
+.metrics article:first-child {
+  padding-left: 0;
+}
+
+.metrics strong {
+  color: var(--accent-bright);
+  font-size: 20px;
+}
+
+.panel-head {
+  min-height: 94px;
+  margin-top: 0;
+  padding: 30px 0 18px;
+  border-bottom-color: var(--line-2);
+}
+
+.panel-head .eyebrow {
+  margin-bottom: 6px;
+  color: var(--cobalt);
+}
+
+.panel-head h2 {
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 400;
+}
+
+.result-mode {
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  padding: 3px 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.result-groups {
+  gap: 42px;
+  margin-top: 30px;
+}
+
+.result-group header {
+  min-height: 38px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.result-group h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.result-row {
+  min-height: 78px;
+  border-radius: 0;
+  border-bottom-color: var(--line-1);
+  transition: padding var(--t-base) var(--ease), background var(--t-base) var(--ease);
+}
+
+.result-row:hover {
+  padding-right: 10px;
+  padding-left: 10px;
+  background: rgba(242, 237, 225, 0.02);
+}
+
+.result-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  transform: rotate(45deg);
+  box-shadow: none;
+}
+
+.result-copy strong {
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 480;
+}
+
+.batch-actions {
+  padding: 16px 0;
+  border-top: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-1);
+  background: transparent;
+}
+
+.batch-actions button {
+  border-radius: 0;
+  background: rgba(242, 237, 225, 0.018);
+}
+
+.empty-state {
+  min-height: 220px;
+  display: grid;
+  place-items: center start;
+  padding: 0;
+  color: var(--text-4);
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+@media (max-width: 900px) {
+  .search-view {
+    width: min(100% - 56px, 840px);
+  }
+
+  .filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .search-view {
+    width: calc(100% - 36px);
+    padding: 28px 0 calc(var(--app-mobile-nav-height) + 44px);
+  }
+
+  .topbar {
+    min-height: 146px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    padding-bottom: 22px;
+  }
+
+  .topbar h1 {
+    font-size: 31px;
+  }
+
+  .library-index {
+    display: none;
+  }
+
+  .topbar-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .library-pane-switch {
+    flex: 1;
+  }
+
+  .library-pane-switch button {
+    flex: 1;
+  }
+
+  .query-panel {
+    padding-top: 38px;
+  }
+
+  .query-form > label:first-child input {
+    min-height: 66px;
+    font-size: 23px;
+  }
+
+  .mode-pills button {
+    min-width: 0;
+  }
+
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics {
+    width: 100%;
+  }
+
+  .metrics article {
+    min-width: 0;
+    flex: 1;
+    padding: 12px 10px;
+  }
+
+  .metrics article:first-child {
+    padding-left: 0;
+  }
+
+  .result-row {
+    min-height: 86px;
   }
 }
 </style>

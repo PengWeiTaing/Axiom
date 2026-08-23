@@ -208,29 +208,40 @@ defineExpose({ show, close });
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgba(7, 9, 13, 0.7);
-  backdrop-filter: blur(12px);
+  background: rgba(8, 8, 7, 0.84);
+  backdrop-filter: blur(18px) saturate(90%);
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 22vh;
+  padding-top: 17vh;
 }
 
 .quick-card {
-  width: min(560px, 92vw);
-  background: var(--glass-bg);
+  position: relative;
+  width: min(720px, calc(100vw - 64px));
+  background: rgba(14, 14, 12, 0.72);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-3);
-  padding: var(--s-5);
-  box-shadow: var(--shadow-2);
+  border-top: 1px solid var(--line-warm);
+  border-bottom: 1px solid var(--line-2);
+  padding: 30px 0 24px;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.42);
+}
+
+.quick-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: 0;
+  width: 74px;
+  height: 3px;
+  background: var(--focus);
 }
 
 .quick-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--s-4);
+  margin-bottom: 34px;
 }
 
 .quick-head > div {
@@ -241,8 +252,9 @@ defineExpose({ show, close });
 
 .quick-head strong {
   color: var(--text-1);
-  font-size: var(--fs-4);
-  font-weight: 560;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 400;
 }
 
 .quick-head .eyebrow {
@@ -255,7 +267,7 @@ defineExpose({ show, close });
   height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 5px;
+  border-radius: 50%;
   color: var(--text-4);
 }
 
@@ -269,11 +281,13 @@ defineExpose({ show, close });
   background: transparent;
   border: none;
   outline: none;
-  font-size: var(--fs-6);
+  min-height: 178px;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
   color: var(--text-1);
   resize: none;
-  font-family: inherit;
-  line-height: var(--lh-tight);
+  line-height: 1.42;
 }
 
 .quick-card textarea::placeholder {
@@ -281,13 +295,15 @@ defineExpose({ show, close });
 }
 
 .bar {
-  margin-top: var(--s-4);
+  margin-top: 24px;
   display: flex;
   align-items: center;
   gap: var(--s-3);
   font-size: var(--fs-2);
   color: var(--text-3);
-  min-height: 36px;
+  min-height: 44px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-1);
 }
 
 .file-input {
@@ -296,12 +312,12 @@ defineExpose({ show, close });
 
 .attach-button,
 .submit-button {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 50%;
   color: var(--text-3);
 }
 
@@ -312,8 +328,16 @@ defineExpose({ show, close });
 
 .submit-button {
   margin-left: auto;
+  border: 1px solid var(--line-warm);
+  background: var(--focus-dim);
+  color: var(--focus-bright);
+  transition: transform var(--t-base) var(--ease), background var(--t-base) var(--ease), color var(--t-base) var(--ease);
+}
+
+.submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
   background: var(--focus);
-  color: #111318;
+  color: var(--surface-0);
 }
 
 .submit-button:disabled {
@@ -335,8 +359,7 @@ defineExpose({ show, close });
   align-items: center;
   gap: 8px;
   padding: 0 7px 0 10px;
-  border: 1px solid var(--line-1);
-  border-radius: 5px;
+  border-bottom: 1px solid var(--line-1);
   color: var(--text-3);
   font-size: var(--fs-2);
 }
@@ -371,7 +394,7 @@ defineExpose({ show, close });
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--line-2);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-2);
   font-size: var(--fs-3);
   color: var(--text-1);
   box-shadow: var(--shadow-1);
@@ -394,16 +417,17 @@ defineExpose({ show, close });
 @media (max-width: 640px) {
   .quick-overlay {
     align-items: flex-end;
-    padding: 0 0 calc(var(--app-mobile-nav-height) + 8px);
+    padding: 0 14px calc(var(--app-mobile-nav-height) + 14px);
   }
 
   .quick-card {
-    width: calc(100vw - 16px);
-    padding: var(--s-4);
+    width: 100%;
+    padding: 24px 0 20px;
   }
 
   .quick-card textarea {
-    font-size: 18px;
+    min-height: 150px;
+    font-size: 23px;
   }
 }
 

@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useModeStore } from '@/stores/mode';
 import KeyGate from '@/components/KeyGate.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
+import AxiomAtmosphere from '@/components/AxiomAtmosphere.vue';
 import QuickCapture from '@/components/QuickCapture.vue';
 import TodayView from '@/views/TodayView.vue';
 
@@ -40,8 +41,9 @@ onMounted(async () => {
 <template>
   <KeyGate v-if="!auth.ready" />
   <template v-else>
+    <AxiomAtmosphere :mode="mode.mode" />
     <AppNavigation @capture="openCapture" />
-    <div class="app-stage" :class="{ 'atlas-stage': mode.mode === 'atlas' }">
+    <div class="app-stage" :class="[`mode-${mode.mode}`, { 'atlas-stage': mode.mode === 'atlas' }]">
       <Transition name="mode" mode="out-in">
         <TodayView
           v-if="mode.mode === 'today' || mode.mode === 'capture'"
@@ -76,27 +78,28 @@ onMounted(async () => {
   --atlas-shell-bottom: 0px;
   min-height: 100vh;
   margin-left: var(--app-rail-width);
+  position: relative;
+  z-index: 1;
 }
 
 .app-stage.atlas-stage {
   min-height: 0;
 }
 
-/* 模式切换过渡：轻微缩放 + 渐隐，传达"切到另一种视角" */
 .mode-enter-active,
 .mode-leave-active {
-  transition: opacity 240ms var(--ease),
-              transform 240ms var(--ease);
+  transition: opacity var(--t-slow) var(--ease),
+              transform var(--t-slow) var(--ease);
 }
 
 .mode-enter-from {
   opacity: 0;
-  transform: scale(1.02);
+  transform: translateY(10px);
 }
 
 .mode-leave-to {
   opacity: 0;
-  transform: scale(0.98);
+  transform: translateY(-6px);
 }
 
 @media (max-width: 760px) {

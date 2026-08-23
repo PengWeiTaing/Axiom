@@ -384,6 +384,7 @@ watch(() => props.revision, load);
         <p class="date">{{ dateLabel }}</p>
         <h1>{{ greeting }}</h1>
       </div>
+      <span class="day-mark" aria-hidden="true">AXIOM / NOW</span>
       <button class="icon-button" type="button" title="刷新" aria-label="刷新此刻" :disabled="loading" @click="load">
         <RefreshCw :size="18" :class="{ spinning: loading }" />
       </button>
@@ -392,6 +393,7 @@ watch(() => props.revision, load);
     <p v-if="error" class="notice" role="alert">{{ error }}</p>
 
     <section class="focus-section" aria-labelledby="focus-title">
+      <span class="focus-number" aria-hidden="true">01</span>
       <div class="section-kicker">
         <span class="focus-dot" />
         <span>当前焦点</span>
@@ -873,7 +875,7 @@ h2 {
 
 .focus-copy h2,
 .empty-focus h2 {
-  font-size: clamp(25px, 4vw, 38px);
+  font-size: 38px;
   line-height: 1.22;
   overflow-wrap: anywhere;
 }
@@ -1647,6 +1649,533 @@ h2 {
 
   .today-columns {
     padding-top: 32px;
+  }
+}
+</style>
+
+<style scoped>
+/* Ink & Light: the Now surface behaves like a scroll, not a dashboard. */
+.today-view {
+  width: min(1180px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 58px 0 128px;
+}
+
+.today-header {
+  min-height: 116px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 40px;
+  align-items: start;
+  gap: 28px;
+  margin-bottom: 0;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.today-header .date {
+  margin-bottom: 9px;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.today-header h1 {
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1.12;
+}
+
+.day-mark {
+  align-self: center;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  writing-mode: vertical-rl;
+}
+
+.today-header .icon-button {
+  width: 38px;
+  height: 38px;
+  border-color: var(--line-1);
+  border-radius: 50%;
+  background: rgba(242, 237, 225, 0.018);
+}
+
+.focus-section {
+  position: relative;
+  min-height: 470px;
+  display: grid;
+  grid-template-columns: 126px minmax(0, 1fr);
+  align-content: center;
+  justify-content: stretch;
+  column-gap: 44px;
+  padding: 64px 0 58px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.focus-section::before {
+  content: '';
+  position: absolute;
+  top: 64px;
+  bottom: 58px;
+  left: 125px;
+  width: 1px;
+  background: var(--line-warm);
+}
+
+.focus-section::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  width: 24%;
+  height: 3px;
+  background: var(--focus);
+}
+
+.focus-number {
+  position: absolute;
+  top: 58px;
+  right: 0;
+  color: rgba(242, 237, 225, 0.055);
+  font-family: var(--font-display);
+  font-size: 96px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.section-kicker {
+  grid-column: 1;
+  grid-row: 1 / span 5;
+  align-self: start;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 9px 0 0;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.focus-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: var(--focus);
+  box-shadow: 0 0 18px rgba(225, 165, 88, 0.32);
+  transform: rotate(45deg);
+  animation: focus-breathe 3.2s var(--ease) infinite alternate;
+}
+
+.focus-copy,
+.focus-goal,
+.focus-footer,
+.empty-focus,
+.focus-loading {
+  grid-column: 2;
+}
+
+.focus-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 850px;
+}
+
+.focus-reason {
+  margin-bottom: 14px;
+  color: var(--focus-bright);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.focus-copy h2,
+.empty-focus h2 {
+  max-width: 920px;
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 50px;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.focus-copy p,
+.empty-focus p {
+  max-width: 680px;
+  margin-top: 20px;
+  color: var(--text-3);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.focus-goal {
+  width: fit-content;
+  margin-top: 22px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line-2);
+  color: var(--text-3);
+}
+
+.focus-source {
+  margin-top: 10px;
+}
+
+.focus-footer {
+  align-items: flex-end;
+  margin-top: 44px;
+}
+
+.task-meta {
+  max-width: 680px;
+  gap: 8px 24px;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.complete-button,
+.capture-button {
+  min-height: 44px;
+  padding: 0 17px;
+  border: 1px solid color-mix(in srgb, var(--success) 42%, transparent);
+  border-radius: var(--r-2);
+  background: rgba(145, 185, 154, 0.035);
+  color: var(--success);
+}
+
+.complete-button:hover:not(:disabled),
+.capture-button:hover {
+  background: var(--success);
+  color: var(--surface-0);
+}
+
+.feedback-strip {
+  min-height: 82px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line-1);
+  border-left: 2px solid var(--success);
+  background: rgba(145, 185, 154, 0.035);
+}
+
+.week-section {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  column-gap: 44px;
+  padding: 52px 0 48px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.week-header {
+  grid-column: 1;
+  align-self: start;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 0;
+}
+
+.week-heading .eyebrow,
+.section-header .eyebrow {
+  margin-bottom: 8px;
+  color: var(--focus);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.week-title-row {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.week-title-row h2,
+.section-header h2 {
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 400;
+}
+
+.week-header-actions {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.week-button-group {
+  flex-wrap: wrap;
+}
+
+.week-edit-button {
+  border-radius: var(--r-2);
+  background: rgba(242, 237, 225, 0.018);
+}
+
+.week-list,
+.week-empty,
+.week-candidates,
+.week-review {
+  grid-column: 2;
+  margin-top: 0;
+}
+
+.week-list,
+.week-candidate-list {
+  border-top-color: var(--line-2);
+}
+
+.week-row,
+.week-candidate-row {
+  min-height: 66px;
+}
+
+.week-task,
+.week-candidate-task {
+  min-height: 66px;
+}
+
+.week-state {
+  color: var(--focus);
+}
+
+.week-row:hover,
+.week-candidate-row:hover {
+  background: rgba(242, 237, 225, 0.018);
+}
+
+.week-review {
+  margin-top: 30px;
+}
+
+.status-strip {
+  min-height: 68px;
+  gap: 12px 34px;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.today-columns {
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  gap: 0;
+  padding: 56px 0 16px;
+}
+
+.column-section:first-child {
+  padding-right: 42px;
+}
+
+.column-section + .column-section {
+  padding-left: 42px;
+  border-left: 1px solid var(--line-1);
+}
+
+.section-header {
+  min-height: 58px;
+  margin-bottom: 12px;
+}
+
+.row-list,
+.recent-list {
+  border-top-color: var(--line-2);
+}
+
+.content-row,
+.recent-row {
+  min-height: 70px;
+  transition: padding var(--t-base) var(--ease), background var(--t-base) var(--ease);
+}
+
+.content-row:hover,
+.recent-row:hover {
+  padding-right: 8px;
+  padding-left: 8px;
+  background: rgba(242, 237, 225, 0.02);
+}
+
+.row-icon {
+  color: var(--text-5);
+}
+
+.task-icon { color: var(--info); }
+.nudge-icon { color: var(--focus); }
+.memory-icon { color: var(--success); }
+.decision-icon { color: var(--violet); }
+
+.row-copy strong {
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 480;
+}
+
+.recent-section {
+  margin-top: 48px;
+  padding-top: 46px;
+  border-top-color: var(--line-2);
+}
+
+@keyframes focus-breathe {
+  from { opacity: 0.52; transform: rotate(45deg) scale(0.82); }
+  to { opacity: 1; transform: rotate(45deg) scale(1); }
+}
+
+@media (max-width: 980px) {
+  .today-view {
+    width: min(100% - 56px, 920px);
+  }
+
+  .focus-section {
+    grid-template-columns: 96px minmax(0, 1fr);
+    column-gap: 32px;
+  }
+
+  .focus-section::before {
+    left: 95px;
+  }
+
+  .focus-copy h2,
+  .empty-focus h2 {
+    font-size: 42px;
+  }
+
+  .week-section {
+    grid-template-columns: 180px minmax(0, 1fr);
+    column-gap: 32px;
+  }
+}
+
+@media (max-width: 800px) {
+  .week-section {
+    display: block;
+  }
+
+  .week-header {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .week-header-actions {
+    align-items: flex-end;
+  }
+
+  .today-columns {
+    grid-template-columns: 1fr;
+    gap: 42px;
+  }
+
+  .column-section:first-child,
+  .column-section + .column-section {
+    padding-right: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .today-view {
+    width: calc(100% - 36px);
+    padding: 28px 0 calc(var(--app-mobile-nav-height) + 42px);
+  }
+
+  .today-header {
+    min-height: 96px;
+    grid-template-columns: minmax(0, 1fr) 34px;
+    gap: 12px;
+    padding-bottom: 24px;
+  }
+
+  .today-header h1 {
+    font-size: 31px;
+  }
+
+  .day-mark {
+    display: none;
+  }
+
+  .today-header .icon-button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .focus-section {
+    min-height: 430px;
+    display: block;
+    padding: 42px 0 38px 20px;
+  }
+
+  .focus-section::before {
+    top: 42px;
+    bottom: 38px;
+    left: 0;
+  }
+
+  .focus-section::after {
+    width: 42%;
+  }
+
+  .focus-number {
+    top: 38px;
+    font-size: 68px;
+  }
+
+  .section-kicker {
+    flex-direction: row;
+    align-items: center;
+    margin: 0 0 24px;
+  }
+
+  .focus-copy h2,
+  .empty-focus h2 {
+    padding-right: 4px;
+    font-size: 32px;
+    line-height: 1.26;
+  }
+
+  .focus-copy p,
+  .empty-focus p {
+    font-size: 14px;
+  }
+
+  .focus-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-top: 34px;
+  }
+
+  .complete-button,
+  .capture-button {
+    align-self: flex-start;
+  }
+
+  .week-section {
+    padding: 42px 0 38px;
+  }
+
+  .week-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .week-header-actions {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .status-strip {
+    padding: 13px 0;
+  }
+
+  .today-columns {
+    padding-top: 42px;
+  }
+
+  .recent-section {
+    margin-top: 34px;
   }
 }
 </style>
