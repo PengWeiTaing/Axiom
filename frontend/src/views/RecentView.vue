@@ -270,7 +270,7 @@ onMounted(loadOverview);
               </button>
               <button
                 type="button"
-                :disabled="!groupActionItem(group) || actionBusyId === groupActionItem(group)?.id"
+                :disabled="!groupActionItem(group) || actionBusyId !== null"
                 @click="markReadyFromGroup(group)"
               >
                 {{ actionBusyId === groupActionItem(group)?.id ? '处理中' : '标记就绪' }}
@@ -391,7 +391,7 @@ onMounted(loadOverview);
             <button
               v-if="item.processing_override === 'ready'"
               type="button"
-              :disabled="actionBusyId === item.id"
+              :disabled="actionBusyId !== null"
               @click="markItemPending(item)"
             >
               {{ actionBusyId === item.id ? '处理中' : '退回待处理' }}

@@ -113,6 +113,8 @@ def main() -> None:
             semantic = [edge for edge in data["edges"] if edge["edge_class"] == "semantic"]
             check("semantic edge visible", len(semantic) == 1, str(semantic))
             check("semantic evidence", bool(semantic[0].get("evidence")), str(semantic[0]))
+            check("semantic evidence items", len(semantic[0].get("evidence_items", [])) == 1, str(semantic[0]))
+            check("semantic status", semantic[0].get("status") == "accepted", str(semantic[0]))
             check("semantic strength", semantic[0]["strength"] >= 0.9, str(semantic[0]))
             check("hidden nodes", data["view"]["hidden_nodes"] >= 4, str(data["view"]))
             check("layout version", data["view"].get("layout") == "semantic_shell_sector_v2", str(data["view"]))

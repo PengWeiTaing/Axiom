@@ -20,6 +20,13 @@ def main() -> int:
         "selectedLocalRelation",
         'data-testid="atlas-3d-scene"',
         'data-testid="local-atlas-2d"',
+        'data-testid="relation-create"',
+        'data-testid="relation-editor"',
+        'data-testid="relation-accept"',
+        'data-testid="relation-delete"',
+        "canGovernRelation(selectedLocalRelation)",
+        "height: calc(66% - 64px)",
+        "height: calc(50% - 64px)",
     )
     for fragment in required:
         if fragment not in text:
@@ -32,6 +39,7 @@ def main() -> int:
         'class="zoom-range"',
         'viewBox="-400 -270 800 540"',
         "3D Skeleton Atlas",
+        "AssociationEditDialog",
     )
     for fragment in retired:
         if fragment in text:

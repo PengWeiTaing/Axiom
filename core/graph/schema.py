@@ -115,7 +115,9 @@ def make_edge(
     strength: float,
     confidence: float,
     evidence: str = "",
+    evidence_items: list[dict[str, Any]] | None = None,
     generated_by: str = "rule",
+    status: str | None = None,
     visible_by_default: bool = False,
     layer_delta: int = 0,
 ) -> dict[str, Any]:
@@ -141,7 +143,9 @@ def make_edge(
         "confidence": round(confidence_f, 4),
         "layer_delta": abs(int(layer_delta or 0)),
         "evidence": evidence or "",
+        "evidence_items": evidence_items or [],
         "generated_by": generated_by,
+        "status": status,
         "visible_by_default": bool(visible_by_default),
         "distance": _edge_distance(abs(int(layer_delta or 0)), strength_f),
         "width": round(width, 3),
@@ -175,4 +179,3 @@ def _edge_distance(layer_delta: int, strength: float) -> float:
     else:
         base = 180.0
     return round(base * (1.2 - max(0.0, min(1.0, strength))), 2)
-

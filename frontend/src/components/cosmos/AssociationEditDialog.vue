@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useDocumentEventListener } from '@/composables/useEventListener'
+import type { CosmosRelationType } from '@/cosmos/types'
 
 export interface AssocEvidence {
   type: string
@@ -25,15 +26,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'cancel'): void
   (e: 'create', data: {
-    from: string; to: string; relation_type: string; confidence: number; evidence: AssocEvidence[]
+    from: string; to: string; relation_type: CosmosRelationType; confidence: number; evidence: AssocEvidence[]
   }): void
   (e: 'update', data: {
-    association_id: string; relation_type?: string; confidence?: number; evidence?: AssocEvidence[]
+    association_id: string; relation_type?: CosmosRelationType; confidence?: number; evidence?: AssocEvidence[]
   }): void
   (e: 'delete', assocId: string): void
 }>()
 
-const relationType = ref(props.existing?.relation_type || 'manual')
+const relationType = ref<CosmosRelationType>((props.existing?.relation_type as CosmosRelationType) || 'manual')
 const confidence = ref(props.existing?.confidence ?? 0.7)
 const evidence = reactive<AssocEvidence[]>(
   props.existing?.evidence?.length
@@ -44,10 +45,15 @@ const isNew = !props.existing
 const showDeleteConfirm = ref(false)
 
 const relationOptions = [
+  { value: 'same_topic', label: '同主题' },
   { value: 'co_occurrence', label: '共现' },
   { value: 'causal', label: '因果' },
   { value: 'tension', label: '张力' },
   { value: 'derived_from', label: '衍生' },
+  { value: 'supports', label: '支持' },
+  { value: 'contradicts', label: '冲突' },
+  { value: 'prerequisite', label: '前置' },
+  { value: 'next_action', label: '下一步' },
   { value: 'manual', label: '人工标注' },
 ]
 

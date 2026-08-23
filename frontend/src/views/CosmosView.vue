@@ -5,7 +5,7 @@ import { useCosmosStore } from '@/stores/cosmos'
 import { initScene, createAssociationLines, fadeNodes, resetNodeAlpha, updateNodePositions, applyConstellationOpacities, ghostExcept, cssVar, addHalo, removeHalo, highlightPaths, clearPathHighlight, clearPathDecorations, addPathStepLabels, PATH_PALETTE } from '@/cosmos/scene'
 import type { PathHighlight3D } from '@/cosmos/scene'
 import { tweenCamera, updateTween } from '@/cosmos/camera'
-import type { CosmosState } from '@/cosmos/types'
+import type { CosmosAssociationEvidence, CosmosRelationType, CosmosState } from '@/cosmos/types'
 import type { LayoutNode } from '@/cosmos/layout'
 import { RADII, computeFocusLayout } from '@/cosmos/layout'
 import * as THREE from 'three'
@@ -757,16 +757,16 @@ function onContextAssociateTo(target: ContextMenuTarget) {
 }
 
 async function onAssocCreate(data: {
-  from: string; to: string; relation_type: string; confidence: number
-  evidence: { type: string; excerpt: string; weight: number }[]
+  from: string; to: string; relation_type: CosmosRelationType; confidence: number
+  evidence: CosmosAssociationEvidence[]
 }) {
   await store.createAssoc(data)
   store.closeEditAssoc()
 }
 
 async function onAssocUpdate(data: {
-  association_id: string; relation_type?: string; confidence?: number
-  evidence?: { type: string; excerpt: string; weight: number }[]
+  association_id: string; relation_type?: CosmosRelationType; confidence?: number
+  evidence?: CosmosAssociationEvidence[]
 }) {
   await store.updateAssoc(data.association_id, {
     relation_type: data.relation_type,

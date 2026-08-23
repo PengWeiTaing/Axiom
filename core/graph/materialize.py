@@ -326,7 +326,8 @@ def _load_semantic_edges(
             continue
         confidence = float(row["confidence"] or 0.0)
         layer_delta = abs((node_layers.get(source) or 4) - (node_layers.get(target) or 4))
-        evidence = _evidence_text(row["evidence"]) or "由现有 associations 表映射，暂无详细证据。"
+        evidence_items = _evidence_items(row["evidence"], confidence)
+        evidence = evidence_items[0]["excerpt"] if evidence_items else ""
         edges.append(
             make_edge(
                 edge_id=f"assoc:{row['id']}",
@@ -337,7 +338,9 @@ def _load_semantic_edges(
                 strength=confidence,
                 confidence=confidence,
                 evidence=evidence,
+                evidence_items=evidence_items,
                 generated_by="associations",
+                status=row["status"],
                 visible_by_default=confidence >= 0.65,
                 layer_delta=layer_delta,
             )
@@ -417,19 +420,31 @@ def _decision_weight(row: sqlite3.Row) -> float:
     return min(1.0, base + _recency_score(row["created_at"]))
 
 
-def _evidence_text(raw: str | None) -> str:
+def _evidence_items(raw: str | None, fallback_weight: float) -> list[dict[str, Any]]:
     if not raw:
-        return ""
+        return []
     try:
         parsed = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
-        return str(raw)[:160]
-    if isinstance(parsed, list):
-        for item in parsed:
-            if isinstance(item, dict):
-                excerpt = item.get("excerpt") or item.get("text") or item.get("evidence")
-                if excerpt:
-                    return str(excerpt)[:160]
-    if isinstance(parsed, dict):
-        return str(parsed.get("excerpt") or parsed.get("text") or parsed)[:160]
-    return str(parsed)[:160]
+        text = str(raw).strip()
+        return [{"type": "legacy", "excerpt": text[:240], "weight": fallback_weight}] if text else []
+    candidates = parsed if isinstance(parsed, list) else [parsed]
+    evidence: list[dict[str, Any]] = []
+    for item in candidates[:5]:
+        if isinstance(item, dict):
+            excerpt = item.get("excerpt") or item.get("text") or item.get("evidence")
+            item_type = str(item.get("type") or "evidence")[:40]
+            raw_weight = item.get("weight", fallback_weight)
+        else:
+            excerpt = item
+            item_type = "evidence"
+            raw_weight = fallback_weight
+        text = str(excerpt or "").strip()
+        if not text:
+            continue
+        try:
+            weight = max(0.0, min(1.0, float(raw_weight)))
+        except (TypeError, ValueError):
+            weight = fallback_weight
+        evidence.append({"type": item_type, "excerpt": text[:240], "weight": round(weight, 4)})
+    return evidence

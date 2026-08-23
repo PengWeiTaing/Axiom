@@ -1,5 +1,6 @@
 """Cosmos 关联自动生成 — 规则初筛 + LLM 分类."""
 import json
+import math
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -17,6 +18,7 @@ from core._common import (
     require_key,
 )
 from core.routes.cosmos import PREFIX_TO_TABLE, entity_id
+from core.audit import write_audit_log
 
 SYSTEM_PROMPT = """你是个人知识图谱的关联分类器。对每对 entity，判断关系类型：
 - co_occurrence: 同主题/同场景/同时间段
@@ -34,6 +36,165 @@ confidence 范围 0-1。evidence 是 1 句简短摘录（≤40 字），说明�
 BATCH_SIZE = 20
 SCORE_THRESHOLD = 0.5
 MAX_PER_LIFELINE = 30
+
+ENTITY_TABLES = {kind: table for kind, table in PREFIX_TO_TABLE.items() if kind != "lifeline"}
+GENERATED_RELATION_TYPES = frozenset({"co_occurrence", "causal", "tension", "derived_from"})
+RELATION_TYPES = frozenset({
+    *GENERATED_RELATION_TYPES,
+    "same_topic",
+    "supports",
+    "contradicts",
+    "prerequisite",
+    "next_action",
+    "manual",
+})
+ASSOCIATION_STATUSES = frozenset({"pending", "accepted", "rejected"})
+
+
+class AssociationValidationError(ValueError):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def _parse_entity_ref(raw: object, field: str) -> tuple[str, str]:
+    value = str(raw or "").strip()
+    if ":" not in value:
+        raise AssociationValidationError(
+            "invalid_entity_ref",
+            f"{field} 格式应为 kind:id（如 task:7）",
+        )
+    kind, raw_id = (part.strip() for part in value.split(":", 1))
+    if kind not in ENTITY_TABLES or not raw_id:
+        allowed = "、".join(sorted(ENTITY_TABLES))
+        raise AssociationValidationError(
+            "invalid_entity_ref",
+            f"{field} 只支持 {allowed} 的真实对象",
+        )
+    return kind, raw_id
+
+
+def _parse_relation_type(value: object) -> str:
+    relation_type = str(value or "").strip()
+    if relation_type not in RELATION_TYPES:
+        raise AssociationValidationError("invalid_relation_type", "不支持的 relation_type")
+    return relation_type
+
+
+def _parse_status(value: object, *, review: bool = False) -> str:
+    status = str(value or "").strip()
+    allowed = {"accepted", "rejected"} if review else ASSOCIATION_STATUSES
+    if status not in allowed:
+        expected = "accepted 或 rejected" if review else "pending、accepted 或 rejected"
+        raise AssociationValidationError("invalid_status", f"status 必须是 {expected}")
+    return status
+
+
+def _parse_confidence(value: object) -> float:
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        raise AssociationValidationError("invalid_confidence", "confidence 必须是 0 到 1 的数字") from None
+    if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+        raise AssociationValidationError("invalid_confidence", "confidence 必须在 0 到 1 之间")
+    return round(confidence, 4)
+
+
+def _normalize_evidence(value: object, fallback_weight: float) -> list[dict]:
+    if not isinstance(value, list):
+        raise AssociationValidationError("invalid_evidence", "evidence 必须是证据数组")
+    normalized: list[dict] = []
+    for item in value[:5]:
+        if isinstance(item, dict):
+            excerpt = str(item.get("excerpt") or "").strip()
+            evidence_type = str(item.get("type") or "manual_note").strip()[:40]
+            weight = _parse_confidence(item.get("weight", fallback_weight))
+        else:
+            excerpt = str(item or "").strip()
+            evidence_type = "manual_note"
+            weight = fallback_weight
+        if excerpt:
+            normalized.append({
+                "type": evidence_type or "manual_note",
+                "excerpt": excerpt[:240],
+                "weight": weight,
+            })
+    if not normalized:
+        raise AssociationValidationError("missing_evidence", "关系至少需要一条非空证据")
+    return normalized
+
+
+def _decode_evidence(raw: object) -> list[dict]:
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(str(raw))
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _association_payload(row, *, status: str | None = None) -> dict:
+    return {
+        "id": row["id"],
+        "from": entity_id(row["from_kind"], row["from_id"]),
+        "to": entity_id(row["to_kind"], row["to_id"]),
+        "relation_type": row["relation_type"],
+        "confidence": row["confidence"],
+        "status": status or row["status"],
+        "evidence": _decode_evidence(row["evidence"]),
+    }
+
+
+def _entity_exists(conn, kind: str, raw_id: str) -> bool:
+    table = ENTITY_TABLES[kind]
+    return conn.execute(f"SELECT 1 FROM {table} WHERE id = ?", (raw_id,)).fetchone() is not None
+
+
+def _association_exists(conn, from_kind: str, from_id: str, to_kind: str, to_id: str) -> bool:
+    return conn.execute(
+        """
+        SELECT 1 FROM associations
+        WHERE (from_kind = ? AND from_id = ? AND to_kind = ? AND to_id = ?)
+           OR (from_kind = ? AND from_id = ? AND to_kind = ? AND to_id = ?)
+        LIMIT 1
+        """,
+        (from_kind, from_id, to_kind, to_id, to_kind, to_id, from_kind, from_id),
+    ).fetchone() is not None
+
+
+def _normalize_llm_results(results: object, batch_start: int, batch_size: int) -> list[dict]:
+    """把批次内 pair_index 映射为全局候选索引，丢弃不可治理的弱结果。"""
+    if not isinstance(results, list):
+        return []
+    normalized: list[dict] = []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        try:
+            pair_index = int(result.get("pair_index", -1))
+        except (TypeError, ValueError):
+            continue
+        relation_type = str(result.get("relation_type") or "none").strip()
+        evidence = str(result.get("evidence") or "").strip()[:120]
+        if pair_index < 1 or pair_index > batch_size:
+            continue
+        if relation_type not in GENERATED_RELATION_TYPES or not evidence:
+            continue
+        try:
+            confidence = float(result.get("confidence", 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        if not math.isfinite(confidence):
+            confidence = 0.5
+        normalized.append({
+            "candidate_index": batch_start + pair_index - 1,
+            "relation_type": relation_type,
+            "confidence": round(max(0.0, min(1.0, confidence)), 4),
+            "evidence": evidence,
+        })
+    return normalized
 
 
 # === 文本提取 ===
@@ -278,24 +439,25 @@ def generate_associations(lifeline_id: str | None = None, max_candidates: int = 
                 if raw.startswith("```"):
                     raw = raw.split("\n", 1)[-1].rsplit("\n```", 1)[0]
                 results = json.loads(raw)
-                all_results.extend(results)
+                all_results.extend(_normalize_llm_results(results, batch_start, len(batch)))
             except Exception as exc:
                 batch_errors.append(f"batch {batches_sent}: {exc}")
                 continue  # fail-fast per batch, continue remaining
 
         # 6. 写入 associations
         generated: list[dict] = []
+        generated_candidate_indexes: set[int] = set()
         for r in all_results:
-            pair_idx = r.get("pair_index", -1)
-            rel_type = r.get("relation_type", "none")
-            if rel_type == "none" or pair_idx < 1 or pair_idx > len(selected):
+            candidate_index = r["candidate_index"]
+            if candidate_index in generated_candidate_indexes or candidate_index >= len(selected):
                 continue
-
-            candidate = selected[pair_idx - 1]
+            generated_candidate_indexes.add(candidate_index)
+            rel_type = r["relation_type"]
+            candidate = selected[candidate_index]
             a = candidate["entity_a"]
             b = candidate["entity_b"]
-            confidence = float(r.get("confidence", 0.5))
-            evidence_text = str(r.get("evidence", "") or "")[:120]
+            confidence = r["confidence"]
+            evidence_text = r["evidence"]
 
             assoc_id = str(uuid4())[:8]
             evidence_json = json.dumps(
@@ -326,6 +488,13 @@ def generate_associations(lifeline_id: str | None = None, max_candidates: int = 
             })
 
         conn.commit()
+
+        if generated:
+            write_audit_log(
+                "association_generate",
+                "association",
+                detail=json.dumps({"count": len(generated), "lifeline_id": lifeline_id}, ensure_ascii=False),
+            )
 
         return {
             "dry_run": False,
@@ -395,9 +564,10 @@ def register_routes(app):
             return auth_error
 
         body = request.get_json(silent=True) or {}
-        status = str(body.get("status", "")).strip()
-        if status not in ("accepted", "rejected"):
-            return error_response(400, "invalid_status", "status 必须是 accepted 或 rejected")
+        try:
+            status = _parse_status(body.get("status"), review=True)
+        except AssociationValidationError as exc:
+            return error_response(400, exc.code, exc.message)
 
         conn = get_db_connection()
         try:
@@ -410,23 +580,15 @@ def register_routes(app):
 
             conn.execute("UPDATE associations SET status = ? WHERE id = ?", (status, assoc_id))
             conn.commit()
-
-            evidence_raw = row["evidence"]
-            evidence = json.loads(evidence_raw) if evidence_raw else []
         finally:
             conn.close()
 
-        return ok_response({
-            "association": {
-                "id": row["id"],
-                "from": entity_id(row["from_kind"], row["from_id"]),
-                "to": entity_id(row["to_kind"], row["to_id"]),
-                "relation_type": row["relation_type"],
-                "confidence": row["confidence"],
-                "status": status,
-                "evidence": evidence,
-            },
-        })
+        write_audit_log(
+            "association_review",
+            "association",
+            detail=json.dumps({"id": assoc_id, "status": status}, ensure_ascii=False),
+        )
+        return ok_response({"association": _association_payload(row, status=status)})
 
     # === CRUD：手动创建/编辑/删除关联 ===
 
@@ -437,35 +599,30 @@ def register_routes(app):
             return auth_error
 
         body = request.get_json(silent=True) or {}
-        from_raw = str(body.get("from", "")).strip()
-        to_raw = str(body.get("to", "")).strip()
-        relation_type = str(body.get("relation_type", "manual")).strip()
-        confidence = float(body.get("confidence", 0.7))
-        status = str(body.get("status", "accepted")).strip()
-        evidence_list = body.get("evidence", [])
+        try:
+            from_kind, from_id_str = _parse_entity_ref(body.get("from"), "from")
+            to_kind, to_id_str = _parse_entity_ref(body.get("to"), "to")
+            relation_type = _parse_relation_type(body.get("relation_type", "manual"))
+            confidence = _parse_confidence(body.get("confidence", 0.7))
+            status = _parse_status(body.get("status", "accepted"))
+            evidence_list = _normalize_evidence(body.get("evidence"), confidence)
+        except AssociationValidationError as exc:
+            return error_response(400, exc.code, exc.message)
 
-        if not from_raw or not to_raw:
-            return error_response(400, "missing_fields", "from 和 to 不能为空")
-        if ":" not in from_raw or ":" not in to_raw:
-            return error_response(400, "invalid_format", "from/to 格式应为 kind:id（如 task:7）")
-
-        from_kind, from_id_str = from_raw.split(":", 1)
-        to_kind, to_id_str = to_raw.split(":", 1)
-
-        if relation_type not in ("co_occurrence", "causal", "tension", "derived_from", "manual"):
-            relation_type = "manual"
-        if status not in ("pending", "accepted", "rejected"):
-            status = "accepted"
-        confidence = max(0.0, min(1.0, confidence))
-
-        if not isinstance(evidence_list, list):
-            evidence_list = []
+        if (from_kind, from_id_str) == (to_kind, to_id_str):
+            return error_response(400, "self_association", "不能创建对象到自身的关系")
 
         assoc_id = str(uuid4())[:8]
         evidence_json = json.dumps(evidence_list, ensure_ascii=False)
 
         conn = get_db_connection()
         try:
+            if not _entity_exists(conn, from_kind, from_id_str):
+                return error_response(404, "source_not_found", "from 指向的对象不存在")
+            if not _entity_exists(conn, to_kind, to_id_str):
+                return error_response(404, "target_not_found", "to 指向的对象不存在")
+            if _association_exists(conn, from_kind, from_id_str, to_kind, to_id_str):
+                return error_response(409, "association_exists", "这两个对象之间已经存在关系")
             conn.execute(
                 "INSERT INTO associations (id, from_kind, from_id, to_kind, to_id, relation_type, confidence, status, evidence, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -480,17 +637,25 @@ def register_routes(app):
         finally:
             conn.close()
 
-        return ok_response({
-            "association": {
+        write_audit_log(
+            "association_create",
+            "association",
+            detail=json.dumps({
                 "id": assoc_id,
                 "from": entity_id(from_kind, from_id_str),
                 "to": entity_id(to_kind, to_id_str),
                 "relation_type": relation_type,
-                "confidence": confidence,
-                "status": status,
-                "evidence": evidence_list,
-            },
-        })
+            }, ensure_ascii=False),
+        )
+        return ok_response({"association": {
+            "id": assoc_id,
+            "from": entity_id(from_kind, from_id_str),
+            "to": entity_id(to_kind, to_id_str),
+            "relation_type": relation_type,
+            "confidence": confidence,
+            "status": status,
+            "evidence": evidence_list,
+        }})
 
     @app.route("/cosmos/associations/<path:assoc_id>", methods=["PUT"])
     def cosmos_assoc_update(assoc_id: str):
@@ -507,45 +672,45 @@ def register_routes(app):
             body = request.get_json(silent=True) or {}
 
             updates: dict[str, str | float] = {}
-            if "relation_type" in body:
-                rt = str(body["relation_type"]).strip()
-                if rt in ("co_occurrence", "causal", "tension", "derived_from", "manual"):
-                    updates["relation_type"] = rt
-            if "confidence" in body:
-                updates["confidence"] = max(0.0, min(1.0, float(body["confidence"])))
-            if "status" in body:
-                st = str(body["status"]).strip()
-                if st in ("pending", "accepted", "rejected"):
-                    updates["status"] = st
-            if "evidence" in body:
-                ev = body["evidence"]
-                if isinstance(ev, list):
-                    updates["evidence"] = json.dumps(ev, ensure_ascii=False)
+            try:
+                confidence = (
+                    _parse_confidence(body["confidence"])
+                    if "confidence" in body
+                    else float(row["confidence"])
+                )
+                if "relation_type" in body:
+                    updates["relation_type"] = _parse_relation_type(body["relation_type"])
+                if "confidence" in body:
+                    updates["confidence"] = confidence
+                if "status" in body:
+                    updates["status"] = _parse_status(body["status"])
+                if "evidence" in body:
+                    updates["evidence"] = json.dumps(
+                        _normalize_evidence(body["evidence"], confidence),
+                        ensure_ascii=False,
+                    )
+            except AssociationValidationError as exc:
+                return error_response(400, exc.code, exc.message)
+
+            if not updates:
+                return error_response(400, "no_updates", "没有可更新的关系字段")
 
             set_clauses = [f"{k} = ?" for k in updates]
             values = list(updates.values())
-            if set_clauses:
-                values.append(assoc_id)
-                conn.execute(f"UPDATE associations SET {', '.join(set_clauses)} WHERE id = ?", values)
-                conn.commit()
+            values.append(assoc_id)
+            conn.execute(f"UPDATE associations SET {', '.join(set_clauses)} WHERE id = ?", values)
+            conn.commit()
 
             row = conn.execute("SELECT * FROM associations WHERE id = ?", (assoc_id,)).fetchone()
-            evidence_raw = row["evidence"]
-            evidence = json.loads(evidence_raw) if evidence_raw else []
         finally:
             conn.close()
 
-        return ok_response({
-            "association": {
-                "id": row["id"],
-                "from": entity_id(row["from_kind"], row["from_id"]),
-                "to": entity_id(row["to_kind"], row["to_id"]),
-                "relation_type": row["relation_type"],
-                "confidence": row["confidence"],
-                "status": row["status"],
-                "evidence": evidence,
-            },
-        })
+        write_audit_log(
+            "association_update",
+            "association",
+            detail=json.dumps({"id": assoc_id, "fields": sorted(updates)}, ensure_ascii=False),
+        )
+        return ok_response({"association": _association_payload(row)})
 
     @app.route("/cosmos/associations/<path:assoc_id>", methods=["DELETE"])
     def cosmos_assoc_delete(assoc_id: str):
@@ -555,7 +720,10 @@ def register_routes(app):
 
         conn = get_db_connection()
         try:
-            row = conn.execute("SELECT id FROM associations WHERE id = ?", (assoc_id,)).fetchone()
+            row = conn.execute(
+                "SELECT id, from_kind, from_id, to_kind, to_id FROM associations WHERE id = ?",
+                (assoc_id,),
+            ).fetchone()
             if not row:
                 return error_response(404, "association_not_found", f"association '{assoc_id}' 不存在")
             conn.execute("DELETE FROM associations WHERE id = ?", (assoc_id,))
@@ -563,6 +731,15 @@ def register_routes(app):
         finally:
             conn.close()
 
+        write_audit_log(
+            "association_delete",
+            "association",
+            detail=json.dumps({
+                "id": assoc_id,
+                "from": entity_id(row["from_kind"], row["from_id"]),
+                "to": entity_id(row["to_kind"], row["to_id"]),
+            }, ensure_ascii=False),
+        )
         return ok_response({"ok": True, "message": f"已删除 association:{assoc_id}"})
 
     return  # register_routes 结束

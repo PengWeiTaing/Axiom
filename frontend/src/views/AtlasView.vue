@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import {
   AdditiveBlending,
   BufferGeometry,
@@ -27,10 +27,29 @@ import {
   type Object3D,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { ArrowLeft, ArrowUpRight, Crosshair, RefreshCw } from '@lucide/vue'
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Check,
+  Crosshair,
+  Link2,
+  Pencil,
+  RefreshCw,
+  Save,
+  Trash2,
+  X,
+} from '@lucide/vue'
+import { ApiError } from '@/api/client'
+import {
+  createAssociation,
+  deleteAssociation,
+  reviewAssociation,
+  updateAssociation,
+} from '@/api/cosmos'
 import { useAtlasGraphStore } from '@/stores/atlasGraph'
 import { listenToElementEvent, useWindowEventListener } from '@/composables/useEventListener'
 import type { AtlasEdge, AtlasNode } from '@/atlas/types'
+import type { CosmosAssociationEvidence, CosmosRelationType } from '@/cosmos/types'
 
 interface LocalNode {
   node: AtlasNode
@@ -63,6 +82,30 @@ interface NodeVisual {
   hit: Mesh
 }
 
+type RelationEditorMode = 'create' | 'edit' | null
+
+interface RelationDraft {
+  targetId: string
+  relationType: CosmosRelationType
+  confidence: number
+  evidence: string
+}
+
+const RELATION_OPTIONS: Array<{ value: CosmosRelationType, label: string }> = [
+  { value: 'same_topic', label: '同主题' },
+  { value: 'supports', label: '支持' },
+  { value: 'derived_from', label: '衍生' },
+  { value: 'causal', label: '因果' },
+  { value: 'prerequisite', label: '前置' },
+  { value: 'next_action', label: '下一步' },
+  { value: 'co_occurrence', label: '共现' },
+  { value: 'tension', label: '张力' },
+  { value: 'contradicts', label: '冲突' },
+  { value: 'manual', label: '人工关系' },
+]
+
+const EDITABLE_NODE_TYPES = new Set<AtlasNode['type']>(['item', 'task', 'memory', 'decision'])
+
 const store = useAtlasGraphStore()
 const sceneHost = ref<HTMLElement | null>(null)
 const sceneReady = ref(false)
@@ -70,6 +113,17 @@ const graphScale = ref(1)
 const focusMode = ref(false)
 const projectedLabels = ref<ProjectedLabel[]>([])
 const selectedRelationId = ref<string | null>(null)
+const relationEditorMode = ref<RelationEditorMode>(null)
+const relationBusy = ref(false)
+const relationError = ref<string | null>(null)
+const relationFeedback = ref<string | null>(null)
+const deleteConfirmId = ref<string | null>(null)
+const relationDraft = reactive<RelationDraft>({
+  targetId: '',
+  relationType: 'same_topic',
+  confidence: 0.88,
+  evidence: '',
+})
 const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 
 const nodes = computed(() => store.data?.nodes || [])
@@ -209,6 +263,34 @@ const selectedLocalRelation = computed(() => {
   if (!localRelationRows.value.length) return null
   return localRelationRows.value.find(edge => edge.id === selectedRelationId.value) || localRelationRows.value[0]
 })
+
+const relationTargetOptions = computed(() => {
+  const center = store.selectedNode
+  if (!center || !EDITABLE_NODE_TYPES.has(center.type)) return []
+  const connectedIds = new Set<string>()
+  for (const entry of primaryLocalEdges.value) {
+    if (entry.edge.edge_class !== 'semantic') continue
+    connectedIds.add(entry.edge.source === center.id ? entry.edge.target : entry.edge.source)
+  }
+  return nodes.value
+    .filter(node => EDITABLE_NODE_TYPES.has(node.type) && node.id !== center.id && !connectedIds.has(node.id))
+    .sort((a, b) => {
+      const sameLifeline = Number(b.lifeline_id === center.lifeline_id) - Number(a.lifeline_id === center.lifeline_id)
+      return sameLifeline || b.weight - a.weight || a.label.localeCompare(b.label)
+    })
+})
+
+const canCreateRelation = computed(() => Boolean(
+  store.selectedNode
+  && EDITABLE_NODE_TYPES.has(store.selectedNode.type)
+  && relationTargetOptions.value.length,
+))
+
+const relationSaveDisabled = computed(() => (
+  relationBusy.value
+  || !relationDraft.evidence.trim()
+  || (relationEditorMode.value === 'create' && !relationDraft.targetId)
+))
 
 const localNodes = computed<LocalNode[]>(() => {
   const center = store.selectedNode
@@ -421,6 +503,161 @@ function relationLabel(type: string): string {
   return labels[type] || type
 }
 
+function relationStatusLabel(status: AtlasEdge['status']): string {
+  if (status === 'accepted') return '已确认'
+  if (status === 'pending') return '待确认'
+  if (status === 'rejected') return '已放弃'
+  return '只读'
+}
+
+function associationId(edge: AtlasEdge): string | null {
+  return edge.edge_class === 'semantic' && edge.id.startsWith('assoc:')
+    ? edge.id.slice('assoc:'.length)
+    : null
+}
+
+function canGovernRelation(edge: AtlasEdge): boolean {
+  return Boolean(associationId(edge))
+}
+
+function relationEvidence(edge: AtlasEdge): CosmosAssociationEvidence[] {
+  if (edge.evidence_items?.length) return edge.evidence_items
+  return edge.evidence
+    ? [{ type: 'legacy', excerpt: edge.evidence, weight: edge.confidence }]
+    : []
+}
+
+function clearRelationInteraction(clearFeedback = true) {
+  relationEditorMode.value = null
+  relationError.value = null
+  deleteConfirmId.value = null
+  if (clearFeedback) relationFeedback.value = null
+}
+
+function startCreateRelation() {
+  if (!canCreateRelation.value) return
+  relationDraft.targetId = relationTargetOptions.value[0]?.id || ''
+  relationDraft.relationType = 'same_topic'
+  relationDraft.confidence = 0.88
+  relationDraft.evidence = ''
+  relationEditorMode.value = 'create'
+  relationError.value = null
+  relationFeedback.value = null
+  deleteConfirmId.value = null
+}
+
+function startEditRelation(edge: AtlasEdge) {
+  if (!canGovernRelation(edge)) return
+  relationDraft.targetId = relationTarget(edge)?.id || ''
+  relationDraft.relationType = edge.relation_type === 'contains' ? 'manual' : edge.relation_type
+  relationDraft.confidence = edge.confidence
+  relationDraft.evidence = relationEvidence(edge).map(item => item.excerpt).join('\n')
+  relationEditorMode.value = 'edit'
+  relationError.value = null
+  relationFeedback.value = null
+  deleteConfirmId.value = null
+}
+
+function draftEvidence(edge?: AtlasEdge | null): CosmosAssociationEvidence[] {
+  const existing = edge ? relationEvidence(edge) : []
+  return relationDraft.evidence
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((excerpt, index) => ({
+      type: existing[index]?.type || 'manual_note',
+      excerpt,
+      weight: relationDraft.confidence,
+    }))
+}
+
+function mutationMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError || error instanceof Error ? error.message : fallback
+}
+
+async function submitRelation() {
+  const center = store.selectedNode
+  if (!center || relationSaveDisabled.value) return
+  relationBusy.value = true
+  relationError.value = null
+  relationFeedback.value = null
+  try {
+    if (relationEditorMode.value === 'create') {
+      const result = await createAssociation({
+        from: center.id,
+        to: relationDraft.targetId,
+        relation_type: relationDraft.relationType,
+        confidence: relationDraft.confidence,
+        status: 'accepted',
+        evidence: draftEvidence(),
+      })
+      selectedRelationId.value = `assoc:${result.association.id}`
+      relationFeedback.value = '关系已建立'
+    } else if (relationEditorMode.value === 'edit' && selectedLocalRelation.value) {
+      const rawId = associationId(selectedLocalRelation.value)
+      if (!rawId) return
+      await updateAssociation(rawId, {
+        relation_type: relationDraft.relationType,
+        confidence: relationDraft.confidence,
+        evidence: draftEvidence(selectedLocalRelation.value),
+      })
+      relationFeedback.value = '关系已更新'
+    }
+    relationEditorMode.value = null
+    await store.load(true)
+    if (store.error) throw new Error(store.error)
+  } catch (error) {
+    relationError.value = mutationMessage(error, '关系保存失败')
+  } finally {
+    relationBusy.value = false
+  }
+}
+
+async function reviewLocalRelation(edge: AtlasEdge, status: 'accepted' | 'rejected') {
+  const rawId = associationId(edge)
+  if (!rawId || relationBusy.value) return
+  relationBusy.value = true
+  relationError.value = null
+  relationFeedback.value = null
+  try {
+    await reviewAssociation(rawId, status)
+    selectedRelationId.value = status === 'accepted' ? edge.id : null
+    relationFeedback.value = status === 'accepted' ? '关系已确认' : '关系已放弃'
+    await store.load(true)
+    if (store.error) throw new Error(store.error)
+  } catch (error) {
+    relationError.value = mutationMessage(error, '关系审核失败')
+  } finally {
+    relationBusy.value = false
+  }
+}
+
+async function removeLocalRelation(edge: AtlasEdge) {
+  const rawId = associationId(edge)
+  if (!rawId || relationBusy.value) return
+  if (deleteConfirmId.value !== edge.id) {
+    deleteConfirmId.value = edge.id
+    return
+  }
+  relationBusy.value = true
+  relationError.value = null
+  relationFeedback.value = null
+  try {
+    await deleteAssociation(rawId)
+    selectedRelationId.value = null
+    deleteConfirmId.value = null
+    relationEditorMode.value = null
+    relationFeedback.value = '关系已删除'
+    await store.load(true)
+    if (store.error) throw new Error(store.error)
+  } catch (error) {
+    relationError.value = mutationMessage(error, '关系删除失败')
+  } finally {
+    relationBusy.value = false
+  }
+}
+
 function shortLabel(label: string, max = 12): string {
   return label.length > max ? label.slice(0, max - 1) + '…' : label
 }
@@ -433,27 +670,32 @@ function reload() {
 function enterFocus(node: AtlasNode) {
   store.selectNode(node)
   selectedRelationId.value = null
+  clearRelationInteraction()
   focusMode.value = true
 }
 
 function exitFocus() {
   focusMode.value = false
   selectedRelationId.value = null
+  clearRelationInteraction()
 }
 
 function clearSelection() {
   store.selectNode(null)
   focusMode.value = false
+  clearRelationInteraction()
 }
 
 function selectLocalNode(node: AtlasNode) {
   store.selectNode(node)
   selectedRelationId.value = null
+  clearRelationInteraction()
   focusMode.value = true
 }
 
 function inspectLocalRelation(edge: AtlasEdge) {
   selectedRelationId.value = edge.id
+  clearRelationInteraction()
 }
 
 function relationTarget(edge: AtlasEdge): AtlasNode | undefined {
@@ -463,6 +705,7 @@ function relationTarget(edge: AtlasEdge): AtlasNode | undefined {
 function navigateRelation(edge: AtlasEdge) {
   store.selectNeighbor(edge)
   selectedRelationId.value = null
+  clearRelationInteraction()
 }
 
 function relationOriginLabel(edge: AtlasEdge): string {
@@ -1102,6 +1345,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
     semantic: entry.edge.edge_class === 'semantic',
     primary: entry.role === 'primary',
     secondary: entry.role === 'secondary',
+    pending: entry.edge.status === 'pending',
   }
 }
 </script>
@@ -1164,7 +1408,12 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
       <span v-if="store.data.view.unclassified_count">未归类 {{ store.data.view.unclassified_count }}</span>
     </div>
 
-    <section v-if="focusMode && store.selectedNode" class="local-atlas" data-testid="local-atlas-2d">
+    <section
+      v-if="focusMode && store.selectedNode"
+      class="local-atlas"
+      :class="{ 'relation-editor-open': relationEditorMode }"
+      data-testid="local-atlas-2d"
+    >
       <div class="local-toolbar">
         <button class="back-btn" type="button" @click="exitFocus">
           <ArrowLeft :size="17" :stroke-width="1.8" />
@@ -1218,8 +1467,23 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
       </svg>
 
       <aside class="local-panel">
-        <div class="panel-kicker">{{ typeLabel(store.selectedNode.type) }} · 局部焦点</div>
-        <h2>{{ store.selectedNode.label }}</h2>
+        <div class="local-panel-heading">
+          <div>
+            <div class="panel-kicker">{{ typeLabel(store.selectedNode.type) }} · 局部焦点</div>
+            <h2>{{ store.selectedNode.label }}</h2>
+          </div>
+          <button
+            v-if="canCreateRelation"
+            class="relation-command"
+            type="button"
+            title="新建关系"
+            aria-label="新建关系"
+            data-testid="relation-create"
+            @click="startCreateRelation"
+          >
+            <Link2 :size="16" :stroke-width="1.7" />
+          </button>
+        </div>
         <p v-if="store.selectedNode.summary" class="summary">{{ store.selectedNode.summary }}</p>
         <div class="focus-metrics">
           <span>{{ localNodes.length }} 个节点</span>
@@ -1231,26 +1495,163 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
             v-for="edge in localRelationRows"
             :key="edge.id"
             class="relation-row"
-            :class="{ active: selectedLocalRelation?.id === edge.id }"
+            :class="{ active: selectedLocalRelation?.id === edge.id, pending: edge.status === 'pending' }"
             type="button"
             @click="inspectLocalRelation(edge)"
           >
             <span>{{ relationLabel(edge.relation_type) }}</span>
             <small>{{ relationTarget(edge)?.label }}</small>
-            <strong>{{ Math.round(edge.confidence * 100) }}%</strong>
+            <strong>
+              <i v-if="edge.status === 'pending'" aria-label="待确认" />
+              {{ Math.round(edge.confidence * 100) }}%
+            </strong>
           </button>
         </div>
 
-        <div v-if="selectedLocalRelation" class="relation-insight">
+        <p v-if="relationFeedback" class="relation-feedback" role="status">{{ relationFeedback }}</p>
+        <p v-if="relationError" class="relation-error" role="alert">{{ relationError }}</p>
+
+        <form
+          v-if="relationEditorMode"
+          class="relation-editor"
+          data-testid="relation-editor"
+          @submit.prevent="submitRelation"
+        >
+          <div class="relation-editor-title">
+            <strong>{{ relationEditorMode === 'create' ? '建立关系' : '修改关系' }}</strong>
+            <button type="button" title="取消" aria-label="取消" @click="clearRelationInteraction(false)">
+              <X :size="15" :stroke-width="1.8" />
+            </button>
+          </div>
+
+          <label v-if="relationEditorMode === 'create'" class="relation-field">
+            <span>关联对象</span>
+            <select v-model="relationDraft.targetId" data-testid="relation-target">
+              <option v-for="node in relationTargetOptions" :key="node.id" :value="node.id">
+                {{ typeLabel(node.type) }} · {{ node.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="relation-field">
+            <span>关系类型</span>
+            <select v-model="relationDraft.relationType" data-testid="relation-type">
+              <option v-for="option in RELATION_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="relation-field relation-confidence">
+            <span>置信度 <strong>{{ Math.round(relationDraft.confidence * 100) }}%</strong></span>
+            <input
+              v-model.number="relationDraft.confidence"
+              type="range"
+              min="0.45"
+              max="1"
+              step="0.01"
+              data-testid="relation-confidence"
+            >
+          </label>
+
+          <label class="relation-field">
+            <span>证据</span>
+            <textarea
+              v-model="relationDraft.evidence"
+              rows="4"
+              maxlength="1200"
+              placeholder="每行一条具体依据"
+              data-testid="relation-evidence"
+            />
+          </label>
+
+          <button
+            class="relation-save"
+            type="submit"
+            :disabled="relationSaveDisabled"
+            data-testid="relation-save"
+          >
+            <Save :size="15" :stroke-width="1.8" />
+            <span>{{ relationBusy ? '保存中' : '保存' }}</span>
+          </button>
+        </form>
+
+        <div v-else-if="selectedLocalRelation" class="relation-insight" data-testid="relation-insight">
           <div class="relation-insight-meta">
             <span>{{ relationLabel(selectedLocalRelation.relation_type) }}</span>
-            <span>{{ relationOriginLabel(selectedLocalRelation) }}</span>
+            <span :class="[`status-${selectedLocalRelation.status || 'readonly'}`]">
+              {{ relationStatusLabel(selectedLocalRelation.status) }} · {{ relationOriginLabel(selectedLocalRelation) }}
+            </span>
           </div>
-          <p>{{ selectedLocalRelation.evidence || '这是一条结构关系，没有额外语义证据。' }}</p>
-          <button type="button" @click="navigateRelation(selectedLocalRelation)">
+          <div v-if="relationEvidence(selectedLocalRelation).length" class="relation-evidence-list">
+            <p v-for="(item, index) in relationEvidence(selectedLocalRelation)" :key="`${item.type}-${index}`">
+              {{ item.excerpt }}
+            </p>
+          </div>
+          <p v-else class="relation-structural-note">结构归属</p>
+          <button class="relation-navigate" type="button" @click="navigateRelation(selectedLocalRelation)">
             <span>聚焦 {{ relationTarget(selectedLocalRelation)?.label }}</span>
             <ArrowUpRight :size="15" :stroke-width="1.7" />
           </button>
+
+          <div v-if="canGovernRelation(selectedLocalRelation)" class="relation-governance">
+            <template v-if="selectedLocalRelation.status === 'pending'">
+              <button
+                type="button"
+                title="确认关系"
+                data-testid="relation-accept"
+                :disabled="relationBusy"
+                @click="reviewLocalRelation(selectedLocalRelation, 'accepted')"
+              >
+                <Check :size="15" :stroke-width="1.9" />
+                <span>确认</span>
+              </button>
+              <button
+                type="button"
+                title="放弃关系"
+                data-testid="relation-reject"
+                :disabled="relationBusy"
+                @click="reviewLocalRelation(selectedLocalRelation, 'rejected')"
+              >
+                <X :size="15" :stroke-width="1.9" />
+                <span>放弃</span>
+              </button>
+            </template>
+            <template v-else>
+              <button
+                type="button"
+                title="修改关系"
+                data-testid="relation-edit"
+                :disabled="relationBusy"
+                @click="startEditRelation(selectedLocalRelation)"
+              >
+                <Pencil :size="14" :stroke-width="1.8" />
+                <span>修改</span>
+              </button>
+              <button
+                type="button"
+                class="relation-delete"
+                :class="{ confirming: deleteConfirmId === selectedLocalRelation.id }"
+                :title="deleteConfirmId === selectedLocalRelation.id ? '再次点击确认删除' : '删除关系'"
+                data-testid="relation-delete"
+                :disabled="relationBusy"
+                @click="removeLocalRelation(selectedLocalRelation)"
+              >
+                <Trash2 :size="14" :stroke-width="1.8" />
+                <span>{{ deleteConfirmId === selectedLocalRelation.id ? '确认删除' : '删除' }}</span>
+              </button>
+              <button
+                v-if="deleteConfirmId === selectedLocalRelation.id"
+                class="relation-cancel-delete"
+                type="button"
+                title="取消删除"
+                aria-label="取消删除"
+                @click="deleteConfirmId = null"
+              >
+                <X :size="14" :stroke-width="1.8" />
+              </button>
+            </template>
+          </div>
         </div>
       </aside>
     </section>
@@ -1444,6 +1845,35 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   line-height: var(--lh-tight);
 }
 
+.local-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.local-panel-heading > div {
+  min-width: 0;
+}
+
+.relation-command {
+  display: inline-grid;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  color: #87bbae;
+  border: 1px solid rgba(135, 187, 174, 0.18);
+  border-radius: 4px;
+  background: rgba(135, 187, 174, 0.045);
+}
+
+.relation-command:hover {
+  color: #acd1c8;
+  border-color: rgba(135, 187, 174, 0.34);
+}
+
 .summary {
   margin: var(--s-2) 0 0;
   color: var(--text-3);
@@ -1556,6 +1986,10 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .local-edges path.secondary {
   stroke-dasharray: 2 7;
+}
+
+.local-edges path.semantic.pending {
+  stroke-dasharray: 2 5;
 }
 
 .local-node {
@@ -1673,9 +2107,21 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 }
 
 .relation-row strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
   color: #5f7fa6;
   font-size: var(--fs-1);
   text-align: right;
+}
+
+.relation-row strong i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #d7a45f;
+  box-shadow: 0 0 6px rgba(215, 164, 95, 0.38);
 }
 
 .relation-row small {
@@ -1700,6 +2146,14 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   font-size: var(--fs-1);
 }
 
+.relation-insight-meta .status-pending {
+  color: #c89b60;
+}
+
+.relation-insight-meta .status-accepted {
+  color: #78aa9c;
+}
+
 .relation-insight p {
   margin: 10px 0 0;
   color: var(--text-2);
@@ -1707,7 +2161,24 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   line-height: 1.6;
 }
 
-.relation-insight button {
+.relation-evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.relation-evidence-list p {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 1px solid rgba(180, 106, 99, 0.34);
+}
+
+.relation-structural-note {
+  color: var(--text-4) !important;
+}
+
+.relation-navigate {
   width: 100%;
   min-height: 34px;
   display: flex;
@@ -1720,8 +2191,168 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   border-top: 1px solid rgba(255, 255, 255, 0.045);
 }
 
-.relation-insight button:hover {
+.relation-navigate:hover {
   color: var(--text-1);
+}
+
+.relation-feedback,
+.relation-error {
+  margin: 14px 0 0;
+  padding: 8px 0;
+  font-size: var(--fs-2);
+  line-height: 1.45;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.relation-feedback {
+  color: #82b3a5;
+}
+
+.relation-error {
+  color: #ce817b;
+}
+
+.relation-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.relation-editor-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.relation-editor-title strong {
+  color: var(--text-1);
+  font-size: var(--fs-3);
+  font-weight: 600;
+}
+
+.relation-editor-title button,
+.relation-cancel-delete {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  color: var(--text-4);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  background: transparent;
+}
+
+.relation-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-4);
+  font-size: var(--fs-1);
+}
+
+.relation-field select,
+.relation-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.035);
+  font: inherit;
+  font-size: var(--fs-2);
+  color-scheme: dark;
+}
+
+.relation-field select {
+  height: 34px;
+  padding: 0 8px;
+}
+
+.relation-field textarea {
+  resize: vertical;
+  min-height: 82px;
+  padding: 8px;
+  line-height: 1.5;
+}
+
+.relation-confidence span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.relation-confidence strong {
+  color: #7f9dbd;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 550;
+}
+
+.relation-confidence input {
+  width: 100%;
+  accent-color: #7ea99d;
+}
+
+.relation-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  color: #b8d4cc;
+  border: 1px solid rgba(126, 169, 157, 0.25);
+  border-radius: 4px;
+  background: rgba(126, 169, 157, 0.08);
+}
+
+.relation-save:disabled,
+.relation-governance button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.relation-governance {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.relation-governance button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 31px;
+  padding: 0 9px;
+  color: var(--text-3);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: var(--fs-1);
+}
+
+.relation-governance button:hover {
+  color: var(--text-1);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.relation-governance .relation-delete.confirming {
+  color: #d18a82;
+  border-color: rgba(209, 138, 130, 0.3);
+  background: rgba(209, 138, 130, 0.07);
+}
+
+.relation-governance .relation-cancel-delete {
+  flex: 0 0 31px;
+  width: 31px;
+  padding: 0;
 }
 
 @media (max-width: 760px) {
@@ -1768,8 +2399,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
   .local-map {
     width: 100%;
-    height: 68%;
-    margin-top: 34px;
+    height: calc(66% - 64px);
+    margin-top: 64px;
   }
 
   .local-panel {
@@ -1782,6 +2413,14 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
     padding: 18px 16px 24px;
     border-top: 1px solid rgba(255, 255, 255, 0.065);
     border-left: 0;
+  }
+
+  .local-atlas.relation-editor-open .local-map {
+    height: calc(50% - 64px);
+  }
+
+  .local-atlas.relation-editor-open .local-panel {
+    height: 50%;
   }
 
   .local-panel h2 {

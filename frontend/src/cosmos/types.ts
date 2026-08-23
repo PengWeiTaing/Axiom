@@ -15,14 +15,34 @@ export interface CosmosEntity {
   meta?: Record<string, unknown>
 }
 
+export type CosmosRelationType =
+  | 'same_topic'
+  | 'co_occurrence'
+  | 'causal'
+  | 'tension'
+  | 'derived_from'
+  | 'supports'
+  | 'contradicts'
+  | 'prerequisite'
+  | 'next_action'
+  | 'manual'
+
+export type CosmosAssociationStatus = 'accepted' | 'pending' | 'rejected'
+
+export interface CosmosAssociationEvidence {
+  type: string
+  excerpt: string
+  weight: number
+}
+
 export interface CosmosAssociation {
   id: string
   from: string
   to: string
-  relation_type: 'co_occurrence' | 'causal' | 'tension' | 'derived_from'
+  relation_type: CosmosRelationType
   confidence: number
-  status: 'accepted' | 'pending' | 'rejected'
-  evidence?: { type: string; excerpt: string; weight: number }[]
+  status: CosmosAssociationStatus
+  evidence?: CosmosAssociationEvidence[]
 }
 
 export interface CosmosData {

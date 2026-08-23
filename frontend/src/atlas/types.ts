@@ -1,3 +1,9 @@
+import type {
+  CosmosAssociationEvidence,
+  CosmosAssociationStatus,
+  CosmosRelationType,
+} from '@/cosmos/types'
+
 export type AtlasNodeType =
   | 'root'
   | 'lifeline'
@@ -46,12 +52,14 @@ export interface AtlasEdge {
   source: string
   target: string
   edge_class: AtlasEdgeClass
-  relation_type: string
+  relation_type: CosmosRelationType | 'contains'
   strength: number
   confidence: number
   layer_delta: number
   evidence: string
+  evidence_items: CosmosAssociationEvidence[]
   generated_by: string
+  status: CosmosAssociationStatus | null
   visible_by_default: boolean
   distance: number
   width: number

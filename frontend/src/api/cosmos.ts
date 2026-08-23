@@ -1,6 +1,13 @@
 import { apiRequest } from './client';
 import type { AtlasGraphPayload } from '@/atlas/types';
-import type { CosmosData, CosmosLifeline } from '@/cosmos/types';
+import type {
+  CosmosAssociation,
+  CosmosAssociationEvidence,
+  CosmosAssociationStatus,
+  CosmosData,
+  CosmosLifeline,
+  CosmosRelationType,
+} from '@/cosmos/types';
 import type { LifelineContextPayload, LifelineSummary } from '@/api/types';
 
 export const getCosmos = () => apiRequest<CosmosData>('/cosmos');
@@ -54,7 +61,7 @@ export const mountEntity = (kind: string, id: number, lifeline_id: string | null
   });
 
 export const reviewAssociation = (id: string, status: 'accepted' | 'rejected') =>
-  apiRequest<{ association: import('@/cosmos/types').CosmosAssociation }>(
+  apiRequest<{ association: CosmosAssociation }>(
     `/cosmos/associations/${encodeURIComponent(id)}/review`,
     { method: 'POST', json: { status } },
   );
@@ -92,11 +99,11 @@ export const updateEntityField = (kind: string, id: number, data: Record<string,
 export const createAssociation = (data: {
   from: string;
   to: string;
-  relation_type: string;
+  relation_type: CosmosRelationType;
   confidence: number;
-  status?: string;
-  evidence?: { type: string; excerpt: string; weight: number }[];
-}) => apiRequest<{ association: import('@/cosmos/types').CosmosAssociation }>(
+  status?: CosmosAssociationStatus;
+  evidence?: CosmosAssociationEvidence[];
+}) => apiRequest<{ association: CosmosAssociation }>(
   '/cosmos/associations',
   { method: 'POST', json: data },
 );
@@ -104,11 +111,12 @@ export const createAssociation = (data: {
 export const updateAssociation = (
   id: string,
   data: {
-    relation_type?: string;
+    relation_type?: CosmosRelationType;
     confidence?: number;
-    evidence?: { type: string; excerpt: string; weight: number }[];
+    status?: CosmosAssociationStatus;
+    evidence?: CosmosAssociationEvidence[];
   },
-) => apiRequest<{ association: import('@/cosmos/types').CosmosAssociation }>(
+) => apiRequest<{ association: CosmosAssociation }>(
   `/cosmos/associations/${encodeURIComponent(id)}`,
   { method: 'PUT', json: data },
 );

@@ -1,7 +1,12 @@
 /** Cosmos Pinia store — 数据 + 状态 + 极小事件总线 */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { CosmosState, CosmosData } from '@/cosmos/types'
+import type {
+  CosmosAssociationEvidence,
+  CosmosData,
+  CosmosRelationType,
+  CosmosState,
+} from '@/cosmos/types'
 
 interface FocusEntry {
   state: CosmosState
@@ -270,8 +275,8 @@ export const useCosmosStore = defineStore('cosmos', () => {
 
   // Association CRUD
   async function createAssoc(data: {
-    from: string; to: string; relation_type: string; confidence: number
-    evidence?: { type: string; excerpt: string; weight: number }[]
+    from: string; to: string; relation_type: CosmosRelationType; confidence: number
+    evidence?: CosmosAssociationEvidence[]
   }) {
     const { createAssociation: apiCreate } = await import('@/api/cosmos')
     await apiCreate({ ...data, status: 'accepted' })
@@ -279,8 +284,8 @@ export const useCosmosStore = defineStore('cosmos', () => {
   }
 
   async function updateAssoc(id: string, data: {
-    relation_type?: string; confidence?: number
-    evidence?: { type: string; excerpt: string; weight: number }[]
+    relation_type?: CosmosRelationType; confidence?: number
+    evidence?: CosmosAssociationEvidence[]
   }) {
     const { updateAssociation: apiUpdate } = await import('@/api/cosmos')
     await apiUpdate(id, data)
@@ -306,8 +311,8 @@ export const useCosmosStore = defineStore('cosmos', () => {
   const selectingTarget = ref<{ fromId: string; fromTitle: string } | null>(null)
   const editAssoc = ref<{
     id: string; from: string; fromTitle: string; to: string; toTitle: string
-    relation_type: string; confidence: number; status: string
-    evidence: { type: string; excerpt: string; weight: number }[]
+    relation_type: CosmosRelationType; confidence: number; status: string
+    evidence: CosmosAssociationEvidence[]
   } | null>(null)
 
   function startSelectingTarget(fromId: string, fromTitle: string) {
