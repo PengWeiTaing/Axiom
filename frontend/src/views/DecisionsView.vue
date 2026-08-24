@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { ArrowUpRight, Check, Plus, RefreshCw } from '@lucide/vue';
 import { ApiError } from '@/api/client';
 import { createDecision, listDecisions, reviewDecision } from '@/api/knowledge';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
@@ -168,11 +169,12 @@ onMounted(() => {
   <main class="decisions-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Decisions</p>
-        <h1>决策台</h1>
+        <p class="eyebrow">06 / DECISION</p>
+        <h1>决定索引</h1>
+        <span>CONTEXT / CHOICE / EXPECTATION / OUTCOME</span>
       </div>
-      <button class="refresh-btn" type="button" :disabled="loading" @click="refreshAll">
-        <span>{{ loading ? '刷新中' : '刷新' }}</span>
+      <button class="refresh-btn" type="button" title="刷新决定" aria-label="刷新决定" :disabled="loading" @click="refreshAll">
+        <RefreshCw :size="17" :class="{ spinning: loading }" />
       </button>
     </header>
 
@@ -184,32 +186,33 @@ onMounted(() => {
       <span>{{ feedback }}</span>
     </div>
 
-    <section class="metrics" aria-label="决策指标">
+    <section class="metrics" aria-label="决定计数">
       <article>
-        <span>总量</span>
+        <span>LEDGER</span>
         <strong>{{ pendingTotal + reviewedTotal }}</strong>
-        <small>全部决策记录</small>
+        <small>全部</small>
       </article>
       <article :class="{ urgent: pendingTotal > 0 }">
-        <span>待回顾</span>
+        <span>OPEN</span>
         <strong>{{ pendingTotal }}</strong>
-        <small>需要补实际结果</small>
+        <small>待回顾</small>
       </article>
       <article>
-        <span>已回顾</span>
+        <span>REVIEWED</span>
         <strong>{{ reviewedTotal }}</strong>
-        <small>可沉淀为经验</small>
+        <small>已有结果</small>
       </article>
     </section>
 
     <section class="workspace-grid">
-      <div class="panel create-panel">
-        <div class="panel-head">
+      <details class="panel create-panel">
+        <summary class="panel-head">
           <div>
-            <p class="eyebrow">Create</p>
-            <h2>快速新增</h2>
+            <p class="eyebrow">NEW / 01</p>
+            <h2>记下一次选择</h2>
           </div>
-        </div>
+          <Plus :size="18" />
+        </summary>
 
         <form class="decision-form" @submit.prevent="submitDecision">
           <label>
@@ -250,16 +253,17 @@ onMounted(() => {
             />
           </label>
           <button class="primary-action" type="submit" :disabled="saving || !draft.title.trim() || !draft.decision.trim()">
-            {{ saving ? '添加中' : '添加决策' }}
+            <Plus :size="15" />
+            <span>{{ saving ? '添加中' : '加入决定账册' }}</span>
           </button>
         </form>
-      </div>
+      </details>
 
       <section class="panel list-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Decision List</p>
-            <h2>决策列表</h2>
+            <p class="eyebrow">ARCHIVE / 02</p>
+            <h2>选择与结果</h2>
           </div>
           <div class="filters">
             <label>
@@ -286,7 +290,7 @@ onMounted(() => {
               <p>{{ decisionSummary(item) }}</p>
               <p class="context-line">{{ contextSummary(item) }}</p>
               <div class="decision-meta">
-                <button type="button" @click="openDecisionDetail(item.id)">详情</button>
+                <button type="button" title="打开详情" aria-label="打开决定详情" @click="openDecisionDetail(item.id)"><ArrowUpRight :size="14" /></button>
                 <span>{{ statusLabel(item.status) }}</span>
                 <span>{{ formatRelative(item.updated_at) }}</span>
                 <span v-if="item.actual_outcome">结果：{{ compactText(item.actual_outcome, '') }}</span>
@@ -302,7 +306,7 @@ onMounted(() => {
                   type="button"
                   :disabled="busyDecisionId === item.id || !String(reviewDrafts[item.id] || '').trim()"
                   @click="submitReview(item)"
-                >标记已回顾</button>
+                ><Check :size="14" /><span>标记已回顾</span></button>
               </div>
             </div>
           </article>
@@ -325,12 +329,12 @@ onMounted(() => {
 
 <style scoped>
 .decisions-view {
+  width: min(1240px, 100%);
   min-height: 100vh;
-  padding: var(--s-8) var(--s-6) calc(var(--s-8) + 72px);
+  margin: 0 auto;
+  padding: 46px 42px 110px;
   color: var(--text-1);
-  background:
-    radial-gradient(circle at 12% 0%, rgba(205, 160, 101, 0.10), transparent 32%),
-    linear-gradient(180deg, rgba(12, 16, 24, 0.96), rgba(9, 12, 18, 1));
+  background: transparent;
 }
 
 .topbar,
@@ -344,9 +348,10 @@ onMounted(() => {
 }
 
 .topbar {
+  min-height: 168px;
   justify-content: space-between;
-  gap: var(--s-4);
-  margin-bottom: var(--s-5);
+  gap: 32px;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .topbar h1,
@@ -356,15 +361,28 @@ onMounted(() => {
 }
 
 .topbar h1 {
-  font-size: 2.75rem;
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 400;
+  line-height: 1.18;
+}
+
+.topbar > div > span {
+  display: block;
+  margin-top: 12px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 8px;
 }
 
 .eyebrow {
   margin: 0 0 var(--s-1);
   color: var(--text-3);
+  font-family: var(--font-mono);
   font-size: var(--fs-1);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
 }
 
 .refresh-btn,
@@ -373,29 +391,46 @@ onMounted(() => {
 .review-box button,
 .load-more,
 .notice button {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-1);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-3);
   cursor: pointer;
   transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
 }
 
 .refresh-btn,
 .load-more {
-  padding: var(--s-2) var(--s-4);
+  min-width: 42px;
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0 14px;
 }
 
 .primary-action {
   width: 100%;
-  padding: var(--s-3) var(--s-4);
-  background: rgba(205, 160, 101, 0.16);
-  border-color: rgba(205, 160, 101, 0.34);
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 var(--s-4);
+  color: var(--surface-1);
+  background: var(--text-1);
+  border-color: var(--text-1);
 }
 
 button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text-1);
+  background: rgba(23, 26, 22, 0.045);
+  border-color: var(--line-3);
+}
+
+.primary-action:hover:not(:disabled) {
+  color: var(--surface-1);
+  background: var(--violet);
+  border-color: var(--violet);
 }
 
 button:disabled {
@@ -407,9 +442,9 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   gap: var(--s-3);
-  margin-bottom: var(--s-4);
-  padding: var(--s-3) var(--s-4);
-  border-radius: 8px;
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-radius: 0;
 }
 
 .error-row {
@@ -423,17 +458,26 @@ button:disabled {
 }
 
 .metrics {
-  gap: var(--s-3);
-  margin-bottom: var(--s-5);
+  gap: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .metrics article {
   flex: 1;
   min-width: 0;
-  padding: var(--s-4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: minmax(56px, auto) 1fr;
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 2px 14px;
+  padding: 16px 24px;
+  border-right: 1px solid var(--line-1);
+  background: transparent;
+}
+
+.metrics article:last-child {
+  border-right: 0;
 }
 
 .metrics span,
@@ -443,42 +487,73 @@ button:disabled {
 }
 
 .metrics strong {
-  display: block;
-  margin: var(--s-1) 0;
-  font-size: 1.9rem;
+  grid-row: 1 / 3;
+  color: var(--violet);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1;
 }
 
 .metrics .urgent strong {
-  color: #d3b36f;
+  color: var(--focus);
 }
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.72fr) minmax(440px, 1.28fr);
-  gap: var(--s-4);
+  grid-template-columns: minmax(290px, 0.7fr) minmax(460px, 1.3fr);
+  gap: 0;
 }
 
 .panel {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
-  backdrop-filter: blur(18px);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
-.create-panel,
+.create-panel {
+  padding: 30px 32px 30px 0;
+  border-right: 1px solid var(--line-1);
+}
+
 .list-panel {
-  padding: var(--s-5);
+  padding: 30px 0 0 40px;
+}
+
+.create-panel > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.create-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.create-panel > summary > svg {
+  color: var(--violet);
+  transition: transform var(--t-base) var(--ease);
+}
+
+.create-panel[open] > summary > svg {
+  transform: rotate(45deg);
 }
 
 .panel-head {
   justify-content: space-between;
   gap: var(--s-4);
-  margin-bottom: var(--s-4);
+  margin-bottom: 0;
+}
+
+.create-panel[open] .panel-head,
+.list-panel .panel-head {
+  margin-bottom: 24px;
 }
 
 .decision-form {
   display: grid;
-  gap: var(--s-3);
+  gap: 18px;
+  padding-top: 4px;
 }
 
 .decision-form label,
@@ -494,9 +569,10 @@ button:disabled {
 .filters select,
 .review-box textarea {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 8px;
-  background: rgba(7, 10, 15, 0.64);
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   font: inherit;
 }
@@ -509,23 +585,32 @@ button:disabled {
 
 .decision-form textarea,
 .review-box textarea {
+  border: 1px solid var(--line-1);
   resize: vertical;
   padding: var(--s-3);
 }
 
+.decision-form input:focus,
+.decision-form textarea:focus,
+.filters select:focus,
+.review-box textarea:focus {
+  border-color: var(--violet);
+  outline: none;
+}
+
 .filter-summary {
-  --filter-summary-accent: rgb(205, 160, 101);
-  --filter-summary-button-border: rgba(255, 255, 255, 0.12);
-  --filter-summary-button-bg: rgba(255, 255, 255, 0.06);
+  --filter-summary-accent: var(--violet);
+  --filter-summary-button-border: var(--line-2);
+  --filter-summary-button-bg: transparent;
   --filter-summary-button-color: var(--text-1);
-  --filter-summary-button-hover-border: rgba(255, 255, 255, 0.22);
-  --filter-summary-button-hover-bg: rgba(255, 255, 255, 0.10);
-  margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+  --filter-summary-button-hover-border: var(--line-3);
+  --filter-summary-button-hover-bg: rgba(23, 26, 22, 0.04);
+  margin: -8px 0 16px;
 }
 
 .decision-list {
   display: grid;
-  gap: var(--s-3);
+  gap: 0;
 }
 
 .decision-row {
@@ -533,15 +618,20 @@ button:disabled {
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--s-3);
   align-items: start;
-  padding: var(--s-3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(8, 11, 17, 0.46);
+  min-height: 104px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+}
+
+.decision-row:last-child {
+  border-bottom: 1px solid var(--line-1);
 }
 
 .decision-row.reviewed {
   opacity: 0.76;
-  border-color: rgba(109, 181, 168, 0.18);
+  border-top-color: var(--line-1);
 }
 
 .decision-main {
@@ -553,6 +643,12 @@ button:disabled {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.decision-main strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 520;
 }
 
 .decision-main p {
@@ -575,32 +671,42 @@ button:disabled {
 .decision-meta span,
 .decision-meta button,
 .status-dot {
-  border-radius: 999px;
+  border-radius: 0;
 }
 
 .decision-meta span,
 .decision-meta button {
-  padding: 2px var(--s-2);
-  background: rgba(255, 255, 255, 0.055);
+  padding: 2px var(--s-2) 2px 0;
+  background: transparent;
+}
+
+.decision-meta button {
+  width: 30px;
+  min-height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-color: var(--line-1);
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
-  margin-top: 8px;
-  background: #d3b36f;
-  box-shadow: 0 0 14px rgba(211, 179, 111, 0.34);
+  width: 3px;
+  height: 38px;
+  margin-top: 4px;
+  background: var(--violet);
+  box-shadow: none;
 }
 
 .status-dot.reviewed {
-  background: #6db5a8;
-  box-shadow: 0 0 14px rgba(109, 181, 168, 0.28);
+  background: var(--accent);
 }
 
 .review-box {
   align-items: stretch;
   gap: var(--s-2);
-  margin-top: var(--s-3);
+  margin-top: 16px;
+  padding-left: 16px;
+  border-left: 2px solid rgba(116, 93, 120, 0.34);
 }
 
 .review-box textarea {
@@ -609,6 +715,10 @@ button:disabled {
 
 .review-box button {
   min-width: 112px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 0 var(--s-3);
   font-size: var(--fs-1);
 }
@@ -619,12 +729,21 @@ button:disabled {
 }
 
 .load-more {
-  margin-top: var(--s-4);
+  width: 100%;
+  margin-top: 20px;
+}
+
+.spinning {
+  animation: ledger-spin 0.8s linear infinite;
+}
+
+@keyframes ledger-spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 900px) {
   .decisions-view {
-    padding: var(--s-7) var(--s-4) calc(var(--s-8) + 72px);
+    padding: 28px 18px calc(var(--app-mobile-nav-height) + 34px);
   }
 
   .workspace-grid,
@@ -634,13 +753,52 @@ button:disabled {
 
   .metrics {
     display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .topbar,
-  .panel-head,
+  .metrics article {
+    min-height: 82px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 10px;
+  }
+
+  .metrics strong {
+    order: -1;
+    font-size: 27px;
+  }
+
+  .metrics small {
+    display: none;
+  }
+
+  .topbar {
+    min-height: 140px;
+  }
+
+  .topbar h1 {
+    font-size: 34px;
+  }
+
+  .create-panel {
+    padding: 24px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-1);
+  }
+
+  .list-panel {
+    padding: 32px 0 0;
+  }
+
   .decision-row,
   .review-box {
     align-items: stretch;
+  }
+
+  .topbar,
+  .panel-head {
+    align-items: center;
   }
 
   .decision-row {

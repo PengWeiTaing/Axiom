@@ -8,6 +8,20 @@
 
 import { ref, watch, computed, onBeforeUnmount } from 'vue'
 import {
+  Archive,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Download,
+  FolderOpen,
+  Info,
+  Pencil,
+  RotateCcw,
+  Save,
+  Trash2,
+  X,
+} from '@lucide/vue'
+import {
   getItem,
   getItemFile,
   updateItem,
@@ -399,12 +413,10 @@ onBeforeUnmount(() => {
         <!-- 加载进度条 -->
         <div v-if="loading || acting" class="progress-bar" />
 
-        <!-- Header -->
         <header class="drawer-head">
           <div class="head-left">
-            <span class="type-chip mono" :style="{ '--chip-accent': detail ? typeAccent(detail.type) : 'var(--text-5)' }">
-              {{ typeLabel }}
-            </span>
+            <span class="type-chip mono" :style="{ '--chip-accent': detail ? typeAccent(detail.type) : 'var(--text-5)' }">{{ typeLabel }} / {{ detail ? `#${detail.id}` : '—' }}</span>
+            <strong>原始记录</strong>
             <span v-if="detail" class="head-time mono">{{ formatRelative(detail.created_at, nowDate) }}</span>
           </div>
           <button
@@ -413,7 +425,7 @@ onBeforeUnmount(() => {
             aria-label="关闭"
             @click="emit('close')"
             :disabled="acting"
-          >&times;</button>
+          ><X :size="18" /></button>
         </header>
 
         <!-- Body -->
@@ -500,26 +512,32 @@ onBeforeUnmount(() => {
           </template>
         </div>
 
-        <!-- Metadata -->
-        <div v-if="detail" class="drawer-meta">
-          <div class="meta-row"><span class="meta-key mono">ID</span><span class="meta-val mono">#{{ detail.id }}</span></div>
-          <div class="meta-row"><span class="meta-key mono">来源</span><span class="meta-val">{{ detail.source }}</span></div>
-          <div v-if="detail.processing_note" class="meta-row">
-            <span class="meta-key mono">处理</span>
-            <span class="meta-val">{{ detail.processing_note }}</span>
+        <details v-if="detail" class="drawer-meta">
+          <summary>
+            <Info :size="14" />
+            <span>记录信息</span>
+            <ChevronDown :size="14" />
+          </summary>
+          <div class="meta-list">
+            <div class="meta-row"><span class="meta-key mono">ID</span><span class="meta-val mono">#{{ detail.id }}</span></div>
+            <div class="meta-row"><span class="meta-key mono">来源</span><span class="meta-val">{{ detail.source }}</span></div>
+            <div v-if="detail.processing_note" class="meta-row">
+              <span class="meta-key mono">处理</span>
+              <span class="meta-val">{{ detail.processing_note }}</span>
+            </div>
+            <div v-if="detail.processing_override_label" class="meta-row">
+              <span class="meta-key mono">覆盖</span>
+              <span class="meta-val">{{ detail.processing_override_label }}</span>
+            </div>
+            <div v-if="detail.size_bytes" class="meta-row">
+              <span class="meta-key mono">大小</span><span class="meta-val mono">{{ humanSize(detail.size_bytes) }}</span>
+            </div>
+            <div v-if="detail.file_path" class="meta-row">
+              <span class="meta-key mono">路径</span>
+              <span class="meta-val mono path" :title="detail.file_path">{{ detail.file_path }}</span>
+            </div>
           </div>
-          <div v-if="detail.processing_override_label" class="meta-row">
-            <span class="meta-key mono">覆盖</span>
-            <span class="meta-val">{{ detail.processing_override_label }}</span>
-          </div>
-          <div v-if="detail.size_bytes" class="meta-row">
-            <span class="meta-key mono">大小</span><span class="meta-val mono">{{ humanSize(detail.size_bytes) }}</span>
-          </div>
-          <div v-if="detail.file_path" class="meta-row">
-            <span class="meta-key mono">路径</span>
-            <span class="meta-val mono path" :title="detail.file_path">{{ detail.file_path }}</span>
-          </div>
-        </div>
+        </details>
 
         <!-- Error -->
         <p v-if="error" class="drawer-error">{{ error }}</p>
@@ -532,26 +550,29 @@ onBeforeUnmount(() => {
               class="action-btn primary-btn"
               type="button"
               :disabled="acting"
-              @click="doSaveEdit(false)"
-            >
-              保存
+            @click="doSaveEdit(false)"
+          >
+              <Save :size="14" />
+              <span>保存</span>
             </button>
             <button
               v-if="isPending"
               class="action-btn archive-btn"
               type="button"
               :disabled="acting"
-              @click="doSaveEdit(true)"
-            >
-              保存并打开同类下一条
+            @click="doSaveEdit(true)"
+          >
+              <ArrowRight :size="14" />
+              <span>保存并打开同类下一条</span>
             </button>
             <button
               class="action-btn archive-btn"
               type="button"
               :disabled="acting"
-              @click="cancelEdit"
-            >
-              取消
+            @click="cancelEdit"
+          >
+              <X :size="14" />
+              <span>取消</span>
             </button>
           </template>
           <button
@@ -561,7 +582,8 @@ onBeforeUnmount(() => {
             :disabled="acting"
             @click="startEdit"
           >
-            编辑
+            <Pencil :size="14" />
+            <span>编辑</span>
           </button>
           <button
             v-if="!editing && isPending"
@@ -570,7 +592,8 @@ onBeforeUnmount(() => {
             :disabled="acting"
             @click="doReadyAndNext"
           >
-            完成并打开同类下一条
+            <ArrowRight :size="14" />
+            <span>完成并打开同类下一条</span>
           </button>
           <button
             v-if="!editing && isPending"
@@ -579,7 +602,8 @@ onBeforeUnmount(() => {
             :disabled="acting"
             @click="doMarkReady"
           >
-            标记就绪
+            <Check :size="14" />
+            <span>标记就绪</span>
           </button>
           <button
             v-if="!editing && isOverridden"
@@ -588,7 +612,8 @@ onBeforeUnmount(() => {
             :disabled="acting"
             @click="doMarkPending"
           >
-            退回待处理
+            <RotateCcw :size="14" />
+            <span>退回待处理</span>
           </button>
           <button
             v-if="!editing && detail.lifeline_id"
@@ -597,7 +622,8 @@ onBeforeUnmount(() => {
             :disabled="acting"
             @click="openLifeline"
           >
-            打开所属项目 / 生活线
+            <FolderOpen :size="14" />
+            <span>打开所属项目 / 生活线</span>
           </button>
           <button
             v-if="!editing && detail.file_url"
@@ -606,7 +632,8 @@ onBeforeUnmount(() => {
             :disabled="acting || fileLoading"
             @click="doDownloadFile"
           >
-            下载文件
+            <Download :size="14" />
+            <span>下载文件</span>
           </button>
           <button
             v-if="!editing"
@@ -615,7 +642,9 @@ onBeforeUnmount(() => {
             :disabled="acting"
             @click="doArchive"
           >
-            {{ isInbox ? '归档' : '恢复' }}
+            <Archive v-if="isInbox" :size="14" />
+            <RotateCcw v-else :size="14" />
+            <span>{{ isInbox ? '归档' : '恢复' }}</span>
           </button>
           <button
             v-if="!editing"
@@ -624,7 +653,8 @@ onBeforeUnmount(() => {
             :disabled="acting"
             @click="doDelete"
           >
-            {{ deleteConfirm ? '确认删除？' : '删除' }}
+            <Trash2 :size="14" />
+            <span>{{ deleteConfirm ? '确认删除？' : '删除' }}</span>
           </button>
         </div>
       </div>
@@ -637,8 +667,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 82;
-  background: rgba(7, 9, 13, 0.35);
-  backdrop-filter: blur(4px);
+  background: rgba(23, 26, 22, 0.17);
 }
 
 .drawer-panel {
@@ -646,11 +675,10 @@ onBeforeUnmount(() => {
   right: 0;
   top: 0;
   height: 100vh;
-  width: min(440px, 92vw);
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
+  width: min(620px, 96vw);
+  background: var(--surface-1);
   border-left: 1px solid var(--line-2);
-  box-shadow: var(--shadow-2);
+  box-shadow: -24px 0 68px rgba(23, 26, 22, 0.12);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -662,7 +690,7 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--accent);
+  background: var(--focus);
   opacity: 0.6;
   animation: progressPulse 0.8s ease-in-out infinite;
 }
@@ -675,27 +703,34 @@ onBeforeUnmount(() => {
 /* Header */
 .drawer-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  height: 56px;
-  padding: 0 var(--s-4);
-  border-bottom: 1px solid var(--line-1);
+  min-height: 118px;
+  padding: 26px 30px 24px 42px;
+  border-bottom: 1px solid var(--line-2);
   flex-shrink: 0;
 }
 
 .head-left {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
+  display: grid;
+  gap: 5px;
+}
+
+.head-left strong {
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 400;
 }
 
 .type-chip {
-  font-size: var(--fs-1);
-  color: var(--text-3);
+  width: max-content;
+  color: var(--chip-accent, var(--text-5));
+  font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding-left: 10px;
-  border-left: 4px solid var(--chip-accent, var(--text-5));
+  letter-spacing: 0;
+  padding-left: 8px;
+  border-left: 2px solid currentColor;
 }
 
 .head-time {
@@ -704,28 +739,28 @@ onBeforeUnmount(() => {
 }
 
 .close-btn {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   background: transparent;
-  border: none;
-  border-radius: var(--r-2);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
   color: var(--text-3);
   font-size: 18px;
   transition: all var(--t-fast) var(--ease);
 }
 
 .close-btn:hover {
-  background: var(--surface-2);
-  color: var(--text-1);
+  color: var(--surface-1);
+  background: var(--text-1);
 }
 
 /* Body */
 .drawer-body {
   flex: 1;
   overflow-y: auto;
-  padding: var(--s-4);
+  padding: 36px 42px;
 }
 
 .loading {
@@ -734,16 +769,17 @@ onBeforeUnmount(() => {
 }
 
 .content-text {
-  font-size: var(--fs-4);
+  font-family: var(--font-display);
+  font-size: 17px;
   color: var(--text-1);
-  line-height: var(--lh-base);
+  line-height: 1.82;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .edit-form {
   display: grid;
-  gap: var(--s-3);
+  gap: 24px;
 }
 
 .edit-field {
@@ -756,9 +792,10 @@ onBeforeUnmount(() => {
 .edit-field input,
 .edit-field textarea {
   width: 100%;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   font: inherit;
 }
@@ -770,9 +807,16 @@ onBeforeUnmount(() => {
 
 .edit-field textarea {
   min-height: 260px;
-  padding: var(--s-3);
+  padding: 16px 0;
+  border: 1px solid var(--line-1);
   line-height: var(--lh-base);
   resize: vertical;
+}
+
+.edit-field input:focus,
+.edit-field textarea:focus {
+  border-color: var(--cobalt);
+  outline: none;
 }
 
 .edit-hint {
@@ -788,15 +832,15 @@ onBeforeUnmount(() => {
 
 .preview-img {
   max-width: 100%;
-  border-radius: var(--r-2);
-  margin-bottom: var(--s-3);
+  border-radius: 0;
+  margin-bottom: 22px;
 }
 
 .file-frame {
   width: 100%;
   min-height: 360px;
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: 0;
   background: var(--surface-1);
   margin: var(--s-3) 0;
 }
@@ -814,21 +858,50 @@ onBeforeUnmount(() => {
 .audio-player {
   width: 100%;
   margin-bottom: var(--s-3);
-  border-radius: var(--r-2);
+  border-radius: 0;
 }
 
 /* Metadata */
 .drawer-meta {
-  padding: var(--s-3) var(--s-4);
+  padding: 0 30px;
   border-top: 1px solid var(--line-1);
   flex-shrink: 0;
+}
+
+.drawer-meta summary {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 18px 1fr 18px;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.drawer-meta summary::-webkit-details-marker {
+  display: none;
+}
+
+.drawer-meta summary svg:last-child {
+  transition: transform var(--t-base) var(--ease);
+}
+
+.drawer-meta[open] summary svg:last-child {
+  transform: rotate(180deg);
+}
+
+.meta-list {
+  padding: 0 12px 14px 26px;
 }
 
 .meta-row {
   display: flex;
   align-items: baseline;
   gap: var(--s-3);
-  padding: 3px 0;
+  padding: 5px 0;
 }
 
 .meta-key {
@@ -836,7 +909,7 @@ onBeforeUnmount(() => {
   color: var(--text-4);
   min-width: 36px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .meta-val {
@@ -852,13 +925,13 @@ onBeforeUnmount(() => {
 
 /* Error */
 .drawer-error {
-  padding: var(--s-2) var(--s-4);
+  padding: 9px 30px;
   font-size: var(--fs-2);
   color: var(--error);
 }
 
 .drawer-feedback {
-  padding: var(--s-2) var(--s-4);
+  padding: 9px 30px;
   font-size: var(--fs-2);
   color: var(--accent-bright);
 }
@@ -867,45 +940,52 @@ onBeforeUnmount(() => {
 .drawer-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--s-2);
-  padding: var(--s-3) var(--s-4);
-  border-top: 1px solid var(--line-1);
+  gap: 7px;
+  padding: 16px 30px 20px;
+  border-top: 1px solid var(--line-2);
   flex-shrink: 0;
 }
 
 .action-btn {
-  flex: 1 1 42%;
-  padding: var(--s-2) var(--s-3);
-  font-size: var(--fs-3);
-  border-radius: var(--r-2);
+  min-height: 38px;
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 var(--s-3);
+  font-size: var(--fs-2);
+  border-radius: 0;
   transition: all var(--t-fast) var(--ease);
 }
 
 .primary-btn {
   flex-basis: 100%;
-  background: var(--accent);
+  min-height: 44px;
+  background: var(--text-1);
   border: 1px solid transparent;
-  color: var(--bg);
+  color: var(--surface-1);
 }
 
 .primary-btn:hover:not(:disabled) {
-  filter: brightness(1.06);
+  color: var(--surface-1);
+  background: var(--focus);
 }
 
 .archive-btn {
-  background: var(--surface-2);
-  border: 1px solid var(--line-2);
-  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--line-1);
+  color: var(--text-3);
 }
 
 .archive-btn:hover:not(:disabled) {
-  background: var(--surface-3);
+  background: rgba(23, 26, 22, 0.04);
   color: var(--text-1);
 }
 
 .delete-btn {
   background: transparent;
-  border: 1px solid var(--line-1);
+  border: 1px solid transparent;
   color: var(--error);
 }
 
@@ -937,5 +1017,47 @@ onBeforeUnmount(() => {
 }
 .drawer-leave-to .drawer-panel {
   transform: translateX(100%);
+}
+
+@media (max-width: 640px) {
+  .drawer {
+    background: var(--surface-1);
+  }
+
+  .drawer-panel {
+    width: 100vw;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .drawer-head {
+    min-height: 102px;
+    padding: 20px 18px 18px 24px;
+  }
+
+  .head-left strong {
+    font-size: 22px;
+  }
+
+  .drawer-body {
+    padding: 28px 24px;
+  }
+
+  .content-text {
+    font-size: 16px;
+  }
+
+  .drawer-meta,
+  .drawer-actions {
+    padding-inline: 18px;
+  }
+
+  .drawer-actions {
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .action-btn {
+    flex: 1 1 auto;
+  }
 }
 </style>

@@ -993,9 +993,10 @@ def main() -> None:
                         vue_task_title = "Vue smoke task"
                         today = datetime.now().date().isoformat()
                         vue_page.goto(f"{base_url}/app?mode=tasks", wait_until="networkidle")
-                        vue_page.get_by_role("heading", name="任务台").wait_for(timeout=15_000)
-                        vue_page.get_by_role("heading", name="今日任务").wait_for(timeout=15_000)
-                        vue_page.get_by_role("heading", name="全部任务").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="行动索引").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="今天与逾期").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="行动档案").wait_for(timeout=15_000)
+                        vue_page.locator(".create-panel > summary").click()
                         vue_page.get_by_label("任务标题").fill(vue_task_title)
                         vue_page.get_by_label("任务详情").fill("created by smoke test")
                         vue_page.get_by_label("截止日期").fill(today)
@@ -1004,10 +1005,10 @@ def main() -> None:
                             and response.request.method == "POST"
                             and response.status == 201
                         ):
-                            vue_page.get_by_role("button", name="添加任务").click()
+                            vue_page.get_by_role("button", name="加入行动账册").click()
                         vue_task_row = vue_page.locator(".list-panel .task-row").filter(has_text=vue_task_title).first
                         vue_task_row.wait_for(timeout=15_000)
-                        vue_task_row.get_by_role("button", name="详情").click()
+                        vue_task_row.get_by_role("button", name="打开行动详情").click()
                         vue_page.locator(".object-panel").get_by_text("created by smoke test", exact=False).wait_for(
                             timeout=15_000
                         )
@@ -1068,9 +1069,10 @@ def main() -> None:
 
                         vue_memory_content = "Vue smoke memory"
                         vue_page.goto(f"{base_url}/app?mode=memories", wait_until="networkidle")
-                        vue_page.get_by_role("heading", name="记忆库").wait_for(timeout=15_000)
-                        vue_page.get_by_role("heading", name="快速新增").wait_for(timeout=15_000)
-                        vue_page.get_by_role("heading", name="记忆列表").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="记忆索引").wait_for(timeout=15_000)
+                        vue_page.get_by_text("保留一条记忆", exact=True).wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="长期记忆").wait_for(timeout=15_000)
+                        vue_page.locator(".create-panel > summary").click()
                         vue_page.get_by_label("记忆内容").fill(vue_memory_content)
                         vue_page.get_by_label("记忆详情").fill("created by smoke test")
                         with vue_page.expect_response(
@@ -1078,12 +1080,12 @@ def main() -> None:
                             and response.request.method == "POST"
                             and response.status == 201
                         ):
-                            vue_page.get_by_role("button", name="添加记忆").click()
+                            vue_page.get_by_role("button", name="加入记忆账册").click()
                         vue_memory_row = vue_page.locator(".list-panel .memory-row").filter(
                             has_text=vue_memory_content
                         ).first
                         vue_memory_row.wait_for(timeout=15_000)
-                        vue_memory_row.get_by_role("button", name="详情").click()
+                        vue_memory_row.get_by_role("button", name="打开记忆详情").click()
                         vue_page.locator(".object-panel").get_by_text("created by smoke test", exact=False).wait_for(
                             timeout=15_000
                         )
@@ -1160,7 +1162,7 @@ def main() -> None:
                             has_text=source_memory_content
                         ).first
                         source_memory_row.wait_for(timeout=15_000)
-                        source_memory_row.get_by_role("button", name="详情").click()
+                        source_memory_row.get_by_role("button", name="打开记忆详情").click()
                         vue_page.locator(".object-panel").get_by_text("源记录", exact=False).wait_for(timeout=15_000)
                         vue_page.locator(".object-panel .source-card").click()
                         vue_page.locator(".drawer-panel").get_by_text(source_item_text, exact=False).wait_for(
@@ -1220,9 +1222,10 @@ def main() -> None:
 
                         vue_decision_title = "Vue smoke decision"
                         vue_page.goto(f"{base_url}/app?mode=decisions", wait_until="networkidle")
-                        vue_page.get_by_role("heading", name="决策台").wait_for(timeout=15_000)
-                        vue_page.get_by_role("heading", name="快速新增").wait_for(timeout=15_000)
-                        vue_page.get_by_role("heading", name="决策列表").wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="决定索引").wait_for(timeout=15_000)
+                        vue_page.get_by_text("记下一次选择", exact=True).wait_for(timeout=15_000)
+                        vue_page.get_by_role("heading", name="选择与结果").wait_for(timeout=15_000)
+                        vue_page.locator(".create-panel > summary").click()
                         vue_page.get_by_label("决策标题").fill(vue_decision_title)
                         vue_page.get_by_label("决策内容").fill("choose the smoke path")
                         vue_page.get_by_label("决策背景").fill("created by smoke test")
@@ -1232,12 +1235,12 @@ def main() -> None:
                             and response.request.method == "POST"
                             and response.status == 201
                         ):
-                            vue_page.get_by_role("button", name="添加决策").click()
+                            vue_page.get_by_role("button", name="加入决定账册").click()
                         vue_decision_row = vue_page.locator(".list-panel .decision-row").filter(
                             has_text=vue_decision_title
                         ).first
                         vue_decision_row.wait_for(timeout=15_000)
-                        vue_decision_row.get_by_role("button", name="详情").click()
+                        vue_decision_row.get_by_role("button", name="打开决定详情").click()
                         vue_page.locator(".object-panel").get_by_text("choose the smoke path", exact=False).wait_for(
                             timeout=15_000
                         )

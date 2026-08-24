@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { Archive, ArrowUpRight, Check, Plus, RefreshCw } from '@lucide/vue';
 import { ApiError } from '@/api/client';
 import ItemDrawer from '@/components/ItemDrawer.vue';
 import ObjectDrawer from '@/components/ObjectDrawer.vue';
@@ -207,11 +208,12 @@ onMounted(() => {
   <main class="memories-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Memories</p>
-        <h1>记忆库</h1>
+        <p class="eyebrow">05 / MEMORY</p>
+        <h1>记忆索引</h1>
+        <span>FACTS / PREFERENCES / GOALS / EVENTS</span>
       </div>
-      <button class="refresh-btn" type="button" :disabled="loading" @click="refreshAll">
-        <span>{{ loading ? '刷新中' : '刷新' }}</span>
+      <button class="refresh-btn" type="button" title="刷新记忆" aria-label="刷新记忆" :disabled="loading" @click="refreshAll">
+        <RefreshCw :size="17" :class="{ spinning: loading }" />
       </button>
     </header>
 
@@ -223,32 +225,33 @@ onMounted(() => {
       <span>{{ feedback }}</span>
     </div>
 
-    <section class="metrics" aria-label="记忆指标">
+    <section class="metrics" aria-label="记忆计数">
       <article>
-        <span>总量</span>
+        <span>LEDGER</span>
         <strong>{{ stats?.total ?? total }}</strong>
-        <small>全部长期记忆</small>
+        <small>全部</small>
       </article>
       <article>
-        <span>候选</span>
+        <span>PENDING</span>
         <strong>{{ candidateCount }}</strong>
-        <small>需要人工确认</small>
+        <small>待确认</small>
       </article>
       <article>
-        <span>已确认</span>
+        <span>KEPT</span>
         <strong>{{ confirmedCount }}</strong>
         <small>{{ archivedCount }} 已归档</small>
       </article>
     </section>
 
     <section class="workspace-grid">
-      <div class="panel create-panel">
-        <div class="panel-head">
+      <details class="panel create-panel">
+        <summary class="panel-head">
           <div>
-            <p class="eyebrow">Create</p>
-            <h2>快速新增</h2>
+            <p class="eyebrow">NEW / 01</p>
+            <h2>保留一条记忆</h2>
           </div>
-        </div>
+          <Plus :size="18" />
+        </summary>
 
         <form class="memory-form" @submit.prevent="submitMemory">
           <label>
@@ -278,16 +281,17 @@ onMounted(() => {
             />
           </label>
           <button class="primary-action" type="submit" :disabled="saving || !draft.content.trim()">
-            {{ saving ? '添加中' : '添加记忆' }}
+            <Plus :size="15" />
+            <span>{{ saving ? '添加中' : '加入记忆账册' }}</span>
           </button>
         </form>
-      </div>
+      </details>
 
       <section class="panel list-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Memory List</p>
-            <h2>记忆列表</h2>
+            <p class="eyebrow">ARCHIVE / 02</p>
+            <h2>长期记忆</h2>
           </div>
           <div class="filters">
             <label>
@@ -329,19 +333,19 @@ onMounted(() => {
               </div>
             </div>
             <div class="memory-actions">
-              <button type="button" @click="openMemoryDetail(memory.id)">详情</button>
+              <button type="button" title="打开详情" aria-label="打开记忆详情" @click="openMemoryDetail(memory.id)"><ArrowUpRight :size="14" /></button>
               <button
                 v-if="memory.status !== 'confirmed'"
                 type="button"
                 :disabled="busyMemoryId === memory.id"
                 @click="updateMemoryStatus(memory, 'confirm')"
-              >确认</button>
+              ><Check :size="14" /><span>确认</span></button>
               <button
                 v-if="memory.status !== 'archived'"
                 type="button"
                 :disabled="busyMemoryId === memory.id"
                 @click="updateMemoryStatus(memory, 'archive')"
-              >归档</button>
+              ><Archive :size="14" /><span>归档</span></button>
             </div>
           </article>
         </div>
@@ -365,12 +369,12 @@ onMounted(() => {
 
 <style scoped>
 .memories-view {
+  width: min(1240px, 100%);
   min-height: 100vh;
-  padding: var(--s-8) var(--s-6) calc(var(--s-8) + 72px);
+  margin: 0 auto;
+  padding: 46px 42px 110px;
   color: var(--text-1);
-  background:
-    radial-gradient(circle at 12% 0%, rgba(141, 164, 198, 0.10), transparent 32%),
-    linear-gradient(180deg, rgba(12, 16, 24, 0.96), rgba(9, 12, 18, 1));
+  background: transparent;
 }
 
 .topbar,
@@ -384,9 +388,10 @@ onMounted(() => {
 }
 
 .topbar {
+  min-height: 168px;
   justify-content: space-between;
-  gap: var(--s-4);
-  margin-bottom: var(--s-5);
+  gap: 32px;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .topbar h1,
@@ -396,15 +401,28 @@ onMounted(() => {
 }
 
 .topbar h1 {
-  font-size: 2.75rem;
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 400;
+  line-height: 1.18;
+}
+
+.topbar > div > span {
+  display: block;
+  margin-top: 12px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 8px;
 }
 
 .eyebrow {
   margin: 0 0 var(--s-1);
   color: var(--text-3);
+  font-family: var(--font-mono);
   font-size: var(--fs-1);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
 }
 
 .refresh-btn,
@@ -412,29 +430,46 @@ onMounted(() => {
 .memory-actions button,
 .load-more,
 .notice button {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-1);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-3);
   cursor: pointer;
   transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
 }
 
 .refresh-btn,
 .load-more {
-  padding: var(--s-2) var(--s-4);
+  min-width: 42px;
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0 14px;
 }
 
 .primary-action {
   width: 100%;
-  padding: var(--s-3) var(--s-4);
-  background: rgba(141, 164, 198, 0.16);
-  border-color: rgba(141, 164, 198, 0.34);
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 var(--s-4);
+  color: var(--surface-1);
+  background: var(--text-1);
+  border-color: var(--text-1);
 }
 
 button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text-1);
+  background: rgba(23, 26, 22, 0.045);
+  border-color: var(--line-3);
+}
+
+.primary-action:hover:not(:disabled) {
+  color: var(--surface-1);
+  background: var(--cobalt);
+  border-color: var(--cobalt);
 }
 
 button:disabled {
@@ -446,9 +481,9 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   gap: var(--s-3);
-  margin-bottom: var(--s-4);
-  padding: var(--s-3) var(--s-4);
-  border-radius: 8px;
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-radius: 0;
 }
 
 .error-row {
@@ -462,17 +497,26 @@ button:disabled {
 }
 
 .metrics {
-  gap: var(--s-3);
-  margin-bottom: var(--s-5);
+  gap: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .metrics article {
   flex: 1;
   min-width: 0;
-  padding: var(--s-4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: minmax(56px, auto) 1fr;
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 2px 14px;
+  padding: 16px 24px;
+  border-right: 1px solid var(--line-1);
+  background: transparent;
+}
+
+.metrics article:last-child {
+  border-right: 0;
 }
 
 .metrics span,
@@ -482,38 +526,69 @@ button:disabled {
 }
 
 .metrics strong {
-  display: block;
-  margin: var(--s-1) 0;
-  font-size: 1.9rem;
+  grid-row: 1 / 3;
+  color: var(--cobalt);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1;
 }
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.74fr) minmax(420px, 1.26fr);
-  gap: var(--s-4);
+  grid-template-columns: minmax(280px, 0.68fr) minmax(440px, 1.32fr);
+  gap: 0;
 }
 
 .panel {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
-  backdrop-filter: blur(18px);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
-.create-panel,
+.create-panel {
+  padding: 30px 32px 30px 0;
+  border-right: 1px solid var(--line-1);
+}
+
 .list-panel {
-  padding: var(--s-5);
+  padding: 30px 0 0 40px;
+}
+
+.create-panel > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.create-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.create-panel > summary > svg {
+  color: var(--cobalt);
+  transition: transform var(--t-base) var(--ease);
+}
+
+.create-panel[open] > summary > svg {
+  transform: rotate(45deg);
 }
 
 .panel-head {
   justify-content: space-between;
   gap: var(--s-4);
-  margin-bottom: var(--s-4);
+  margin-bottom: 0;
+}
+
+.create-panel[open] .panel-head,
+.list-panel .panel-head {
+  margin-bottom: 24px;
 }
 
 .memory-form {
   display: grid;
-  gap: var(--s-3);
+  gap: 18px;
+  padding-top: 4px;
 }
 
 .memory-form label,
@@ -528,9 +603,10 @@ button:disabled {
 .memory-form select,
 .filters select {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 8px;
-  background: rgba(7, 10, 15, 0.64);
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   font: inherit;
 }
@@ -542,8 +618,17 @@ button:disabled {
 }
 
 .memory-form textarea {
+  min-height: 90px;
+  border: 1px solid var(--line-1);
   resize: vertical;
   padding: var(--s-3);
+}
+
+.memory-form textarea:focus,
+.memory-form select:focus,
+.filters select:focus {
+  border-color: var(--cobalt);
+  outline: none;
 }
 
 .filters {
@@ -551,18 +636,18 @@ button:disabled {
 }
 
 .filter-summary {
-  --filter-summary-accent: rgb(141, 164, 198);
-  --filter-summary-button-border: rgba(255, 255, 255, 0.12);
-  --filter-summary-button-bg: rgba(255, 255, 255, 0.06);
+  --filter-summary-accent: var(--cobalt);
+  --filter-summary-button-border: var(--line-2);
+  --filter-summary-button-bg: transparent;
   --filter-summary-button-color: var(--text-1);
-  --filter-summary-button-hover-border: rgba(255, 255, 255, 0.22);
-  --filter-summary-button-hover-bg: rgba(255, 255, 255, 0.10);
-  margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+  --filter-summary-button-hover-border: var(--line-3);
+  --filter-summary-button-hover-bg: rgba(23, 26, 22, 0.04);
+  margin: -8px 0 16px;
 }
 
 .memory-list {
   display: grid;
-  gap: var(--s-3);
+  gap: 0;
 }
 
 .memory-row {
@@ -570,14 +655,19 @@ button:disabled {
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--s-3);
   align-items: center;
-  padding: var(--s-3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(8, 11, 17, 0.46);
+  min-height: 88px;
+  padding: 17px 0;
+  border-top: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+}
+
+.memory-row:last-child {
+  border-bottom: 1px solid var(--line-1);
 }
 
 .memory-row.confirmed {
-  border-color: rgba(109, 181, 168, 0.20);
+  border-top-color: var(--line-1);
 }
 
 .memory-row.archived {
@@ -595,6 +685,12 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
+.memory-main strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 520;
+}
+
 .memory-main p {
   margin: var(--s-1) 0 var(--s-2);
   color: var(--text-2);
@@ -609,29 +705,27 @@ button:disabled {
 
 .memory-meta span,
 .status-dot {
-  border-radius: 999px;
+  border-radius: 0;
 }
 
 .memory-meta span {
-  padding: 2px var(--s-2);
-  background: rgba(255, 255, 255, 0.055);
+  padding-right: var(--s-2);
+  background: transparent;
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
-  background: #d3b36f;
-  box-shadow: 0 0 14px rgba(211, 179, 111, 0.34);
+  width: 3px;
+  height: 36px;
+  background: var(--yellow);
+  box-shadow: none;
 }
 
 .status-dot.confirmed {
-  background: #6db5a8;
-  box-shadow: 0 0 14px rgba(109, 181, 168, 0.34);
+  background: var(--accent);
 }
 
 .status-dot.archived {
-  background: #8f7f7c;
-  box-shadow: none;
+  background: var(--text-5);
 }
 
 .memory-actions {
@@ -642,8 +736,19 @@ button:disabled {
 
 .memory-actions button {
   min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 0 var(--s-3);
   font-size: var(--fs-1);
+  border-color: transparent;
+}
+
+.memory-actions button:first-child {
+  width: 32px;
+  padding: 0;
+  border-color: var(--line-1);
 }
 
 .empty-line {
@@ -652,12 +757,21 @@ button:disabled {
 }
 
 .load-more {
-  margin-top: var(--s-4);
+  width: 100%;
+  margin-top: 20px;
+}
+
+.spinning {
+  animation: ledger-spin 0.8s linear infinite;
+}
+
+@keyframes ledger-spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 900px) {
   .memories-view {
-    padding: var(--s-7) var(--s-4) calc(var(--s-8) + 72px);
+    padding: 28px 18px calc(var(--app-mobile-nav-height) + 34px);
   }
 
   .workspace-grid,
@@ -667,12 +781,51 @@ button:disabled {
 
   .metrics {
     display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .metrics article {
+    min-height: 82px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 10px;
+  }
+
+  .metrics strong {
+    order: -1;
+    font-size: 27px;
+  }
+
+  .metrics small {
+    display: none;
+  }
+
+  .topbar {
+    min-height: 140px;
+  }
+
+  .topbar h1 {
+    font-size: 34px;
+  }
+
+  .create-panel {
+    padding: 24px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-1);
+  }
+
+  .list-panel {
+    padding: 32px 0 0;
+  }
+
+  .memory-row {
+    align-items: stretch;
   }
 
   .topbar,
-  .panel-head,
-  .memory-row {
-    align-items: stretch;
+  .panel-head {
+    align-items: center;
   }
 
   .memory-row {
@@ -685,6 +838,10 @@ button:disabled {
 
   .filters {
     flex-direction: column;
+  }
+
+  .memory-actions {
+    justify-content: flex-start;
   }
 }
 </style>

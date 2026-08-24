@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Check, GitFork, ListTree, Pencil, Plus, Sparkles, X } from '@lucide/vue';
+import {
+  Archive,
+  ArrowUpRight,
+  Check,
+  GitFork,
+  ListTree,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  X,
+} from '@lucide/vue';
 import { ApiError } from '@/api/client';
 import {
   cancelTask,
@@ -533,7 +544,7 @@ useWindowEventListener('keydown', onKey);
 
         <header class="object-head">
           <div>
-            <p class="eyebrow">{{ kind ? objectKindLabel(kind) : 'Object' }}</p>
+            <p class="eyebrow">{{ kind ? objectKindLabel(kind) : 'Object' }} / CONTEXT</p>
             <h2>{{ title }}</h2>
             <span>{{ subtitle }}<template v-if="createdAt"> · {{ formatRelative(createdAt) }}</template></span>
           </div>
@@ -894,19 +905,19 @@ useWindowEventListener('keydown', onKey);
               type="button"
               :disabled="acting"
               @click="updateTask('done')"
-            >完成</button>
+            ><Check :size="14" /><span>完成</span></button>
             <button
               v-if="task.status !== 'todo'"
               type="button"
               :disabled="acting"
               @click="updateTask('todo')"
-            >恢复</button>
+            ><RotateCcw :size="14" /><span>恢复</span></button>
             <button
               v-if="task.status !== 'cancelled' && !taskHasOpenSteps"
               type="button"
               :disabled="acting"
               @click="updateTask('cancel')"
-            >取消</button>
+            ><X :size="14" /><span>取消</span></button>
             <button
               v-if="canBreakDownTask && !taskBreakdownOpen"
               class="ai-action-button"
@@ -922,7 +933,7 @@ useWindowEventListener('keydown', onKey);
               type="button"
               :disabled="acting"
               @click="startTaskBreakdown"
-            >{{ taskSubtasks.length ? '手动补步骤' : '手动拆解' }}</button>
+            ><ListTree :size="14" /><span>{{ taskSubtasks.length ? '手动补步骤' : '手动拆解' }}</span></button>
           </template>
           <template v-if="memory">
             <button
@@ -930,28 +941,31 @@ useWindowEventListener('keydown', onKey);
               type="button"
               :disabled="acting"
               @click="startGoalAction"
-            >补下一步</button>
+            ><Plus :size="14" /><span>补下一步</span></button>
             <button
               v-if="memory.status === 'candidate'"
               type="button"
               :disabled="acting"
               @click="updateMemory('confirm')"
-            >确认</button>
+            ><Check :size="14" /><span>确认</span></button>
             <button
               v-if="memory.status !== 'archived'"
               type="button"
               :disabled="acting"
               @click="updateMemory('archive')"
-            >归档</button>
+            ><Archive :size="14" /><span>归档</span></button>
           </template>
           <template v-if="decision?.status === 'pending'">
             <button
               type="button"
               :disabled="acting || !decisionReviewDraft.trim()"
               @click="submitDecisionReview"
-            >标记已回顾</button>
+            ><Check :size="14" /><span>标记已回顾</span></button>
           </template>
-          <button type="button" @click="openWorkspace">{{ collectionLabel }}</button>
+          <button class="context-link" type="button" @click="openWorkspace">
+            <span>{{ collectionLabel }}</span>
+            <ArrowUpRight :size="14" />
+          </button>
         </footer>
       </div>
     </aside>
@@ -962,9 +976,8 @@ useWindowEventListener('keydown', onKey);
 .object-drawer {
   position: fixed;
   inset: 0;
-  z-index: 76;
-  background: rgba(7, 9, 13, 0.35);
-  backdrop-filter: blur(4px);
+  z-index: 84;
+  background: rgba(23, 26, 22, 0.17);
 }
 
 .object-panel {
@@ -973,13 +986,12 @@ useWindowEventListener('keydown', onKey);
   top: 0;
   display: flex;
   flex-direction: column;
-  width: min(420px, 92vw);
+  width: min(640px, 96vw);
   height: 100vh;
   overflow: hidden;
   border-left: 1px solid var(--line-2);
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  box-shadow: var(--shadow-2);
+  background: var(--surface-1);
+  box-shadow: -24px 0 68px rgba(23, 26, 22, 0.12);
 }
 
 .progress-bar {
@@ -988,7 +1000,7 @@ useWindowEventListener('keydown', onKey);
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--accent);
+  background: var(--focus);
   opacity: 0.7;
   animation: progressPulse 0.8s ease-in-out infinite;
 }
@@ -1001,19 +1013,21 @@ useWindowEventListener('keydown', onKey);
 .object-head {
   display: flex;
   justify-content: space-between;
-  gap: var(--s-4);
-  padding: var(--s-4);
-  border-bottom: 1px solid var(--line-1);
+  gap: 24px;
+  min-height: 126px;
+  padding: 26px 30px 24px 42px;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .object-head h2 {
-  max-width: 320px;
-  margin: var(--s-1) 0;
+  max-width: 490px;
+  margin: 6px 0;
   overflow-wrap: anywhere;
   color: var(--text-1);
-  font-size: var(--fs-6);
-  font-weight: 560;
-  line-height: var(--lh-tight);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.36;
   letter-spacing: 0;
 }
 
@@ -1025,33 +1039,39 @@ useWindowEventListener('keydown', onKey);
 .linked-list small,
 .meta-grid span {
   color: var(--text-3);
-  font-size: var(--fs-2);
+  font-size: 10px;
+}
+
+.object-head .eyebrow {
+  color: var(--violet);
+  font-family: var(--font-mono);
+  font-size: 9px;
 }
 
 .close-btn {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: var(--r-2);
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line-2);
+  border-radius: 0;
   color: var(--text-3);
   font-size: 18px;
 }
 
 .close-btn:hover {
-  background: var(--surface-2);
-  color: var(--text-1);
+  color: var(--surface-1);
+  background: var(--text-1);
 }
 
 .object-body {
   display: grid;
   flex: 1;
   align-content: start;
-  gap: var(--s-3);
+  gap: 0;
   overflow-y: auto;
-  padding: var(--s-4);
+  padding: 18px 42px 36px;
 }
 
 .detail-block,
@@ -1062,10 +1082,11 @@ useWindowEventListener('keydown', onKey);
 .empty-line,
 .feedback-line,
 .error-line {
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-  padding: var(--s-3);
+  border: 0;
+  border-top: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+  padding: 18px 0;
 }
 
 .detail-block {
@@ -1081,7 +1102,7 @@ useWindowEventListener('keydown', onKey);
 .goal-commitment {
   display: grid;
   gap: var(--s-3);
-  padding: var(--s-3) 0;
+  padding: 20px 0;
   border-top: 1px solid var(--line-1);
   border-bottom: 1px solid var(--line-1);
 }
@@ -1120,7 +1141,7 @@ useWindowEventListener('keydown', onKey);
   border-left: 2px solid var(--line-2);
   color: var(--text-2);
   font-size: var(--fs-2);
-  font-weight: 560;
+  font-weight: 540;
 }
 
 .goal-state-active { border-color: var(--accent); color: var(--accent-bright); }
@@ -1135,7 +1156,7 @@ useWindowEventListener('keydown', onKey);
   width: 30px;
   height: 30px;
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
+  border-radius: 0;
   color: var(--text-3);
 }
 
@@ -1167,9 +1188,10 @@ useWindowEventListener('keydown', onKey);
 .goal-profile-form textarea {
   width: 100%;
   min-height: 38px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
-  background: rgba(7, 10, 15, 0.52);
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   font: inherit;
   padding: 0 var(--s-3);
@@ -1177,6 +1199,7 @@ useWindowEventListener('keydown', onKey);
 
 .goal-profile-form textarea {
   min-height: 82px;
+  border: 1px solid var(--line-1);
   resize: vertical;
   line-height: var(--lh-base);
   padding-block: var(--s-2);
@@ -1185,7 +1208,7 @@ useWindowEventListener('keydown', onKey);
 .goal-profile-form input:focus,
 .goal-profile-form select:focus,
 .goal-profile-form textarea:focus {
-  border-color: rgba(110, 231, 208, 0.3);
+  border-color: var(--violet);
   outline: none;
 }
 
@@ -1201,7 +1224,7 @@ useWindowEventListener('keydown', onKey);
   gap: var(--s-2);
   min-height: 36px;
   border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
+  border-radius: 0;
   color: var(--text-2);
 }
 
@@ -1234,7 +1257,7 @@ useWindowEventListener('keydown', onKey);
 }
 
 .goal-parent-link:hover strong {
-  color: var(--accent-bright);
+  color: var(--cobalt);
 }
 
 .goal-review-line {
@@ -1287,16 +1310,17 @@ useWindowEventListener('keydown', onKey);
 .goal-action-form input {
   width: 100%;
   min-height: 38px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
-  background: rgba(7, 10, 15, 0.52);
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   font: inherit;
   padding: 0 var(--s-3);
 }
 
 .goal-action-form input:focus {
-  border-color: rgba(110, 231, 208, 0.3);
+  border-color: var(--cobalt);
   outline: none;
 }
 
@@ -1312,7 +1336,7 @@ useWindowEventListener('keydown', onKey);
   gap: var(--s-2);
   min-height: 38px;
   border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
+  border-radius: 0;
   color: var(--text-2);
 }
 
@@ -1321,9 +1345,10 @@ useWindowEventListener('keydown', onKey);
 .linked-list strong,
 .meta-grid strong {
   color: var(--text-1);
-  font-size: var(--fs-3);
-  font-weight: 500;
-  line-height: var(--lh-base);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.72;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -1333,8 +1358,8 @@ useWindowEventListener('keydown', onKey);
   min-height: 96px;
   resize: vertical;
   border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: rgba(7, 10, 15, 0.52);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   font: inherit;
   line-height: var(--lh-base);
@@ -1342,7 +1367,7 @@ useWindowEventListener('keydown', onKey);
 }
 
 .review-block textarea:focus {
-  border-color: rgba(110, 231, 208, 0.28);
+  border-color: var(--violet);
   outline: none;
 }
 
@@ -1365,8 +1390,8 @@ useWindowEventListener('keydown', onKey);
 }
 
 .source-card:hover {
-  border-color: rgba(110, 231, 208, 0.25);
-  background: var(--surface-2);
+  border-color: var(--line-3);
+  background: rgba(23, 26, 22, 0.025);
 }
 
 .linked-list {
@@ -1383,12 +1408,12 @@ useWindowEventListener('keydown', onKey);
 }
 
 .linked-row:hover {
-  border-color: rgba(110, 231, 208, 0.25);
-  background: var(--surface-2);
+  border-color: var(--line-3);
+  background: rgba(23, 26, 22, 0.025);
 }
 
 .task-parent-source svg {
-  color: var(--accent-bright);
+  color: var(--cobalt);
 }
 
 .task-parent-source-missing {
@@ -1461,7 +1486,7 @@ useWindowEventListener('keydown', onKey);
   display: grid;
   gap: var(--s-2);
   padding-left: var(--s-3);
-  border-left: 2px solid rgba(110, 231, 208, 0.3);
+  border-left: 2px solid rgba(49, 93, 130, 0.32);
 }
 
 .task-ai-suggestion > div,
@@ -1473,7 +1498,7 @@ useWindowEventListener('keydown', onKey);
 }
 
 .task-ai-suggestion strong {
-  color: var(--accent-bright);
+  color: var(--cobalt);
   font-size: var(--fs-2);
   font-weight: 560;
 }
@@ -1522,8 +1547,8 @@ useWindowEventListener('keydown', onKey);
   min-width: 0;
   min-height: 38px;
   border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
-  background: rgba(7, 10, 15, 0.52);
+  border-radius: 0;
+  background: transparent;
 }
 
 .task-breakdown-row > input,
@@ -1561,13 +1586,13 @@ useWindowEventListener('keydown', onKey);
   place-items: center;
   width: 30px;
   height: 30px;
-  border-radius: var(--r-2);
+  border-radius: 0;
   color: var(--text-4);
 }
 
 .task-breakdown-row > input:focus,
 .task-breakdown-row label:focus-within {
-  border-color: rgba(110, 231, 208, 0.3);
+  border-color: var(--cobalt);
   outline: none;
 }
 
@@ -1583,13 +1608,13 @@ useWindowEventListener('keydown', onKey);
   min-height: 34px;
   padding: 0 var(--s-3);
   border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
+  border-radius: 0;
   color: var(--text-2);
 }
 
 .task-breakdown-actions .task-breakdown-submit {
-  border-color: rgba(110, 231, 208, 0.25);
-  color: var(--accent-bright);
+  border-color: rgba(49, 93, 130, 0.28);
+  color: var(--cobalt);
 }
 
 .empty-line {
@@ -1597,8 +1622,8 @@ useWindowEventListener('keydown', onKey);
 }
 
 .feedback-line {
-  color: var(--accent-bright);
-  border-color: rgba(110, 231, 208, 0.22);
+  color: var(--accent);
+  border-color: var(--line-1);
 }
 
 .error-line {
@@ -1607,24 +1632,42 @@ useWindowEventListener('keydown', onKey);
 }
 
 .object-actions {
-  display: grid;
-  gap: var(--s-2);
-  padding: var(--s-3) var(--s-4);
-  border-top: 1px solid var(--line-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 16px 30px 20px;
+  border-top: 1px solid var(--line-2);
 }
 
 .object-actions button {
-  width: 100%;
+  width: auto;
   min-height: 38px;
   border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
+  border-radius: 0;
   color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 13px;
   transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 
 .object-actions button:hover {
-  border-color: rgba(110, 231, 208, 0.25);
+  border-color: var(--line-3);
   color: var(--text-1);
+}
+
+.object-actions > button:first-child:not(.context-link) {
+  color: var(--surface-1);
+  background: var(--text-1);
+  border-color: var(--text-1);
+}
+
+.object-actions > button:first-child:not(.context-link):hover {
+  color: var(--surface-1);
+  background: var(--focus);
+  border-color: var(--focus);
 }
 
 .object-actions .ai-action-button {
@@ -1632,8 +1675,14 @@ useWindowEventListener('keydown', onKey);
   align-items: center;
   justify-content: center;
   gap: var(--s-2);
-  border-color: rgba(110, 231, 208, 0.25);
-  color: var(--accent-bright);
+  border-color: rgba(49, 93, 130, 0.28);
+  color: var(--cobalt);
+}
+
+.object-actions .context-link {
+  margin-left: auto;
+  border-color: transparent;
+  color: var(--text-4);
 }
 
 .object-drawer-enter-active,
@@ -1657,6 +1706,39 @@ useWindowEventListener('keydown', onKey);
 }
 
 @media (max-width: 560px) {
+  .object-drawer {
+    background: var(--surface-1);
+  }
+
+  .object-panel {
+    width: 100vw;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .object-head {
+    min-height: 108px;
+    padding: 20px 18px 18px 24px;
+  }
+
+  .object-head h2 {
+    max-width: calc(100vw - 98px);
+    font-size: 22px;
+  }
+
+  .object-body {
+    padding: 14px 24px 28px;
+  }
+
+  .object-actions {
+    padding: 14px 18px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .object-actions .context-link {
+    width: 100%;
+    margin-left: 0;
+  }
+
   .meta-grid {
     grid-template-columns: 1fr;
   }

@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import {
+  ArrowUpRight,
+  Check,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  X,
+} from '@lucide/vue';
+import {
   cancelTask,
   createTask,
   listTasks,
@@ -221,11 +229,12 @@ onMounted(() => {
   <main class="tasks-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Tasks</p>
-        <h1>任务台</h1>
+        <p class="eyebrow">04 / ACTION</p>
+        <h1>行动索引</h1>
+        <span>COMMITMENTS / NEXT STEPS / HISTORY</span>
       </div>
-      <button class="refresh-btn" type="button" :disabled="loadingToday || loadingList" @click="refreshAll">
-        <span>{{ loadingToday || loadingList ? '刷新中' : '刷新' }}</span>
+      <button class="refresh-btn" type="button" title="刷新行动" aria-label="刷新行动" :disabled="loadingToday || loadingList" @click="refreshAll">
+        <RefreshCw :size="17" :class="{ spinning: loadingToday || loadingList }" />
       </button>
     </header>
 
@@ -237,32 +246,33 @@ onMounted(() => {
       <span>{{ feedback }}</span>
     </div>
 
-    <section class="metrics" aria-label="任务指标">
+    <section class="metrics" aria-label="行动计数">
       <article>
-        <span>今日</span>
+        <span>NOW</span>
         <strong>{{ todayTasks.length }}</strong>
-        <small>当前需要推进</small>
+        <small>今天</small>
       </article>
       <article :class="{ urgent: overdueTasks.length > 0 }">
-        <span>逾期</span>
+        <span>OVERDUE</span>
         <strong>{{ overdueTasks.length }}</strong>
-        <small>需要重新安排</small>
+        <small>需要重排</small>
       </article>
       <article>
-        <span>列表</span>
+        <span>LEDGER</span>
         <strong>{{ total }}</strong>
-        <small>{{ todoCount }} 待办 / {{ doneCount }} 完成</small>
+        <small>{{ todoCount }} 推进中 / {{ doneCount }} 已完成</small>
       </article>
     </section>
 
     <section class="workspace-grid">
-      <div class="panel create-panel">
-        <div class="panel-head">
+      <details class="panel create-panel">
+        <summary class="panel-head">
           <div>
-            <p class="eyebrow">Create</p>
-            <h2>快速新增</h2>
+            <p class="eyebrow">NEW / 01</p>
+            <h2>记下一步</h2>
           </div>
-        </div>
+          <Plus :size="18" />
+        </summary>
 
         <form class="task-form" @submit.prevent="submitTask">
           <label>
@@ -299,16 +309,17 @@ onMounted(() => {
             </label>
           </div>
           <button class="primary-action" type="submit" :disabled="saving || !draft.title.trim()">
-            {{ saving ? '添加中' : '添加任务' }}
+            <Plus :size="15" />
+            <span>{{ saving ? '添加中' : '加入行动账册' }}</span>
           </button>
         </form>
-      </div>
+      </details>
 
       <div class="panel today-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Today</p>
-            <h2>今日任务</h2>
+            <p class="eyebrow">CURRENT / 02</p>
+            <h2>今天与逾期</h2>
           </div>
           <small>{{ overdueTasks.length + todayTasks.length }} 项</small>
         </div>
@@ -325,9 +336,9 @@ onMounted(() => {
               </div>
             </div>
             <div class="task-actions">
-              <button type="button" @click="openTaskDetail(task.id)">详情</button>
-              <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'done')">完成</button>
-              <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'today')">今天做</button>
+              <button type="button" title="打开详情" aria-label="打开行动详情" @click="openTaskDetail(task.id)"><ArrowUpRight :size="14" /></button>
+              <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'done')"><Check :size="14" /><span>完成</span></button>
+              <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'today')"><RotateCcw :size="14" /><span>今天做</span></button>
             </div>
           </article>
         </div>
@@ -344,9 +355,9 @@ onMounted(() => {
               </div>
             </div>
             <div class="task-actions">
-              <button type="button" @click="openTaskDetail(task.id)">详情</button>
-              <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'done')">完成</button>
-              <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'cancel')">取消</button>
+              <button type="button" title="打开详情" aria-label="打开行动详情" @click="openTaskDetail(task.id)"><ArrowUpRight :size="14" /></button>
+              <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'done')"><Check :size="14" /><span>完成</span></button>
+              <button type="button" :disabled="busyTaskId === task.id" @click="updateTaskStatus(task, 'cancel')"><X :size="14" /><span>取消</span></button>
             </div>
           </article>
         </div>
@@ -359,8 +370,8 @@ onMounted(() => {
     <section class="panel list-panel">
       <div class="panel-head">
         <div>
-          <p class="eyebrow">All Tasks</p>
-          <h2>全部任务</h2>
+          <p class="eyebrow">ARCHIVE / 03</p>
+          <h2>行动档案</h2>
         </div>
         <div class="filters">
           <label>
@@ -403,25 +414,25 @@ onMounted(() => {
             </div>
           </div>
           <div class="task-actions">
-            <button type="button" @click="openTaskDetail(task.id)">详情</button>
+            <button type="button" title="打开详情" aria-label="打开行动详情" @click="openTaskDetail(task.id)"><ArrowUpRight :size="14" /></button>
             <button
               v-if="task.status !== 'done'"
               type="button"
               :disabled="busyTaskId === task.id"
               @click="updateTaskStatus(task, 'done')"
-            >完成</button>
+            ><Check :size="14" /><span>完成</span></button>
             <button
               v-if="task.status !== 'todo'"
               type="button"
               :disabled="busyTaskId === task.id"
               @click="updateTaskStatus(task, 'todo')"
-            >恢复</button>
+            ><RotateCcw :size="14" /><span>恢复</span></button>
             <button
               v-if="task.status !== 'cancelled'"
               type="button"
               :disabled="busyTaskId === task.id"
               @click="updateTaskStatus(task, 'cancel')"
-            >取消</button>
+            ><X :size="14" /><span>取消</span></button>
           </div>
         </article>
       </div>
@@ -442,12 +453,12 @@ onMounted(() => {
 
 <style scoped>
 .tasks-view {
+  width: min(1240px, 100%);
   min-height: 100vh;
-  padding: var(--s-8) var(--s-6) calc(var(--s-8) + 72px);
+  margin: 0 auto;
+  padding: 46px 42px 110px;
   color: var(--text-1);
-  background:
-    radial-gradient(circle at 10% 0%, rgba(109, 181, 168, 0.10), transparent 32%),
-    linear-gradient(180deg, rgba(12, 16, 24, 0.96), rgba(9, 12, 18, 1));
+  background: transparent;
 }
 
 .topbar,
@@ -462,9 +473,10 @@ onMounted(() => {
 }
 
 .topbar {
+  min-height: 168px;
   justify-content: space-between;
-  gap: var(--s-4);
-  margin-bottom: var(--s-5);
+  gap: 32px;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .topbar h1,
@@ -474,16 +486,29 @@ onMounted(() => {
 }
 
 .topbar h1 {
-  font-size: 2.75rem;
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 400;
+  line-height: 1.18;
+}
+
+.topbar > div > span {
+  display: block;
+  margin-top: 12px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 8px;
 }
 
 .eyebrow,
 .section-label {
   margin: 0 0 var(--s-1);
   color: var(--text-3);
+  font-family: var(--font-mono);
   font-size: var(--fs-1);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
 }
 
 .refresh-btn,
@@ -491,29 +516,47 @@ onMounted(() => {
 .task-actions button,
 .load-more,
 .notice button {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-1);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-3);
   cursor: pointer;
   transition: background var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
 }
 
 .refresh-btn,
 .load-more {
-  padding: var(--s-2) var(--s-4);
+  min-width: 42px;
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0 14px;
+  border-color: var(--line-2);
 }
 
 .primary-action {
   width: 100%;
-  padding: var(--s-3) var(--s-4);
-  background: rgba(109, 181, 168, 0.16);
-  border-color: rgba(109, 181, 168, 0.34);
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 var(--s-4);
+  color: var(--surface-1);
+  background: var(--text-1);
+  border-color: var(--text-1);
 }
 
 button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text-1);
+  background: rgba(23, 26, 22, 0.045);
+  border-color: var(--line-3);
+}
+
+.primary-action:hover:not(:disabled) {
+  color: var(--surface-1);
+  background: var(--focus);
+  border-color: var(--focus);
 }
 
 button:disabled {
@@ -525,9 +568,9 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   gap: var(--s-3);
-  margin-bottom: var(--s-4);
-  padding: var(--s-3) var(--s-4);
-  border-radius: 8px;
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-radius: 0;
 }
 
 .error-row {
@@ -541,17 +584,26 @@ button:disabled {
 }
 
 .metrics {
-  gap: var(--s-3);
-  margin-bottom: var(--s-5);
+  gap: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .metrics article {
   flex: 1;
   min-width: 0;
-  padding: var(--s-4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: minmax(56px, auto) 1fr;
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 2px 14px;
+  padding: 16px 24px;
+  border-right: 1px solid var(--line-1);
+  background: transparent;
+}
+
+.metrics article:last-child {
+  border-right: 0;
 }
 
 .metrics span,
@@ -561,44 +613,79 @@ button:disabled {
 }
 
 .metrics strong {
-  display: block;
-  margin: var(--s-1) 0;
-  font-size: 1.9rem;
+  grid-row: 1 / 3;
+  color: var(--accent-bright);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1;
 }
 
 .metrics .urgent strong {
-  color: #e1a39b;
+  color: var(--focus);
 }
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
-  gap: var(--s-4);
-  margin-bottom: var(--s-4);
+  grid-template-columns: minmax(280px, 0.72fr) minmax(420px, 1.28fr);
+  gap: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .panel {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
-  backdrop-filter: blur(18px);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.create-panel {
+  border-right: 1px solid var(--line-1);
 }
 
 .create-panel,
-.today-panel,
+.today-panel {
+  padding: 30px 32px;
+}
+
 .list-panel {
-  padding: var(--s-5);
+  padding: 44px 0 0;
+}
+
+.create-panel > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.create-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.create-panel > summary > svg {
+  color: var(--focus);
+  transition: transform var(--t-base) var(--ease);
+}
+
+.create-panel[open] > summary > svg {
+  transform: rotate(45deg);
 }
 
 .panel-head {
   justify-content: space-between;
   gap: var(--s-4);
-  margin-bottom: var(--s-4);
+  margin-bottom: 0;
+}
+
+.create-panel[open] .panel-head,
+.today-panel .panel-head,
+.list-panel .panel-head {
+  margin-bottom: 24px;
 }
 
 .task-form {
   display: grid;
-  gap: var(--s-3);
+  gap: 18px;
+  padding-top: 4px;
 }
 
 .task-form label,
@@ -614,9 +701,10 @@ button:disabled {
 .task-form select,
 .filters select {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 8px;
-  background: rgba(7, 10, 15, 0.64);
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   font: inherit;
 }
@@ -629,8 +717,18 @@ button:disabled {
 }
 
 .task-form textarea {
+  min-height: 88px;
+  border: 1px solid var(--line-1);
   resize: vertical;
   padding: var(--s-3);
+}
+
+.task-form input:focus,
+.task-form select:focus,
+.task-form textarea:focus,
+.filters select:focus {
+  border-color: var(--cobalt);
+  outline: none;
 }
 
 .form-row,
@@ -644,19 +742,19 @@ button:disabled {
 }
 
 .filter-summary {
-  --filter-summary-accent: rgb(109, 181, 168);
-  --filter-summary-button-border: rgba(255, 255, 255, 0.12);
-  --filter-summary-button-bg: rgba(255, 255, 255, 0.06);
+  --filter-summary-accent: var(--accent);
+  --filter-summary-button-border: var(--line-2);
+  --filter-summary-button-bg: transparent;
   --filter-summary-button-color: var(--text-1);
-  --filter-summary-button-hover-border: rgba(255, 255, 255, 0.22);
-  --filter-summary-button-hover-bg: rgba(255, 255, 255, 0.10);
-  margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+  --filter-summary-button-hover-border: var(--line-3);
+  --filter-summary-button-hover-bg: rgba(23, 26, 22, 0.04);
+  margin: -8px 0 16px;
 }
 
 .task-stack,
 .task-list {
   display: grid;
-  gap: var(--s-3);
+  gap: 0;
 }
 
 .task-stack + .task-stack {
@@ -668,10 +766,16 @@ button:disabled {
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--s-3);
   align-items: center;
-  padding: var(--s-3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(8, 11, 17, 0.46);
+  min-height: 82px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+}
+
+.task-list .task-row:last-child,
+.task-stack .task-row:last-child {
+  border-bottom: 1px solid var(--line-1);
 }
 
 .today-panel .task-row {
@@ -679,7 +783,7 @@ button:disabled {
 }
 
 .task-row.overdue {
-  border-color: rgba(180, 106, 99, 0.22);
+  box-shadow: inset 3px 0 0 var(--focus);
 }
 
 .task-row.done {
@@ -701,6 +805,12 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
+.task-main strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 520;
+}
+
 .task-main p {
   margin: var(--s-1) 0 var(--s-2);
   color: var(--text-2);
@@ -715,29 +825,27 @@ button:disabled {
 
 .task-meta span,
 .status-dot {
-  border-radius: 999px;
+  border-radius: 0;
 }
 
 .task-meta span {
-  padding: 2px var(--s-2);
-  background: rgba(255, 255, 255, 0.055);
+  padding-right: var(--s-2);
+  background: transparent;
 }
 
 .status-dot {
-  width: 9px;
-  height: 9px;
-  background: #6db5a8;
-  box-shadow: 0 0 16px rgba(109, 181, 168, 0.38);
+  width: 3px;
+  height: 34px;
+  background: var(--accent);
+  box-shadow: none;
 }
 
 .status-dot.done {
-  background: #a6b4c8;
-  box-shadow: none;
+  background: var(--cobalt);
 }
 
 .status-dot.cancelled {
-  background: #8f7f7c;
-  box-shadow: none;
+  background: var(--text-5);
 }
 
 .task-actions {
@@ -748,8 +856,19 @@ button:disabled {
 
 .task-actions button {
   min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 0 var(--s-3);
   font-size: var(--fs-1);
+  border-color: transparent;
+}
+
+.task-actions button:first-child {
+  width: 32px;
+  padding: 0;
+  border-color: var(--line-1);
 }
 
 .empty-line {
@@ -758,12 +877,21 @@ button:disabled {
 }
 
 .load-more {
-  margin-top: var(--s-4);
+  width: 100%;
+  margin-top: 20px;
+}
+
+.spinning {
+  animation: ledger-spin 0.8s linear infinite;
+}
+
+@keyframes ledger-spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 900px) {
   .tasks-view {
-    padding: var(--s-7) var(--s-4) calc(var(--s-8) + 72px);
+    padding: 28px 18px calc(var(--app-mobile-nav-height) + 34px);
   }
 
   .workspace-grid,
@@ -773,13 +901,56 @@ button:disabled {
 
   .metrics {
     display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .topbar,
-  .panel-head,
+  .metrics article {
+    min-height: 82px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 10px;
+  }
+
+  .metrics strong {
+    order: -1;
+    font-size: 27px;
+  }
+
+  .metrics small {
+    display: none;
+  }
+
+  .topbar {
+    min-height: 140px;
+  }
+
+  .topbar h1 {
+    font-size: 34px;
+  }
+
+  .create-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-1);
+  }
+
+  .create-panel,
+  .today-panel {
+    padding: 24px 0;
+  }
+
+  .list-panel {
+    padding-top: 34px;
+  }
+
   .task-row,
   .today-panel .task-row {
     align-items: stretch;
+  }
+
+  .topbar,
+  .panel-head {
+    align-items: center;
   }
 
   .task-row,
@@ -794,6 +965,10 @@ button:disabled {
   .filters,
   .form-row {
     flex-direction: column;
+  }
+
+  .task-actions {
+    justify-content: flex-start;
   }
 }
 </style>

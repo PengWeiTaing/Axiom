@@ -20,6 +20,17 @@ def require(path: Path, fragments: tuple[str, ...]) -> list[str]:
     ]
 
 
+def forbid(path: Path, fragments: tuple[str, ...]) -> list[str]:
+    if not path.exists():
+        return []
+    text = path.read_text(encoding="utf-8")
+    return [
+        f"{path.relative_to(ROOT)} contains forbidden art direction: {fragment}"
+        for fragment in fragments
+        if fragment in text
+    ]
+
+
 def main() -> int:
     errors: list[str] = []
     contracts = {
@@ -73,6 +84,35 @@ def main() -> int:
             "result-section",
             "library-query:focus-visible",
         ),
+        FRONTEND / "views" / "TasksView.vue": (
+            "行动索引",
+            '<details class="panel create-panel">',
+            "今天与逾期",
+            "行动档案",
+            'aria-label="打开行动详情"',
+        ),
+        FRONTEND / "views" / "MemoriesView.vue": (
+            "记忆索引",
+            '<details class="panel create-panel">',
+            "长期记忆",
+            'aria-label="打开记忆详情"',
+        ),
+        FRONTEND / "views" / "DecisionsView.vue": (
+            "决定索引",
+            '<details class="panel create-panel">',
+            "选择与结果",
+            'aria-label="打开决定详情"',
+        ),
+        FRONTEND / "components" / "ItemDrawer.vue": (
+            "原始记录",
+            "记录信息",
+            '<details v-if="detail" class="drawer-meta">',
+        ),
+        FRONTEND / "components" / "ObjectDrawer.vue": (
+            " / CONTEXT",
+            'class="context-link"',
+            "<ArrowUpRight",
+        ),
         FRONTEND / "views" / "AtlasView.vue": (
             "scene.background = new Color(0x090a08)",
             "if (node.type === 'root') return 3.5 * boost",
@@ -98,11 +138,33 @@ def main() -> int:
         FRONTEND / "views" / "TodayView.vue",
         FRONTEND / "views" / "SearchView.vue",
         FRONTEND / "views" / "AtlasView.vue",
+        FRONTEND / "views" / "TasksView.vue",
+        FRONTEND / "views" / "MemoriesView.vue",
+        FRONTEND / "views" / "DecisionsView.vue",
+        FRONTEND / "components" / "ItemDrawer.vue",
+        FRONTEND / "components" / "ObjectDrawer.vue",
     )
     for path in fixed_type_surfaces:
         text = path.read_text(encoding="utf-8")
         if "font-size: clamp(" in text:
             errors.append(f"viewport-scaled type returned: {path.relative_to(ROOT)}")
+
+    folio_ledgers = (
+        FRONTEND / "views" / "TasksView.vue",
+        FRONTEND / "views" / "MemoriesView.vue",
+        FRONTEND / "views" / "DecisionsView.vue",
+    )
+    for path in folio_ledgers:
+        errors.extend(
+            forbid(
+                path,
+                (
+                    "radial-gradient(",
+                    "linear-gradient(",
+                    "backdrop-filter: blur",
+                ),
+            )
+        )
 
     if errors:
         print("Axiom frontend art-direction guard failed")
