@@ -8,7 +8,9 @@ Axiom 是个人“外脑系统”的后端工程。当前已经从最小接收�
 
 当前产品形态以 `docs/PRODUCT_MODEL.md` 为最高事实源：默认工作面是“此刻”，一级目的地只有“此刻 / 资料库 / Atlas”，记录是全局动作。任务、记忆、决策、时间线、处理和系统治理不得重新扩张为平级一级工作台。
 
-当前前端视觉人格以 `docs/FRONTEND_ART_DIRECTION.md` 为事实源：采用“墨与光”系统，艺术感来自留白、秩序、语义色、真实关系和克制状态光，不来自卡片堆叠、蓝紫科技皮肤、行星节点或全局持续动画。
+当前前端视觉人格以 `docs/FRONTEND_ART_DIRECTION.md` 为事实源：采用“活页”系统，以冷静纸面、编辑秩序、连续索引和少量矿物色形成日常认知表面；Atlas 只在关系远观时切换为深色空间。艺术感不来自卡片堆叠、蓝紫科技皮肤、行星节点或全局持续动画。
+
+低摩擦是产品约束而不是可选模式：默认进入“此刻”，全局记录不预先分类，资料库短查询自动检索，次级能力只从索引或当前上下文按需出现。新增能力不得以增加一级入口作为默认实现。
 
 长期方向来自 `deep-research-report.md`，短期执行看 `docs/SHORT_TERM.md`。
 
@@ -72,7 +74,7 @@ Axiom 是个人“外脑系统”的后端工程。当前已经从最小接收�
 
 ```text
 frontend/
-  src/                 # 当前主前端：墨与光视觉系统 + 此刻 / 资料库 / Atlas + 全局记录
+  src/                 # 当前主前端：活页视觉系统 + 此刻 / 资料库 / Atlas + 全局记录
 core/
   receiver.py
   goals.py             # 承诺档案、生命周期和目标层级规则
@@ -98,7 +100,7 @@ core/
       axiom-mark.svg
 scripts/
   backup_axiom.py
-  check_frontend_art_direction.py # 防止“墨与光”主前端退回旧视觉语言
+  check_frontend_art_direction.py # 防止“活页”主前端退回旧视觉语言
   check_consistency.py
   backfill_document_text.py
   backfill_audio_transcript.py

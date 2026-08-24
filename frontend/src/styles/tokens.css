@@ -1,52 +1,53 @@
 /*
- * Axiom / Ink & Light
+ * Axiom / Living Folio
  *
- * A cognitive instrument made from ink, warm paper, mineral colour and light.
- * Amber marks intention, jade marks continuity, blue marks recall, and
- * vermilion marks tension or intervention.
+ * A cool paper field, dense ink and a small set of mineral pigments. Colour
+ * belongs to meaning, never to decoration: vermilion is intent, moss is
+ * continuity, cobalt is recall, and violet is unresolved judgement.
  */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  --surface-0: #0a0a09;
-  --surface-1: #11110f;
-  --surface-2: #181713;
-  --surface-3: #22201a;
-  --surface-4: #302c24;
-  --surface-raised: rgba(19, 18, 15, 0.88);
+  --surface-0: #e8eae5;
+  --surface-1: #f3f4ef;
+  --surface-2: #dfe2dc;
+  --surface-3: #cdd1c9;
+  --surface-4: #aeb4aa;
+  --surface-raised: rgba(243, 244, 239, 0.96);
 
-  --text-1: #f2ede1;
-  --text-2: #d2cabb;
-  --text-3: #9d978c;
-  --text-4: #706d66;
-  --text-5: #4b4a45;
+  --text-1: #171a16;
+  --text-2: #30352e;
+  --text-3: #5d645b;
+  --text-4: #7a8278;
+  --text-5: #9ca39a;
 
-  --line-1: rgba(242, 237, 225, 0.065);
-  --line-2: rgba(242, 237, 225, 0.125);
-  --line-3: rgba(242, 237, 225, 0.22);
-  --line-warm: rgba(227, 167, 89, 0.28);
+  --line-1: rgba(23, 26, 22, 0.10);
+  --line-2: rgba(23, 26, 22, 0.19);
+  --line-3: rgba(23, 26, 22, 0.34);
+  --line-warm: rgba(178, 77, 55, 0.34);
 
-  --accent: #86ad9e;
-  --accent-bright: #bdd8cc;
-  --accent-dim: rgba(134, 173, 158, 0.16);
-  --accent-glow: rgba(134, 173, 158, 0.1);
-  --focus: #e1a558;
-  --focus-bright: #f0c47f;
-  --focus-dim: rgba(225, 165, 88, 0.13);
-  --success: #91b99a;
-  --info: #7d9fb5;
-  --cobalt: #7388ad;
-  --vermilion: #c66f58;
-  --violet: #9a83a2;
+  --accent: #587363;
+  --accent-bright: #375849;
+  --accent-dim: rgba(88, 115, 99, 0.12);
+  --accent-glow: rgba(88, 115, 99, 0.07);
+  --focus: #b24d37;
+  --focus-bright: #8f3828;
+  --focus-dim: rgba(178, 77, 55, 0.10);
+  --success: #5f7b64;
+  --info: #476d8b;
+  --cobalt: #315d82;
+  --vermilion: #b24d37;
+  --violet: #745d78;
+  --yellow: #b98c31;
 
   --warm: var(--focus);
-  --warn: #c88c58;
-  --error: #cf7667;
+  --warn: #9e652d;
+  --error: #a74232;
 
-  --r-1: 2px;
-  --r-2: 4px;
-  --r-3: 8px;
+  --r-1: 0;
+  --r-2: 2px;
+  --r-3: 4px;
   --r-pill: 999px;
 
   --s-1: 4px;
@@ -67,8 +68,8 @@
   --font-mono:
     "Cascadia Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
 
-  --fs-1: 11px;
-  --fs-2: 12px;
+  --fs-1: 10px;
+  --fs-2: 11px;
   --fs-3: 13px;
   --fs-4: 14px;
   --fs-5: 16px;
@@ -76,23 +77,24 @@
   --fs-7: 30px;
   --fs-display: 48px;
 
-  --lh-tight: 1.22;
+  --lh-tight: 1.2;
   --lh-base: 1.62;
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.64, 0, 0.78, 0);
-  --t-fast: 140ms;
-  --t-base: 260ms;
-  --t-slow: 520ms;
-  --t-drawer: 360ms;
+  --t-fast: 120ms;
+  --t-base: 220ms;
+  --t-slow: 440ms;
+  --t-drawer: 320ms;
 
-  --glass-blur: blur(24px) saturate(115%);
-  --glass-bg: rgba(15, 15, 13, 0.84);
-  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.025) inset, 0 12px 32px rgba(0, 0, 0, 0.28);
-  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.035) inset, 0 28px 80px rgba(0, 0, 0, 0.58);
+  --glass-blur: none;
+  --glass-bg: rgba(243, 244, 239, 0.98);
+  --shadow-1: 0 8px 24px rgba(23, 26, 22, 0.08);
+  --shadow-2: 0 24px 72px rgba(23, 26, 22, 0.15);
 
-  --content-max: 780px;
-  --content-wide: 1240px;
-  --app-rail-width: 88px;
-  --app-mobile-nav-height: 76px;
+  --content-max: 820px;
+  --content-wide: 1380px;
+  --app-header-height: 74px;
+  --app-rail-width: 0px;
+  --app-mobile-nav-height: 70px;
 }

@@ -636,7 +636,7 @@ onBeforeUnmount(() => {
 .drawer {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 82;
   background: rgba(7, 9, 13, 0.35);
   backdrop-filter: blur(4px);
 }

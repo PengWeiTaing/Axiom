@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ArrowRight, CircleDot } from '@lucide/vue';
+import { ArrowRight, LockKeyhole } from '@lucide/vue';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
@@ -18,50 +18,43 @@ async function submit() {
 
 <template>
   <main class="gate">
-    <div class="gate-field" aria-hidden="true">
-      <i v-for="index in 9" :key="index" />
-      <span />
+    <header class="gate-head">
+      <span>Axiom / Private Edition</span>
+      <span>01</span>
+    </header>
+
+    <div class="gate-registration" aria-hidden="true">
+      <i /><i /><i /><i />
     </div>
-    <p class="gate-coordinate">PRIVATE COGNITIVE SYSTEM · 01</p>
 
-    <section class="gate-card" aria-labelledby="gate-title">
-      <div class="gate-mark">
-        <CircleDot :size="30" :stroke-width="1.2" />
-        <span>AX / 01</span>
+    <section class="gate-cover" aria-labelledby="gate-title">
+      <div class="gate-title">
+        <span class="gate-seal"><LockKeyhole :size="18" :stroke-width="1.45" /></span>
+        <p>PERSONAL CORTEX</p>
+        <h1 id="gate-title">Axiom</h1>
+        <strong>私有外脑</strong>
       </div>
-      <h1 id="gate-title">Axiom</h1>
-      <p class="gate-line">个人外脑 · 私有入口</p>
 
-      <form @submit.prevent="submit">
-        <input
-          class="visually-hidden"
-          type="text"
-          name="username"
-          autocomplete="username"
-          value="axiom"
-          tabindex="-1"
-          aria-hidden="true"
-        />
-        <label>
-          <span>访问密钥</span>
-          <input
-            v-model="input"
-            type="password"
-            name="axiom-key"
-            autocomplete="current-password"
-            placeholder="X-Axiom-Key"
-            autofocus
-            spellcheck="false"
-          />
-        </label>
-        <button type="submit" :disabled="!input.trim() || checking" :title="checking ? '验证中' : '进入'" aria-label="进入 Axiom">
-          <ArrowRight :size="20" :class="{ checking }" />
-        </button>
-      </form>
-
-      <p v-if="auth.lastError" class="gate-err">{{ auth.lastError }}</p>
-      <p class="gate-hint">密钥只保留在当前设备。</p>
+      <div class="gate-entry">
+        <span class="entry-index">ACCESS / 01</span>
+        <form @submit.prevent="submit">
+          <input class="visually-hidden" type="text" name="username" autocomplete="username" value="axiom" tabindex="-1" aria-hidden="true" />
+          <label>
+            <span>访问密钥</span>
+            <input v-model="input" type="password" name="axiom-key" autocomplete="current-password" placeholder="X-Axiom-Key" autofocus spellcheck="false" />
+          </label>
+          <button type="submit" :disabled="!input.trim() || checking" :title="checking ? '验证中' : '进入'" aria-label="进入 Axiom">
+            <ArrowRight :size="20" :class="{ checking }" />
+          </button>
+        </form>
+        <p v-if="auth.lastError" class="gate-error">{{ auth.lastError }}</p>
+        <p class="gate-local">LOCAL DEVICE / ENCRYPTED TRANSIT</p>
+      </div>
     </section>
+
+    <footer class="gate-foot">
+      <span>RECORD</span><i /><span>RECALL</span><i /><span>RELATE</span><i /><span>ACT</span>
+    </footer>
   </main>
 </template>
 
@@ -70,134 +63,156 @@ async function submit() {
   position: relative;
   min-height: 100vh;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(260px, 0.82fr) minmax(420px, 1.18fr);
-  align-items: stretch;
-  background: var(--surface-0);
+  padding: 28px clamp(28px, 4vw, 62px) 24px;
+  color: var(--text-2);
+  background: var(--surface-1);
 }
 
 .gate::before {
   content: '';
   position: absolute;
-  inset: 0 auto 0 38%;
-  width: 1px;
-  background: var(--line-1);
+  top: 0;
+  bottom: 0;
+  left: 7.5%;
+  width: 12px;
+  background: var(--focus);
 }
 
 .gate::after {
-  content: '';
+  content: 'A';
   position: absolute;
-  top: 12%;
-  left: calc(38% - 1px);
-  width: 3px;
-  height: 19%;
-  background: var(--vermilion);
+  right: -2vw;
+  bottom: -18vh;
+  color: rgba(23, 26, 22, 0.025);
+  font-family: var(--font-display);
+  font-size: 72vh;
+  line-height: 1;
+  pointer-events: none;
 }
 
-.gate-field {
+.gate-head,
+.gate-foot {
   position: relative;
-  min-height: 100vh;
-  overflow: hidden;
-}
-
-.gate-field i {
-  position: absolute;
-  right: 10%;
-  width: 72%;
-  height: 1px;
-  background: rgba(242, 237, 225, 0.055);
-  transform-origin: right center;
-}
-
-.gate-field i:nth-child(1) { top: 18%; transform: rotate(-4deg); }
-.gate-field i:nth-child(2) { top: 26%; transform: rotate(3deg); width: 58%; }
-.gate-field i:nth-child(3) { top: 35%; transform: rotate(-8deg); width: 82%; }
-.gate-field i:nth-child(4) { top: 45%; transform: rotate(5deg); width: 66%; }
-.gate-field i:nth-child(5) { top: 55%; transform: rotate(-2deg); width: 92%; }
-.gate-field i:nth-child(6) { top: 65%; transform: rotate(7deg); width: 76%; }
-.gate-field i:nth-child(7) { top: 73%; transform: rotate(-5deg); width: 54%; }
-.gate-field i:nth-child(8) { top: 81%; transform: rotate(2deg); width: 84%; }
-.gate-field i:nth-child(9) { top: 88%; transform: rotate(-3deg); width: 62%; }
-
-.gate-field span {
-  position: absolute;
-  top: 34%;
-  right: 18%;
-  width: 88px;
-  height: 88px;
-  border: 1px solid rgba(225, 165, 88, 0.22);
-  transform: rotate(45deg);
-  animation: field-turn 24s linear infinite;
-}
-
-.gate-coordinate {
-  position: absolute;
-  left: 24px;
-  bottom: 22px;
-  color: var(--text-5);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-}
-
-.gate-card {
-  width: min(570px, calc(100% - 72px));
-  align-self: center;
-  justify-self: center;
-  padding: 56px 0;
-}
-
-.gate-mark {
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 14px;
-  color: var(--focus-bright);
-  margin-bottom: 64px;
-}
-
-.gate-mark svg {
-  filter: drop-shadow(0 0 10px rgba(225, 165, 88, 0.22));
-}
-
-.gate-mark span {
-  color: var(--text-5);
+  color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8px;
 }
 
-h1 {
+.gate-head {
+  min-height: 44px;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.gate-registration {
+  position: absolute;
+  inset: 90px clamp(28px, 4vw, 62px) 70px;
+  pointer-events: none;
+}
+
+.gate-registration i {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+}
+
+.gate-registration i::before,
+.gate-registration i::after {
+  content: '';
+  position: absolute;
+  background: var(--line-2);
+}
+
+.gate-registration i::before { top: 0; left: 0; width: 24px; height: 1px; }
+.gate-registration i::after { top: 0; left: 0; width: 1px; height: 24px; }
+.gate-registration i:nth-child(1) { top: 0; left: 0; }
+.gate-registration i:nth-child(2) { top: 0; right: 0; transform: rotate(90deg); }
+.gate-registration i:nth-child(3) { right: 0; bottom: 0; transform: rotate(180deg); }
+.gate-registration i:nth-child(4) { bottom: 0; left: 0; transform: rotate(270deg); }
+
+.gate-cover {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 140px);
+  display: grid;
+  grid-template-columns: minmax(300px, 1.05fr) minmax(360px, 0.95fr);
+  align-items: center;
+}
+
+.gate-title {
+  min-height: 430px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 42px 7vw 42px 10vw;
+  border-right: 1px solid var(--line-2);
+}
+
+.gate-seal {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 52px;
+  color: var(--surface-1);
+  background: var(--focus);
+}
+
+.gate-title p,
+.entry-index,
+.gate-local {
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+
+.gate-title h1 {
+  margin-top: 14px;
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 64px;
+  font-size: 76px;
   font-weight: 400;
   line-height: 1;
-  letter-spacing: 0;
 }
 
-.gate-line {
-  margin-top: 15px;
+.gate-title strong {
+  margin-top: 18px;
   color: var(--text-3);
-  font-size: var(--fs-3);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 400;
 }
 
-form {
+.gate-entry {
+  width: min(460px, calc(100% - 60px));
+  justify-self: center;
+  padding: 42px 0;
+}
+
+.entry-index {
+  color: var(--cobalt);
+}
+
+.gate-entry form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 48px;
   align-items: end;
   gap: 16px;
-  margin-top: 72px;
+  margin-top: 48px;
 }
 
-form label {
+.gate-entry label {
   display: grid;
   gap: 9px;
 }
 
-form label > span {
-  color: var(--text-5);
+.gate-entry label > span {
+  color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .visually-hidden {
@@ -212,115 +227,122 @@ form label > span {
   border: 0;
 }
 
-form input:not(.visually-hidden) {
+.gate-entry input:not(.visually-hidden) {
   width: 100%;
   min-height: 48px;
-  padding: 0 4px;
-  border-bottom: 1px solid var(--line-3);
+  padding: 0 2px;
   color: var(--text-1);
   font-family: var(--font-mono);
-  transition: border-color var(--t-base) var(--ease);
+  border-bottom: 1px solid var(--line-3);
 }
 
-form input:not(.visually-hidden):focus {
-  border-color: var(--focus-bright);
+.gate-entry input:not(.visually-hidden):focus {
+  border-bottom-color: var(--focus);
 }
 
-form input::placeholder {
+.gate-entry input:not(.visually-hidden):focus-visible {
+  outline: none;
+}
+
+.gate-entry input::placeholder {
   color: var(--text-5);
 }
 
-form button {
+.gate-entry form button {
   width: 48px;
   height: 48px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--line-warm);
-  border-radius: 50%;
-  color: var(--focus-bright);
-  transition: color var(--t-base) var(--ease), background var(--t-base) var(--ease), transform var(--t-base) var(--ease);
+  color: var(--surface-1);
+  background: var(--text-1);
 }
 
-form button:hover:not(:disabled) {
-  color: var(--surface-0);
+.gate-entry form button:hover:not(:disabled) {
   background: var(--focus);
-  transform: translateX(3px);
+}
+
+.gate-error,
+.gate-local {
+  margin-top: 18px;
+}
+
+.gate-error {
+  color: var(--error);
+  font-size: 11px;
 }
 
 .checking {
-  animation: checking 1s var(--ease) infinite alternate;
+  animation: checking 800ms var(--ease) infinite alternate;
 }
 
-.gate-err,
-.gate-hint {
-  margin-top: 18px;
-  font-size: var(--fs-2);
+.gate-foot {
+  min-height: 42px;
+  gap: 12px;
+  border-top: 1px solid var(--line-2);
 }
 
-.gate-err { color: var(--error); }
-.gate-hint { color: var(--text-5); }
-
-@keyframes field-turn {
-  to { transform: rotate(405deg); }
+.gate-foot i {
+  flex: 1;
+  height: 1px;
+  background: var(--line-1);
 }
 
 @keyframes checking {
-  to { opacity: 0.35; transform: translateX(5px); }
+  to { opacity: 0.3; transform: translateX(5px); }
 }
 
 @media (max-width: 760px) {
   .gate {
-    grid-template-columns: 1fr;
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
   }
 
   .gate::before {
     left: 18px;
+    width: 4px;
   }
 
   .gate::after {
-    top: 8%;
-    left: 17px;
-    height: 16%;
+    right: -18vw;
+    bottom: -5vh;
+    font-size: 55vh;
   }
 
-  .gate-field {
-    position: absolute;
-    inset: 0;
-    min-height: 0;
-    opacity: 0.75;
+  .gate-cover {
+    min-height: calc(100vh - 118px);
+    grid-template-columns: 1fr;
+    align-content: center;
   }
 
-  .gate-field i {
-    right: -16%;
+  .gate-title {
+    min-height: 300px;
+    padding: 48px 26px 34px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-2);
   }
 
-  .gate-field span {
-    top: 17%;
-    right: 10%;
-    width: 64px;
-    height: 64px;
+  .gate-seal {
+    margin-bottom: 38px;
   }
 
-  .gate-coordinate {
+  .gate-title h1 {
+    font-size: 58px;
+  }
+
+  .gate-entry {
+    width: calc(100% - 52px);
+    justify-self: end;
+    padding: 38px 0 44px;
+  }
+
+  .gate-entry form {
+    margin-top: 34px;
+  }
+
+  .gate-foot span:nth-of-type(2),
+  .gate-foot span:nth-of-type(3),
+  .gate-foot i:nth-of-type(2),
+  .gate-foot i:nth-of-type(3) {
     display: none;
-  }
-
-  .gate-card {
-    position: relative;
-    width: calc(100% - 56px);
-    padding: 36px 0 90px;
-  }
-
-  .gate-mark {
-    margin-bottom: 72px;
-  }
-
-  h1 {
-    font-size: 52px;
-  }
-
-  form {
-    margin-top: 58px;
   }
 }
 </style>

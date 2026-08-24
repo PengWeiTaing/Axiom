@@ -1,165 +1,203 @@
 <script setup lang="ts">
-import { type Component, onBeforeUnmount, onMounted, ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, type Component } from 'vue';
 import {
   Archive,
   Brain,
   CalendarDays,
+  CheckSquare2,
   CircleDot,
-  Ellipsis,
+  FileStack,
   GitFork,
-  House,
   Inbox,
   LibraryBig,
   ListTodo,
+  Menu,
   Orbit,
   Plus,
+  Search,
   Settings,
   SlidersHorizontal,
   Workflow,
+  X,
 } from '@lucide/vue';
 import { useModeStore, type AppMode, type PrimaryMode } from '@/stores/mode';
 
 const emit = defineEmits<{ capture: [] }>();
 const mode = useModeStore();
-const menuOpen = ref(false);
+const indexOpen = ref(false);
 
-const primaryItems: { key: PrimaryMode; label: string; icon: Component }[] = [
-  { key: 'today', label: '此刻', icon: House },
-  { key: 'library', label: '资料库', icon: LibraryBig },
-  { key: 'atlas', label: 'Atlas', icon: Orbit },
+const primaryItems: { key: PrimaryMode; label: string; index: string; icon: Component }[] = [
+  { key: 'today', label: '此刻', index: '01', icon: CircleDot },
+  { key: 'library', label: '资料库', index: '02', icon: LibraryBig },
+  { key: 'atlas', label: 'Atlas', index: '03', icon: Orbit },
 ];
 
-const contextItems: { key: AppMode; label: string; icon: Component }[] = [
-  { key: 'processing', label: '待处理', icon: Inbox },
-  { key: 'tasks', label: '任务', icon: ListTodo },
-  { key: 'memories', label: '记忆', icon: Brain },
-  { key: 'decisions', label: '决策', icon: GitFork },
-  { key: 'timeline', label: '时间线', icon: CalendarDays },
-  { key: 'recent', label: '回顾', icon: Archive },
+const contextItems: { key: AppMode; label: string; code: string; icon: Component }[] = [
+  { key: 'processing', label: '待整理', code: 'INPUT', icon: Inbox },
+  { key: 'tasks', label: '行动', code: 'ACTION', icon: ListTodo },
+  { key: 'memories', label: '记忆', code: 'MEMORY', icon: Brain },
+  { key: 'decisions', label: '决定', code: 'DECISION', icon: GitFork },
+  { key: 'timeline', label: '时间', code: 'TIMELINE', icon: CalendarDays },
+  { key: 'recent', label: '回顾', code: 'RECENT', icon: Archive },
 ];
 
-const adminItems: { key: AppMode; label: string; icon: Component }[] = [
-  { key: 'cosmos', label: '结构编辑', icon: SlidersHorizontal },
+const systemItems: { key: AppMode; label: string; icon: Component }[] = [
+  { key: 'cosmos', label: '结构校准', icon: SlidersHorizontal },
   { key: 'automation', label: '自动化', icon: Workflow },
-  { key: 'system', label: '系统', icon: Settings },
+  { key: 'system', label: '系统状态', icon: Settings },
 ];
+
+function isTextLikeElement(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+}
 
 function select(next: AppMode) {
-  menuOpen.value = false;
+  indexOpen.value = false;
   mode.set(next);
 }
 
-function onWindowPointerDown(event: PointerEvent) {
-  const target = event.target as HTMLElement | null;
-  if (menuOpen.value && !target?.closest('.app-navigation, .more-menu')) {
-    menuOpen.value = false;
-  }
+function openSearch() {
+  indexOpen.value = false;
+  mode.set('library');
+  nextTick(() => window.dispatchEvent(new CustomEvent('axiom:focus-search')));
+}
+
+function openCapture() {
+  indexOpen.value = false;
+  emit('capture');
 }
 
 function onWindowKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') menuOpen.value = false;
+  if (event.key === 'Escape' && indexOpen.value) {
+    event.preventDefault();
+    indexOpen.value = false;
+    return;
+  }
+  if (isTextLikeElement(event.target)) return;
+  if (event.key === '/' || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k')) {
+    event.preventDefault();
+    openSearch();
+    return;
+  }
+  if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'n') {
+    event.preventDefault();
+    openCapture();
+  }
 }
 
-onMounted(() => {
-  window.addEventListener('pointerdown', onWindowPointerDown);
-  window.addEventListener('keydown', onWindowKeydown);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener('pointerdown', onWindowPointerDown);
-  window.removeEventListener('keydown', onWindowKeydown);
-});
+onMounted(() => window.addEventListener('keydown', onWindowKeydown));
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
 </script>
 
 <template>
-  <nav class="app-navigation" aria-label="主要导航">
-    <button class="brand-mark" type="button" title="Axiom" aria-label="Axiom" @click="select('today')">
-      <CircleDot :size="23" :stroke-width="1.35" />
-      <span class="brand-word">Axiom</span>
-      <small>01</small>
+  <nav class="app-navigation" :class="{ 'over-atlas': mode.mode === 'atlas' }" aria-label="主要导航">
+    <button class="brand" type="button" aria-label="返回此刻" @click="select('today')">
+      <span class="brand-name">Axiom</span>
+      <span class="brand-state">personal cortex</span>
     </button>
 
     <div class="primary-navigation">
       <button
         v-for="item in primaryItems.slice(0, 2)"
         :key="item.key"
-        class="nav-item"
+        class="chapter-link"
         :class="{ active: mode.mode === item.key }"
-        :data-mode="item.key"
         type="button"
         @click="select(item.key)"
       >
-        <component :is="item.icon" :size="20" :stroke-width="1.45" />
+        <component :is="item.icon" class="chapter-icon" :size="18" :stroke-width="1.55" />
         <span>{{ item.label }}</span>
+        <small>{{ item.index }}</small>
       </button>
 
-      <button class="nav-item capture-item" type="button" data-mode="capture" @click="emit('capture')">
-        <span class="capture-icon"><Plus :size="21" :stroke-width="1.75" /></span>
+      <button class="capture-link" type="button" title="记录（N）" aria-label="记录" @click="openCapture">
+        <Plus :size="19" :stroke-width="1.8" />
         <span>记录</span>
       </button>
 
       <button
         v-for="item in primaryItems.slice(2)"
         :key="item.key"
-        class="nav-item"
+        class="chapter-link"
         :class="{ active: mode.mode === item.key }"
-        :data-mode="item.key"
         type="button"
         @click="select(item.key)"
       >
-        <component :is="item.icon" :size="20" :stroke-width="1.45" />
+        <component :is="item.icon" class="chapter-icon" :size="18" :stroke-width="1.55" />
         <span>{{ item.label }}</span>
+        <small>{{ item.index }}</small>
       </button>
     </div>
 
-    <button
-      class="nav-item more-trigger"
-      :class="{ active: menuOpen || !['today', 'library', 'atlas'].includes(mode.mode) }"
-      type="button"
-      aria-haspopup="menu"
-      :aria-expanded="menuOpen"
-      @click.stop="menuOpen = !menuOpen"
-    >
-      <Ellipsis :size="20" :stroke-width="1.45" />
-      <span>更多</span>
-    </button>
+    <div class="nav-tools">
+      <button class="tool-link search-link" type="button" title="找回（/）" aria-label="找回" @click="openSearch">
+        <Search :size="18" :stroke-width="1.55" />
+      </button>
+      <button
+        class="tool-link index-link"
+        :class="{ active: indexOpen || !['today', 'library', 'atlas'].includes(mode.mode) }"
+        type="button"
+        title="索引"
+        aria-label="打开索引"
+        :aria-expanded="indexOpen"
+        @click="indexOpen = true"
+      >
+        <Menu :size="19" :stroke-width="1.55" />
+        <span>索引</span>
+      </button>
+    </div>
   </nav>
 
-  <Transition name="menu">
-    <aside v-if="menuOpen" class="more-menu" role="menu" aria-label="其他视图">
-      <header class="menu-brand">
+  <Transition name="index-sheet">
+    <aside v-if="indexOpen" class="index-sheet" aria-label="Axiom 索引">
+      <header class="index-head">
         <div>
-          <span>Axiom</span>
-          <small>Context index</small>
+          <span class="index-kicker">Axiom / Index</span>
+          <h2>索引</h2>
         </div>
-        <i aria-hidden="true" />
+        <button type="button" title="关闭" aria-label="关闭索引" @click="indexOpen = false">
+          <X :size="22" :stroke-width="1.45" />
+        </button>
       </header>
-      <p class="menu-label">整理与回顾</p>
-      <button
-        v-for="item in contextItems"
-        :key="item.key"
-        class="menu-item"
-        :class="{ active: mode.mode === item.key }"
-        type="button"
-        role="menuitem"
-        @click="select(item.key)"
-      >
-        <component :is="item.icon" :size="17" :stroke-width="1.45" />
-        <span>{{ item.label }}</span>
-      </button>
-      <p class="menu-label admin-label">系统与治理</p>
-      <button
-        v-for="item in adminItems"
-        :key="item.key"
-        class="menu-item"
-        :class="{ active: mode.mode === item.key }"
-        type="button"
-        role="menuitem"
-        @click="select(item.key)"
-      >
-        <component :is="item.icon" :size="17" :stroke-width="1.45" />
-        <span>{{ item.label }}</span>
-      </button>
+
+      <div class="index-body">
+        <section class="index-context">
+          <p>在需要时进入</p>
+          <button
+            v-for="(item, itemIndex) in contextItems"
+            :key="item.key"
+            type="button"
+            :class="{ active: mode.mode === item.key }"
+            @click="select(item.key)"
+          >
+            <span class="index-number">{{ String(itemIndex + 1).padStart(2, '0') }}</span>
+            <component :is="item.icon" :size="17" :stroke-width="1.45" />
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.code }}</small>
+          </button>
+        </section>
+
+        <section class="index-system">
+          <p>校准与治理</p>
+          <button
+            v-for="item in systemItems"
+            :key="item.key"
+            type="button"
+            :class="{ active: mode.mode === item.key }"
+            @click="select(item.key)"
+          >
+            <component :is="item.icon" :size="15" :stroke-width="1.45" />
+            <span>{{ item.label }}</span>
+          </button>
+        </section>
+      </div>
+
+      <footer class="index-foot">
+        <FileStack :size="15" />
+        <span>PRIVATE INDEX / 06 + 03</span>
+        <CheckSquare2 :size="15" />
+      </footer>
     </aside>
   </Transition>
 </template>
@@ -167,316 +205,419 @@ onBeforeUnmount(() => {
 <style scoped>
 .app-navigation {
   position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 50;
-  width: var(--app-rail-width);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 14px 0 13px;
-  background: rgba(10, 10, 9, 0.86);
-  border-right: 1px solid var(--line-1);
-  backdrop-filter: blur(22px) saturate(105%);
-}
-
-.app-navigation::after {
-  content: '';
-  position: absolute;
-  top: 112px;
-  bottom: 88px;
-  left: 43px;
-  z-index: -1;
-  width: 1px;
-  background: var(--line-1);
-}
-
-.brand-mark {
-  position: relative;
-  width: 64px;
-  min-height: 76px;
+  inset: 0 0 auto;
+  z-index: 60;
+  height: var(--app-header-height);
   display: grid;
-  grid-template-columns: 25px 1fr;
-  grid-template-rows: 28px 18px;
+  grid-template-columns: minmax(210px, 1fr) auto minmax(210px, 1fr);
+  align-items: stretch;
+  padding: 0 30px;
+  color: var(--text-2);
+  background: rgba(232, 234, 229, 0.94);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.brand {
+  width: max-content;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
   align-content: center;
-  align-items: center;
-  color: var(--text-1);
+  gap: 11px;
   text-align: left;
-  margin-bottom: 22px;
 }
 
-.brand-mark svg {
-  grid-row: 1 / -1;
-  color: var(--focus-bright);
-  filter: drop-shadow(0 0 7px rgba(225, 165, 88, 0.25));
-}
-
-.brand-word {
-  align-self: end;
+.brand-name {
+  color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 22px;
   line-height: 1;
 }
 
-.brand-mark small {
-  align-self: start;
+.brand-state {
   color: var(--text-5);
   font-family: var(--font-mono);
   font-size: 8px;
 }
 
 .primary-navigation {
-  display: contents;
+  display: flex;
+  align-items: stretch;
 }
 
-.nav-item {
+.chapter-link {
   position: relative;
-  width: 72px;
-  min-height: 62px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  min-width: 96px;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-content: center;
   justify-content: center;
-  gap: 5px;
+  gap: 0 7px;
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
+}
+
+.chapter-link::after {
+  content: '';
+  position: absolute;
+  right: 18px;
+  bottom: -1px;
+  left: 18px;
+  height: 2px;
+  background: transparent;
+}
+
+.chapter-link small {
+  grid-column: 2;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+
+.chapter-icon {
+  display: none;
+}
+
+.chapter-link:hover,
+.chapter-link.active {
+  color: var(--text-1);
+}
+
+.app-navigation button:focus-visible {
+  outline: none;
+  background: rgba(23, 26, 22, 0.035);
+}
+
+.chapter-link.active::after {
+  background: var(--text-1);
+}
+
+.capture-link {
+  width: 66px;
+  display: grid;
+  place-items: center;
+  color: var(--focus);
+}
+
+.capture-link span {
+  display: none;
+}
+
+.capture-link svg {
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: 1px solid currentColor;
+  transform: rotate(45deg);
   transition: color var(--t-base) var(--ease), background var(--t-base) var(--ease), transform var(--t-base) var(--ease);
 }
 
-.nav-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 18px;
-  width: 1px;
-  height: 26px;
-  background: transparent;
-  transition: width var(--t-base) var(--ease), background var(--t-base) var(--ease);
+.capture-link :deep(path),
+.capture-link :deep(line) {
+  transform-origin: center;
+  transform: rotate(-45deg);
 }
 
-.nav-item:hover {
-  color: var(--text-1);
-  background: rgba(242, 237, 225, 0.025);
-}
-
-.nav-item:focus-visible {
-  outline: none;
-  color: var(--text-1);
-  background: rgba(242, 237, 225, 0.025);
-}
-
-.nav-item:focus-visible::after {
-  content: '';
-  position: absolute;
-  top: 8px;
-  right: 7px;
-  width: 6px;
-  height: 6px;
-  border-top: 1px solid var(--focus-bright);
-  border-right: 1px solid var(--focus-bright);
-}
-
-.nav-item.active {
-  color: var(--text-1);
-}
-
-.nav-item.active::before {
-  width: 3px;
+.capture-link:hover svg {
+  color: var(--surface-1);
   background: var(--focus);
+  transform: rotate(0deg);
 }
 
-.nav-item[data-mode='library'].active::before {
-  background: var(--accent);
+.capture-link:hover :deep(path),
+.capture-link:hover :deep(line) {
+  transform: rotate(0deg);
 }
 
-.nav-item[data-mode='atlas'].active::before {
-  background: var(--cobalt);
+.nav-tools {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
 }
 
-.capture-item {
-  min-height: 76px;
-  color: var(--text-3);
+.tool-link {
+  width: 52px;
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
 }
 
-.capture-icon {
+.tool-link:hover,
+.tool-link.active {
+  color: var(--text-1);
+}
+
+.index-link {
+  width: 76px;
+  grid-template-columns: auto auto;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.index-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow-y: auto;
+  padding: 46px clamp(28px, 6vw, 96px) 28px;
+  color: var(--text-2);
+  background: var(--surface-1);
+}
+
+.index-sheet::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 36%;
+  width: 1px;
+  background: var(--line-1);
+  pointer-events: none;
+}
+
+.index-head {
+  min-height: 190px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.index-kicker,
+.index-context > p,
+.index-system > p {
+  color: var(--focus);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.index-head h2 {
+  margin-top: 21px;
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1.38;
+}
+
+.index-head > button {
   width: 42px;
   height: 42px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--line-warm);
-  border-radius: 50%;
-  background: var(--focus-dim);
-  color: var(--focus-bright);
-  box-shadow: 0 0 28px rgba(225, 165, 88, 0.08);
-  transition: transform var(--t-base) var(--ease), background var(--t-base) var(--ease), color var(--t-base) var(--ease);
-}
-
-.capture-item:hover .capture-icon {
-  transform: rotate(90deg);
-  background: var(--focus);
-  color: var(--surface-0);
-}
-
-.more-trigger {
-  margin-top: auto;
-}
-
-.more-menu {
-  position: fixed;
-  left: calc(var(--app-rail-width) + 14px);
-  bottom: 14px;
-  z-index: 55;
-  width: 272px;
-  max-height: calc(100vh - 28px);
-  overflow-y: auto;
-  padding: 16px;
-  background: rgba(16, 16, 14, 0.96);
+  color: var(--text-3);
   border: 1px solid var(--line-2);
-  border-radius: var(--r-3);
-  box-shadow: var(--shadow-2);
-  backdrop-filter: var(--glass-blur);
 }
 
-.menu-brand {
-  min-height: 64px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+.index-head > button:hover {
+  color: var(--surface-1);
+  background: var(--text-1);
+}
+
+.index-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  gap: clamp(42px, 8vw, 130px);
+  padding: 44px 0 52px;
+}
+
+.index-context,
+.index-system {
+  min-width: 0;
+}
+
+.index-context > p,
+.index-system > p {
+  margin-bottom: 18px;
+  color: var(--text-5);
+}
+
+.index-context > button {
+  width: 100%;
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: 28px 24px minmax(100px, 0.55fr) minmax(180px, 1fr);
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  border-top: 1px solid var(--line-1);
+}
+
+.index-context > button:last-child {
   border-bottom: 1px solid var(--line-1);
 }
 
-.menu-brand > div {
-  display: grid;
-  gap: 3px;
+.index-context > button:hover,
+.index-context > button.active {
+  padding-left: 8px;
+  color: var(--focus);
 }
 
-.menu-brand span {
-  color: var(--text-1);
-  font-family: var(--font-display);
-  font-size: 20px;
-}
-
-.menu-brand small,
-.menu-label {
+.index-number {
   color: var(--text-5);
   font-family: var(--font-mono);
   font-size: 9px;
 }
 
-.menu-brand i {
-  width: 20px;
-  height: 20px;
-  border-top: 1px solid var(--focus);
-  border-right: 1px solid var(--focus);
+.index-context strong {
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 540;
 }
 
-.menu-label {
-  padding: 18px 8px 6px;
+.index-context small {
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-align: right;
 }
 
-.admin-label {
-  border-top: 1px solid var(--line-1);
-  margin-top: 10px;
-}
-
-.menu-item {
+.index-system > button {
   width: 100%;
-  min-height: 40px;
+  min-height: 48px;
   display: grid;
-  grid-template-columns: 26px 1fr;
+  grid-template-columns: 25px 1fr;
   align-items: center;
   gap: 8px;
-  padding: 0 8px;
   color: var(--text-3);
-  font-size: var(--fs-3);
   text-align: left;
-  border-bottom: 1px solid transparent;
+  border-top: 1px solid var(--line-1);
 }
 
-.menu-item:hover,
-.menu-item.active {
+.index-system > button:hover,
+.index-system > button.active {
   color: var(--text-1);
-  border-bottom-color: var(--line-2);
 }
 
-.menu-item.active svg {
-  color: var(--focus-bright);
+.index-foot {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  border-top: 1px solid var(--line-2);
 }
 
-.menu-enter-active,
-.menu-leave-active {
-  transition: opacity var(--t-base) var(--ease), transform var(--t-base) var(--ease);
+.index-foot svg:last-child {
+  margin-left: auto;
 }
 
-.menu-enter-from,
-.menu-leave-to {
+.index-sheet-enter-active,
+.index-sheet-leave-active {
+  transition: clip-path var(--t-slow) var(--ease), opacity var(--t-base) var(--ease);
+}
+
+.index-sheet-enter-from,
+.index-sheet-leave-to {
   opacity: 0;
-  transform: translateX(-10px);
+  clip-path: inset(0 0 100% 0);
 }
 
 @media (max-width: 760px) {
   .app-navigation {
     inset: auto 0 0;
-    width: auto;
     height: var(--app-mobile-nav-height);
-    display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    padding: 5px max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
-    border-right: 0;
-    border-top: 1px solid var(--line-1);
+    padding: 0 max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
+    background: rgba(232, 234, 229, 0.97);
+    border-top: 1px solid var(--line-2);
+    border-bottom: 0;
   }
 
-  .app-navigation::after,
-  .brand-mark {
+  .brand {
     display: none;
   }
 
-  .primary-navigation {
+  .primary-navigation,
+  .nav-tools {
     display: contents;
   }
 
-  .nav-item {
-    width: 100%;
-    min-height: 60px;
+  .chapter-link {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 9px;
   }
 
-  .nav-item::before {
+  .chapter-link::after {
     top: 0;
-    right: 22%;
-    left: 22%;
+    right: 26%;
+    bottom: auto;
+    left: 26%;
+  }
+
+  .chapter-link small {
+    display: none;
+  }
+
+  .chapter-icon {
+    display: block;
+  }
+
+  .capture-link {
     width: auto;
-    height: 1px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 9px;
   }
 
-  .nav-item.active::before {
+  .capture-link span {
+    display: block;
+  }
+
+  .capture-link svg {
+    width: 30px;
+    height: 30px;
+    padding: 6px;
+  }
+
+  .search-link {
+    display: none;
+  }
+
+  .index-link {
     width: auto;
-    height: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 9px;
   }
 
-  .capture-item {
-    grid-column: 3;
+  .index-sheet {
+    padding: 28px 20px calc(var(--app-mobile-nav-height) + 28px);
   }
 
-  .capture-icon {
-    width: 39px;
-    height: 39px;
+  .index-sheet::before {
+    display: none;
   }
 
-  .more-trigger {
-    grid-column: 5;
-    margin: 0;
+  .index-head {
+    min-height: 150px;
   }
 
-  .more-menu {
-    left: 10px;
-    right: 10px;
-    bottom: calc(var(--app-mobile-nav-height) + 10px);
-    width: auto;
-    max-height: min(68vh, 560px);
+  .index-head h2 {
+    font-size: 28px;
   }
 
-  .menu-enter-from,
-  .menu-leave-to {
-    transform: translateY(10px);
+  .index-body {
+    grid-template-columns: 1fr;
+    gap: 42px;
+    padding-top: 30px;
+  }
+
+  .index-context > button {
+    grid-template-columns: 24px 22px minmax(0, 1fr);
+    min-height: 62px;
+  }
+
+  .index-context small {
+    display: none;
   }
 }
 </style>

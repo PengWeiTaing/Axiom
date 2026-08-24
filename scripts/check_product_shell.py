@@ -31,7 +31,8 @@ def main() -> int:
                 "{ key: 'library', label: '资料库'",
                 "{ key: 'atlas', label: 'Atlas'",
                 "<span>记录</span>",
-                "<span>更多</span>",
+                "<span>索引</span>",
+                "function openSearch()",
             ),
         )
     )

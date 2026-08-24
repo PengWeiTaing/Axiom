@@ -1657,8 +1657,22 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 <style scoped>
 .atlas-view {
+  --text-1: #f0eee7;
+  --text-2: #cbc9c2;
+  --text-3: #94958f;
+  --text-4: #676b67;
+  --text-5: #454a47;
+  --line-1: rgba(240, 238, 231, 0.07);
+  --line-2: rgba(240, 238, 231, 0.13);
+  --line-3: rgba(240, 238, 231, 0.22);
+  --focus: #d69755;
+  --focus-bright: #efbf79;
+  --accent: #78a395;
+  --cobalt: #7895b4;
+  --vermilion: #bd6a5e;
   position: fixed;
   inset: 0;
+  top: var(--atlas-shell-top, 0px);
   left: var(--atlas-shell-left, 0px);
   bottom: var(--atlas-shell-bottom, 0px);
   z-index: 10;

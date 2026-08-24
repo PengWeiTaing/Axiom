@@ -65,6 +65,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const overview = ref<OverviewPayload | null>(null);
 const nowContext = ref<NowContextPayload | null>(null);
+const weeklyPlan = ref<WeeklyPlanPayload | null>(null);
 const candidateMemories = ref<Memory[]>([]);
 const pendingDecisions = ref<Decision[]>([]);
 const selectedItemId = ref<number | null>(null);
@@ -74,7 +75,6 @@ const completingId = ref<number | null>(null);
 const feedbackOutcome = ref<ContextOutcome | null>(null);
 const feedbackEffect = ref<string | null>(null);
 const feedbackSubmitting = ref(false);
-const weeklyPlan = ref<WeeklyPlanPayload | null>(null);
 const weekEditing = ref(false);
 const weekMutatingId = ref<number | null>(null);
 const weekReviewOpen = ref(false);
@@ -120,13 +120,9 @@ const primaryCues = computed(() => {
   if (!action) return [];
   return action.cues.filter((cue) => cue !== action.reason.label);
 });
-const nextActions = computed(() => nowContext.value?.alternatives ?? []);
+const nextActions = computed(() => nowContext.value?.alternatives.slice(0, 4) ?? []);
 const weeklySelected = computed(() => weeklyPlan.value?.selected ?? []);
 const weeklyCandidates = computed(() => weeklyPlan.value?.candidates ?? []);
-const weekRangeLabel = computed(() => {
-  if (!weeklyPlan.value) return '';
-  return `${shortDate(weeklyPlan.value.week_start)} - ${shortDate(weeklyPlan.value.week_end)}`;
-});
 const goalAttention = computed(() => nowContext.value?.commitments.attention ?? []);
 const contextNudges = computed(() => nowContext.value?.nudges ?? []);
 const firstGoalAttention = computed(() => goalAttention.value[0] ?? null);
@@ -138,10 +134,10 @@ const judgementTotal = computed(() => (
   + candidateMemories.value.length
   + pendingDecisions.value.length
 ));
-
-function actionMeta(action: ContextAction): string {
-  return action.cues.slice(0, 3).join(' · ');
-}
+const weekRangeLabel = computed(() => {
+  if (!weeklyPlan.value) return '';
+  return `${shortDate(weeklyPlan.value.week_start)} — ${shortDate(weeklyPlan.value.week_end)}`;
+});
 
 function compact(value: string | null | undefined, fallback: string, limit = 92): string {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
@@ -152,6 +148,10 @@ function compact(value: string | null | undefined, fallback: string, limit = 92)
 function shortDate(value: string): string {
   const [, month, day] = value.split('-').map(Number);
   return `${month}月${day}日`;
+}
+
+function actionMeta(action: ContextAction): string {
+  return action.cues.slice(0, 3).join(' · ');
 }
 
 function weeklyItemMeta(item: WeeklyPlanItem): string {
@@ -166,6 +166,14 @@ function weeklyItemMeta(item: WeeklyPlanItem): string {
   return item.task.estimated_minutes ? `预计 ${item.task.estimated_minutes} 分钟` : '本周已承诺';
 }
 
+function itemTitle(item: Item): string {
+  return compact(item.content || item.derived_text || item.transcript_text || item.original_name, `记录 #${item.id}`);
+}
+
+function itemTypeLabel(item: Item): string {
+  return { text: '文字', image: '图片', document: '文档', audio: '音频' }[item.type];
+}
+
 function syncWeekReviewDraft(plan: WeeklyPlanPayload | null) {
   const saved = plan?.review.saved_feedback;
   weekReviewDraft.value = {
@@ -173,14 +181,6 @@ function syncWeekReviewDraft(plan: WeeklyPlanPayload | null) {
     reflection: saved?.reflection ?? '',
   };
   weekReviewSaved.value = false;
-}
-
-function itemTitle(item: Item): string {
-  return compact(item.content || item.derived_text || item.transcript_text || item.original_name, `记录 #${item.id}`);
-}
-
-function itemTypeLabel(item: Item): string {
-  return { text: '文字', image: '图片', document: '文档', audio: '音频' }[item.type];
 }
 
 async function load() {
@@ -193,8 +193,8 @@ async function load() {
       getOverview({ recent_limit: 6, preview_chars: 140 }),
       getNowContext(5),
       getWeeklyPlan(),
-      listMemories({ status: 'candidate', page: 1, page_size: 4 }),
-      listDecisions({ status: 'pending', page: 1, page_size: 4 }),
+      listMemories({ status: 'candidate', page: 1, page_size: 3 }),
+      listDecisions({ status: 'pending', page: 1, page_size: 3 }),
     ]);
     overview.value = overviewPayload;
     nowContext.value = contextPayload;
@@ -227,6 +227,22 @@ async function finishTask(task: Task) {
     error.value = err instanceof ApiError ? err.message : '任务完成失败';
   } finally {
     completingId.value = null;
+  }
+}
+
+async function sendFeedback(fitFeedback: ContextFitFeedback) {
+  if (!feedbackOutcome.value || feedbackSubmitting.value) return;
+  feedbackSubmitting.value = true;
+  error.value = null;
+  try {
+    const result = await submitContextFeedback(feedbackOutcome.value.id, fitFeedback);
+    feedbackOutcome.value = result.outcome;
+    feedbackEffect.value = result.effect;
+    nowContext.value = result.now_context;
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : '反馈记录失败';
+  } finally {
+    feedbackSubmitting.value = false;
   }
 }
 
@@ -286,25 +302,18 @@ async function submitWeekReview() {
   }
 }
 
-async function sendFeedback(fitFeedback: ContextFitFeedback) {
-  if (!feedbackOutcome.value || feedbackSubmitting.value) return;
-  feedbackSubmitting.value = true;
+async function dismissNudge(nudge: ContextNudge) {
+  if (dismissingNudgeId.value) return;
+  dismissingNudgeId.value = nudge.id;
   error.value = null;
   try {
-    const result = await submitContextFeedback(feedbackOutcome.value.id, fitFeedback);
-    feedbackOutcome.value = result.outcome;
-    feedbackEffect.value = result.effect;
+    const result = await dismissContextNudge(nudge.id);
     nowContext.value = result.now_context;
   } catch (err) {
-    error.value = err instanceof ApiError ? err.message : '反馈记录失败';
+    error.value = err instanceof ApiError ? err.message : '提示暂时无法忽略';
   } finally {
-    feedbackSubmitting.value = false;
+    dismissingNudgeId.value = null;
   }
-}
-
-function dismissFeedback() {
-  feedbackOutcome.value = null;
-  feedbackEffect.value = null;
 }
 
 function openTask(task: Task) {
@@ -315,16 +324,6 @@ function openTask(task: Task) {
 function openTaskById(id: number) {
   selectedObjectIntent.value = 'view';
   selectedObject.value = { kind: 'task', id };
-}
-
-function openMemory(memory: Memory) {
-  selectedObjectIntent.value = 'view';
-  selectedObject.value = { kind: 'memory', id: memory.id };
-}
-
-function openDecision(decision: Decision) {
-  selectedObjectIntent.value = 'view';
-  selectedObject.value = { kind: 'decision', id: decision.id };
 }
 
 function openGoal(
@@ -351,21 +350,17 @@ async function openContextNudge(nudge: ContextNudge) {
   weekReviewOpen.value = true;
   syncWeekReviewDraft(weeklyPlan.value);
   await nextTick();
-  document.getElementById('week-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('week-review')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-async function dismissNudge(nudge: ContextNudge) {
-  if (dismissingNudgeId.value) return;
-  dismissingNudgeId.value = nudge.id;
-  error.value = null;
-  try {
-    const result = await dismissContextNudge(nudge.id);
-    nowContext.value = result.now_context;
-  } catch (err) {
-    error.value = err instanceof ApiError ? err.message : '提示暂时无法忽略';
-  } finally {
-    dismissingNudgeId.value = null;
-  }
+function openMemory(memory: Memory) {
+  selectedObjectIntent.value = 'view';
+  selectedObject.value = { kind: 'memory', id: memory.id };
+}
+
+function openDecision(decision: Decision) {
+  selectedObjectIntent.value = 'view';
+  selectedObject.value = { kind: 'decision', id: decision.id };
 }
 
 function openObject(target: ObjectTarget) {
@@ -378,380 +373,271 @@ watch(() => props.revision, load);
 </script>
 
 <template>
-  <main class="today-view">
-    <header class="today-header">
-      <div>
-        <p class="date">{{ dateLabel }}</p>
-        <h1>{{ greeting }}</h1>
+  <main class="now-view">
+    <header class="folio-head">
+      <div class="folio-identity">
+        <span>01 / NOW</span>
+        <strong>{{ greeting }}</strong>
       </div>
-      <span class="day-mark" aria-hidden="true">AXIOM / NOW</span>
-      <button class="icon-button" type="button" title="刷新" aria-label="刷新此刻" :disabled="loading" @click="load">
-        <RefreshCw :size="18" :class="{ spinning: loading }" />
+      <p>{{ dateLabel }}</p>
+      <button type="button" title="刷新" aria-label="刷新此刻" :disabled="loading" @click="load">
+        <RefreshCw :size="17" :class="{ spinning: loading }" />
       </button>
     </header>
 
     <p v-if="error" class="notice" role="alert">{{ error }}</p>
 
-    <section class="focus-section" aria-labelledby="focus-title">
-      <span class="focus-number" aria-hidden="true">01</span>
-      <div class="section-kicker">
-        <span class="focus-dot" />
-        <span>当前焦点</span>
-      </div>
+    <section class="focus-spread" aria-labelledby="focus-title">
+      <aside class="focus-margin">
+        <span class="margin-label"><i /> 当前焦点</span>
+        <p v-if="primaryCues.length">{{ primaryCues.join(' / ') }}</p>
+        <p v-else>只留下现在真正需要发生的事。</p>
+      </aside>
 
-      <template v-if="primaryTask && primaryAction">
-        <button class="focus-copy" type="button" @click="openTask(primaryTask)">
-          <span class="focus-reason">{{ primaryAction.reason.label }}</span>
-          <h2 id="focus-title">{{ primaryTask.title }}</h2>
-          <p>{{ primaryAction.reason.detail }}</p>
-        </button>
-        <button v-if="primaryTask.goal" class="focus-goal" type="button" @click="openGoal(primaryTask.goal)">
-          <Target :size="15" />
-          <span v-if="primaryAction.reason.code === 'goal_progress'">查看目标与进展</span>
-          <span v-else>同时推进「{{ compact(primaryTask.goal.title, '已确认目标', 40) }}」</span>
-          <ArrowRight :size="14" />
-        </button>
-        <button
-          v-if="primaryTask.parent_task?.available && primaryTask.parent_task.id"
-          class="focus-goal focus-source"
-          type="button"
-          @click="openTaskById(primaryTask.parent_task.id)"
-        >
-          <GitFork :size="15" />
-          <span>来自「{{ compact(primaryTask.parent_task.title, '上层行动', 40) }}」</span>
-          <ArrowRight :size="14" />
-        </button>
-        <div class="focus-footer">
-          <div class="task-meta">
-            <span v-for="entry in primaryCues" :key="entry">{{ entry }}</span>
+      <div class="focus-body">
+        <template v-if="primaryTask && primaryAction">
+          <button class="focus-copy" type="button" @click="openTask(primaryTask)">
+            <span>{{ primaryAction.reason.label }}</span>
+            <h1 id="focus-title">{{ primaryTask.title }}</h1>
+            <p>{{ primaryAction.reason.detail }}</p>
+          </button>
+
+          <div class="focus-context">
+            <button v-if="primaryTask.goal" type="button" @click="openGoal(primaryTask.goal)">
+              <Target :size="14" />
+              <span>{{ primaryAction.reason.code === 'goal_progress' ? '查看目标与进展' : compact(primaryTask.goal.title, '已确认目标', 42) }}</span>
+              <ArrowRight :size="13" />
+            </button>
+            <button
+              v-if="primaryTask.parent_task?.available && primaryTask.parent_task.id"
+              type="button"
+              @click="openTaskById(primaryTask.parent_task.id)"
+            >
+              <GitFork :size="14" />
+              <span>来自「{{ compact(primaryTask.parent_task.title, '上层行动', 38) }}」</span>
+              <ArrowRight :size="13" />
+            </button>
           </div>
-          <button class="complete-button" type="button" :disabled="completingId !== null" @click="finishTask(primaryTask)">
-            <Check :size="18" :stroke-width="2" />
-            <span>{{ completingId === primaryTask.id ? '完成中' : '完成' }}</span>
-          </button>
-        </div>
-      </template>
+        </template>
 
-      <div v-else-if="!loading" class="empty-focus">
-        <template v-if="firstGoalAttention">
-          <h2 id="focus-title">
-            {{ firstGoalAttention.attention_code === 'missing_action' ? '目标还在，下一步还没落下来' : '有一项承诺需要重新确认' }}
-          </h2>
-          <p>「{{ compact(firstGoalAttention.title, '已确认目标', 40) }}」{{ firstGoalAttention.attention_detail }}</p>
-          <button class="capture-button" type="button" @click="openGoalAttention(firstGoalAttention)">
-            <Target :size="18" />
-            <span>{{ firstGoalAttention.attention_action === 'add_action' ? '补下一步' : '查看承诺' }}</span>
-          </button>
-        </template>
-        <template v-else>
-          <h2 id="focus-title">今天还没有明确的下一步</h2>
-          <p>先记下正在占据你注意力的事情。</p>
-          <button class="capture-button" type="button" @click="emit('capture')">
-            <Plus :size="18" />
-            <span>记录此刻</span>
-          </button>
-        </template>
+        <div v-else-if="!loading" class="empty-focus">
+          <template v-if="firstGoalAttention">
+            <span>承诺仍在等待下一步</span>
+            <h1 id="focus-title">{{ compact(firstGoalAttention.title, '一项已确认目标', 64) }}</h1>
+            <p>{{ firstGoalAttention.attention_detail }}</p>
+            <button type="button" @click="openGoalAttention(firstGoalAttention)">
+              {{ firstGoalAttention.attention_action === 'add_action' ? '补下一步' : '重新确认' }}
+              <ArrowRight :size="14" />
+            </button>
+          </template>
+          <template v-else>
+            <span>注意力尚未落定</span>
+            <h1 id="focus-title">先把脑海里的事情放下来。</h1>
+            <p>不必先想分类，也不必整理成完整句子。</p>
+            <button type="button" @click="emit('capture')">记录此刻 <ArrowRight :size="14" /></button>
+          </template>
+        </div>
+
+        <div v-else class="focus-loading">正在读取此刻的上下文</div>
       </div>
 
-      <div v-else class="focus-loading">正在整理此刻</div>
+      <aside class="focus-action">
+        <div class="action-score" aria-hidden="true">
+          <i v-for="index in 5" :key="index" :class="{ active: index <= Math.max(1, Math.min(primaryCues.length + 1, 5)) }" />
+        </div>
+        <button
+          v-if="primaryTask"
+          type="button"
+          :disabled="completingId !== null"
+          :title="completingId === primaryTask.id ? '完成中' : '标记完成'"
+          @click="finishTask(primaryTask)"
+        >
+          <Check :size="22" :stroke-width="1.65" />
+          <span>{{ completingId === primaryTask.id ? '完成中' : '完成' }}</span>
+        </button>
+      </aside>
     </section>
 
     <Transition name="feedback">
-      <section v-if="feedbackOutcome" class="feedback-strip" aria-live="polite">
-        <div class="feedback-copy">
-          <span>已完成「{{ compact(feedbackOutcome.task_title, '刚才的行动', 42) }}」</span>
-          <p>{{ feedbackEffect || '刚才把它放在“此刻”，合适吗？' }}</p>
+      <section v-if="feedbackOutcome" class="feedback-line" aria-live="polite">
+        <Check :size="16" />
+        <div>
+          <strong>已完成「{{ compact(feedbackOutcome.task_title, '刚才的行动', 44) }}」</strong>
+          <span>{{ feedbackEffect || '刚才把它放在“此刻”，合适吗？' }}</span>
         </div>
-        <div v-if="!feedbackEffect" class="feedback-options" role="group" aria-label="评价刚才的推荐">
+        <div v-if="!feedbackEffect" class="feedback-options">
           <button
             v-for="option in feedbackOptions"
             :key="option.value"
             type="button"
             :disabled="feedbackSubmitting"
             @click="sendFeedback(option.value)"
-          >
-            {{ option.label }}
-          </button>
+          >{{ option.label }}</button>
         </div>
-        <button class="feedback-dismiss" type="button" aria-label="关闭反馈" @click="dismissFeedback">
-          <X :size="16" />
+        <button type="button" title="关闭反馈" aria-label="关闭反馈" @click="feedbackOutcome = null; feedbackEffect = null">
+          <X :size="15" />
         </button>
       </section>
     </Transition>
 
-    <section class="week-section" aria-labelledby="week-title">
-      <header class="week-header">
-        <div class="week-heading">
-          <p class="eyebrow">Week</p>
-          <div class="week-title-row">
-            <h2 id="week-title">本周承诺</h2>
-            <span v-if="weekRangeLabel">{{ weekRangeLabel }}</span>
-          </div>
-        </div>
-        <div class="week-header-actions">
-          <span v-if="weeklyPlan?.summary.selected">
-            {{ weeklyPlan.summary.completed }} / {{ weeklyPlan.summary.selected }} 已完成
-          </span>
-          <span v-else>尚未选择</span>
-          <div class="week-button-group">
-            <button
-              class="week-edit-button"
-              type="button"
-              :disabled="loading || !weeklyPlan?.summary.selected"
-              @click="toggleWeekReview"
-            >
-              <History :size="15" />
-              <span>{{ weekReviewOpen ? '收起回看' : '回看' }}</span>
-            </button>
-            <button
-              class="week-edit-button"
-              type="button"
-              :disabled="loading || weeklyPlan?.summary.capacity_remaining === 0"
-              @click="weekEditing = !weekEditing"
-            >
-              <CalendarDays :size="15" />
-              <span>{{ weekEditing ? '收起' : weeklySelected.length ? '调整' : '选择' }}</span>
-            </button>
-          </div>
+    <section class="week-score" aria-labelledby="week-title">
+      <header class="section-margin">
+        <span>本周 / {{ weekRangeLabel || '尚未形成' }}</span>
+        <h2 id="week-title">明确承诺</h2>
+        <p>最多五件。它们不是另一张任务清单，而是这周主动保留的方向。</p>
+        <div class="section-actions">
+          <button type="button" :disabled="!weeklyPlan?.summary.selected" @click="toggleWeekReview">
+            <History :size="14" />
+            <span>{{ weekReviewOpen ? '收起回看' : '回看' }}</span>
+          </button>
+          <button type="button" :disabled="weeklyPlan?.summary.capacity_remaining === 0" @click="weekEditing = !weekEditing">
+            <CalendarDays :size="14" />
+            <span>{{ weekEditing ? '完成调整' : '调整' }}</span>
+          </button>
         </div>
       </header>
 
-      <div v-if="weeklySelected.length" class="week-list">
-        <div
-          v-for="item in weeklySelected"
-          :key="item.id"
-          class="week-row"
-          :class="`is-${item.state}`"
-        >
-          <button
-            class="week-task"
-            type="button"
-            :disabled="!item.task"
-            @click="item.task && openTask(item.task)"
-          >
-            <span class="week-state" aria-hidden="true">
+      <div class="week-body">
+        <div class="week-progress">
+          <span>{{ weeklyPlan?.summary.completed ?? 0 }} / {{ weeklyPlan?.summary.selected ?? 0 }}</span>
+          <div><i :style="{ width: `${weeklyPlan?.summary.selected ? (weeklyPlan.summary.completed / weeklyPlan.summary.selected) * 100 : 0}%` }" /></div>
+          <small>本周已处理</small>
+        </div>
+
+        <div v-if="weeklySelected.length" class="commitment-list">
+          <article v-for="(item, index) in weeklySelected" :key="item.id" :class="`is-${item.state}`">
+            <span class="commitment-index">{{ String(index + 1).padStart(2, '0') }}</span>
+            <button type="button" :disabled="!item.task" @click="item.task && openTask(item.task)">
+              <strong>{{ item.title }}</strong>
+              <small>{{ weeklyItemMeta(item) }}</small>
+            </button>
+            <span class="commitment-state" aria-hidden="true">
               <CircleCheck v-if="item.state === 'completed'" :size="17" />
               <Circle v-else :size="16" />
             </span>
-            <span class="row-copy">
-              <strong>{{ item.title }}</strong>
-              <small>{{ weeklyItemMeta(item) }}</small>
-            </span>
-          </button>
-          <button
-            v-if="item.state !== 'completed'"
-            class="week-remove"
-            type="button"
-            :title="`将「${item.title}」移出本周`"
-            :aria-label="`将「${item.title}」移出本周`"
-            :disabled="weekMutatingId !== null"
-            @click="removeFromWeek(item)"
-          >
-            <X :size="15" />
-          </button>
-        </div>
-      </div>
-      <p v-else-if="!weekEditing" class="week-empty">本周还没有明确承诺。</p>
-
-      <div v-if="weekEditing" class="week-candidates">
-        <div class="week-candidate-header">
-          <span>从当前脉络中选择</span>
-          <small>还可选择 {{ weeklyPlan?.summary.capacity_remaining ?? 0 }} 项</small>
-        </div>
-        <div v-if="weeklyCandidates.length" class="week-candidate-list">
-          <div v-for="action in weeklyCandidates" :key="action.task.id" class="week-candidate-row">
-            <button class="week-candidate-task" type="button" @click="openTask(action.task)">
-              <span class="row-copy">
-                <strong>{{ action.task.title }}</strong>
-                <small>{{ actionMeta(action) }}</small>
-              </span>
-            </button>
             <button
-              class="week-add"
+              v-if="weekEditing && item.state !== 'completed'"
+              class="commitment-remove"
               type="button"
-              :title="`将「${action.task.title}」加入本周`"
-              :aria-label="`将「${action.task.title}」加入本周`"
+              :title="`将「${item.title}」移出本周`"
+              :aria-label="`将「${item.title}」移出本周`"
               :disabled="weekMutatingId !== null"
-              @click="addToWeek(action.task)"
-            >
-              <Plus :size="16" />
-            </button>
-          </div>
+              @click="removeFromWeek(item)"
+            ><X :size="14" /></button>
+          </article>
         </div>
-        <p v-else class="week-empty">当前没有其他可加入的行动。</p>
-      </div>
+        <p v-else class="empty-line">本周还没有明确承诺。系统不会替你自动填满。</p>
 
-      <div v-if="weekReviewOpen && weeklyPlan" id="week-review" class="week-review">
-        <header class="week-review-header">
-          <div>
-            <span>本周回看</span>
-            <small>{{ weeklyPlan.review.state === 'saved' ? '已形成可供下次拆解使用的判断' : '基于这周真实行动证据' }}</small>
-          </div>
-          <small>{{ weeklyPlan.review.review_window_open ? '适合完成复盘' : '可以先记下阶段判断' }}</small>
-        </header>
-        <div class="week-review-stats">
-          <div>
-            <strong>{{ weeklyPlan.review.commitments.resolved }} / {{ weeklyPlan.review.commitments.selected }}</strong>
-            <span>承诺已处理</span>
-          </div>
-          <div>
-            <strong>{{ weeklyPlan.review.steps.done }} / {{ weeklyPlan.review.steps.total }}</strong>
-            <span>步骤已完成</span>
-          </div>
-          <div>
-            <strong>{{ weeklyPlan.review.outcomes.rated }} / {{ weeklyPlan.review.outcomes.completed }}</strong>
-            <span>完成后有反馈</span>
-          </div>
-        </div>
-        <p class="week-review-recommendation">{{ weeklyPlan.review.recommendation }}</p>
-        <form class="week-review-form" @submit.prevent="submitWeekReview">
-          <div class="week-review-fit" role="group" aria-label="评价本周拆解粒度">
-            <button
-              v-for="option in weekReviewOptions"
-              :key="option.value"
-              type="button"
-              :class="{ active: weekReviewDraft.decomposition_fit === option.value }"
-              :aria-pressed="weekReviewDraft.decomposition_fit === option.value"
-              :disabled="weekReviewSaving"
-              @click="weekReviewDraft.decomposition_fit = option.value; weekReviewSaved = false"
-            >{{ option.label }}</button>
-          </div>
-          <textarea
-            v-model="weekReviewDraft.reflection"
-            maxlength="1000"
-            rows="3"
-            placeholder="这周哪一步最容易开始，哪一步仍然卡住？"
-            @input="weekReviewSaved = false"
-          />
-          <div class="week-review-save">
-            <span v-if="weekReviewSaved">本周判断已保存</span>
-            <span v-else-if="weeklyPlan.review.saved_feedback">
-              上次保存：{{ formatRelative(weeklyPlan.review.saved_feedback.reviewed_at) }}
-            </span>
-            <span v-else />
-            <button type="submit" :disabled="weekReviewSaving">
-              <Save :size="15" />
-              <span>{{ weekReviewSaving ? '保存中' : '保存本周判断' }}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </section>
-
-    <div class="status-strip" aria-label="当前状态摘要">
-      <span><strong>{{ nowContext?.signals.open_tasks ?? 0 }}</strong> 个开放行动</span>
-      <span v-if="nowContext?.signals.overdue_tasks"><strong>{{ nowContext.signals.overdue_tasks }}</strong> 个已逾期</span>
-      <button type="button" @click="mode.set('processing')"><strong>{{ backlogTotal }}</strong> 条待整理</button>
-      <span><strong>{{ judgementTotal }}</strong> 项待判断</span>
-      <span v-if="overview?.stats.streak"><strong>{{ overview.stats.streak }}</strong> 天连续记录</span>
-    </div>
-
-    <div class="today-columns">
-      <section class="column-section" aria-labelledby="next-title">
-        <header class="section-header">
-          <div>
-            <p class="eyebrow">Next</p>
-            <h2 id="next-title">接下来</h2>
-          </div>
-          <button class="text-link" type="button" @click="mode.set('tasks')">
-            <span>查看任务</span><ArrowRight :size="15" />
-          </button>
-        </header>
-
-        <div v-if="nextActions.length" class="row-list">
-          <button v-for="action in nextActions" :key="action.task.id" class="content-row" type="button" @click="openTask(action.task)">
-            <span class="row-icon task-icon"><Clock :size="16" /></span>
-            <span class="row-copy">
+        <div v-if="weekEditing" class="week-candidates">
+          <header>
+            <span>可以加入</span>
+            <small>还可选择 {{ weeklyPlan?.summary.capacity_remaining ?? 0 }} 项</small>
+          </header>
+          <article v-for="action in weeklyCandidates" :key="action.task.id">
+            <button type="button" @click="openTask(action.task)">
               <strong>{{ action.task.title }}</strong>
               <small>{{ actionMeta(action) }}</small>
-            </span>
-            <ArrowRight class="row-arrow" :size="15" />
-          </button>
-        </div>
-        <p v-else class="section-empty">当前没有其他今日行动。</p>
-      </section>
-
-      <section class="column-section" aria-labelledby="judgement-title">
-        <header class="section-header">
-          <div>
-            <p class="eyebrow">Review</p>
-            <h2 id="judgement-title">待你判断</h2>
-          </div>
-        </header>
-
-        <div v-if="contextNudges.length || goalAttention.length || candidateMemories.length || pendingDecisions.length" class="row-list">
-          <div v-for="nudge in contextNudges" :key="`nudge-${nudge.id}`" class="content-row nudge-row">
-            <button class="nudge-main" type="button" @click="openContextNudge(nudge)">
-              <span class="row-icon nudge-icon"><History :size="16" /></span>
-              <span class="row-copy">
-                <strong>{{ nudge.title }}</strong>
-                <small>{{ nudge.evidence.join(' · ') }}</small>
-              </span>
-              <ArrowRight class="row-arrow" :size="15" />
             </button>
             <button
-              class="nudge-dismiss"
               type="button"
-              :title="nudge.dismiss_label"
-              :aria-label="`${nudge.dismiss_label}：${nudge.title}`"
-              :disabled="dismissingNudgeId === nudge.id"
-              @click="dismissNudge(nudge)"
-            >
-              <X :size="14" />
-            </button>
-          </div>
-          <button v-for="goal in goalAttention" :key="`goal-${goal.id}`" class="content-row" type="button" @click="openGoalAttention(goal)">
-            <span class="row-icon goal-icon"><Target :size="16" /></span>
-            <span class="row-copy">
-              <strong>{{ goal.title }}</strong>
-              <small>当前承诺 · {{ goal.attention_label }}</small>
-            </span>
-            <ArrowRight class="row-arrow" :size="15" />
-          </button>
-          <button v-for="memory in candidateMemories" :key="`memory-${memory.id}`" class="content-row" type="button" @click="openMemory(memory)">
-            <span class="row-icon memory-icon"><Brain :size="16" /></span>
-            <span class="row-copy">
-              <strong>{{ compact(memory.content, `记忆 #${memory.id}`) }}</strong>
-              <small>候选记忆 · 等待确认</small>
-            </span>
-            <ArrowRight class="row-arrow" :size="15" />
-          </button>
-          <button v-for="decision in pendingDecisions" :key="`decision-${decision.id}`" class="content-row" type="button" @click="openDecision(decision)">
-            <span class="row-icon decision-icon"><GitFork :size="16" /></span>
-            <span class="row-copy">
-              <strong>{{ decision.title }}</strong>
-              <small>决策 · 等待结果回顾</small>
-            </span>
-            <ArrowRight class="row-arrow" :size="15" />
-          </button>
+              :title="`将「${action.task.title}」加入本周`"
+              :disabled="weekMutatingId !== null"
+              @click="addToWeek(action.task)"
+            ><Plus :size="15" /></button>
+          </article>
+          <p v-if="!weeklyCandidates.length" class="empty-line">当前没有其他可加入的行动。</p>
         </div>
-        <p v-else class="section-empty">目前没有需要确认的判断。</p>
-      </section>
-    </div>
 
-    <section class="recent-section" aria-labelledby="recent-title">
-      <header class="section-header">
-        <div>
-          <p class="eyebrow">Recent</p>
-          <h2 id="recent-title">最近进入外脑</h2>
+        <div v-if="weekReviewOpen && weeklyPlan" id="week-review" class="week-review">
+          <header>
+            <div><span>本周回看</span><small>{{ weeklyPlan.review.recommendation }}</small></div>
+            <p>{{ weeklyPlan.review.commitments.resolved }}/{{ weeklyPlan.review.commitments.selected }} 承诺 · {{ weeklyPlan.review.steps.done }}/{{ weeklyPlan.review.steps.total }} 步骤</p>
+          </header>
+          <form @submit.prevent="submitWeekReview">
+            <div class="review-fit" role="group" aria-label="评价本周拆解粒度">
+              <button
+                v-for="option in weekReviewOptions"
+                :key="option.value"
+                type="button"
+                :class="{ active: weekReviewDraft.decomposition_fit === option.value }"
+                :aria-pressed="weekReviewDraft.decomposition_fit === option.value"
+                @click="weekReviewDraft.decomposition_fit = option.value; weekReviewSaved = false"
+              >{{ option.label }}</button>
+            </div>
+            <textarea v-model="weekReviewDraft.reflection" rows="3" maxlength="1000" placeholder="哪一步最容易开始，哪一步仍然卡住？" />
+            <footer>
+              <span>{{ weekReviewSaved ? '本周判断已保存' : weeklyPlan.review.saved_feedback ? `上次保存：${formatRelative(weeklyPlan.review.saved_feedback.reviewed_at)}` : '' }}</span>
+              <button type="submit" :disabled="weekReviewSaving"><Save :size="14" /> {{ weekReviewSaving ? '保存中' : '保存判断' }}</button>
+            </footer>
+          </form>
         </div>
-        <button class="text-link" type="button" @click="mode.set('library')">
-          <span>打开资料库</span><ArrowRight :size="15" />
-        </button>
+      </div>
+    </section>
+
+    <section class="context-field">
+      <div class="next-field">
+        <header class="field-head">
+          <div><span>如果当前一步不合适</span><h2>还可以从这里开始</h2></div>
+          <button type="button" title="查看全部行动" aria-label="查看全部行动" @click="mode.set('tasks')"><ArrowRight :size="17" /></button>
+        </header>
+        <div v-if="nextActions.length" class="next-list">
+          <button v-for="(action, index) in nextActions" :key="action.task.id" type="button" @click="openTask(action.task)">
+            <span>{{ String(index + 1).padStart(2, '0') }}</span>
+            <strong>{{ action.task.title }}</strong>
+            <small>{{ actionMeta(action) }}</small>
+            <Clock :size="14" />
+          </button>
+        </div>
+        <p v-else class="empty-line">当前没有其他可执行行动。</p>
+      </div>
+
+      <aside class="judgement-field">
+        <header class="field-head">
+          <div><span>需要人的判断</span><h2>{{ judgementTotal }} 项边注</h2></div>
+        </header>
+        <div v-if="contextNudges.length || goalAttention.length || candidateMemories.length || pendingDecisions.length" class="judgement-list">
+          <article v-for="nudge in contextNudges" :key="`nudge-${nudge.id}`" class="tone-focus">
+            <button type="button" @click="openContextNudge(nudge)"><History :size="15" /><span><strong>{{ nudge.title }}</strong><small>{{ nudge.evidence.join(' · ') }}</small></span></button>
+            <button type="button" :title="nudge.dismiss_label" :disabled="dismissingNudgeId === nudge.id" @click="dismissNudge(nudge)"><X :size="13" /></button>
+          </article>
+          <article v-for="goal in goalAttention" :key="`goal-${goal.id}`" class="tone-goal">
+            <button type="button" @click="openGoalAttention(goal)"><Target :size="15" /><span><strong>{{ goal.title }}</strong><small>{{ goal.attention_label }}</small></span></button>
+          </article>
+          <article v-for="memory in candidateMemories" :key="`memory-${memory.id}`" class="tone-memory">
+            <button type="button" @click="openMemory(memory)"><Brain :size="15" /><span><strong>{{ compact(memory.content, `记忆 #${memory.id}`, 56) }}</strong><small>候选记忆 · 等待确认</small></span></button>
+          </article>
+          <article v-for="decision in pendingDecisions" :key="`decision-${decision.id}`" class="tone-decision">
+            <button type="button" @click="openDecision(decision)"><GitFork :size="15" /><span><strong>{{ decision.title }}</strong><small>等待结果回顾</small></span></button>
+          </article>
+        </div>
+        <p v-else class="empty-line">目前没有需要确认的判断。</p>
+      </aside>
+    </section>
+
+    <section class="recent-trace" aria-labelledby="recent-title">
+      <header class="field-head">
+        <div><span>刚刚进入外脑</span><h2 id="recent-title">最近痕迹</h2></div>
+        <button type="button" title="打开资料库" aria-label="打开资料库" @click="mode.set('library')"><ArrowRight :size="17" /></button>
       </header>
-
-      <div v-if="recentItems.length" class="recent-list">
-        <button v-for="item in recentItems" :key="item.id" class="recent-row" type="button" @click="selectedItemId = item.id">
-          <span class="row-icon"><FileText v-if="item.type !== 'audio'" :size="16" /><Inbox v-else :size="16" /></span>
-          <span class="row-copy">
-            <strong>{{ itemTitle(item) }}</strong>
-            <small>{{ itemTypeLabel(item) }} · {{ formatRelative(item.created_at) }}</small>
-          </span>
-          <ArrowRight class="row-arrow" :size="15" />
+      <div v-if="recentItems.length" class="trace-list">
+        <button v-for="(item, index) in recentItems" :key="item.id" type="button" @click="selectedItemId = item.id">
+          <span>{{ String(index + 1).padStart(2, '0') }}</span>
+          <FileText v-if="item.type !== 'audio'" :size="15" /><Inbox v-else :size="15" />
+          <strong>{{ itemTitle(item) }}</strong>
+          <small>{{ itemTypeLabel(item) }} · {{ formatRelative(item.created_at) }}</small>
         </button>
       </div>
-      <p v-else class="section-empty">还没有记录。想到什么，直接记下来。</p>
+      <p v-else class="empty-line">还没有记录。想到什么，直接记下来。</p>
     </section>
+
+    <footer class="now-foot">
+      <span><strong>{{ nowContext?.signals.open_tasks ?? 0 }}</strong> 开放行动</span>
+      <span v-if="nowContext?.signals.overdue_tasks"><strong>{{ nowContext.signals.overdue_tasks }}</strong> 已逾期</span>
+      <button type="button" @click="mode.set('processing')"><strong>{{ backlogTotal }}</strong> 待整理</button>
+      <span v-if="overview?.stats.streak"><strong>{{ overview.stats.streak }}</strong> 天连续记录</span>
+      <i />
+      <button type="button" @click="emit('capture')"><Plus :size="13" /> 记录此刻</button>
+    </footer>
 
     <ItemDrawer :item-id="selectedItemId" @close="selectedItemId = null" @changed="load" />
     <ObjectDrawer
@@ -766,1416 +652,960 @@ watch(() => props.revision, load);
 </template>
 
 <style scoped>
-.today-view {
-  width: min(980px, calc(100% - 48px));
+.now-view {
+  width: min(1380px, calc(100% - 76px));
   margin: 0 auto;
-  padding: 54px 0 88px;
+  padding: 34px 0 86px;
 }
 
-.today-header,
-.section-header,
-.focus-footer,
-.status-strip {
+.folio-head {
+  min-height: 86px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 36px;
+  align-items: start;
+  gap: 24px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.folio-identity {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 18px;
 }
 
-.today-header {
-  margin-bottom: 38px;
-}
-
-.date {
+.folio-identity span,
+.folio-head > p,
+.section-margin > span,
+.field-head span {
   color: var(--text-4);
-  font-size: var(--fs-2);
-  margin-bottom: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
 }
 
-h1,
-h2 {
+.folio-identity span {
+  color: var(--focus);
+}
+
+.folio-identity strong {
   color: var(--text-1);
-  font-weight: 560;
-  letter-spacing: 0;
-}
-
-h1 {
+  font-family: var(--font-display);
   font-size: 22px;
+  font-weight: 400;
 }
 
-h2 {
-  font-size: var(--fs-6);
+.folio-head > p {
+  padding-top: 4px;
 }
 
-.icon-button {
-  width: 36px;
-  height: 36px;
+.folio-head > button {
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
-  color: var(--text-3);
+  color: var(--text-4);
   border: 1px solid var(--line-1);
-  border-radius: 6px;
 }
 
-.icon-button:hover:not(:disabled) {
+.folio-head > button:hover {
   color: var(--text-1);
-  border-color: var(--line-2);
-}
-
-.spinning {
-  animation: spin 900ms linear infinite;
+  border-color: var(--line-3);
 }
 
 .notice {
-  padding: 10px 12px;
-  margin-bottom: 14px;
-  border-left: 2px solid var(--error);
-  background: rgba(232, 120, 120, 0.06);
+  padding: 13px 0;
   color: var(--error);
-  font-size: var(--fs-3);
+  font-size: 12px;
+  border-bottom: 1px solid var(--error);
 }
 
-.focus-section {
-  min-height: 250px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 34px 0 30px;
-  border-top: 1px solid var(--line-1);
+.focus-spread {
+  min-height: min(690px, calc(100vh - 160px));
+  display: grid;
+  grid-template-columns: minmax(150px, 0.75fr) minmax(400px, 3.4fr) minmax(120px, 0.72fr);
+  align-items: stretch;
   border-bottom: 1px solid var(--line-2);
 }
 
-.section-kicker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-3);
-  font-size: var(--fs-2);
-  margin-bottom: 20px;
-}
-
-.focus-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--focus);
-  box-shadow: 0 0 12px rgba(222, 170, 95, 0.34);
-}
-
-.focus-copy {
-  max-width: 760px;
-  text-align: left;
-}
-
-.focus-reason {
-  display: block;
-  color: var(--focus);
-  font-size: var(--fs-2);
-  margin-bottom: 8px;
-}
-
-.focus-copy h2,
-.empty-focus h2 {
-  font-size: 38px;
-  line-height: 1.22;
-  overflow-wrap: anywhere;
-}
-
-.focus-copy p,
-.empty-focus p {
-  max-width: 640px;
-  color: var(--text-3);
-  margin-top: 12px;
-}
-
-.focus-footer {
-  gap: 18px;
-  margin-top: 30px;
-}
-
-.task-meta {
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  color: var(--text-4);
-  font-size: var(--fs-2);
-}
-
-.complete-button,
-.capture-button {
-  flex: 0 0 auto;
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 15px;
-  border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
-  border-radius: 6px;
-  color: var(--success);
-  white-space: nowrap;
-}
-
-.complete-button:hover:not(:disabled),
-.capture-button:hover {
-  background: color-mix(in srgb, var(--success) 10%, transparent);
-  color: var(--text-1);
-}
-
-.capture-button {
-  margin-top: 24px;
-  border-color: color-mix(in srgb, var(--focus) 42%, transparent);
-  color: var(--focus);
-}
-
-.empty-focus,
-.focus-loading {
-  color: var(--text-3);
-}
-
-.focus-goal {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  max-width: min(100%, 520px);
-  margin-top: 17px;
-  color: var(--text-3);
-  font-size: var(--fs-2);
-  text-align: left;
-}
-
-.focus-goal span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.focus-goal:hover {
-  color: var(--text-1);
-}
-
-.focus-source {
-  display: flex;
-  margin-top: 9px;
-}
-
-.feedback-strip {
-  min-height: 68px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 32px;
-  align-items: center;
-  gap: 14px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--line-1);
-}
-
-.feedback-copy {
-  min-width: 0;
-}
-
-.feedback-copy span {
-  display: block;
-  color: var(--success);
-  font-size: var(--fs-1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.feedback-copy p {
-  color: var(--text-2);
-  font-size: var(--fs-3);
-  margin-top: 3px;
-}
-
-.feedback-options {
-  display: inline-grid;
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
-  border: 1px solid var(--line-2);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.feedback-options button {
-  min-height: 34px;
-  padding: 0 12px;
-  color: var(--text-3);
-  font-size: var(--fs-2);
-  border-left: 1px solid var(--line-1);
-  white-space: nowrap;
-}
-
-.feedback-options button:first-child {
-  border-left: 0;
-}
-
-.feedback-options button:hover:not(:disabled) {
-  color: var(--text-1);
-  background: rgba(255, 255, 255, 0.035);
-}
-
-.feedback-dismiss {
-  grid-column: 3;
-  grid-row: 1;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  color: var(--text-4);
-  border-radius: 6px;
-}
-
-.feedback-dismiss:hover {
-  color: var(--text-1);
-  background: rgba(255, 255, 255, 0.035);
-}
-
-.feedback-enter-active,
-.feedback-leave-active {
-  transition: opacity 160ms ease, transform 160ms ease;
-}
-
-.feedback-enter-from,
-.feedback-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-
-.week-section {
-  padding: 32px 0 28px;
-  border-bottom: 1px solid var(--line-1);
-}
-
-.week-header,
-.week-title-row,
-.week-header-actions,
-.week-candidate-header {
-  display: flex;
-  align-items: center;
-}
-
-.week-header {
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 14px;
-}
-
-.week-heading .eyebrow {
-  margin-bottom: 3px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.week-title-row {
-  min-width: 0;
-  gap: 12px;
-}
-
-.week-title-row span,
-.week-header-actions > span {
-  color: var(--text-4);
-  font-size: var(--fs-2);
-  white-space: nowrap;
-}
-
-.week-header-actions {
-  flex: 0 0 auto;
-  gap: 14px;
-}
-
-.week-button-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.week-edit-button {
-  min-height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 9px;
-  color: var(--text-3);
-  font-size: var(--fs-2);
-  border: 1px solid var(--line-1);
-  border-radius: 6px;
-}
-
-.week-edit-button:hover:not(:disabled) {
-  color: var(--text-1);
-  border-color: var(--line-2);
-}
-
-.week-list,
-.week-candidate-list {
-  border-top: 1px solid var(--line-1);
-}
-
-.week-row,
-.week-candidate-row {
-  min-height: 58px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
-  align-items: center;
-  border-bottom: 1px solid var(--line-1);
-}
-
-.week-task {
-  min-width: 0;
-  min-height: 58px;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-}
-
-.week-state {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  color: var(--text-4);
-}
-
-.week-row.is-completed .week-state {
-  color: var(--success);
-}
-
-.week-row.is-completed .row-copy strong {
-  color: var(--text-3);
-}
-
-.week-row.is-unavailable .week-task {
-  opacity: 0.55;
-}
-
-.week-task:hover:not(:disabled) .row-copy strong,
-.week-candidate-task:hover .row-copy strong {
-  color: var(--text-1);
-}
-
-.week-remove,
-.week-add {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  justify-self: end;
-  color: var(--text-5);
-  border-radius: 5px;
-}
-
-.week-remove:hover:not(:disabled) {
-  color: var(--error);
-  background: color-mix(in srgb, var(--error) 8%, transparent);
-}
-
-.week-empty {
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  color: var(--text-4);
-  font-size: var(--fs-3);
-  border-top: 1px solid var(--line-1);
-}
-
-.week-candidates {
-  margin-top: 20px;
-}
-
-.week-candidate-header {
-  justify-content: space-between;
-  gap: 14px;
-  min-height: 36px;
-  color: var(--text-3);
-  font-size: var(--fs-2);
-}
-
-.week-candidate-header small {
-  color: var(--text-5);
-  font-size: var(--fs-1);
-}
-
-.week-candidate-task {
-  min-width: 0;
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  text-align: left;
-}
-
-.week-add {
-  color: var(--focus);
-}
-
-.week-add:hover:not(:disabled) {
-  color: var(--text-1);
-  background: color-mix(in srgb, var(--focus) 10%, transparent);
-}
-
-.week-review {
-  display: grid;
-  gap: 18px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line-1);
-}
-
-.week-review-header,
-.week-review-header > div,
-.week-review-save {
-  display: flex;
-  align-items: center;
-}
-
-.week-review-header {
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.week-review-header > div {
-  min-width: 0;
-  gap: 10px;
-}
-
-.week-review-header span {
-  color: var(--text-2);
-  font-size: var(--fs-3);
-  font-weight: 560;
-}
-
-.week-review-header small,
-.week-review-save > span {
-  color: var(--text-5);
-  font-size: var(--fs-1);
-}
-
-.week-review-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-top: 1px solid var(--line-1);
-  border-bottom: 1px solid var(--line-1);
-}
-
-.week-review-stats > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  padding: 14px 16px;
-  border-left: 1px solid var(--line-1);
-}
-
-.week-review-stats > div:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.week-review-stats strong {
-  color: var(--text-1);
-  font-size: var(--fs-4);
-  font-weight: 560;
-}
-
-.week-review-stats span {
-  color: var(--text-4);
-  font-size: var(--fs-1);
-}
-
-.week-review-recommendation {
-  margin: 0;
-  padding-left: 12px;
-  color: var(--text-3);
-  font-size: var(--fs-3);
-  line-height: 1.65;
-  border-left: 2px solid rgba(224, 170, 93, 0.35);
-}
-
-.week-review-form {
-  display: grid;
-  gap: 12px;
-}
-
-.week-review-fit {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid var(--line-1);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.week-review-fit button {
-  min-height: 36px;
-  padding: 0 10px;
-  color: var(--text-4);
-  font-size: var(--fs-2);
-  border-left: 1px solid var(--line-1);
-}
-
-.week-review-fit button:first-child {
-  border-left: 0;
-}
-
-.week-review-fit button.active {
-  color: var(--text-1);
-  background: rgba(224, 170, 93, 0.09);
-}
-
-.week-review-form textarea {
-  width: 100%;
-  min-height: 84px;
-  resize: vertical;
-  padding: 12px;
-  color: var(--text-1);
-  font: inherit;
-  line-height: 1.6;
-  border: 1px solid var(--line-1);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.012);
-}
-
-.week-review-form textarea:focus {
-  border-color: var(--line-2);
-  outline: none;
-}
-
-.week-review-save {
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.week-review-save button {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 11px;
-  color: var(--text-2);
-  font-size: var(--fs-2);
-  border: 1px solid var(--line-2);
-  border-radius: 6px;
-}
-
-.week-review-save button:hover:not(:disabled) {
-  color: var(--text-1);
-}
-
-.status-strip {
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 10px 28px;
-  min-height: 54px;
-  color: var(--text-4);
-  font-size: var(--fs-2);
-  border-bottom: 1px solid var(--line-1);
-}
-
-.status-strip button {
-  color: inherit;
-}
-
-.status-strip button:hover {
-  color: var(--text-2);
-}
-
-.status-strip strong {
-  color: var(--text-2);
-  font-weight: 560;
-}
-
-.today-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 52px;
-  padding: 42px 0 10px;
-}
-
-.column-section,
-.recent-section {
-  min-width: 0;
-}
-
-.section-header {
-  min-height: 46px;
-  margin-bottom: 10px;
-}
-
-.section-header .eyebrow {
-  margin-bottom: 2px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.text-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-4);
-  font-size: var(--fs-2);
-}
-
-.text-link:hover {
-  color: var(--text-1);
-}
-
-.row-list,
-.recent-list {
-  border-top: 1px solid var(--line-1);
-}
-
-.content-row,
-.recent-row {
-  width: 100%;
-  min-height: 62px;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-  border-bottom: 1px solid var(--line-1);
-}
-
-.content-row:hover,
-.recent-row:hover {
-  background: rgba(255, 255, 255, 0.022);
-}
-
-.nudge-row {
-  grid-template-columns: minmax(0, 1fr) 32px;
-  gap: 4px;
-}
-
-.nudge-main {
-  min-width: 0;
-  min-height: 61px;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-}
-
-.nudge-dismiss {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  color: var(--text-5);
-  border-radius: 6px;
-}
-
-.nudge-dismiss:hover:not(:disabled) {
-  color: var(--text-2);
-  background: rgba(255, 255, 255, 0.035);
-}
-
-.row-icon {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  color: var(--text-4);
-}
-
-.task-icon { color: var(--info); }
-.nudge-icon { color: var(--focus); }
-.memory-icon { color: var(--success); }
-.decision-icon { color: var(--focus); }
-
-.row-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.row-copy strong {
-  color: var(--text-2);
-  font-size: var(--fs-3);
-  font-weight: 520;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.row-copy small {
-  color: var(--text-4);
-  font-size: var(--fs-1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.row-arrow {
-  color: var(--text-5);
-}
-
-.section-empty {
-  min-height: 76px;
-  display: flex;
-  align-items: center;
-  border-top: 1px solid var(--line-1);
-  color: var(--text-4);
-  font-size: var(--fs-3);
-}
-
-.recent-section {
-  margin-top: 38px;
-  padding-top: 38px;
-  border-top: 1px solid var(--line-1);
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (max-width: 800px) {
-  .today-columns {
-    grid-template-columns: 1fr;
-    gap: 38px;
-  }
-}
-
-@media (max-width: 760px) {
-  .today-view {
-    width: calc(100% - 28px);
-    padding: 26px 0 calc(var(--app-mobile-nav-height) + 38px);
-  }
-
-  .today-header {
-    margin-bottom: 24px;
-  }
-
-  .focus-section {
-    min-height: 235px;
-    padding: 28px 0 24px;
-  }
-
-  .focus-copy h2,
-  .empty-focus h2 {
-    font-size: 27px;
-  }
-
-  .focus-footer {
-    align-items: flex-end;
-  }
-
-  .status-strip {
-    gap: 8px 18px;
-    padding: 10px 0;
-  }
-
-  .feedback-strip {
-    grid-template-columns: minmax(0, 1fr) 32px;
-    gap: 9px;
-    padding: 13px 0;
-  }
-
-  .feedback-options {
-    width: 100%;
-    grid-column: 1 / -1;
-    grid-row: 2;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-  }
-
-  .feedback-dismiss {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .feedback-options button {
-    padding: 0 8px;
-  }
-
-  .week-header {
-    align-items: flex-end;
-  }
-
-  .week-title-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .week-header-actions {
-    align-items: flex-end;
-    flex-direction: column-reverse;
-    gap: 5px;
-  }
-
-  .week-button-group {
-    gap: 6px;
-  }
-
-  .week-edit-button {
-    padding: 0 7px;
-  }
-
-  .week-review-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .week-review-header > div {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .week-review-stats > div {
-    padding: 12px 9px;
-  }
-
-  .week-review-stats > div:first-child {
-    padding-left: 0;
-  }
-
-  .week-review-fit button {
-    min-height: 42px;
-    padding: 0 6px;
-  }
-
-  .week-review-save {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .week-review-save button {
-    justify-content: center;
-  }
-
-  .today-columns {
-    padding-top: 32px;
-  }
-}
-</style>
-
-<style scoped>
-/* Ink & Light: the Now surface behaves like a scroll, not a dashboard. */
-.today-view {
-  width: min(1180px, calc(100% - 96px));
-  margin: 0 auto;
-  padding: 58px 0 128px;
-}
-
-.today-header {
-  min-height: 116px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 40px;
-  align-items: start;
-  gap: 28px;
-  margin-bottom: 0;
-  padding-bottom: 28px;
-  border-bottom: 1px solid var(--line-1);
-}
-
-.today-header .date {
-  margin-bottom: 9px;
-  color: var(--text-4);
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
-
-.today-header h1 {
-  color: var(--text-1);
-  font-family: var(--font-display);
-  font-size: 38px;
-  font-weight: 400;
-  line-height: 1.12;
-}
-
-.day-mark {
-  align-self: center;
-  color: var(--text-5);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  writing-mode: vertical-rl;
-}
-
-.today-header .icon-button {
-  width: 38px;
-  height: 38px;
-  border-color: var(--line-1);
-  border-radius: 50%;
-  background: rgba(242, 237, 225, 0.018);
-}
-
-.focus-section {
+.focus-margin {
   position: relative;
-  min-height: 470px;
-  display: grid;
-  grid-template-columns: 126px minmax(0, 1fr);
-  align-content: center;
-  justify-content: stretch;
-  column-gap: 44px;
-  padding: 64px 0 58px;
-  border-top: 0;
-  border-bottom: 1px solid var(--line-2);
+  padding: 70px 36px 48px 0;
+  border-right: 1px solid var(--line-1);
 }
 
-.focus-section::before {
-  content: '';
-  position: absolute;
-  top: 64px;
-  bottom: 58px;
-  left: 125px;
-  width: 1px;
-  background: var(--line-warm);
-}
-
-.focus-section::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  width: 24%;
-  height: 3px;
-  background: var(--focus);
-}
-
-.focus-number {
-  position: absolute;
-  top: 58px;
-  right: 0;
-  color: rgba(242, 237, 225, 0.055);
-  font-family: var(--font-display);
-  font-size: 96px;
-  line-height: 1;
-  pointer-events: none;
-}
-
-.section-kicker {
-  grid-column: 1;
-  grid-row: 1 / span 5;
-  align-self: start;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 11px;
-  margin: 9px 0 0;
-  color: var(--text-4);
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
-
-.focus-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 0;
-  background: var(--focus);
-  box-shadow: 0 0 18px rgba(225, 165, 88, 0.32);
-  transform: rotate(45deg);
-  animation: focus-breathe 3.2s var(--ease) infinite alternate;
-}
-
-.focus-copy,
-.focus-goal,
-.focus-footer,
-.empty-focus,
-.focus-loading {
-  grid-column: 2;
-}
-
-.focus-copy {
-  position: relative;
-  z-index: 1;
-  max-width: 850px;
-}
-
-.focus-reason {
-  margin-bottom: 14px;
-  color: var(--focus-bright);
-  font-family: var(--font-mono);
+.margin-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-3);
   font-size: 11px;
 }
 
-.focus-copy h2,
-.empty-focus h2 {
-  max-width: 920px;
-  color: var(--text-1);
-  font-family: var(--font-display);
-  font-size: 50px;
-  font-weight: 400;
-  line-height: 1.2;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
+.margin-label i {
+  width: 8px;
+  height: 8px;
+  background: var(--focus);
+  transform: rotate(45deg);
 }
 
-.focus-copy p,
-.empty-focus p {
-  max-width: 680px;
-  margin-top: 20px;
-  color: var(--text-3);
-  font-size: 15px;
-  line-height: 1.75;
-}
-
-.focus-goal {
-  width: fit-content;
-  margin-top: 22px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid var(--line-2);
-  color: var(--text-3);
-}
-
-.focus-source {
-  margin-top: 10px;
-}
-
-.focus-footer {
-  align-items: flex-end;
-  margin-top: 44px;
-}
-
-.task-meta {
-  max-width: 680px;
-  gap: 8px 24px;
+.focus-margin > p {
+  max-width: 160px;
+  margin-top: 36px;
   color: var(--text-4);
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.focus-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 70px clamp(36px, 5vw, 86px) 58px;
+}
+
+.focus-copy {
+  width: 100%;
+  max-width: 860px;
+  text-align: left;
+}
+
+.focus-copy > span,
+.empty-focus > span {
+  display: block;
+  margin-bottom: 18px;
+  color: var(--focus);
   font-family: var(--font-mono);
   font-size: 10px;
 }
 
-.complete-button,
-.capture-button {
-  min-height: 44px;
-  padding: 0 17px;
-  border: 1px solid color-mix(in srgb, var(--success) 42%, transparent);
-  border-radius: var(--r-2);
-  background: rgba(145, 185, 154, 0.035);
-  color: var(--success);
+.focus-copy h1,
+.empty-focus h1 {
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 46px;
+  font-weight: 400;
+  line-height: 1.34;
+  overflow-wrap: anywhere;
 }
 
-.complete-button:hover:not(:disabled),
-.capture-button:hover {
-  background: var(--success);
-  color: var(--surface-0);
+.focus-copy > p,
+.empty-focus > p {
+  max-width: 680px;
+  margin-top: 24px;
+  color: var(--text-3);
+  font-size: 14px;
+  line-height: 1.8;
 }
 
-.feedback-strip {
-  min-height: 82px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--line-1);
-  border-left: 2px solid var(--success);
-  background: rgba(145, 185, 154, 0.035);
+.focus-copy:hover h1 {
+  color: var(--focus-bright);
 }
 
-.week-section {
+.focus-context {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  column-gap: 44px;
-  padding: 52px 0 48px;
-  border-bottom: 1px solid var(--line-1);
+  gap: 9px;
+  margin-top: 34px;
 }
 
-.week-header {
-  grid-column: 1;
-  align-self: start;
-  align-items: flex-start;
+.focus-context button,
+.empty-focus > button {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 4px;
+  color: var(--text-3);
+  font-size: 11px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.focus-context button:hover,
+.empty-focus > button:hover {
+  color: var(--text-1);
+  border-bottom-color: var(--text-1);
+}
+
+.empty-focus > button {
+  margin-top: 32px;
+}
+
+.focus-loading {
+  color: var(--text-4);
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.focus-action {
+  display: flex;
   flex-direction: column;
-  gap: 24px;
-  margin-bottom: 0;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 70px 0 48px 28px;
+  border-left: 1px solid var(--line-1);
 }
 
-.week-heading .eyebrow,
-.section-header .eyebrow {
-  margin-bottom: 8px;
-  color: var(--focus);
-  font-family: var(--font-mono);
-  font-size: 9px;
+.action-score {
+  width: 100%;
+  display: grid;
+  gap: 8px;
 }
 
-.week-title-row {
-  align-items: flex-start;
+.action-score i {
+  display: block;
+  height: 1px;
+  background: var(--line-1);
+}
+
+.action-score i.active {
+  background: var(--focus);
+}
+
+.focus-action > button {
+  width: 80px;
+  height: 80px;
+  display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 5px;
+  color: var(--success);
+  font-size: 10px;
+  border: 1px solid var(--success);
+  border-radius: 50%;
 }
 
-.week-title-row h2,
-.section-header h2 {
+.focus-action > button:hover:not(:disabled) {
+  color: var(--surface-1);
+  background: var(--success);
+}
+
+.feedback-line {
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto 28px;
+  align-items: center;
+  gap: 14px;
+  color: var(--success);
+  border-bottom: 1px solid var(--success);
+}
+
+.feedback-line > div:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.feedback-line strong {
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.feedback-line span {
+  color: var(--text-4);
+  font-size: 10px;
+}
+
+.feedback-options {
+  display: flex;
+  align-items: center;
+}
+
+.feedback-options button {
+  min-height: 32px;
+  padding: 0 12px;
+  color: var(--text-3);
+  font-size: 10px;
+  border-left: 1px solid var(--line-1);
+}
+
+.feedback-options button:hover {
+  color: var(--text-1);
+}
+
+.week-score {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.92fr) minmax(0, 3.9fr);
+  gap: clamp(36px, 6vw, 94px);
+  padding: 74px 0 70px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.section-margin {
+  align-self: start;
+}
+
+.section-margin > span {
+  color: var(--accent);
+}
+
+.section-margin h2,
+.field-head h2 {
+  margin-top: 11px;
   color: var(--text-1);
   font-family: var(--font-display);
   font-size: 25px;
   font-weight: 400;
 }
 
-.week-header-actions {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 10px;
+.section-margin > p {
+  max-width: 230px;
+  margin-top: 20px;
+  color: var(--text-4);
+  font-size: 11px;
+  line-height: 1.75;
 }
 
-.week-button-group {
-  flex-wrap: wrap;
-}
-
-.week-edit-button {
-  border-radius: var(--r-2);
-  background: rgba(242, 237, 225, 0.018);
-}
-
-.week-list,
-.week-empty,
-.week-candidates,
-.week-review {
-  grid-column: 2;
-  margin-top: 0;
-}
-
-.week-list,
-.week-candidate-list {
-  border-top-color: var(--line-2);
-}
-
-.week-row,
-.week-candidate-row {
-  min-height: 66px;
-}
-
-.week-task,
-.week-candidate-task {
-  min-height: 66px;
-}
-
-.week-state {
-  color: var(--focus);
-}
-
-.week-row:hover,
-.week-candidate-row:hover {
-  background: rgba(242, 237, 225, 0.018);
-}
-
-.week-review {
+.section-actions {
+  display: flex;
+  gap: 18px;
   margin-top: 30px;
 }
 
-.status-strip {
-  min-height: 68px;
-  gap: 12px 34px;
+.section-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-size: 10px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.week-body {
+  min-width: 0;
+}
+
+.week-progress {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 36px;
+  margin-bottom: 20px;
+}
+
+.week-progress > span {
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+.week-progress > div {
+  height: 2px;
+  background: var(--line-1);
+}
+
+.week-progress i {
+  display: block;
+  height: 100%;
+  background: var(--success);
+}
+
+.week-progress small {
   color: var(--text-4);
+  font-size: 9px;
+}
+
+.commitment-list {
+  border-top: 1px solid var(--line-2);
+}
+
+.commitment-list article {
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 28px 28px;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.commitment-index {
+  color: var(--text-5);
   font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.commitment-list article > button:nth-child(2),
+.week-candidates article > button:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.commitment-list strong,
+.week-candidates strong {
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 520;
+}
+
+.commitment-list small,
+.week-candidates small {
+  color: var(--text-4);
   font-size: 10px;
 }
 
-.today-columns {
-  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
-  gap: 0;
-  padding: 56px 0 16px;
+.commitment-state {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
 }
 
-.column-section:first-child {
-  padding-right: 42px;
+.commitment-list .is-completed strong {
+  color: var(--text-4);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
 }
 
-.column-section + .column-section {
-  padding-left: 42px;
-  border-left: 1px solid var(--line-1);
+.commitment-list .is-completed .commitment-state {
+  color: var(--success);
 }
 
-.section-header {
-  min-height: 58px;
-  margin-bottom: 12px;
-}
-
-.row-list,
-.recent-list {
-  border-top-color: var(--line-2);
-}
-
-.content-row,
-.recent-row {
-  min-height: 70px;
-  transition: padding var(--t-base) var(--ease), background var(--t-base) var(--ease);
-}
-
-.content-row:hover,
-.recent-row:hover {
-  padding-right: 8px;
-  padding-left: 8px;
-  background: rgba(242, 237, 225, 0.02);
-}
-
-.row-icon {
+.commitment-remove {
   color: var(--text-5);
 }
 
-.task-icon { color: var(--info); }
-.nudge-icon { color: var(--focus); }
-.memory-icon { color: var(--success); }
-.decision-icon { color: var(--violet); }
+.commitment-remove:hover {
+  color: var(--error);
+}
 
-.row-copy strong {
-  color: var(--text-2);
+.empty-line {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  color: var(--text-4);
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 480;
+  border-top: 1px solid var(--line-1);
 }
 
-.recent-section {
-  margin-top: 48px;
-  padding-top: 46px;
-  border-top-color: var(--line-2);
+.week-candidates,
+.week-review {
+  margin-top: 34px;
+  padding-top: 24px;
+  border-top: 2px solid var(--cobalt);
 }
 
-@keyframes focus-breathe {
-  from { opacity: 0.52; transform: rotate(45deg) scale(0.82); }
-  to { opacity: 1; transform: rotate(45deg) scale(1); }
+.week-candidates > header,
+.week-review > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 12px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.week-candidates article {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  border-top: 1px solid var(--line-1);
+}
+
+.week-review > header div {
+  display: grid;
+  gap: 4px;
+}
+
+.week-review > header small,
+.week-review > header p {
+  color: var(--text-4);
+  font-size: 10px;
+}
+
+.week-review form {
+  display: grid;
+  gap: 16px;
+}
+
+.review-fit {
+  display: flex;
+  border-top: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.review-fit button {
+  min-height: 38px;
+  padding: 0 16px;
+  color: var(--text-4);
+  font-size: 10px;
+  border-right: 1px solid var(--line-1);
+}
+
+.review-fit button.active {
+  color: var(--surface-1);
+  background: var(--cobalt);
+}
+
+.week-review textarea {
+  width: 100%;
+  min-height: 86px;
+  padding: 12px 0;
+  color: var(--text-1);
+  line-height: 1.7;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.week-review form footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-4);
+  font-size: 10px;
+}
+
+.week-review form footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+}
+
+.context-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.8fr);
+  gap: 0;
+  padding: 72px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.next-field {
+  min-width: 0;
+  padding-right: clamp(36px, 6vw, 86px);
+}
+
+.judgement-field {
+  min-width: 0;
+  padding-left: clamp(30px, 4vw, 58px);
+  border-left: 1px solid var(--line-2);
+}
+
+.field-head {
+  min-height: 68px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.field-head > button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
+  border: 1px solid var(--line-1);
+}
+
+.field-head > button:hover {
+  color: var(--surface-1);
+  background: var(--text-1);
+}
+
+.next-list,
+.judgement-list {
+  border-top: 1px solid var(--line-2);
+}
+
+.next-list > button {
+  width: 100%;
+  min-height: 78px;
+  display: grid;
+  grid-template-columns: 32px minmax(120px, 0.85fr) minmax(180px, 1fr) 18px;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.next-list > button:hover {
+  padding-left: 7px;
+}
+
+.next-list span {
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.next-list strong {
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 520;
+}
+
+.next-list small {
+  color: var(--text-4);
+  font-size: 10px;
+}
+
+.judgement-list article {
+  position: relative;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.judgement-list article::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 0;
+  width: 2px;
+  background: var(--note-tone, var(--text-4));
+}
+
+.judgement-list article > button:first-child {
+  min-width: 0;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding-left: 14px;
+  text-align: left;
+}
+
+.judgement-list article > button:first-child > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.judgement-list strong {
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 520;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.judgement-list small {
+  color: var(--text-4);
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tone-focus { --note-tone: var(--focus); }
+.tone-goal { --note-tone: var(--yellow); }
+.tone-memory { --note-tone: var(--accent); }
+.tone-decision { --note-tone: var(--violet); }
+
+.recent-trace {
+  padding: 66px 0 52px;
+}
+
+.trace-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--line-2);
+}
+
+.trace-list button {
+  min-width: 0;
+  min-height: 154px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  grid-template-rows: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 20px 18px;
+  text-align: left;
+  border-left: 1px solid var(--line-1);
+}
+
+.trace-list button:first-child {
+  border-left: 0;
+}
+
+.trace-list button:hover {
+  background: rgba(49, 93, 130, 0.05);
+}
+
+.trace-list span {
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.trace-list svg {
+  color: var(--cobalt);
+}
+
+.trace-list strong {
+  grid-column: 1 / -1;
+  color: var(--text-1);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.55;
+  overflow: hidden;
+}
+
+.trace-list small {
+  grid-column: 1 / -1;
+  color: var(--text-4);
+  font-size: 9px;
+}
+
+.now-foot {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.now-foot strong {
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.now-foot i {
+  flex: 1;
+  height: 1px;
+  background: var(--line-1);
+}
+
+.now-foot button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.spinning {
+  animation: spin 900ms linear infinite;
+}
+
+.feedback-enter-active,
+.feedback-leave-active {
+  transition: opacity var(--t-base) var(--ease), transform var(--t-base) var(--ease);
+}
+
+.feedback-enter-from,
+.feedback-leave-to {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 980px) {
-  .today-view {
-    width: min(100% - 56px, 920px);
+  .now-view {
+    width: min(100% - 48px, 920px);
   }
 
-  .focus-section {
-    grid-template-columns: 96px minmax(0, 1fr);
-    column-gap: 32px;
+  .focus-spread {
+    grid-template-columns: 120px minmax(0, 1fr) 92px;
   }
 
-  .focus-section::before {
-    left: 95px;
+  .focus-body {
+    padding-right: 42px;
+    padding-left: 42px;
   }
 
-  .focus-copy h2,
-  .empty-focus h2 {
-    font-size: 42px;
+  .focus-copy h1,
+  .empty-focus h1 {
+    font-size: 39px;
   }
 
-  .week-section {
-    grid-template-columns: 180px minmax(0, 1fr);
-    column-gap: 32px;
-  }
-}
-
-@media (max-width: 800px) {
-  .week-section {
-    display: block;
-  }
-
-  .week-header {
-    flex-direction: row;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
-
-  .week-header-actions {
-    align-items: flex-end;
-  }
-
-  .today-columns {
+  .context-field {
     grid-template-columns: 1fr;
-    gap: 42px;
+    gap: 58px;
   }
 
-  .column-section:first-child,
-  .column-section + .column-section {
-    padding-right: 0;
-    padding-left: 0;
+  .next-field,
+  .judgement-field {
+    padding: 0;
     border-left: 0;
+  }
+
+  .trace-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .trace-list button:nth-child(4) {
+    border-left: 0;
+    border-top: 1px solid var(--line-1);
+  }
+
+  .trace-list button:nth-child(n + 4) {
+    border-top: 1px solid var(--line-1);
   }
 }
 
 @media (max-width: 760px) {
-  .today-view {
-    width: calc(100% - 36px);
-    padding: 28px 0 calc(var(--app-mobile-nav-height) + 42px);
+  .now-view {
+    width: calc(100% - 32px);
+    padding: 22px 0 calc(var(--app-mobile-nav-height) + 30px);
   }
 
-  .today-header {
-    min-height: 96px;
+  .folio-head {
+    min-height: 72px;
     grid-template-columns: minmax(0, 1fr) 34px;
-    gap: 12px;
-    padding-bottom: 24px;
   }
 
-  .today-header h1 {
-    font-size: 31px;
-  }
-
-  .day-mark {
+  .folio-head > p {
     display: none;
   }
 
-  .today-header .icon-button {
-    width: 34px;
-    height: 34px;
+  .folio-identity {
+    gap: 12px;
   }
 
-  .focus-section {
-    min-height: 430px;
-    display: block;
-    padding: 42px 0 38px 20px;
+  .folio-identity strong {
+    font-size: 19px;
   }
 
-  .focus-section::before {
-    top: 42px;
-    bottom: 38px;
-    left: 0;
+  .focus-spread {
+    min-height: 570px;
+    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
   }
 
-  .focus-section::after {
-    width: 42%;
+  .focus-margin {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 30px 0 18px;
+    border-right: 0;
   }
 
-  .focus-number {
-    top: 38px;
-    font-size: 68px;
+  .focus-margin > p {
+    max-width: 48%;
+    margin: 0;
+    text-align: right;
+    font-size: 10px;
   }
 
-  .section-kicker {
+  .focus-body {
+    grid-column: 2;
+    grid-row: 2;
+    padding: 30px 0 34px 18px;
+    border-left: 1px solid var(--line-1);
+  }
+
+  .focus-copy h1,
+  .empty-focus h1 {
+    font-size: 31px;
+    line-height: 1.38;
+  }
+
+  .focus-copy > p,
+  .empty-focus > p {
+    font-size: 13px;
+  }
+
+  .focus-action {
+    grid-column: 1 / -1;
+    grid-row: 3;
     flex-direction: row;
     align-items: center;
-    margin: 0 0 24px;
+    padding: 20px 0 26px;
+    border-top: 1px solid var(--line-1);
+    border-left: 0;
   }
 
-  .focus-copy h2,
-  .empty-focus h2 {
-    padding-right: 4px;
-    font-size: 32px;
-    line-height: 1.26;
+  .action-score {
+    width: min(55%, 180px);
   }
 
-  .focus-copy p,
-  .empty-focus p {
-    font-size: 14px;
+  .focus-action > button {
+    width: 64px;
+    height: 64px;
   }
 
-  .focus-footer {
-    align-items: flex-start;
+  .feedback-line {
+    grid-template-columns: 20px minmax(0, 1fr) 24px;
+    padding: 12px 0;
+  }
+
+  .feedback-options {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border-top: 1px solid var(--line-1);
+  }
+
+  .week-score {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding: 56px 0 52px;
+  }
+
+  .section-margin > p {
+    max-width: 320px;
+  }
+
+  .commitment-list article {
+    grid-template-columns: 28px minmax(0, 1fr) 24px 24px;
+  }
+
+  .week-review > header {
     flex-direction: column;
-    margin-top: 34px;
   }
 
-  .complete-button,
-  .capture-button {
-    align-self: flex-start;
+  .review-fit button {
+    flex: 1;
+    padding: 0 6px;
   }
 
-  .week-section {
-    padding: 42px 0 38px;
+  .context-field {
+    padding: 54px 0;
   }
 
-  .week-header {
-    align-items: flex-start;
-    flex-direction: column;
+  .next-list > button {
+    grid-template-columns: 28px minmax(0, 1fr) 16px;
+    gap: 10px;
   }
 
-  .week-header-actions {
-    width: 100%;
-    align-items: flex-start;
+  .next-list small {
+    display: none;
   }
 
-  .status-strip {
-    padding: 13px 0;
+  .trace-list {
+    grid-template-columns: 1fr;
   }
 
-  .today-columns {
-    padding-top: 42px;
+  .trace-list button,
+  .trace-list button:nth-child(n) {
+    min-height: 104px;
+    border-top: 1px solid var(--line-1);
+    border-left: 0;
   }
 
-  .recent-section {
-    margin-top: 34px;
+  .trace-list button:first-child {
+    border-top: 0;
+  }
+
+  .now-foot {
+    flex-wrap: wrap;
+    gap: 12px 20px;
+  }
+
+  .now-foot i {
+    flex-basis: 100%;
+    order: 1;
+  }
+
+  .now-foot button:last-child {
+    order: 2;
   }
 }
 </style>

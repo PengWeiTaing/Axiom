@@ -74,12 +74,12 @@ onMounted(async () => {
 
 <style>
 .app-stage {
-  --atlas-shell-left: var(--app-rail-width);
+  --atlas-shell-left: 0px;
+  --atlas-shell-top: var(--app-header-height);
   --atlas-shell-bottom: 0px;
   min-height: 100vh;
-  margin-left: var(--app-rail-width);
+  padding-top: var(--app-header-height);
   position: relative;
-  z-index: 1;
 }
 
 .app-stage.atlas-stage {
@@ -94,19 +94,20 @@ onMounted(async () => {
 
 .mode-enter-from {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(7px);
 }
 
 .mode-leave-to {
   opacity: 0;
-  transform: translateY(-6px);
+  transform: translateY(-4px);
 }
 
 @media (max-width: 760px) {
   .app-stage {
     --atlas-shell-left: 0px;
+    --atlas-shell-top: 0px;
     --atlas-shell-bottom: var(--app-mobile-nav-height);
-    margin-left: 0;
+    padding-top: 0;
     padding-bottom: var(--app-mobile-nav-height);
   }
 }

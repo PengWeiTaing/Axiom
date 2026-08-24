@@ -1,4 +1,4 @@
-"""Guard the Ink & Light frontend language against visual regression."""
+"""Guard the Living Folio frontend language against visual regression."""
 
 from __future__ import annotations
 
@@ -24,14 +24,14 @@ def main() -> int:
     errors: list[str] = []
     contracts = {
         FRONTEND / "styles" / "tokens.css": (
-            "Axiom / Ink & Light",
-            "--surface-0: #0a0a09",
-            "--focus: #e1a558",
-            "--accent: #86ad9e",
-            "--cobalt: #7388ad",
-            "--vermilion: #c66f58",
-            "--r-3: 8px",
-            "--app-rail-width: 88px",
+            "Axiom / Living Folio",
+            "--surface-0: #e8eae5",
+            "--focus: #b24d37",
+            "--accent: #587363",
+            "--cobalt: #315d82",
+            "--vermilion: #b24d37",
+            "--r-3: 4px",
+            "--app-header-height: 74px",
         ),
         FRONTEND / "styles" / "base.css": (
             "letter-spacing: 0 !important",
@@ -45,29 +45,33 @@ def main() -> int:
         ),
         FRONTEND / "components" / "AxiomAtmosphere.vue": (
             'ref="canvas"',
-            "timestamp - lastPaint < 48",
-            "prefers-reduced-motion: reduce",
+            "function seeded(index: number, salt: number)",
+            "A deterministic fibre field",
+            "mix-blend-mode: multiply",
             ".axiom-atmosphere.is-atlas",
         ),
         FRONTEND / "components" / "AppNavigation.vue": (
-            "app-rail-width",
-            'data-mode="capture"',
-            "capture-icon",
+            "app-header-height",
+            "index-sheet",
+            "function openSearch()",
+            "capture-link",
         ),
         FRONTEND / "components" / "QuickCapture.vue": (
-            "写下正在占据你注意力的事",
-            '<div class="quick-card"',
-            ".quick-card textarea",
+            "先接住，再理解。",
+            '<section class="capture-plane"',
+            ".capture-editor textarea",
         ),
         FRONTEND / "views" / "TodayView.vue": (
-            "AXIOM / NOW",
-            "focus-number",
-            "the Now surface behaves like a scroll, not a dashboard",
+            "focus-spread",
+            "week-score",
+            "context-field",
+            "recent-trace",
         ),
         FRONTEND / "views" / "SearchView.vue": (
-            "ARCHIVE / 02",
-            "library-index",
-            "recall is treated as an index room, not a form dashboard",
+            "function scheduleSearch()",
+            "recall-line",
+            "result-section",
+            "library-query:focus-visible",
         ),
         FRONTEND / "views" / "AtlasView.vue": (
             "scene.background = new Color(0x090a08)",
@@ -77,9 +81,9 @@ def main() -> int:
             "the map owns the viewport; controls read like museum captions",
         ),
         ROOT / "docs" / "FRONTEND_ART_DIRECTION.md": (
-            "# Axiom 前端艺术方向：墨与光",
-            "## 产品空间",
-            "## 动效逻辑",
+            "# Axiom 前端艺术方向：活页",
+            "## 低摩擦原则",
+            "## 核心产品空间",
             "## 必须避免",
         ),
     }

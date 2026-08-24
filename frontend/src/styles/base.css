@@ -54,7 +54,7 @@ button {
 
 button:disabled {
   cursor: default;
-  opacity: 0.46;
+  opacity: 0.42;
 }
 
 input,
@@ -64,7 +64,6 @@ select {
   background: none;
   border: 0;
   outline: none;
-  letter-spacing: 0;
 }
 
 textarea {
@@ -72,7 +71,7 @@ textarea {
 }
 
 a {
-  color: var(--accent-bright);
+  color: var(--cobalt);
   text-decoration: none;
   transition: color var(--t-fast) var(--ease);
 }
@@ -82,31 +81,27 @@ a:hover {
 }
 
 ::selection {
-  color: var(--surface-0);
-  background: var(--focus-bright);
+  color: var(--surface-1);
+  background: var(--text-1);
 }
 
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--surface-0);
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--surface-4);
-  border: 2px solid var(--surface-0);
+  border: 3px solid var(--surface-0);
 }
 
 :focus-visible {
-  outline: 1px solid var(--focus-bright);
-  outline-offset: 3px;
-}
-
-.app-navigation .nav-item:focus-visible {
-  outline: none;
+  outline: 1px solid var(--focus);
+  outline-offset: 4px;
 }
 
 .mono {
@@ -117,9 +112,7 @@ a:hover {
   color: var(--text-4);
   font-family: var(--font-mono);
   font-size: var(--fs-1);
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: uppercase;
+  font-weight: 540;
 }
 
 .muted { color: var(--text-3); }
@@ -127,16 +120,10 @@ a:hover {
 
 .filter-summary {
   --filter-summary-accent: var(--accent);
-  --filter-summary-button-border: var(--line-1);
-  --filter-summary-button-bg: var(--surface-1);
-  --filter-summary-button-color: var(--text-3);
-  --filter-summary-button-hover-border: var(--line-2);
-  --filter-summary-button-hover-bg: var(--surface-2);
-  --filter-summary-button-hover-color: var(--text-1);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--s-2);
+  gap: 7px 18px;
 }
 
 .filter-summary span {
@@ -144,27 +131,23 @@ a:hover {
   align-items: center;
   min-height: 24px;
   max-width: 100%;
-  border-bottom: 1px solid color-mix(in srgb, var(--filter-summary-accent) 42%, transparent);
-  color: var(--text-2);
+  color: var(--text-3);
   font-size: var(--fs-1);
-  padding: 0 2px;
+  border-bottom: 1px solid color-mix(in srgb, var(--filter-summary-accent) 52%, transparent);
   overflow-wrap: anywhere;
 }
 
 .filter-summary button {
   min-height: 28px;
-  border: 1px solid var(--filter-summary-button-border);
-  border-radius: var(--r-2);
-  background: var(--filter-summary-button-bg);
-  color: var(--filter-summary-button-color);
+  padding: 0 2px;
+  color: var(--text-4);
   font-size: var(--fs-2);
-  padding: 0 var(--s-3);
+  border-bottom: 1px solid var(--line-2);
 }
 
 .filter-summary button:hover:not(:disabled) {
-  border-color: var(--filter-summary-button-hover-border);
-  background: var(--filter-summary-button-hover-bg);
-  color: var(--filter-summary-button-hover-color);
+  color: var(--text-1);
+  border-bottom-color: var(--text-1);
 }
 
 @media (prefers-reduced-motion: reduce) {

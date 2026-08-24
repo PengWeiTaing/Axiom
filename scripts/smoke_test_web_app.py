@@ -207,6 +207,8 @@ def main() -> None:
         os.environ["AXIOM_ROOT"] = str(root)
         os.environ["AXIOM_SECRET_KEY"] = "test-key"
         os.environ["AXIOM_LOG_PATH"] = ""
+        os.environ["AXIOM_LOG_LEVEL"] = "ERROR"
+        os.environ["AXIOM_DEEPSEEK_API_KEY"] = ""
         os.environ["AXIOM_AUDIO_TRANSCRIBE_MOCK_TEMPLATE"] = "browser mock transcript for {original_name}"
         os.environ["AXIOM_IMAGE_DESCRIBE_MOCK_TEMPLATE"] = "browser mock image description for {original_name}"
         create_sample_artifact(root)
@@ -215,6 +217,7 @@ def main() -> None:
             from core.receiver import app  # noqa: WPS433
             from playwright.sync_api import sync_playwright  # noqa: WPS433
 
+            logging.getLogger("werkzeug").setLevel(logging.ERROR)
             server = LocalServerThread(app)
             server.start()
 
@@ -707,8 +710,7 @@ def main() -> None:
                         vue_page.get_by_role("button", name="记录", exact=True).click()
                         capture_dialog = vue_page.get_by_role("dialog", name="记录")
                         capture_dialog.locator("textarea").fill(vue_file_note)
-                        vue_page.set_input_files(
-                            ".quick-card .file-input",
+                        capture_dialog.locator(".file-input").set_input_files(
                             {
                                 "name": "vue-smart-input.png",
                                 "mimeType": "image/png",
@@ -726,14 +728,14 @@ def main() -> None:
                             capture_dialog.get_by_role("button", name="记录", exact=True).click()
                         vue_upload_payload = vue_upload_info.value.json()
                         vue_file_item_id = vue_upload_payload["item"]["id"]
-                        vue_page.locator(".recent-list .recent-row").filter(
+                        vue_page.locator(".trace-list > button").filter(
                             has_text=vue_file_note
                         ).first.wait_for(timeout=15_000)
                         with vue_page.expect_response(
                             lambda response: response.url.endswith(f"/file/{vue_file_item_id}")
                             and response.status == 200
                         ):
-                            vue_page.locator(".recent-list .recent-row").filter(
+                            vue_page.locator(".trace-list > button").filter(
                                 has_text=vue_file_note
                             ).first.click()
                         vue_page.locator(".drawer-panel img.preview-img").wait_for(timeout=15_000)
@@ -747,16 +749,15 @@ def main() -> None:
                         vue_page.get_by_label("关闭").click()
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="资料库").wait_for(timeout=15_000)
-                        vue_page.get_by_label("搜索查询").fill(vue_search_text)
                         with vue_page.expect_response(
                             lambda response: "/search/all" in response.url and response.status == 200
                         ):
-                            vue_page.locator("main").get_by_role("button", name="搜索").click()
+                            vue_page.get_by_label("搜索查询").fill(vue_search_text)
                         vue_page.wait_for_function(
                             """() => new URL(window.location.href).searchParams.get("q") === "Vue smoke search target" """,
                             timeout=15_000,
                         )
-                        vue_page.locator(".result-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
+                        vue_page.locator(".result-list > button").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
                         encoded_vue_search = urllib.parse.quote(vue_search_text)
                         vue_page.goto(
                             f"{base_url}/app?mode=search&q={encoded_vue_search}&type=text&source=vue_search_smoke",
@@ -766,10 +767,12 @@ def main() -> None:
                             raise AssertionError("Vue search query was not restored from URL")
                         if vue_page.get_by_label("来源").input_value() != "vue_search_smoke":
                             raise AssertionError("Vue search source filter was not restored from URL")
-                        vue_page.get_by_text("类型 文本", exact=True).wait_for(timeout=15_000)
-                        vue_page.get_by_text("来源 vue_search_smoke", exact=True).wait_for(timeout=15_000)
-                        vue_page.locator(".result-row").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
-                        vue_page.locator(".result-row").filter(has_text=vue_search_text).first.click()
+                        vue_page.locator(".filter-summary").get_by_text("文字", exact=True).wait_for(timeout=15_000)
+                        vue_page.locator(".filter-summary").get_by_text(
+                            "来自 vue_search_smoke", exact=True
+                        ).wait_for(timeout=15_000)
+                        vue_page.locator(".result-list > button").filter(has_text=vue_search_text).first.wait_for(timeout=15_000)
+                        vue_page.locator(".result-list > button").filter(has_text=vue_search_text).first.click()
                         vue_page.locator(".drawer-panel").get_by_text(vue_search_text, exact=False).wait_for(timeout=15_000)
                         vue_updated_text = "Vue smoke search target edited"
                         vue_page.locator(".drawer-panel").get_by_role("button", name="编辑").click()
@@ -956,7 +959,7 @@ def main() -> None:
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="资料库").wait_for(timeout=15_000)
                         vue_page.get_by_label("搜索查询").fill("pending-shot.png")
-                        vue_page.get_by_role("button", name="筛选").click()
+                        vue_page.get_by_role("button", name="细化条件").click()
                         vue_page.get_by_label("记录类型").select_option("image")
                         vue_page.get_by_label("处理状态").select_option("pending")
                         with vue_page.expect_response(
@@ -965,22 +968,22 @@ def main() -> None:
                             and "processing_state=pending" in response.url
                             and response.status == 200
                         ):
-                            vue_page.locator("main").get_by_role("button", name="搜索").click()
-                        vue_page.locator(".result-row").filter(has_text="pending-shot.png").first.wait_for(timeout=15_000)
+                            vue_page.get_by_role("button", name="应用").click()
+                        vue_page.locator(".result-list > button").filter(has_text="pending-shot.png").first.wait_for(timeout=15_000)
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-ready" in response.url and response.status == 200
                         ):
                             vue_page.get_by_role("button", name=re.compile(r"标记待处理为就绪")).click()
                         vue_page.get_by_text("已标记", exact=False).wait_for(timeout=15_000)
                         vue_page.get_by_label("处理状态").select_option("")
-                        vue_page.get_by_label("处理覆盖").select_option("ready")
+                        vue_page.get_by_label("人工覆盖").select_option("ready")
                         with vue_page.expect_response(
                             lambda response: "/search/all" in response.url
                             and "processing_override=ready" in response.url
                             and response.status == 200
                         ):
-                            vue_page.locator("main").get_by_role("button", name="搜索").click()
-                        vue_page.locator(".result-row").filter(has_text="pending-shot.png").first.wait_for(timeout=15_000)
+                            vue_page.get_by_role("button", name="应用").click()
+                        vue_page.locator(".result-list > button").filter(has_text="pending-shot.png").first.wait_for(timeout=15_000)
                         with vue_page.expect_response(
                             lambda response: "/processing/mark-pending" in response.url and response.status == 200
                         ):
@@ -1044,12 +1047,11 @@ def main() -> None:
                         )
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="资料库").wait_for(timeout=15_000)
-                        vue_page.get_by_label("搜索查询").fill(vue_task_title)
                         with vue_page.expect_response(
                             lambda response: "/search/all" in response.url and response.status == 200
                         ):
-                            vue_page.locator("main").get_by_role("button", name="搜索").click()
-                        vue_page.locator(".result-row").filter(has_text=vue_task_title).first.click()
+                            vue_page.get_by_label("搜索查询").fill(vue_task_title)
+                        vue_page.locator(".result-list > button").filter(has_text=vue_task_title).first.click()
                         vue_page.locator(".object-panel").get_by_text("created by smoke test", exact=False).wait_for(
                             timeout=15_000
                         )
@@ -1202,12 +1204,11 @@ def main() -> None:
                             {"memoryContent": linked_memory_content, "taskTitle": linked_task_title},
                         )
                         vue_page.goto(f"{base_url}/app?mode=search", wait_until="networkidle")
-                        vue_page.get_by_label("搜索查询").fill(linked_memory_content)
                         with vue_page.expect_response(
                             lambda response: "/search/all" in response.url and response.status == 200
                         ):
-                            vue_page.locator("main").get_by_role("button", name="搜索").click()
-                        vue_page.locator(".result-row").filter(has_text=linked_memory_content).first.click()
+                            vue_page.get_by_label("搜索查询").fill(linked_memory_content)
+                        vue_page.locator(".result-list > button").filter(has_text=linked_memory_content).first.click()
                         vue_page.locator(".object-panel").get_by_text(linked_task_title, exact=False).wait_for(
                             timeout=15_000
                         )
