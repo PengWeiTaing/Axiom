@@ -43,10 +43,32 @@ def main() -> int:
             "--vermilion: #b24d37",
             "--r-3: 4px",
             "--app-header-height: 74px",
+            '"OpenAI Sans SC", "OpenAI Sans", "Noto Sans SC Variable"',
+            "--font-display: var(--font-ui)",
+            "--font-mono: var(--font-ui)",
         ),
         FRONTEND / "styles" / "base.css": (
             "letter-spacing: 0 !important",
+            "font-optical-sizing: auto",
+            "font-synthesis: none",
+            "h1,\nh2,\nh3,",
+            'font-feature-settings: "tnum" 1, "case" 1',
             "@media (prefers-reduced-motion: reduce)",
+        ),
+        FRONTEND / "main.ts": (
+            "import '@fontsource-variable/noto-sans-sc'",
+        ),
+        ROOT / "frontend" / "package.json": (
+            '"@fontsource-variable/noto-sans-sc"',
+        ),
+        ROOT / "frontend" / "THIRD_PARTY_NOTICES.md": (
+            "Noto Sans SC Variable",
+            "SIL Open Font License 1.1",
+            "licenses/NotoSansSC-OFL-1.1.txt",
+        ),
+        ROOT / "frontend" / "licenses" / "NotoSansSC-OFL-1.1.txt": (
+            "SIL OPEN FONT LICENSE Version 1.1",
+            "Google Inc.",
         ),
         FRONTEND / "App.vue": (
             "import AxiomAtmosphere",
@@ -148,6 +170,19 @@ def main() -> int:
         text = path.read_text(encoding="utf-8")
         if "font-size: clamp(" in text:
             errors.append(f"viewport-scaled type returned: {path.relative_to(ROOT)}")
+
+    errors.extend(
+        forbid(
+            FRONTEND / "styles" / "tokens.css",
+            (
+                "Iowan Old Style",
+                "Source Han Serif SC",
+                "Noto Serif CJK SC",
+                "Songti SC",
+                "Georgia, serif",
+            ),
+        )
+    )
 
     folio_ledgers = (
         FRONTEND / "views" / "TasksView.vue",

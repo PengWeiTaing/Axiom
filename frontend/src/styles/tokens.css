@@ -59,14 +59,12 @@
   --s-7: 48px;
   --s-8: 64px;
 
-  --font-sans:
-    "Segoe UI Variable", "PingFang SC", "Microsoft YaHei UI",
-    "Noto Sans CJK SC", system-ui, sans-serif;
-  --font-display:
-    "Iowan Old Style", "Source Han Serif SC", "Noto Serif CJK SC",
-    "Songti SC", "STSong", Georgia, serif;
-  --font-mono:
-    "Cascadia Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --font-ui:
+    "OpenAI Sans SC", "OpenAI Sans", "Noto Sans SC Variable",
+    "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-sans: var(--font-ui);
+  --font-display: var(--font-ui);
+  --font-mono: var(--font-ui);
 
   --fs-1: 10px;
   --fs-2: 11px;

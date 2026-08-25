@@ -15,6 +15,9 @@ body {
   background: var(--surface-0);
   color: var(--text-2);
   font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  font-synthesis: none;
+  font-weight: 400;
   font-size: var(--fs-4);
   line-height: var(--lh-base);
   -webkit-font-smoothing: antialiased;
@@ -35,6 +38,15 @@ body {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 500;
 }
 
 button,
@@ -106,6 +118,8 @@ a:hover {
 
 .mono {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "case" 1;
 }
 
 .eyebrow {
@@ -113,6 +127,8 @@ a:hover {
   font-family: var(--font-mono);
   font-size: var(--fs-1);
   font-weight: 540;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "case" 1;
 }
 
 .muted { color: var(--text-3); }
