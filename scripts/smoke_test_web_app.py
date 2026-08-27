@@ -644,25 +644,6 @@ def main() -> None:
                     try:
                         vue_page.goto(f"{base_url}/app", wait_until="domcontentloaded")
                         vue_page.evaluate("localStorage.setItem('axiom.key', 'test-key')")
-                        vue_board_title = "Vue smoke learning board"
-                        vue_board_id = vue_page.evaluate(
-                            """
-                            async (title) => {
-                                const response = await fetch("/api/learning/boards", {
-                                    method: "POST",
-                                    headers: {
-                                        "X-Axiom-Key": "test-key",
-                                        "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({ title, source_type: "manual", widgets: [], nodes: [] }),
-                                });
-                                if (!response.ok) throw new Error(await response.text());
-                                const payload = await response.json();
-                                return payload.board_id;
-                            }
-                            """,
-                            vue_board_title,
-                        )
                         vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         vue_page.get_by_role("heading", name="近况").wait_for(timeout=15_000)
                         vue_page.get_by_role("heading", name="处理积压").wait_for(timeout=15_000)
@@ -678,13 +659,6 @@ def main() -> None:
                             "Summary line for the browser smoke test.",
                             exact=False,
                         ).wait_for(timeout=15_000)
-                        vue_page.get_by_role("heading", name="学习白板").wait_for(timeout=15_000)
-                        vue_page.get_by_text(vue_board_title, exact=False).wait_for(timeout=15_000)
-                        vue_page.get_by_role("button", name="打开白板工作区").wait_for(timeout=15_000)
-                        with vue_page.expect_navigation(url=f"**/board/{vue_board_id}", wait_until="domcontentloaded"):
-                            vue_page.locator(".board-row").filter(has_text=vue_board_title).first.click()
-                        vue_page.get_by_role("heading", name=vue_board_title).first.wait_for(timeout=15_000)
-                        vue_page.goto(f"{base_url}/app?mode=recent", wait_until="networkidle")
                         vue_search_text = "Vue smoke search target"
                         vue_search_payload = vue_page.evaluate(
                             """

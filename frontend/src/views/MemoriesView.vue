@@ -404,7 +404,7 @@ onMounted(() => {
   color: var(--text-1);
   font-family: var(--font-display);
   font-size: 44px;
-  font-weight: 400;
+  font-weight: 640;
   line-height: 1.18;
 }
 
@@ -413,7 +413,7 @@ onMounted(() => {
   margin-top: 12px;
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .eyebrow {
@@ -462,7 +462,7 @@ onMounted(() => {
 
 button:hover:not(:disabled) {
   color: var(--text-1);
-  background: rgba(23, 26, 22, 0.045);
+  background: var(--surface-2);
   border-color: var(--line-3);
 }
 
@@ -530,7 +530,7 @@ button:disabled {
   color: var(--cobalt);
   font-family: var(--font-display);
   font-size: 34px;
-  font-weight: 400;
+  font-weight: 580;
   line-height: 1;
 }
 
@@ -641,7 +641,7 @@ button:disabled {
   --filter-summary-button-bg: transparent;
   --filter-summary-button-color: var(--text-1);
   --filter-summary-button-hover-border: var(--line-3);
-  --filter-summary-button-hover-bg: rgba(23, 26, 22, 0.04);
+  --filter-summary-button-hover-bg: var(--surface-2);
   margin: -8px 0 16px;
 }
 

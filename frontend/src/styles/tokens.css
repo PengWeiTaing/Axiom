@@ -1,53 +1,53 @@
 /*
- * Axiom / Living Folio
+ * Axiom / Night Field
  *
- * A cool paper field, dense ink and a small set of mineral pigments. Colour
- * belongs to meaning, never to decoration: vermilion is intent, moss is
- * continuity, cobalt is recall, and violet is unresolved judgement.
+ * A native dark workspace built from graphite, warm type and restrained
+ * mineral signals. Depth comes from luminance and proximity, never from
+ * inverted paper colours, neon gradients or decorative glass.
  */
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  --surface-0: #e8eae5;
-  --surface-1: #f3f4ef;
-  --surface-2: #dfe2dc;
-  --surface-3: #cdd1c9;
-  --surface-4: #aeb4aa;
-  --surface-raised: rgba(243, 244, 239, 0.96);
+  --surface-0: #0b0e0c;
+  --surface-1: #101410;
+  --surface-2: #161b16;
+  --surface-3: #1e251f;
+  --surface-4: #2e3730;
+  --surface-raised: rgba(17, 21, 17, 0.97);
 
-  --text-1: #171a16;
-  --text-2: #30352e;
-  --text-3: #5d645b;
-  --text-4: #7a8278;
-  --text-5: #9ca39a;
+  --text-1: #f2f1eb;
+  --text-2: #d5d8cf;
+  --text-3: #a9afa5;
+  --text-4: #7d857c;
+  --text-5: #596159;
 
-  --line-1: rgba(23, 26, 22, 0.10);
-  --line-2: rgba(23, 26, 22, 0.19);
-  --line-3: rgba(23, 26, 22, 0.34);
-  --line-warm: rgba(178, 77, 55, 0.34);
+  --line-1: rgba(235, 239, 229, 0.075);
+  --line-2: rgba(235, 239, 229, 0.14);
+  --line-3: rgba(235, 239, 229, 0.26);
+  --line-warm: rgba(211, 109, 82, 0.38);
 
-  --accent: #587363;
-  --accent-bright: #375849;
-  --accent-dim: rgba(88, 115, 99, 0.12);
-  --accent-glow: rgba(88, 115, 99, 0.07);
-  --focus: #b24d37;
-  --focus-bright: #8f3828;
-  --focus-dim: rgba(178, 77, 55, 0.10);
-  --success: #5f7b64;
-  --info: #476d8b;
-  --cobalt: #315d82;
-  --vermilion: #b24d37;
-  --violet: #745d78;
-  --yellow: #b98c31;
+  --accent: #8ea797;
+  --accent-bright: #b8cabc;
+  --accent-dim: rgba(142, 167, 151, 0.14);
+  --accent-glow: rgba(142, 167, 151, 0.075);
+  --focus: #d36d52;
+  --focus-bright: #ed8d72;
+  --focus-dim: rgba(211, 109, 82, 0.13);
+  --success: #82a98f;
+  --info: #7fa1bd;
+  --cobalt: #7ca4c8;
+  --vermilion: #d36d52;
+  --violet: #b197b2;
+  --yellow: #d0b56e;
 
   --warm: var(--focus);
-  --warn: #9e652d;
-  --error: #a74232;
+  --warn: #d1a060;
+  --error: #e27d70;
 
   --r-1: 0;
   --r-2: 2px;
-  --r-3: 4px;
+  --r-3: 6px;
   --r-pill: 999px;
 
   --s-1: 4px;
@@ -60,23 +60,23 @@
   --s-8: 64px;
 
   --font-ui:
-    "OpenAI Sans SC", "OpenAI Sans", "Noto Sans SC Variable",
+    "OpenAI Sans SC", "OpenAI Sans", "Inter Variable", "Noto Sans SC Variable",
     "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
   --font-sans: var(--font-ui);
   --font-display: var(--font-ui);
   --font-mono: var(--font-ui);
 
-  --fs-1: 10px;
-  --fs-2: 11px;
-  --fs-3: 13px;
-  --fs-4: 14px;
-  --fs-5: 16px;
-  --fs-6: 20px;
-  --fs-7: 30px;
-  --fs-display: 48px;
+  --fs-1: 11px;
+  --fs-2: 12px;
+  --fs-3: 14px;
+  --fs-4: 15px;
+  --fs-5: 17px;
+  --fs-6: 22px;
+  --fs-7: 34px;
+  --fs-display: 58px;
 
   --lh-tight: 1.2;
-  --lh-base: 1.62;
+  --lh-base: 1.58;
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.64, 0, 0.78, 0);
@@ -86,13 +86,13 @@
   --t-drawer: 320ms;
 
   --glass-blur: none;
-  --glass-bg: rgba(243, 244, 239, 0.98);
-  --shadow-1: 0 8px 24px rgba(23, 26, 22, 0.08);
-  --shadow-2: 0 24px 72px rgba(23, 26, 22, 0.15);
+  --glass-bg: rgba(16, 20, 16, 0.97);
+  --shadow-1: 0 14px 34px rgba(0, 0, 0, 0.24);
+  --shadow-2: 0 30px 90px rgba(0, 0, 0, 0.46);
 
   --content-max: 820px;
   --content-wide: 1380px;
-  --app-header-height: 74px;
+  --app-header-height: 68px;
   --app-rail-width: 0px;
   --app-mobile-nav-height: 70px;
 }

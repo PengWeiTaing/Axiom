@@ -284,13 +284,12 @@ onMounted(loadQueue);
 
 <style scoped>
 .processing-view {
+  width: min(1460px, calc(100% - 56px));
   min-height: 100vh;
-  padding: calc(var(--s-10) + 12px) clamp(var(--s-4), 5vw, var(--s-10)) var(--s-8);
+  margin: 0 auto;
+  padding: 34px 0 86px;
   color: var(--text-1);
-  background:
-    radial-gradient(circle at 20% 8%, rgba(108, 142, 170, 0.14), transparent 28%),
-    linear-gradient(180deg, rgba(246, 241, 232, 0.035), transparent 32%),
-    var(--bg);
+  background: transparent;
 }
 
 .topbar,
@@ -304,9 +303,11 @@ onMounted(loadQueue);
 }
 
 .topbar {
+  min-height: 120px;
   justify-content: space-between;
   gap: var(--s-4);
-  margin-bottom: var(--s-5);
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .eyebrow {
@@ -324,8 +325,9 @@ p {
 }
 
 h1 {
-  font-size: 2.6rem;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 640;
 }
 
 h2 {
@@ -334,9 +336,9 @@ h2 {
 
 .refresh-btn,
 button {
-  border: 1px solid var(--border-2);
-  border-radius: var(--r-2);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   cursor: pointer;
   transition: border-color var(--t-base) var(--ease), background var(--t-base) var(--ease), transform var(--t-fast) var(--ease);
@@ -348,8 +350,8 @@ button {
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--line-3);
+  background: var(--surface-2);
 }
 
 button:active:not(:disabled) {
@@ -372,8 +374,8 @@ button:disabled {
   gap: var(--s-3);
   margin-bottom: var(--s-4);
   padding: var(--s-3) var(--s-4);
-  border: 1px solid var(--border-2);
-  border-radius: var(--r-2);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
 }
 
 .error-row {
@@ -391,20 +393,27 @@ button:disabled {
 .metrics {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: var(--s-3);
-  margin-bottom: var(--s-5);
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .metrics article,
 .panel {
-  border: 1px solid var(--border-1);
-  border-radius: var(--r-3);
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: var(--shadow-1);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .metrics article {
-  padding: var(--s-4);
+  min-height: 100px;
+  padding: 22px 26px;
+  border-right: 1px solid var(--line-1);
+}
+
+.metrics article:last-child {
+  border-right: 0;
 }
 
 .metrics span,
@@ -416,7 +425,8 @@ button:disabled {
 .metrics strong {
   display: block;
   margin: var(--s-2) 0;
-  font-size: var(--fs-7);
+  font-size: 30px;
+  font-weight: 580;
 }
 
 .metrics .urgent strong {
@@ -426,11 +436,16 @@ button:disabled {
 .queue-grid {
   display: grid;
   grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.6fr);
-  gap: var(--s-4);
+  gap: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .panel {
-  padding: var(--s-4);
+  padding: 34px 36px 42px;
+}
+
+.queue-grid > .panel:first-child {
+  border-right: 1px solid var(--line-1);
 }
 
 .panel-head {
@@ -445,8 +460,8 @@ button:disabled {
   align-items: center;
   min-height: 28px;
   padding: 0 var(--s-3);
-  border: 1px solid var(--border-2);
-  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  border-radius: 0;
   color: var(--text-3);
   font-size: var(--fs-1);
 }
@@ -493,18 +508,19 @@ button:disabled {
 .group-list,
 .changed-list {
   display: grid;
-  gap: var(--s-3);
+  gap: 0;
 }
 
 .group-card,
 .changed-row {
-  border: 1px solid var(--border-1);
-  border-radius: var(--r-2);
-  background: rgba(0, 0, 0, 0.12);
+  border: 0;
+  border-top: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
 }
 
 .group-card {
-  padding: var(--s-4);
+  padding: 18px 0;
 }
 
 .group-head {
@@ -562,17 +578,18 @@ button:disabled {
   display: grid;
   gap: 2px;
   padding: var(--s-2) 0;
-  border-top: 1px solid var(--border-1);
+  border-top: 1px solid var(--line-1);
 }
 
 .changed-panel {
-  margin-top: var(--s-4);
+  margin-top: 28px;
+  border-top: 1px solid var(--line-2);
 }
 
 .changed-row {
   justify-content: space-between;
   gap: var(--s-4);
-  padding: var(--s-3);
+  padding: 16px 0;
 }
 
 .empty-line {
@@ -591,7 +608,8 @@ button:disabled {
 
 @media (max-width: 640px) {
   .processing-view {
-    padding-top: calc(var(--s-10) + var(--s-8));
+    width: calc(100% - 32px);
+    padding: 22px 0 calc(var(--app-mobile-nav-height) + 30px);
   }
 
   .topbar,

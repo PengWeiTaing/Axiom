@@ -374,9 +374,9 @@ onMounted(() => {
 
 <style scoped>
 .system-view {
-  width: min(1180px, calc(100vw - var(--s-8)));
+  width: min(1460px, calc(100% - 56px));
   margin: 0 auto;
-  padding: calc(var(--s-8) + var(--s-5)) 0 var(--s-8);
+  padding: 34px 0 86px;
 }
 
 .topbar,
@@ -388,7 +388,9 @@ onMounted(() => {
 }
 
 .topbar {
-  margin-bottom: var(--s-5);
+  min-height: 120px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 h1,
@@ -400,7 +402,8 @@ h3 {
 }
 
 h1 {
-  font-size: var(--fs-7);
+  font-size: 38px;
+  font-weight: 640;
   line-height: var(--lh-tight);
 }
 
@@ -423,7 +426,7 @@ h3 {
 .export-btn,
 .filters button {
   border: 1px solid var(--line-2);
-  border-radius: var(--r-2);
+  border-radius: 0;
   color: var(--text-2);
   padding: var(--s-2) var(--s-3);
   transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
@@ -481,18 +484,26 @@ h3 {
 .health-strip {
   display: grid;
   grid-template-columns: 1.2fr repeat(4, 1fr);
-  gap: var(--s-3);
-  margin-bottom: var(--s-4);
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .health-strip article,
 .check-list article,
 .table-list article {
   min-width: 0;
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: rgba(13, 17, 22, 0.74);
-  padding: var(--s-4);
+  border: 0;
+  border-right: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+  padding: 22px 26px;
+}
+
+.health-strip article:last-child,
+.check-list article:nth-child(even),
+.table-list article:nth-child(even) {
+  border-right: 0;
 }
 
 .health-strip span,
@@ -533,20 +544,26 @@ h3 {
 .workspace-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--s-4);
+  gap: 0;
   align-items: start;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .panel {
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: rgba(13, 17, 22, 0.74);
-  padding: var(--s-4);
+  border: 0;
+  border-right: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+  padding: 32px 36px 42px;
+}
+
+.workspace-grid > .panel:nth-child(even) {
+  border-right: 0;
 }
 
 .state-pill {
   border: 1px solid var(--line-1);
-  border-radius: var(--r-pill);
+  border-radius: 0;
   padding: 3px 9px;
 }
 
@@ -609,10 +626,11 @@ select {
 .audit-list article {
   display: grid;
   gap: 3px;
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-  padding: var(--s-3);
+  border: 0;
+  border-top: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+  padding: 14px 0;
 }
 
 .audit-action {
@@ -641,8 +659,8 @@ select {
 
 @media (max-width: 900px) {
   .system-view {
-    width: min(100vw - var(--s-4), 640px);
-    padding-top: calc(var(--s-8) + var(--s-7));
+    width: calc(100% - 32px);
+    padding: 22px 0 calc(var(--app-mobile-nav-height) + 30px);
   }
 
   .health-strip,
@@ -650,6 +668,14 @@ select {
   .check-list,
   .table-list {
     grid-template-columns: 1fr;
+  }
+
+  .health-strip article,
+  .panel,
+  .check-list article,
+  .table-list article {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-1);
   }
 
   .topbar {

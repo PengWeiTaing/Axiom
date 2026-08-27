@@ -470,13 +470,13 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .library-view {
-  width: min(1380px, calc(100% - 76px));
+  width: min(1460px, calc(100% - 56px));
   margin: 0 auto;
   padding: 34px 0 96px;
 }
 
 .library-head {
-  min-height: 150px;
+  min-height: 136px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -487,21 +487,20 @@ onBeforeUnmount(() => {
 .library-title > span {
   color: var(--cobalt);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .library-title h1 {
   margin-top: 12px;
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 400;
+  font-size: 38px;
+  font-weight: 640;
 }
 
 .library-title p {
-  margin-top: 8px;
-  color: var(--text-4);
-  font-size: 11px;
+  display: none;
 }
 
 .library-head nav {
@@ -517,7 +516,8 @@ onBeforeUnmount(() => {
   gap: 7px;
   padding-bottom: 5px;
   color: var(--text-4);
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 560;
   border-bottom: 1px solid transparent;
 }
 
@@ -528,12 +528,15 @@ onBeforeUnmount(() => {
 }
 
 .recall-line {
-  min-height: 190px;
+  min-height: 176px;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) 34px;
   align-items: center;
-  gap: 24px;
+  gap: 22px;
+  padding: 0 34px;
   color: var(--cobalt);
+  background: var(--surface-1);
+  border-top: 1px solid var(--line-1);
   border-bottom: 1px solid var(--line-2);
 }
 
@@ -545,12 +548,13 @@ onBeforeUnmount(() => {
   width: 100%;
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: 40px;
+  font-weight: 560;
   line-height: 1.35;
 }
 
 .library-query::placeholder {
-  color: var(--text-5);
+  color: var(--text-4);
 }
 
 .library-query:focus-visible {
@@ -577,11 +581,11 @@ onBeforeUnmount(() => {
 
 .search-shortcut {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .recall-controls {
-  min-height: 64px;
+  min-height: 70px;
   display: flex;
   align-items: center;
   gap: 28px;
@@ -596,7 +600,8 @@ onBeforeUnmount(() => {
 .mode-switch button,
 .filter-trigger {
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 560;
   border-bottom: 1px solid transparent;
 }
 
@@ -621,7 +626,7 @@ onBeforeUnmount(() => {
   margin-left: auto;
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .filter-sheet {
@@ -640,7 +645,7 @@ onBeforeUnmount(() => {
 .filter-sheet label > span {
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .filter-sheet select,
@@ -648,7 +653,7 @@ onBeforeUnmount(() => {
   width: 100%;
   min-height: 32px;
   color: var(--text-2);
-  font-size: 11px;
+  font-size: 13px;
   border-bottom: 1px solid var(--line-2);
 }
 
@@ -657,7 +662,7 @@ onBeforeUnmount(() => {
   min-height: 32px;
   padding: 0 8px;
   color: var(--text-3);
-  font-size: 10px;
+  font-size: 12px;
   border-bottom: 1px solid var(--line-2);
 }
 
@@ -675,7 +680,7 @@ onBeforeUnmount(() => {
 .library-notice {
   padding: 12px 0;
   color: var(--accent);
-  font-size: 11px;
+  font-size: 13px;
   border-bottom: 1px solid currentColor;
 }
 
@@ -694,7 +699,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 20px;
   color: var(--text-4);
-  font-size: 9px;
+  font-size: 11px;
   border-bottom: 1px solid var(--line-2);
 }
 
@@ -711,7 +716,7 @@ onBeforeUnmount(() => {
 
 .result-section {
   display: grid;
-  grid-template-columns: minmax(170px, 0.82fr) minmax(0, 3.8fr);
+  grid-template-columns: minmax(210px, 0.82fr) minmax(0, 3.8fr);
   gap: clamp(36px, 6vw, 92px);
   padding: 62px 0;
   border-bottom: 1px solid var(--line-2);
@@ -727,20 +732,21 @@ onBeforeUnmount(() => {
 .result-index > span {
   color: var(--cobalt);
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 28px;
+  font-weight: 620;
 }
 
 .result-index h2 {
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 400;
+  font-size: 22px;
+  font-weight: 620;
 }
 
 .result-index > strong {
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
 }
 
@@ -752,7 +758,7 @@ onBeforeUnmount(() => {
 .result-list > button {
   --result-accent: var(--cobalt);
   width: 100%;
-  min-height: 84px;
+  min-height: 92px;
   display: grid;
   grid-template-columns: 30px 3px minmax(180px, 1fr) minmax(120px, auto) 18px;
   align-items: center;
@@ -762,13 +768,14 @@ onBeforeUnmount(() => {
 }
 
 .result-list > button:hover {
-  padding-left: 7px;
+  padding: 0 12px;
+  background: var(--surface-2);
 }
 
 .result-number {
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .result-list > button > i {
@@ -785,8 +792,8 @@ onBeforeUnmount(() => {
 
 .result-copy strong {
   color: var(--text-1);
-  font-size: 13px;
-  font-weight: 520;
+  font-size: 15px;
+  font-weight: 580;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -795,7 +802,7 @@ onBeforeUnmount(() => {
 .result-copy small {
   max-width: 680px;
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -807,7 +814,7 @@ onBeforeUnmount(() => {
   gap: 3px;
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -871,13 +878,14 @@ onBeforeUnmount(() => {
   }
 
   .recall-line {
-    min-height: 148px;
+    min-height: 154px;
     grid-template-columns: 24px minmax(0, 1fr) 30px;
     gap: 12px;
+    padding: 0 14px;
   }
 
   .library-query {
-    font-size: 25px;
+    font-size: 28px;
   }
 
   .recall-controls {

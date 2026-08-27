@@ -133,7 +133,7 @@ defineExpose({ show, close });
         </header>
 
         <div class="capture-editor">
-          <span class="capture-index">+</span>
+          <span class="capture-index" aria-hidden="true" />
           <textarea
             ref="textarea"
             v-model="text"
@@ -194,7 +194,7 @@ defineExpose({ show, close });
   z-index: 90;
   overflow-y: auto;
   color: var(--text-2);
-  background: var(--surface-1);
+  background: rgba(11, 14, 12, 0.99);
 }
 
 .quick-overlay::before {
@@ -203,22 +203,22 @@ defineExpose({ show, close });
   top: 0;
   bottom: 0;
   left: max(24px, calc((100vw - 1120px) / 2));
-  width: 1px;
+  width: 3px;
   background: var(--focus);
-  opacity: 0.56;
+  opacity: 1;
 }
 
 .capture-plane {
-  width: min(1120px, calc(100% - 72px));
+  width: min(1280px, calc(100% - 64px));
   min-height: 100vh;
   display: grid;
   grid-template-rows: auto minmax(300px, 1fr) auto auto;
   margin: 0 auto;
-  padding: 44px 0 36px 72px;
+  padding: 36px 0 38px 58px;
 }
 
 .capture-head {
-  min-height: 118px;
+  min-height: 104px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -234,14 +234,15 @@ defineExpose({ show, close });
 .capture-head span {
   color: var(--focus);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .capture-head strong {
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 400;
+  font-size: 28px;
+  font-weight: 620;
 }
 
 .capture-head > button {
@@ -254,23 +255,25 @@ defineExpose({ show, close });
 }
 
 .capture-head > button:hover {
-  color: var(--surface-1);
+  color: var(--surface-0);
   background: var(--text-1);
 }
 
 .capture-editor {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 22px;
   align-content: center;
   padding: 58px 0;
 }
 
 .capture-index {
-  color: var(--focus);
-  font-family: var(--font-display);
-  font-size: 42px;
-  line-height: 1;
+  width: 9px;
+  height: 9px;
+  margin-top: 19px;
+  background: var(--focus);
+  border-radius: 50%;
+  box-shadow: 0 0 0 7px var(--focus-dim);
 }
 
 .capture-editor textarea {
@@ -278,13 +281,13 @@ defineExpose({ show, close });
   min-height: 250px;
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 42px;
-  font-weight: 400;
-  line-height: 1.5;
+  font-size: 44px;
+  font-weight: 540;
+  line-height: 1.42;
 }
 
 .capture-editor textarea::placeholder {
-  color: var(--text-5);
+  color: var(--text-4);
 }
 
 .file-list {
@@ -324,7 +327,8 @@ defineExpose({ show, close });
   gap: 14px;
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 560;
   border-top: 1px solid var(--line-2);
 }
 
@@ -348,8 +352,9 @@ defineExpose({ show, close });
 
 .submit-button {
   margin-left: auto;
-  color: var(--surface-1);
+  color: var(--surface-0);
   background: var(--text-1);
+  border-radius: 50%;
 }
 
 .submit-button:hover:not(:disabled) {
@@ -376,21 +381,24 @@ defineExpose({ show, close });
   align-items: center;
   gap: 8px;
   padding: 14px 16px;
-  color: var(--surface-1);
-  background: var(--text-1);
+  color: var(--text-1);
+  background: var(--surface-3);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-1);
 }
 
 .quick-toast > span {
-  color: #9bb39f;
+  color: var(--success);
 }
 
 .quick-toast p {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .quick-toast small {
-  color: #b8beb6;
-  font-size: 9px;
+  color: var(--text-3);
+  font-size: 11px;
 }
 
 .capture-plane-enter-active,
@@ -434,18 +442,20 @@ defineExpose({ show, close });
   }
 
   .capture-editor {
-    grid-template-columns: 22px minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 12px;
     padding: 36px 0;
   }
 
   .capture-index {
-    font-size: 28px;
+    width: 7px;
+    height: 7px;
+    margin-top: 13px;
   }
 
   .capture-editor textarea {
     min-height: 220px;
-    font-size: 28px;
+    font-size: 30px;
   }
 
   .capture-foot > span {

@@ -13,10 +13,10 @@ let targetX = pointerX;
 let frame = 0;
 
 const palettes: Record<string, [number, number, number]> = {
-  today: [178, 77, 55],
-  capture: [178, 77, 55],
-  library: [49, 93, 130],
-  search: [49, 93, 130],
+  today: [211, 109, 82],
+  capture: [211, 109, 82],
+  library: [124, 164, 200],
+  search: [124, 164, 200],
 };
 
 function seeded(index: number, salt: number): number {
@@ -56,39 +56,47 @@ function paint() {
   const pigment = palettes[props.mode] || [88, 115, 99];
   ctx.clearRect(0, 0, width, height);
 
-  // A deterministic fibre field gives the surface physical depth without a
-  // decorative texture asset or an always-running animation.
-  const fibreCount = Math.round((width * height) / 5600);
-  ctx.lineWidth = 0.55;
+  // Sparse graphite grain keeps the field tactile without turning the shell
+  // into a paper simulation or running an idle animation.
+  const fibreCount = Math.round((width * height) / 7200);
+  ctx.lineWidth = 0.6;
   for (let index = 0; index < fibreCount; index += 1) {
     const x = seeded(index, 1) * width;
     const y = seeded(index, 2) * height;
     const length = 2 + seeded(index, 3) * 11;
     const slope = (seeded(index, 4) - 0.5) * 2.4;
-    ctx.strokeStyle = `rgba(23, 26, 22, ${0.018 + seeded(index, 5) * 0.018})`;
+    ctx.strokeStyle = `rgba(228, 233, 223, ${0.012 + seeded(index, 5) * 0.018})`;
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(x + length, y + slope);
     ctx.stroke();
   }
 
-  const guideX = Math.round(width * (0.12 + pointerX * 0.06)) + 0.5;
-  ctx.strokeStyle = `rgba(${pigment[0]}, ${pigment[1]}, ${pigment[2]}, 0.10)`;
+  const guideX = Math.round(width * (0.075 + pointerX * 0.035)) + 0.5;
+  ctx.strokeStyle = `rgba(${pigment[0]}, ${pigment[1]}, ${pigment[2]}, 0.17)`;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(guideX, height * 0.18);
-  ctx.lineTo(guideX, height * 0.78);
+  ctx.moveTo(guideX, height * 0.12);
+  ctx.lineTo(guideX, height * 0.88);
   ctx.stroke();
 
-  ctx.fillStyle = `rgba(${pigment[0]}, ${pigment[1]}, ${pigment[2]}, 0.28)`;
-  ctx.fillRect(guideX - 1, height * 0.18, 3, 30);
+  ctx.fillStyle = `rgba(${pigment[0]}, ${pigment[1]}, ${pigment[2]}, 0.72)`;
+  ctx.fillRect(guideX - 1, height * 0.12, 3, 38);
 
-  ctx.strokeStyle = 'rgba(23, 26, 22, 0.055)';
-  for (let index = 0; index < 4; index += 1) {
-    const y = Math.round(height * (0.28 + index * 0.145)) + 0.5;
+  ctx.strokeStyle = 'rgba(228, 233, 223, 0.035)';
+  for (let index = 0; index < 5; index += 1) {
+    const y = Math.round(height * (0.22 + index * 0.135)) + 0.5;
     ctx.beginPath();
-    ctx.moveTo(width * 0.76, y);
-    ctx.lineTo(width * 0.94, y);
+    ctx.moveTo(width * 0.80, y);
+    ctx.lineTo(width * (0.93 + seeded(index, 7) * 0.04), y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = 'rgba(228, 233, 223, 0.022)';
+  for (let index = 0; index < 3; index += 1) {
+    const radius = Math.max(width, height) * (0.40 + index * 0.16);
+    ctx.beginPath();
+    ctx.arc(width * 0.94, height * 0.08, radius, Math.PI * 0.56, Math.PI * 1.02);
     ctx.stroke();
   }
 }
@@ -120,7 +128,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  mix-blend-mode: multiply;
+  opacity: 0.9;
 }
 
 .axiom-atmosphere.is-atlas {

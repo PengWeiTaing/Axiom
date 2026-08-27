@@ -736,7 +736,9 @@ function fitCameraToGraph(force = false) {
   const verticalFov = camera.fov * Math.PI / 180
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect)
   const limitingFov = Math.min(verticalFov, horizontalFov)
-  const distance = Math.max(78, radius / Math.sin(limitingFov / 2) * 0.6)
+  // Narrow screens need breathing room for labels around the 3D point cloud.
+  const framingScale = viewportWidth.value <= 760 ? 0.94 : 0.6
+  const distance = Math.max(78, radius / Math.sin(limitingFov / 2) * framingScale)
   const direction = new Vector3(0.72, 0.58, 1).normalize()
 
   controls.target.copy(center)
@@ -1063,12 +1065,12 @@ function scenePoint(node: AtlasNode): Vector3 {
 function nodeSize3d(node: AtlasNode): number {
   const active = store.selectedId === node.id || store.hoveredId === node.id
   const boost = (active ? 1.16 : 1) * (viewportWidth.value <= 760 ? 1.42 : 1)
-  if (node.type === 'root') return 3.5 * boost
-  if (node.type === 'lifeline') return (isFallbackNode(node) ? 1.35 : 2.35) * boost
-  if (node.type === 'cluster') return (isFallbackNode(node) ? 1.05 : 1.78) * boost
-  if (node.type === 'decision') return 1.4 * boost
-  if (node.type === 'task' || node.type === 'memory') return 1.22 * boost
-  return 0.7 * boost
+  if (node.type === 'root') return 4.1 * boost
+  if (node.type === 'lifeline') return (isFallbackNode(node) ? 1.5 : 2.7) * boost
+  if (node.type === 'cluster') return (isFallbackNode(node) ? 1.15 : 2.05) * boost
+  if (node.type === 'decision') return 1.55 * boost
+  if (node.type === 'task' || node.type === 'memory') return 1.38 * boost
+  return 0.82 * boost
 }
 
 function nodeColor(node: AtlasNode): ColorRepresentation {
@@ -1166,8 +1168,8 @@ function edgeOpacity(edge: AtlasEdge): number {
   const hasFocus = Boolean(store.selectedId || store.hoveredId)
   const compactBoost = viewportWidth.value <= 760 ? 0.11 : 0
   if (!hasFocus) return edge.edge_class === 'structural'
-    ? Math.min(0.36, edge.opacity + 0.055 + compactBoost)
-    : Math.min(edge.opacity + 0.035 + compactBoost, 0.6)
+    ? Math.min(0.42, edge.opacity + 0.085 + compactBoost)
+    : Math.min(edge.opacity + 0.07 + compactBoost, 0.64)
   return relatedEdgeIds.value.has(edge.id) ? Math.min(0.74, edge.opacity + 0.3) : Math.min(edge.opacity, 0.032)
 }
 
@@ -1178,7 +1180,7 @@ function labelVisible(node: AtlasNode): boolean {
   if (store.lod === 'semantic') return node.layer <= 2 || (node.layer === 3 && node.weight >= 0.9)
   if (store.lod === 'tags') return node.layer <= 2
   if (store.lod === 'relations') return node.layer <= 2 || (node.layer === 3 && node.weight >= 0.72)
-  return node.layer <= 1
+  return node.layer <= 1 || (node.layer === 2 && node.weight >= 0.72)
 }
 
 function nodeHaloOpacity(node: AtlasNode): number {
@@ -1217,7 +1219,7 @@ function updateProjectedLabels() {
   const placed: Array<{ left: number, right: number, top: number, bottom: number }> = []
   const labels: ProjectedLabel[] = []
   for (const candidate of candidates) {
-    const width = Math.min(180, Math.max(38, Array.from(candidate.label).length * 7.2 + 12))
+    const width = Math.min(210, Math.max(44, Array.from(candidate.label).length * 8.6 + 14))
     const box = {
       left: candidate.x - width / 2,
       right: candidate.x + width / 2,
@@ -1458,7 +1460,11 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
             <circle class="local-hit" :r="entry.radius + 11" />
             <circle v-if="entry.role === 'center' || entry.node.weight > 0.88" class="local-halo" :r="entry.radius + 4" />
             <circle class="local-core" :r="entry.radius" />
-            <text v-if="localLabelVisible(entry)" :y="entry.radius + 14" text-anchor="middle">{{ shortLabel(entry.node.label, entry.role === 'center' ? 18 : 12) }}</text>
+            <text
+              v-if="localLabelVisible(entry)"
+              :y="entry.role === 'center' ? -(entry.radius + 9) : entry.radius + 14"
+              text-anchor="middle"
+            >{{ shortLabel(entry.node.label, entry.role === 'center' ? 18 : 12) }}</text>
           </g>
         </g>
       </svg>
@@ -2462,8 +2468,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 .scene-label {
   color: var(--text-3);
   font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 480;
+  font-size: 12px;
+  font-weight: 560;
   text-shadow: 0 1px 9px #090a08, 0 0 4px #090a08;
 }
 
@@ -2476,8 +2482,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 .scene-label.type-root {
   color: var(--focus-bright);
   font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 15px;
+  font-weight: 640;
 }
 
 .atlas-toolbar {
@@ -2514,28 +2520,29 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   right: -30px;
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .toolbar-title strong {
   font-family: var(--font-display);
-  font-size: 25px;
-  font-weight: 400;
+  font-size: 27px;
+  font-weight: 640;
 }
 
 .toolbar-title small {
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 560;
 }
 
 .mark {
   width: 7px;
   height: 7px;
-  border-radius: 0;
+  border-radius: 50%;
   background: var(--focus);
   box-shadow: 0 0 16px rgba(225, 165, 88, 0.28);
-  transform: rotate(45deg);
+  transform: none;
 }
 
 .atlas-tabs {
@@ -2549,8 +2556,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   border: 0;
   border-bottom: 1px solid var(--line-2);
   border-radius: 0;
-  background: rgba(9, 10, 8, 0.48);
-  backdrop-filter: blur(12px);
+  background: rgba(9, 10, 8, 0.92);
+  backdrop-filter: none;
 }
 
 .segmented button {
@@ -2560,7 +2567,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   border-bottom: 2px solid transparent;
   border-radius: 0;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 560;
 }
 
 .segmented button.active {
@@ -2577,8 +2585,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   min-height: 38px;
   border-color: var(--line-1);
   border-radius: 50%;
-  background: rgba(9, 10, 8, 0.48);
-  backdrop-filter: blur(12px);
+  background: rgba(9, 10, 8, 0.92);
+  backdrop-filter: none;
 }
 
 .atlas-footnote {
@@ -2587,7 +2595,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   gap: 18px;
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 560;
 }
 
 .atlas-footnote::before {
@@ -2626,14 +2635,14 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   max-width: 420px;
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 19px;
-  font-weight: 400;
+  font-size: 21px;
+  font-weight: 640;
 }
 
 .local-toolbar span {
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .back-btn {
@@ -2643,8 +2652,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   padding: 0;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(9, 10, 8, 0.48);
-  backdrop-filter: blur(12px);
+  background: rgba(9, 10, 8, 0.92);
+  backdrop-filter: none;
 }
 
 .back-btn span {
@@ -2664,20 +2673,20 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   width: 390px;
   padding: 72px 32px 42px;
   border-left-color: var(--line-2);
-  background: rgba(13, 13, 11, 0.91);
-  backdrop-filter: blur(28px) saturate(105%);
+  background: rgba(11, 14, 12, 0.98);
+  backdrop-filter: none;
 }
 
 .panel-kicker {
   color: var(--cobalt);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .local-panel h2 {
   font-family: var(--font-display);
-  font-size: 25px;
-  font-weight: 400;
+  font-size: 27px;
+  font-weight: 640;
 }
 
 .summary {
@@ -2690,7 +2699,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   border-top: 1px solid var(--line-1);
   border-bottom: 1px solid var(--line-1);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .relation-list {
@@ -2745,15 +2754,16 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 .local-node text {
   fill: var(--text-3);
   font-family: var(--font-sans);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 540;
   stroke: rgba(9, 10, 8, 0.96);
 }
 
 .local-node.role-center text {
   fill: var(--text-1);
   font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 400;
+  font-size: 13px;
+  font-weight: 640;
 }
 
 @media (max-width: 760px) {
@@ -2766,8 +2776,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
     min-height: 110px;
     padding: 12px 14px 8px;
     border-bottom: 1px solid var(--line-1);
-    background: rgba(9, 10, 8, 0.78);
-    backdrop-filter: blur(16px);
+    background: rgba(9, 10, 8, 0.96);
+    backdrop-filter: none;
     pointer-events: auto;
   }
 
@@ -2794,7 +2804,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
   .scene-label {
     color: var(--text-2);
-    font-size: 10px;
+    font-size: 11px;
     text-shadow: 0 1px 8px #090a08, 0 0 5px #090a08;
   }
 
@@ -2824,8 +2834,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
     padding: 10px 14px;
     border-left: 0;
     border-bottom: 1px solid var(--line-1);
-    background: rgba(9, 10, 8, 0.82);
-    backdrop-filter: blur(16px);
+    background: rgba(9, 10, 8, 0.96);
+    backdrop-filter: none;
   }
 
   .local-toolbar strong {

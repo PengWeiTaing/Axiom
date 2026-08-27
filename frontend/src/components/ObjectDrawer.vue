@@ -977,7 +977,7 @@ useWindowEventListener('keydown', onKey);
   position: fixed;
   inset: 0;
   z-index: 84;
-  background: rgba(23, 26, 22, 0.17);
+  background: rgba(0, 0, 0, 0.64);
 }
 
 .object-panel {
@@ -991,7 +991,7 @@ useWindowEventListener('keydown', onKey);
   overflow: hidden;
   border-left: 1px solid var(--line-2);
   background: var(--surface-1);
-  box-shadow: -24px 0 68px rgba(23, 26, 22, 0.12);
+  box-shadow: -32px 0 96px rgba(0, 0, 0, 0.48);
 }
 
 .progress-bar {
@@ -1026,7 +1026,7 @@ useWindowEventListener('keydown', onKey);
   color: var(--text-1);
   font-family: var(--font-display);
   font-size: 26px;
-  font-weight: 400;
+  font-weight: 620;
   line-height: 1.36;
   letter-spacing: 0;
 }
@@ -1039,13 +1039,13 @@ useWindowEventListener('keydown', onKey);
 .linked-list small,
 .meta-grid span {
   color: var(--text-3);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .object-head .eyebrow {
   color: var(--violet);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .close-btn {
@@ -1347,7 +1347,7 @@ useWindowEventListener('keydown', onKey);
   color: var(--text-1);
   font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.72;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -1391,7 +1391,7 @@ useWindowEventListener('keydown', onKey);
 
 .source-card:hover {
   border-color: var(--line-3);
-  background: rgba(23, 26, 22, 0.025);
+  background: var(--surface-2);
 }
 
 .linked-list {
@@ -1409,7 +1409,7 @@ useWindowEventListener('keydown', onKey);
 
 .linked-row:hover {
   border-color: var(--line-3);
-  background: rgba(23, 26, 22, 0.025);
+  background: var(--surface-2);
 }
 
 .task-parent-source svg {

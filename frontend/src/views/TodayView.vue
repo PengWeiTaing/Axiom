@@ -653,13 +653,13 @@ watch(() => props.revision, load);
 
 <style scoped>
 .now-view {
-  width: min(1380px, calc(100% - 76px));
+  width: min(1460px, calc(100% - 56px));
   margin: 0 auto;
   padding: 34px 0 86px;
 }
 
 .folio-head {
-  min-height: 86px;
+  min-height: 104px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 36px;
   align-items: start;
@@ -679,7 +679,8 @@ watch(() => props.revision, load);
 .field-head span {
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .folio-identity span {
@@ -689,8 +690,8 @@ watch(() => props.revision, load);
 .folio-identity strong {
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 400;
+  font-size: 26px;
+  font-weight: 620;
 }
 
 .folio-head > p {
@@ -719,49 +720,60 @@ watch(() => props.revision, load);
 }
 
 .focus-spread {
-  min-height: min(690px, calc(100vh - 160px));
+  min-height: min(420px, calc(100vh - 250px));
   display: grid;
-  grid-template-columns: minmax(150px, 0.75fr) minmax(400px, 3.4fr) minmax(120px, 0.72fr);
+  grid-template-columns: minmax(0, 1fr) minmax(168px, 0.18fr);
+  grid-template-rows: auto minmax(0, 1fr);
   align-items: stretch;
+  background: var(--surface-1);
+  border-top: 1px solid var(--line-1);
   border-bottom: 1px solid var(--line-2);
 }
 
 .focus-margin {
   position: relative;
-  padding: 70px 36px 48px 0;
-  border-right: 1px solid var(--line-1);
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 42px clamp(42px, 5vw, 80px) 0;
 }
 
 .margin-label {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--text-3);
-  font-size: 11px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .margin-label i {
   width: 8px;
   height: 8px;
   background: var(--focus);
-  transform: rotate(45deg);
+  border-radius: 50%;
 }
 
 .focus-margin > p {
-  max-width: 160px;
-  margin-top: 36px;
+  max-width: 420px;
+  margin-top: 0;
   color: var(--text-4);
-  font-family: var(--font-display);
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 12px;
+  line-height: 1.65;
+  text-align: right;
 }
 
 .focus-body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 70px clamp(36px, 5vw, 86px) 58px;
+  grid-column: 1;
+  grid-row: 2;
+  justify-content: flex-start;
+  padding: clamp(44px, 6vh, 68px) clamp(42px, 7vw, 108px) 52px;
 }
 
 .focus-copy {
@@ -776,16 +788,18 @@ watch(() => props.revision, load);
   margin-bottom: 18px;
   color: var(--focus);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 620;
 }
 
 .focus-copy h1,
 .empty-focus h1 {
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 46px;
-  font-weight: 400;
-  line-height: 1.34;
+  max-width: 900px;
+  font-size: 50px;
+  font-weight: 620;
+  line-height: 1.22;
   overflow-wrap: anywhere;
 }
 
@@ -794,12 +808,12 @@ watch(() => props.revision, load);
   max-width: 680px;
   margin-top: 24px;
   color: var(--text-3);
-  font-size: 14px;
-  line-height: 1.8;
+  font-size: 16px;
+  line-height: 1.7;
 }
 
 .focus-copy:hover h1 {
-  color: var(--focus-bright);
+  color: var(--text-1);
 }
 
 .focus-context {
@@ -816,7 +830,8 @@ watch(() => props.revision, load);
   gap: 8px;
   padding-bottom: 4px;
   color: var(--text-3);
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 560;
   border-bottom: 1px solid var(--line-2);
 }
 
@@ -837,11 +852,14 @@ watch(() => props.revision, load);
 }
 
 .focus-action {
+  grid-column: 2;
+  grid-row: 1 / 3;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: flex-end;
-  padding: 70px 0 48px 28px;
+  padding: 42px 32px 38px;
+  background: var(--surface-2);
   border-left: 1px solid var(--line-1);
 }
 
@@ -862,15 +880,16 @@ watch(() => props.revision, load);
 }
 
 .focus-action > button {
-  width: 80px;
-  height: 80px;
+  width: 88px;
+  height: 88px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 5px;
   color: var(--success);
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 620;
   border: 1px solid var(--success);
   border-radius: 50%;
 }
@@ -897,13 +916,13 @@ watch(() => props.revision, load);
 
 .feedback-line strong {
   color: var(--text-1);
-  font-size: 12px;
-  font-weight: 560;
+  font-size: 14px;
+  font-weight: 620;
 }
 
 .feedback-line span {
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .feedback-options {
@@ -915,7 +934,7 @@ watch(() => props.revision, load);
   min-height: 32px;
   padding: 0 12px;
   color: var(--text-3);
-  font-size: 10px;
+  font-size: 12px;
   border-left: 1px solid var(--line-1);
 }
 
@@ -944,15 +963,15 @@ watch(() => props.revision, load);
   margin-top: 11px;
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 25px;
-  font-weight: 400;
+  font-size: 28px;
+  font-weight: 620;
 }
 
 .section-margin > p {
   max-width: 230px;
   margin-top: 20px;
   color: var(--text-4);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.75;
 }
 
@@ -967,7 +986,7 @@ watch(() => props.revision, load);
   align-items: center;
   gap: 6px;
   color: var(--text-3);
-  font-size: 10px;
+  font-size: 12px;
   border-bottom: 1px solid var(--line-2);
 }
 
@@ -1003,7 +1022,7 @@ watch(() => props.revision, load);
 
 .week-progress small {
   color: var(--text-4);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .commitment-list {
@@ -1022,7 +1041,7 @@ watch(() => props.revision, load);
 .commitment-index {
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .commitment-list article > button:nth-child(2),
@@ -1036,14 +1055,14 @@ watch(() => props.revision, load);
 .commitment-list strong,
 .week-candidates strong {
   color: var(--text-1);
-  font-size: 14px;
-  font-weight: 520;
+  font-size: 15px;
+  font-weight: 580;
 }
 
 .commitment-list small,
 .week-candidates small {
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .commitment-state {
@@ -1094,7 +1113,7 @@ watch(() => props.revision, load);
   gap: 20px;
   margin-bottom: 12px;
   color: var(--text-3);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .week-candidates article {
@@ -1113,7 +1132,7 @@ watch(() => props.revision, load);
 .week-review > header small,
 .week-review > header p {
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .week-review form {
@@ -1131,7 +1150,7 @@ watch(() => props.revision, load);
   min-height: 38px;
   padding: 0 16px;
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
   border-right: 1px solid var(--line-1);
 }
 
@@ -1154,7 +1173,7 @@ watch(() => props.revision, load);
   align-items: center;
   justify-content: space-between;
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .week-review form footer button {
@@ -1228,18 +1247,18 @@ watch(() => props.revision, load);
 .next-list span {
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .next-list strong {
   color: var(--text-1);
-  font-size: 13px;
-  font-weight: 520;
+  font-size: 15px;
+  font-weight: 580;
 }
 
 .next-list small {
   color: var(--text-4);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .judgement-list article {
@@ -1280,8 +1299,8 @@ watch(() => props.revision, load);
 
 .judgement-list strong {
   color: var(--text-1);
-  font-size: 12px;
-  font-weight: 520;
+  font-size: 14px;
+  font-weight: 580;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1289,7 +1308,7 @@ watch(() => props.revision, load);
 
 .judgement-list small {
   color: var(--text-4);
-  font-size: 9px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1329,13 +1348,13 @@ watch(() => props.revision, load);
 }
 
 .trace-list button:hover {
-  background: rgba(49, 93, 130, 0.05);
+  background: var(--surface-2);
 }
 
 .trace-list span {
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .trace-list svg {
@@ -1346,8 +1365,8 @@ watch(() => props.revision, load);
   grid-column: 1 / -1;
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 400;
+  font-size: 16px;
+  font-weight: 560;
   line-height: 1.55;
   overflow: hidden;
 }
@@ -1355,7 +1374,7 @@ watch(() => props.revision, load);
 .trace-list small {
   grid-column: 1 / -1;
   color: var(--text-4);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .now-foot {
@@ -1365,7 +1384,7 @@ watch(() => props.revision, load);
   gap: 26px;
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .now-foot strong {
@@ -1410,7 +1429,7 @@ watch(() => props.revision, load);
   }
 
   .focus-spread {
-    grid-template-columns: 120px minmax(0, 1fr) 92px;
+    grid-template-columns: minmax(0, 1fr) 172px;
   }
 
   .focus-body {
@@ -1420,7 +1439,7 @@ watch(() => props.revision, load);
 
   .focus-copy h1,
   .empty-focus h1 {
-    font-size: 39px;
+    font-size: 44px;
   }
 
   .context-field {
@@ -1472,19 +1491,19 @@ watch(() => props.revision, load);
   }
 
   .focus-spread {
-    min-height: 570px;
-    grid-template-columns: 20px minmax(0, 1fr);
+    min-height: 520px;
+    grid-template-columns: 1fr;
     grid-template-rows: auto 1fr auto;
   }
 
   .focus-margin {
-    grid-column: 1 / -1;
+    grid-column: 1;
     grid-row: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 20px;
-    padding: 30px 0 18px;
+    padding: 28px 22px 12px;
     border-right: 0;
   }
 
@@ -1492,25 +1511,25 @@ watch(() => props.revision, load);
     max-width: 48%;
     margin: 0;
     text-align: right;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .focus-body {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 2;
-    padding: 30px 0 34px 18px;
-    border-left: 1px solid var(--line-1);
+    padding: 34px 22px 38px;
+    border-left: 0;
   }
 
   .focus-copy h1,
   .empty-focus h1 {
-    font-size: 31px;
-    line-height: 1.38;
+    font-size: 34px;
+    line-height: 1.28;
   }
 
   .focus-copy > p,
   .empty-focus > p {
-    font-size: 13px;
+    font-size: 15px;
   }
 
   .focus-action {
@@ -1518,7 +1537,8 @@ watch(() => props.revision, load);
     grid-row: 3;
     flex-direction: row;
     align-items: center;
-    padding: 20px 0 26px;
+    padding: 20px 22px 24px;
+    background: var(--surface-2);
     border-top: 1px solid var(--line-1);
     border-left: 0;
   }

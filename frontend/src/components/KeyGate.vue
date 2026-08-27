@@ -23,10 +23,6 @@ async function submit() {
       <span>01</span>
     </header>
 
-    <div class="gate-registration" aria-hidden="true">
-      <i /><i /><i /><i />
-    </div>
-
     <section class="gate-cover" aria-labelledby="gate-title">
       <div class="gate-title">
         <span class="gate-seal"><LockKeyhole :size="18" :stroke-width="1.45" /></span>
@@ -36,7 +32,8 @@ async function submit() {
       </div>
 
       <div class="gate-entry">
-        <span class="entry-index">ACCESS / 01</span>
+        <span class="entry-index">PRIVATE ACCESS / 01</span>
+        <h2>回来，继续。</h2>
         <form @submit.prevent="submit">
           <input class="visually-hidden" type="text" name="username" autocomplete="username" value="axiom" tabindex="-1" aria-hidden="true" />
           <label>
@@ -53,7 +50,7 @@ async function submit() {
     </section>
 
     <footer class="gate-foot">
-      <span>RECORD</span><i /><span>RECALL</span><i /><span>RELATE</span><i /><span>ACT</span>
+      <span>LOCAL FIRST</span><i /><span>PRIVATE CORTEX / 01</span>
     </footer>
   </main>
 </template>
@@ -63,7 +60,7 @@ async function submit() {
   position: relative;
   min-height: 100vh;
   overflow: hidden;
-  padding: 28px clamp(28px, 4vw, 62px) 24px;
+  padding: 24px clamp(24px, 3.5vw, 56px) 20px;
   color: var(--text-2);
   background: var(--surface-1);
 }
@@ -71,22 +68,21 @@ async function submit() {
 .gate::before {
   content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 7.5%;
-  width: 12px;
+  top: 24px;
+  bottom: 20px;
+  left: clamp(24px, 3.5vw, 56px);
+  width: 3px;
   background: var(--focus);
 }
 
 .gate::after {
-  content: 'A';
+  content: '';
   position: absolute;
-  right: -2vw;
-  bottom: -18vh;
-  color: rgba(23, 26, 22, 0.025);
-  font-family: var(--font-display);
-  font-size: 72vh;
-  line-height: 1;
+  top: 18%;
+  right: 35%;
+  bottom: 12%;
+  width: 1px;
+  background: var(--line-1);
   pointer-events: none;
 }
 
@@ -98,7 +94,8 @@ async function submit() {
   align-items: center;
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
+  font-weight: 560;
 }
 
 .gate-head {
@@ -107,58 +104,33 @@ async function submit() {
   border-bottom: 1px solid var(--line-2);
 }
 
-.gate-registration {
-  position: absolute;
-  inset: 90px clamp(28px, 4vw, 62px) 70px;
-  pointer-events: none;
-}
-
-.gate-registration i {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-}
-
-.gate-registration i::before,
-.gate-registration i::after {
-  content: '';
-  position: absolute;
-  background: var(--line-2);
-}
-
-.gate-registration i::before { top: 0; left: 0; width: 24px; height: 1px; }
-.gate-registration i::after { top: 0; left: 0; width: 1px; height: 24px; }
-.gate-registration i:nth-child(1) { top: 0; left: 0; }
-.gate-registration i:nth-child(2) { top: 0; right: 0; transform: rotate(90deg); }
-.gate-registration i:nth-child(3) { right: 0; bottom: 0; transform: rotate(180deg); }
-.gate-registration i:nth-child(4) { bottom: 0; left: 0; transform: rotate(270deg); }
-
 .gate-cover {
   position: relative;
   z-index: 1;
   min-height: calc(100vh - 140px);
   display: grid;
-  grid-template-columns: minmax(300px, 1.05fr) minmax(360px, 0.95fr);
+  grid-template-columns: minmax(420px, 1.35fr) minmax(380px, 0.65fr);
   align-items: center;
 }
 
 .gate-title {
-  min-height: 430px;
+  min-height: 520px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 42px 7vw 42px 10vw;
-  border-right: 1px solid var(--line-2);
+  padding: 64px 8vw 64px 9vw;
 }
 
 .gate-seal {
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 46px;
   display: grid;
   place-items: center;
-  margin-bottom: 52px;
-  color: var(--surface-1);
-  background: var(--focus);
+  margin-bottom: 68px;
+  color: var(--focus-bright);
+  background: var(--focus-dim);
+  border: 1px solid var(--line-warm);
+  border-radius: 50%;
 }
 
 .gate-title p,
@@ -166,34 +138,47 @@ async function submit() {
 .gate-local {
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
+  font-weight: 580;
 }
 
 .gate-title h1 {
   margin-top: 14px;
   color: var(--text-1);
   font-family: var(--font-display);
-  font-size: 76px;
-  font-weight: 400;
-  line-height: 1;
+  font-size: 92px;
+  font-weight: 660;
+  line-height: 0.96;
 }
 
 .gate-title strong {
   margin-top: 18px;
   color: var(--text-3);
   font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 400;
+  font-size: 22px;
+  font-weight: 560;
 }
 
 .gate-entry {
-  width: min(460px, calc(100% - 60px));
-  justify-self: center;
-  padding: 42px 0;
+  width: 100%;
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px clamp(42px, 5vw, 76px);
+  background: var(--surface-2);
+  border-left: 1px solid var(--line-2);
 }
 
 .entry-index {
-  color: var(--cobalt);
+  color: var(--focus-bright);
+}
+
+.gate-entry h2 {
+  margin-top: 20px;
+  color: var(--text-1);
+  font-size: 30px;
+  font-weight: 620;
 }
 
 .gate-entry form {
@@ -201,7 +186,7 @@ async function submit() {
   grid-template-columns: minmax(0, 1fr) 48px;
   align-items: end;
   gap: 16px;
-  margin-top: 48px;
+  margin-top: 62px;
 }
 
 .gate-entry label {
@@ -212,7 +197,8 @@ async function submit() {
 .gate-entry label > span {
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 11px;
+  font-weight: 560;
 }
 
 .visually-hidden {
@@ -229,10 +215,11 @@ async function submit() {
 
 .gate-entry input:not(.visually-hidden) {
   width: 100%;
-  min-height: 48px;
+  min-height: 54px;
   padding: 0 2px;
   color: var(--text-1);
-  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 520;
   border-bottom: 1px solid var(--line-3);
 }
 
@@ -249,12 +236,13 @@ async function submit() {
 }
 
 .gate-entry form button {
-  width: 48px;
-  height: 48px;
+  width: 54px;
+  height: 54px;
   display: grid;
   place-items: center;
-  color: var(--surface-1);
+  color: var(--surface-0);
   background: var(--text-1);
+  border-radius: 50%;
 }
 
 .gate-entry form button:hover:not(:disabled) {
@@ -297,14 +285,14 @@ async function submit() {
   }
 
   .gate::before {
+    top: 18px;
+    bottom: 18px;
     left: 18px;
-    width: 4px;
+    width: 3px;
   }
 
   .gate::after {
-    right: -18vw;
-    bottom: -5vh;
-    font-size: 55vh;
+    display: none;
   }
 
   .gate-cover {
@@ -314,8 +302,8 @@ async function submit() {
   }
 
   .gate-title {
-    min-height: 300px;
-    padding: 48px 26px 34px;
+    min-height: 320px;
+    padding: 52px 26px 36px;
     border-right: 0;
     border-bottom: 1px solid var(--line-2);
   }
@@ -325,24 +313,22 @@ async function submit() {
   }
 
   .gate-title h1 {
-    font-size: 58px;
+    font-size: 64px;
   }
 
   .gate-entry {
-    width: calc(100% - 52px);
+    width: calc(100% - 26px);
+    min-height: 310px;
     justify-self: end;
-    padding: 38px 0 44px;
+    padding: 42px 28px 50px;
+    border-left: 0;
+    border-top: 1px solid var(--line-2);
   }
 
   .gate-entry form {
-    margin-top: 34px;
+    margin-top: 42px;
   }
 
-  .gate-foot span:nth-of-type(2),
-  .gate-foot span:nth-of-type(3),
-  .gate-foot i:nth-of-type(2),
-  .gate-foot i:nth-of-type(3) {
-    display: none;
-  }
+  .gate-foot span:last-child { display: none; }
 }
 </style>

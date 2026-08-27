@@ -391,18 +391,18 @@ onMounted(() => {
 
 <style scoped>
 .automation-view {
+  width: min(1460px, calc(100% - 56px));
   min-height: 100vh;
-  padding: calc(var(--s-7) + var(--s-5)) var(--s-5) var(--s-7);
+  margin: 0 auto;
+  padding: 34px 0 86px;
   color: var(--text-2);
-  background:
-    radial-gradient(circle at 20% 0%, rgba(110, 231, 208, 0.08), transparent 28%),
-    var(--surface-0);
+  background: transparent;
 }
 
 .topbar,
 .control-strip,
 .workspace-grid {
-  width: min(1280px, 100%);
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -411,7 +411,9 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: var(--s-4);
-  margin-bottom: var(--s-5);
+  min-height: 120px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .eyebrow {
@@ -431,8 +433,8 @@ p {
 
 h1 {
   color: var(--text-1);
-  font-size: var(--fs-7);
-  font-weight: 520;
+  font-size: 38px;
+  font-weight: 640;
 }
 
 h2 {
@@ -455,8 +457,8 @@ select {
 
 button {
   border: 1px solid var(--line-2);
-  border-radius: var(--r-1);
-  background: var(--surface-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-2);
   min-height: 32px;
   padding: 0 var(--s-3);
@@ -476,13 +478,13 @@ button:disabled {
 
 .refresh-btn,
 .load-more {
-  background: var(--accent-dim);
-  color: var(--accent-bright);
-  border-color: rgba(110, 231, 208, 0.24);
+  background: transparent;
+  color: var(--text-2);
+  border-color: var(--line-2);
 }
 
 .notice {
-  width: min(1280px, 100%);
+  width: 100%;
   margin: 0 auto var(--s-4);
   display: flex;
   justify-content: space-between;
@@ -506,21 +508,27 @@ button:disabled {
 .control-strip {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(110px, 0.4fr));
-  gap: var(--s-3);
-  margin-bottom: var(--s-4);
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .control-strip label,
 .control-strip article {
-  min-height: 68px;
+  min-height: 96px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: var(--s-2);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-1);
-  padding: var(--s-3) var(--s-4);
+  border: 0;
+  border-right: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+  padding: 18px 26px;
+}
+
+.control-strip > :last-child {
+  border-right: 0;
 }
 
 .control-strip span {
@@ -539,8 +547,8 @@ select {
   min-height: 34px;
   width: 100%;
   border: 1px solid var(--line-2);
-  border-radius: var(--r-1);
-  background: var(--surface-2);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-1);
   padding: 0 var(--s-3);
 }
@@ -548,16 +556,22 @@ select {
 .workspace-grid {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.25fr) minmax(280px, 0.8fr);
-  gap: var(--s-4);
+  gap: 0;
   align-items: start;
+  border-bottom: 1px solid var(--line-2);
 }
 
 .panel {
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: rgba(13, 17, 22, 0.82);
-  box-shadow: var(--shadow-1);
-  padding: var(--s-4);
+  border: 0;
+  border-right: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 32px 30px 42px;
+}
+
+.workspace-grid > .panel:last-child {
+  border-right: 0;
 }
 
 .panel-head {
@@ -584,10 +598,11 @@ select {
 .job-card {
   display: grid;
   gap: var(--s-2);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-2);
-  padding: var(--s-4);
+  border: 0;
+  border-top: 1px solid var(--line-1);
+  border-radius: 0;
+  background: transparent;
+  padding: 18px 0;
 }
 
 .job-card.blocked {
@@ -612,7 +627,7 @@ select {
 .job-meta span,
 .status-tag {
   border: 1px solid var(--line-1);
-  border-radius: var(--r-pill);
+  border-radius: 0;
   color: var(--text-3);
   font-size: var(--fs-1);
   padding: 2px var(--s-2);
@@ -635,14 +650,16 @@ select {
   grid-template-columns: 10px 1fr;
   gap: var(--s-3);
   text-align: left;
-  border-radius: var(--r-2);
+  border: 0;
+  border-top: 1px solid var(--line-1);
+  border-radius: 0;
   padding: var(--s-3);
-  background: var(--surface-2);
+  background: transparent;
 }
 
 .run-row.active {
-  border-color: rgba(110, 231, 208, 0.32);
-  background: rgba(110, 231, 208, 0.08);
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .status-dot {
@@ -774,7 +791,8 @@ pre {
 
 @media (max-width: 980px) {
   .automation-view {
-    padding: calc(var(--s-7) + var(--s-5)) var(--s-4) var(--s-6);
+    width: calc(100% - 32px);
+    padding: 22px 0 calc(var(--app-mobile-nav-height) + 30px);
   }
 
   .control-strip,

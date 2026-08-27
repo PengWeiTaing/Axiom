@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 82;
-  background: rgba(23, 26, 22, 0.17);
+  background: rgba(0, 0, 0, 0.64);
 }
 
 .drawer-panel {
@@ -678,7 +678,7 @@ onBeforeUnmount(() => {
   width: min(620px, 96vw);
   background: var(--surface-1);
   border-left: 1px solid var(--line-2);
-  box-shadow: -24px 0 68px rgba(23, 26, 22, 0.12);
+  box-shadow: -32px 0 96px rgba(0, 0, 0, 0.48);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -720,13 +720,13 @@ onBeforeUnmount(() => {
   color: var(--text-1);
   font-family: var(--font-display);
   font-size: 25px;
-  font-weight: 400;
+  font-weight: 620;
 }
 
 .type-chip {
   width: max-content;
   color: var(--chip-accent, var(--text-5));
-  font-size: 9px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0;
   padding-left: 8px;
@@ -876,7 +876,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   color: var(--text-4);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   cursor: pointer;
   list-style: none;
 }
@@ -979,7 +979,7 @@ onBeforeUnmount(() => {
 }
 
 .archive-btn:hover:not(:disabled) {
-  background: rgba(23, 26, 22, 0.04);
+  background: var(--surface-2);
   color: var(--text-1);
 }
 
