@@ -1220,9 +1220,11 @@ function updateProjectedLabels() {
   const labels: ProjectedLabel[] = []
   for (const candidate of candidates) {
     const width = Math.min(210, Math.max(44, Array.from(candidate.label).length * 8.6 + 14))
+    const labelX = Math.min(rect.width - width / 2 - 10, Math.max(width / 2 + 10, candidate.x))
+    const displayCandidate = labelX === candidate.x ? candidate : { ...candidate, x: labelX }
     const box = {
-      left: candidate.x - width / 2,
-      right: candidate.x + width / 2,
+      left: labelX - width / 2,
+      right: labelX + width / 2,
       top: candidate.y - 2,
       bottom: candidate.y + 16,
     }
@@ -1235,7 +1237,7 @@ function updateProjectedLabels() {
     ))
     if (collides && candidate.priority < 95) continue
     placed.push(box)
-    labels.push(candidate)
+    labels.push(displayCandidate)
   }
   projectedLabels.value = labels
 }
