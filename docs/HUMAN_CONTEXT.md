@@ -16,7 +16,7 @@ Axiom 已有可运行的 VPS 后端与跨端基线，当前产品主线已经从
 - `/app` 的 Vue 主前端只有“此刻 / 资料库 / Atlas”三个一级目的地，记录是全局动作；旧 PWA 位于 `/app/legacy`，只承担兼容与迁移参考。
 - 主前端采用原生暗色的“夜间认知场”：此刻是单焦点行动页，资料库是输入即查的连续索引，Atlas 是同一暗场中按需展开的关系空间。日常路径默认低摩擦，次级对象只从索引或当前上下文出现。完整规则见 `docs/FRONTEND_ART_DIRECTION.md`，后续页面不能退回卡片墙、浅色反转或科技仪表盘。
 - “此刻”已经能从真实任务事实中选出一个主要行动，解释为什么，并在完成后自动重排；确认目标有完成定义、目标日期、上层关系、复盘节奏和生命周期。只有推进中的承诺参与判断，暂停或结束会保留历史并让关联行动退出“此刻”。
-- `docs/AXIOM_DISCOVERY_CORTEX_RESEARCH_V2.md` 定义下一阶段中枢方向：观察、选题、规律库、跨域结构映射、竞争假说、主动验证、预测台账和机会论文共同构成发现循环；治理仍重要，但只负责保护大胆探索与真实生活之间的边界。
+- `docs/AXIOM_DISCOVERY_CORTEX_RESEARCH_V2.md` 定义下一阶段中枢方向；`docs/discovery_cortex/` 已把观察、问题、规律、假说、机会、日常环境、Foundry、Atlas 与白板分别展开。Atlas 是人的长期认识地形，不是中枢数据库界面；Axiom 白板是按问题展开的共同发现表面，不是第四个一级工作台。火山杯 Learning Board 继续独立交付，只作为能力参考。
 - “本周承诺”嵌在“此刻”中，最多引用五个现有行动，不复制任务；用户明确选择后才影响判断，完成项保留在本周进度中，行动自身期限仍然优先。
 - 过大的行动可以在详情中拆成最多五个步骤；步骤继承原目标、生活线和时间边界并接续进入“此刻”，父行动与本周承诺显示真实步骤进度。拆解只有一层，不新增任务树工作台。DeepSeek V4 Pro 可以给出可编辑、可放弃的临时候选，但未经确认绝不创建步骤，确认后保留来源。
 - “本周承诺”内含轻量周复盘：系统只汇总承诺、步骤和结果，用户判断步骤粒度是否合适。这个判断会影响下一次 AI 候选，但不会被固化成不可更正的用户画像。
@@ -74,6 +74,8 @@ flowchart LR
    需要掌握：当前短期推进顺序和架构决策方式。
 17. `docs/AXIOM_DISCOVERY_CORTEX_RESEARCH_V2.md`
    需要掌握：为什么 Axiom 的自主性必须从“执行与维护”升级为自由选题、规律发现、原创假说、主动验证和机会探索，以及日常环境与 Foundry 各自怎样承载这种能力。
+18. `docs/discovery_cortex/00_RESEARCH_MAP.md`
+   需要掌握：各认知器官怎样形成完整发现循环；重点阅读 `07_ATLAS_DISCOVERY_LANDSCAPE.md`、`08_WHITEBOARD_CO_DISCOVERY_ENVIRONMENT.md` 与 `09_ATLAS_WHITEBOARD_CONTINUUM.md`，并严格区分研究目标、当前 Atlas v1 与独立竞赛 Learning Board。
 
 ## 可以先略读的位置
 
@@ -89,15 +91,16 @@ flowchart LR
 1. `README.md`
 2. `docs/PRODUCT_MODEL.md`
 3. `docs/FRONTEND_ART_DIRECTION.md`
-4. `docs/AI_CONTEXT.md`
-5. `frontend/src/`
-6. `core/context_engine.py`
-7. `core/receiver.py` 与 `core/routes/`
-8. `scripts/smoke_test_context.py`
-9. `scripts/smoke_test_receiver.py`
-10. `scripts/check_consistency.py`
-11. `scripts/backup_axiom.py`
-12. `deep-research-report.md`
+4. `docs/discovery_cortex/00_RESEARCH_MAP.md`
+5. `docs/AI_CONTEXT.md`
+6. `frontend/src/`
+7. `core/context_engine.py`
+8. `core/receiver.py` 与 `core/routes/`
+9. `scripts/smoke_test_context.py`
+10. `scripts/smoke_test_receiver.py`
+11. `scripts/check_consistency.py`
+12. `scripts/backup_axiom.py`
+13. `deep-research-report.md`
 
 ## 当前真正要盯住的问题
 

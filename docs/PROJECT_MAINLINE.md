@@ -1,10 +1,12 @@
 # Axiom 项目主线
 
-更新时间：2026-08-21
+更新时间：2026-08-31
 
 这份文档是当前开发前置事实源。它不替代详细设计文档，只回答一个问题：新功能应该接到哪条主线，哪些东西只是兼容或历史保留。
 
 产品形态与内在逻辑以 `docs/PRODUCT_MODEL.md` 为准。
+
+下一代发现中枢研究入口是 `docs/discovery_cortex/00_RESEARCH_MAP.md`。当前 `AtlasView.vue` 与 `/api/atlas/*` 仍是可运行 v1 基线；下一代 Atlas 和 Axiom 白板分别以 `07_ATLAS_DISCOVERY_LANDSCAPE.md`、`08_WHITEBOARD_CO_DISCOVERY_ENVIRONMENT.md` 与 `09_ATLAS_WHITEBOARD_CONTINUUM.md` 为产品目标，尚不能被描述为已实现。
 
 ## 当前主入口
 
@@ -51,6 +53,7 @@ Vue 一级目的地：
 - Board 后端 API 在 `/api/learning/*`，核心代码在 `core/boards/` 与 `core/routes/boards.py`。
 - Board 构建产物输出到 `core/static/board/`，独立于主 Vue 的 `core/static/v2/`，避免 Vue 构建清空 Board 产物；产物暂时入库，保证 VPS 不依赖 Node.js。
 - Learning Board 属于火山杯竞赛项目，不进入 Axiom 一级导航，新 Axiom 功能不得依赖其运行时。
+- Axiom 白板是另一项未来产品能力：它从当前问题按需展开，允许人与中枢共同重构模型，但不成为一级工作台。可以评估复用 Board 的通用画布能力，不能直接继承其导航、对象本体、数据权限和视觉。
 - MemoryGuard 属于鸿蒙杯独立项目，Axiom 只吸收治理原则，不建立代码或部署依赖。
 
 ## Atlas / Cosmos 主线
