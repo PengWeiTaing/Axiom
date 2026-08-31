@@ -1,10 +1,10 @@
 # Axiom Atlas 人类认知界面研究底稿 v2
 
-> 状态：研究基线，不是实现规格。
+> 状态：历史研究底稿，不是当前产品事实源。
 >
 > 本文有意不参考当前 Atlas 页面、组件和数据结构。它从认知科学、人机协作、信息可视化、个人信息学、记忆研究与艺术案例出发，定义后续产品设计不可轻易违背的原则。
 >
-> 后续专题 `docs/discovery_cortex/07_ATLAS_DISCOVERY_LANDSCAPE.md` 已在“发现中枢”语境下继续细化 3D 定向、任务适配 2D、证据审理、未知前沿、视觉认识论及 Atlas-白板关系。两者冲突时，以专题研究和 `docs/PRODUCT_MODEL.md` 的较新决策为准。
+> 后续专题 `docs/discovery_cortex/07_ATLAS_DISCOVERY_LANDSCAPE.md`、`08_WHITEBOARD_CO_DISCOVERY_ENVIRONMENT.md` 与 `09_ATLAS_WHITEBOARD_CONTINUUM.md` 已取代本文的产品结论。尤其是本文关于用户移动、摆放或共同建模的设想只保留为历史研究材料；当前白板由 Axiom 生成认知展演，人负责追问与判断。任何冲突都以后续专题和 `docs/PRODUCT_MODEL.md` 为准。
 
 ## 0. 研究问题
 

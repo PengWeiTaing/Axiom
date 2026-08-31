@@ -1,4 +1,4 @@
-"""Guard the Night Field frontend language against visual regression."""
+"""Guard the shipped frontend and its next-generation art-direction source."""
 
 from __future__ import annotations
 
@@ -160,10 +160,11 @@ def main() -> int:
             "the map owns the viewport; controls read like museum captions",
         ),
         ROOT / "docs" / "FRONTEND_ART_DIRECTION.md": (
-            "# Axiom 前端艺术方向：夜间认知场",
-            "## 低摩擦原则",
-            "## 核心产品空间",
-            "## 必须避免",
+            "# Axiom 全前端美学研究：夜行长卷",
+            "## 2. 美学首先是一种认识论治理",
+            "## 6. 全局空间架构",
+            "## 15. 失败标准",
+            "## 16. 研发顺序",
         ),
     }
 

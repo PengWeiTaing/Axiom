@@ -53,7 +53,7 @@ Vue 一级目的地：
 - Board 后端 API 在 `/api/learning/*`，核心代码在 `core/boards/` 与 `core/routes/boards.py`。
 - Board 构建产物输出到 `core/static/board/`，独立于主 Vue 的 `core/static/v2/`，避免 Vue 构建清空 Board 产物；产物暂时入库，保证 VPS 不依赖 Node.js。
 - Learning Board 属于火山杯竞赛项目，不进入 Axiom 一级导航，新 Axiom 功能不得依赖其运行时。
-- Axiom 白板是另一项未来产品能力：它从当前问题按需展开，允许人与中枢共同重构模型，但不成为一级工作台。可以评估复用 Board 的通用画布能力，不能直接继承其导航、对象本体、数据权限和视觉。
+- Axiom 白板是另一项未来产品能力：它从当前问题按需展开，由中枢主动生成认知展演，人通过追问、质疑、换尺度和判断参与，不承担手工布局与模型维护，也不成为一级工作台。可以评估复用 Board 的媒体承载、缩放和持久化能力，不能直接继承其用户创作前提、导航、对象本体、数据权限和视觉。
 - MemoryGuard 属于鸿蒙杯独立项目，Axiom 只吸收治理原则，不建立代码或部署依赖。
 
 ## Atlas / Cosmos 主线
