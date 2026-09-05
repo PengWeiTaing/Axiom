@@ -278,22 +278,36 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
 }
 
 .spatial-overview { position: relative; height: calc(100svh - 76px); min-height: 660px; overflow: hidden; isolation: isolate; }
-.spatial-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.spatial-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; z-index: 2; }
 .spatial-canvas:active { cursor: grabbing; }
 .spatial-heading { position: absolute; top: 29px; left: 38px; right: 38px; display: flex; align-items: center; justify-content: space-between; z-index: 5; pointer-events: none; }
 .spatial-heading h1 { margin: 0; font-size: 32px; font-weight: 550; }
 .spatial-heading button { pointer-events: auto; }
-.spatial-leaders { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.spatial-leaders path { stroke: #99a69c; stroke-width: .6; opacity: .2; fill: none; }
-.spatial-domain { position: absolute; top: 0; left: 0; text-align: left; padding: 8px 2px; z-index: 4; opacity: 0; }
+.spatial-fields, .spatial-connections { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.spatial-fields { z-index: 0; }
+.spatial-connections { z-index: 1; }
+.field-shape { fill: var(--field-tone); fill-opacity: .065; stroke: var(--field-tone); stroke-opacity: .32; stroke-width: .7; stroke-linejoin: round; }
+.field-systems .field-shape { stroke-dasharray: 9 5; fill-opacity: .045; }
+.field-attention .field-shape { stroke-dasharray: 2 4; fill-opacity: .09; }
+.field-time .field-shape { stroke-dasharray: 14 3 2 3; fill-opacity: .05; }
+.spatial-edge path { fill: none; stroke-linecap: round; }
+.edge-active .edge-ink { animation: spatial-connection-emphasis 650ms ease-in-out 2 alternate; }
+@keyframes spatial-connection-emphasis { from { stroke-opacity: .5; } to { stroke-opacity: 1; } }
+.spatial-node-stem { fill: none; stroke-width: .65; }
+.spatial-domain { position: absolute; top: 0; left: 0; text-align: left; padding: 4px 2px; z-index: 4; opacity: 0; }
 .is-ready .spatial-domain { opacity: 1; }
-.domain-name { display: block; font-size: 18px; font-weight: 520; color: var(--tone); line-height: 1.7; background: #171919; box-shadow: -5px 0 #171919, 5px 0 #171919; }
-.domain-count { display: flex; align-items: center; gap: 13px; margin-top: 4px; color: #9ea6a0; font-size: 11px; line-height: 1.6; background: #171919; width: fit-content; }
+.domain-name { display: block; font-size: 18px; font-weight: 550; color: var(--tone); line-height: 1.6; background: #171919; box-shadow: -5px 0 #171919, 5px 0 #171919; }
+.domain-count { display: flex; align-items: center; gap: 13px; margin-top: 1px; color: #9ea6a0; font-size: 11px; line-height: 1.6; background: #171919; width: fit-content; }
 .domain-count svg { opacity: 0; transition: opacity 150ms; }
 .spatial-domain:hover .domain-count svg, .spatial-domain:focus-visible .domain-count svg { opacity: 1; }
 .spatial-domain:hover .domain-name { color: #f0f1e8; }
-.spatial-hit { position: absolute; left: 0; top: 0; width: 26px; height: 26px; padding: 0; border-radius: 50%; }
+.spatial-hit { position: absolute; left: 0; top: 0; padding: 3px 4px; min-height: 26px; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 14px; font-weight: 480; line-height: 20px; color: #e0e5df; text-shadow: 0 0 3px #171919, 0 0 6px #171919, 1px 1px #171919; z-index: 3; opacity: var(--depth-opacity, 1); transition: opacity 160ms, color 160ms; }
+.spatial-hit svg { flex: none; color: var(--node-tone); }
+.spatial-hit[data-depth="front"] { font-weight: 550; }
+.spatial-hit[data-related="false"] { opacity: .3; }
+.spatial-hit.is-active { color: #fff; opacity: 1; }
 .spatial-hit:focus-visible { outline: 1px solid #becbc0; outline-offset: 2px; }
+.spatial-hit, .spatial-domain { visibility: hidden; }
 .spatial-controls { position: absolute; right: 34px; bottom: 30px; display: flex; gap: 9px; z-index: 5; }
 .spatial-footer { position: absolute; bottom: 32px; left: 38px; right: 235px; display: flex; gap: 20px; align-items: center; min-height: 31px; pointer-events: none; color: #aab3ab; font-size: 12px; }
 .spatial-footer-separator { color: #58635a; margin: 0 15px; }
@@ -301,7 +315,7 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
 .spatial-caption { font-size: 15px; color: #d6ddcf; }
 .spatial-fallback { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; font-size: 16px; }
 .spatial-fallback button { justify-self: center; }
-.spatial-failed canvas { display: none; }
+.spatial-failed .spatial-canvas { display: none !important; pointer-events: none; }
 @media (max-width: 649px) {
   .spatial-overview { height: calc(100svh - 66px); min-height: 620px; }
   .spatial-heading { top: 23px; left: 23px; right: 23px; }
@@ -309,6 +323,7 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
   .spatial-heading .quiet-command { font-size: 12px; }
   .domain-name { font-size: 15px; }
   .domain-count { font-size: 10px; }
+  .spatial-hit { font-size: 12px; gap: 4px; padding: 3px; }
   .spatial-controls { right: 19px; bottom: 28px; gap: 3px; }
   .spatial-footer { left: 23px; right: 170px; bottom: 34px; font-size: 11px; }
   .spatial-footer-separator { margin: 0 7px; }

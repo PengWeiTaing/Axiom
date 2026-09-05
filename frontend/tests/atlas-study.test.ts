@@ -3,6 +3,53 @@ import assert from 'node:assert/strict';
 import { averageCycleDays, neighborhood, parseStudyLocation, searchMaterials } from '../src/atlas-study/model.ts';
 import { materials, regions, relations } from '../src/atlas-study/data.ts';
 import { buildSpatialLayout } from '../src/atlas-study/spatial-layout.ts';
+import { boxesOverlap, depthAppearance, findRearCrossings, placeSpatialLabels, spatialKinds, spatialNames, spatialTones } from '../src/atlas-study/spatial-visuals.ts';
+
+test('every spatial dot has a short readable identity without losing its material kind', () => {
+  assert.equal(new Set(Object.values(spatialNames)).size, materials.length);
+  for (const item of materials) {
+    assert.ok(spatialNames[item.id] && spatialNames[item.id]!.length <= 12);
+    assert.ok(spatialKinds[item.kind]);
+    assert.ok(spatialTones[item.region]);
+  }
+  assert.equal(new Set(Object.values(spatialTones)).size, regions.length);
+});
+
+test('depth cues change monotonically without making background identities unreadable', () => {
+  const near = depthAppearance(0), middle = depthAppearance(0.5), far = depthAppearance(1);
+  assert.ok(near.pointSize > middle.pointSize && middle.pointSize > far.pointSize);
+  assert.ok(near.edgeOpacity > middle.edgeOpacity && middle.edgeOpacity > far.edgeOpacity);
+  assert.ok(near.edgeWidth > far.edgeWidth);
+  assert.equal(near.ring, false); assert.equal(far.ring, true);
+  assert.ok(far.labelOpacity >= 0.75);
+  assert.deepEqual(depthAppearance(-3), near); assert.deepEqual(depthAppearance(3), far);
+});
+
+test('crossings reveal actual perspective depth, not endpoint-average sorting', () => {
+  const a = { id: 'a', from: { x: 0, y: 5, distance: 2 }, to: { x: 10, y: 5, distance: 10 } };
+  const b = { id: 'b', from: { x: 5, y: 0, distance: 4 }, to: { x: 5, y: 10, distance: 4 } };
+  const gaps = findRearCrossings([a, b]);
+  assert.deepEqual(gaps.get('a'), []);
+  assert.deepEqual(gaps.get('b'), [{ x: 5, y: 5 }]);
+  assert.deepEqual(findRearCrossings([b, a]), new Map([['b', [{ x: 5, y: 5 }]], ['a', []]]));
+  const parallel = { ...a, id: 'parallel', from: { ...a.from, y: 6 }, to: { ...a.to, y: 6 } };
+  assert.ok([...findRearCrossings([a, parallel]).values()].every(points => !points.length));
+  const sharedEndpoint = { ...b, from: { ...b.from, x: 0 }, to: { ...b.to, x: 0 } };
+  assert.ok([...findRearCrossings([a, sharedEndpoint]).values()].every(points => !points.length));
+});
+
+test('dense screen labels stay inside the frame and do not cover each other or dots', () => {
+  const requests = Array.from({ length: 20 }, (_, i) => ({ id: String(i), x: 155 + (i % 3) * 12, y: 340 + Math.floor(i / 3) * 16, w: 96, h: 26, priority: i % 5 }));
+  const bounds = { x: 18, y: 94, w: 284, h: 584 };
+  const layout = placeSpatialLabels(requests, bounds, requests);
+  assert.equal(layout.size, requests.length);
+  assert.deepEqual(layout, placeSpatialLabels([...requests].reverse(), bounds, requests));
+  for (const [id, box] of layout) {
+    assert.ok(box.x >= bounds.x && box.y >= bounds.y && box.x + box.w <= bounds.x + bounds.w && box.y + box.h <= bounds.y + bounds.h);
+    assert.ok([...layout].every(([other, value]) => id === other || !boxesOverlap(box, value)));
+    assert.ok(requests.every(point => !boxesOverlap(box, { x: point.x - 8, y: point.y - 8, w: 16, h: 16 })));
+  }
+});
 
 test('curated sample has unique identities, valid relations and traceable research', () => {
   const ids = new Set(materials.map(item => item.id));

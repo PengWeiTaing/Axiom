@@ -36,7 +36,7 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
   };
   const results = [];
   try {
-    for (const width of [1440, 390, 320]) {
+    for (const width of [1440, 768, 390, 320]) {
       await page.setViewportSize({ width, height: width > 650 ? 960 : 844 });
       await page.goto(url);
       await page.locator('.spatial-overview.is-ready').waitFor();
@@ -45,6 +45,39 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
       check(await page.locator('.spatial-hit').count() === 20, 'Overview must not invent extra nodes');
       await page.getByRole('button', { name: '恢复三维全貌' }).click();
       await settled();
+      const staticReading = await page.locator('.spatial-overview').evaluate(element => {
+        const labels = [...element.querySelectorAll('.spatial-hit, .spatial-domain')];
+        const boxes = labels.map(el => el.getBoundingClientRect());
+        const dots = [...element.querySelectorAll('.spatial-hit')];
+        const fieldStyles = [...element.querySelectorAll('.field-shape')].map(el => {
+          const css = getComputedStyle(el); return css.fill + css.strokeDasharray;
+        });
+        const alphas = [...element.querySelectorAll('.edge-ink')].map(el => Number(el.getAttribute('opacity')));
+        return {
+          visible: labels.every(el => getComputedStyle(el).visibility === 'visible'),
+          identities: dots.every(el => el.textContent.trim().length > 1 && el.querySelector('svg') && el.getAttribute('title').includes('：')),
+          overlap: boxes.some((a, i) => boxes.some((b, j) => i !== j && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)),
+          outside: boxes.some(box => box.left < 0 || box.right > innerWidth || box.top < 140 || box.bottom > innerHeight - 80),
+          depthTiers: new Set(dots.map(el => el.dataset.depth)).size,
+          fields: new Set(fieldStyles).size,
+          contours: [...element.querySelectorAll('.field-shape')].every(el => el.getAttribute('d')?.endsWith('Z')),
+          depthRange: Math.max(...alphas) - Math.min(...alphas),
+          runningAnimations: element.getAnimations({ subtree: true }).filter(animation => animation.playState === 'running').length,
+        };
+      });
+      check(staticReading.visible && staticReading.identities, `Unnamed or hidden node at ${width}`);
+      check(!staticReading.overlap && !staticReading.outside, `Static identity collision at ${width}`);
+      check(staticReading.depthTiers === 3 && staticReading.depthRange > 0.15, `Missing static depth cues at ${width}`);
+      check(staticReading.fields === 4 && staticReading.contours, `Undifferentiated regions at ${width}`);
+      check(staticReading.runningAnimations === 0, 'Default overview must not depend on continuous motion');
+      if (width === 1440) {
+        await page.locator('[data-spatial-node="unfinished"]').hover();
+        await settled();
+        const pulsing = await page.locator('.edge-active .edge-ink').evaluateAll(elements => elements.filter(el => el.getAnimations().some(animation => animation.playState === 'running')).length);
+        check(pulsing === 6, 'Only the six actual focus connections should pulse');
+        await page.waitForFunction(() => [...document.querySelectorAll('.edge-ink')].every(el => !el.getAnimations().some(animation => animation.playState === 'running')), null, { polling: 50, timeout: 3000 });
+        await page.mouse.move(10, 10); await settled();
+      }
       const before = await pixels();
       check(before.count > 300 && before.right - before.left > width * 0.35, `Blank or undersized 3D scene at ${width}`);
       check(before.left > 2 && before.right < width - 2 && before.top > 75 && before.bottom < before.height - 70, `Clipped 3D scene at ${width}`);
@@ -59,28 +92,42 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
         await settled();
         check((await pixels()).signature !== after.signature, 'Pointer drag did not orbit the 3D scene');
       }
-      const layout = await page.locator('.spatial-domain').evaluateAll(elements => {
+      const layout = await page.locator('.spatial-domain, .spatial-hit').evaluateAll(elements => {
         const boxes = elements.map(el => el.getBoundingClientRect());
-        return { overflow: document.documentElement.scrollWidth > innerWidth, overlap: boxes.some((a, i) => boxes.some((b, j) => i !== j && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)) };
+        return { overflow: document.documentElement.scrollWidth > innerWidth, hidden: elements.some(el => getComputedStyle(el).visibility !== 'visible'), overlap: boxes.some((a, i) => boxes.some((b, j) => i !== j && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)) };
       });
-      check(!layout.overflow && !layout.overlap, `Overview label collision at ${width}`);
+      check(!layout.overflow && !layout.overlap && !layout.hidden, `Overview label collision at ${width}`);
       const point = page.locator('[data-spatial-node="little"]');
-      const position = await point.getAttribute('style');
+      const getPosition = () => point.evaluate(el => {
+        const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+        return { x: matrix.m41, y: matrix.m42, depth: Number(el.style.getPropertyValue('--depth-opacity')) };
+      });
+      const position = await getPosition();
       await page.getByRole('button', { name: '展开复杂性的秩序' }).click();
       check(await page.getByLabel('所在领域').inputValue() === 'systems', 'Domain did not open matching 2D scope');
       await page.getByRole('button', { name: '回到三维全貌' }).click();
       await settled();
-      check(await point.getAttribute('style') === position, '3D orientation changed after returning');
+      const returned = await getPosition();
+      check(Math.hypot(returned.x - position.x, returned.y - position.y) < 0.5 && Math.abs(returned.depth - position.depth) < 0.0001, '3D orientation changed after returning');
       await page.getByRole('button', { name: '恢复三维全貌' }).click();
       await settled();
       await point.click();
       check((await page.locator('.material-detail h2').textContent()).includes('在途、产出与时间'), 'Point did not open the same material in 2D');
-      results.push({ width, visiblePixels: before.count, bounds: [before.left, before.top, before.right, before.bottom], rotated: true });
+      results.push({ width, visiblePixels: before.count, bounds: [before.left, before.top, before.right, before.bottom], staticReading, rotated: true });
     }
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(url);
     await page.locator('.spatial-overview.is-ready').waitFor();
     await settled();
+    await page.locator('[data-spatial-node="unfinished"]').hover();
+    await settled();
+    const focused = await page.locator('.spatial-overview').evaluate(el => ({
+      activeEdges: el.querySelectorAll('.edge-active').length,
+      unrelated: el.querySelectorAll('.spatial-hit[data-related="false"]').length,
+      animations: el.getAnimations({ subtree: true }).filter(animation => animation.playState === 'running').length,
+    }));
+    check(focused.activeEdges === 6 && focused.unrelated === 13, 'Focus must only emphasize the actual local neighborhood');
+    check(focused.animations === 0, 'Reduced motion must also disable local edge pulses');
     await page.getByRole('button', { name: '二维阅读', exact: true }).click();
     await settled();
     const frameCount = await page.evaluate(() => window.__atlasQaFrames);
@@ -94,7 +141,7 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
     await page.locator('.spatial-canvas').dispatchEvent('webglcontextlost', { cancelable: true });
     await page.getByRole('button', { name: '进入二维阅读' }).click();
     check(await page.locator('.atlas-overview').isVisible(), 'GPU failure did not retain the reading path');
-    return { passed: true, results, checks: ['canvas-only pixels', 'rotation', 'framing', 'labels', 'domain and node identity', 'return orientation', 'reduced motion and hidden idle', 'GPU fallback'] };
+    return { passed: true, results, checks: ['canvas-only pixels', 'static node identity and depth', 'four region silhouettes', 'rotation and framing', 'all label collisions', 'domain and node identity', 'return orientation', 'bounded local pulse', 'reduced motion and hidden idle', 'GPU fallback'] };
   } finally {
     page.off('pageerror', onError); page.off('console', onConsole);
     await page.emulateMedia({ reducedMotion: null });
