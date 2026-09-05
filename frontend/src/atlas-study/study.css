@@ -283,31 +283,30 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
 .spatial-heading { position: absolute; top: 29px; left: 38px; right: 38px; display: flex; align-items: center; justify-content: space-between; z-index: 5; pointer-events: none; }
 .spatial-heading h1 { margin: 0; font-size: 32px; font-weight: 550; }
 .spatial-heading button { pointer-events: auto; }
-.spatial-fields, .spatial-connections { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.spatial-fields { z-index: 0; }
-.spatial-connections { z-index: 1; }
-.field-shape { fill: var(--field-tone); fill-opacity: .065; stroke: var(--field-tone); stroke-opacity: .32; stroke-width: .7; stroke-linejoin: round; }
-.field-systems .field-shape { stroke-dasharray: 9 5; fill-opacity: .045; }
-.field-attention .field-shape { stroke-dasharray: 2 4; fill-opacity: .09; }
-.field-time .field-shape { stroke-dasharray: 14 3 2 3; fill-opacity: .05; }
+.spatial-connections { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 .spatial-edge path { fill: none; stroke-linecap: round; }
 .edge-active .edge-ink { animation: spatial-connection-emphasis 650ms ease-in-out 2 alternate; }
 @keyframes spatial-connection-emphasis { from { stroke-opacity: .5; } to { stroke-opacity: 1; } }
 .spatial-node-stem { fill: none; stroke-width: .65; }
 .spatial-domain { position: absolute; top: 0; left: 0; text-align: left; padding: 4px 2px; z-index: 4; opacity: 0; }
-.is-ready .spatial-domain { opacity: 1; }
-.domain-name { display: block; font-size: 18px; font-weight: 550; color: var(--tone); line-height: 1.6; background: #171919; box-shadow: -5px 0 #171919, 5px 0 #171919; }
+.is-ready .spatial-domain { opacity: var(--placement-opacity, 1); }
+.domain-name { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 550; color: var(--tone); line-height: 1.6; }
 .domain-count { display: flex; align-items: center; gap: 13px; margin-top: 1px; color: #9ea6a0; font-size: 11px; line-height: 1.6; background: #171919; width: fit-content; }
 .domain-count svg { opacity: 0; transition: opacity 150ms; }
 .spatial-domain:hover .domain-count svg, .spatial-domain:focus-visible .domain-count svg { opacity: 1; }
 .spatial-domain:hover .domain-name { color: #f0f1e8; }
-.spatial-hit { position: absolute; left: 0; top: 0; padding: 3px 4px; min-height: 26px; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 14px; font-weight: 480; line-height: 20px; color: #e0e5df; text-shadow: 0 0 3px #171919, 0 0 6px #171919, 1px 1px #171919; z-index: 3; opacity: var(--depth-opacity, 1); transition: opacity 160ms, color 160ms; }
+.spatial-hit { position: absolute; left: 0; top: 0; padding: 3px 4px; min-height: 26px; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 14px; font-weight: 500; line-height: 20px; color: #e0e5df; text-shadow: 0 0 3px #171919, 0 0 6px #171919, 1px 1px #171919; z-index: 3; opacity: calc(var(--depth-opacity, 1) * var(--placement-opacity, 1)); transition: opacity 160ms, color 160ms; }
 .spatial-hit svg { flex: none; color: var(--node-tone); }
-.spatial-hit[data-depth="front"] { font-weight: 550; }
-.spatial-hit[data-related="false"] { opacity: .3; }
-.spatial-hit.is-active { color: #fff; opacity: 1; }
+.region-mark { display: inline-flex; width: 5px; height: 14px; align-items: center; justify-content: center; flex: none; color: var(--node-tone, var(--tone)); }
+.region-mark::before { content: ''; height: 10px; border-left: 2px solid currentColor; }
+.region-mark[data-pattern="double"]::before { border-left: 3px double currentColor; }
+.region-mark[data-pattern="dash"]::before { border-left-style: dashed; }
+.region-mark[data-pattern="dots"]::before { border-left-style: dotted; }
+.spatial-hit[data-related="false"] { opacity: calc(.3 * var(--placement-opacity, 1)); }
+.spatial-hit.is-active { color: #fff; opacity: var(--placement-opacity, 1); }
 .spatial-hit:focus-visible { outline: 1px solid #becbc0; outline-offset: 2px; }
 .spatial-hit, .spatial-domain { visibility: hidden; }
+.spatial-overview.is-moving .spatial-hit, .spatial-overview.is-moving .spatial-domain { pointer-events: none; transition: none; }
 .spatial-controls { position: absolute; right: 34px; bottom: 30px; display: flex; gap: 9px; z-index: 5; }
 .spatial-footer { position: absolute; bottom: 32px; left: 38px; right: 235px; display: flex; gap: 20px; align-items: center; min-height: 31px; pointer-events: none; color: #aab3ab; font-size: 12px; }
 .spatial-footer-separator { color: #58635a; margin: 0 15px; }

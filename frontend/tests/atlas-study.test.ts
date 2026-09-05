@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { averageCycleDays, neighborhood, parseStudyLocation, searchMaterials } from '../src/atlas-study/model.ts';
 import { materials, regions, relations } from '../src/atlas-study/data.ts';
 import { buildSpatialLayout } from '../src/atlas-study/spatial-layout.ts';
-import { boxesOverlap, depthAppearance, findRearCrossings, placeSpatialLabels, spatialKinds, spatialNames, spatialTones } from '../src/atlas-study/spatial-visuals.ts';
+import { boxesOverlap, canInterpolateLabels, depthAppearance, findRearCrossings, placeSpatialLabels, spatialKinds, spatialNames, spatialRegionPatterns, spatialTones } from '../src/atlas-study/spatial-visuals.ts';
 
 test('every spatial dot has a short readable identity without losing its material kind', () => {
   assert.equal(new Set(Object.values(spatialNames)).size, materials.length);
@@ -13,6 +13,29 @@ test('every spatial dot has a short readable identity without losing its materia
     assert.ok(spatialTones[item.region]);
   }
   assert.equal(new Set(Object.values(spatialTones)).size, regions.length);
+  assert.equal(new Set(Object.values(spatialRegionPatterns)).size, regions.length);
+});
+
+test('label history absorbs tiny projection noise without side switching', () => {
+  const requests = Array.from({ length: 20 }, (_, i) => ({ id: String(i), x: 155 + (i % 3) * 12, y: 340 + Math.floor(i / 3) * 16, w: 96, h: 26, priority: i % 5 }));
+  const bounds = { x: 18, y: 94, w: 284, h: 584 };
+  const original = placeSpatialLabels(requests, bounds, requests);
+  const stored = JSON.stringify([...original]);
+  for (const epsilon of [1e-7, -1e-7, 0.2, -0.2]) {
+    const perturbed = requests.map(item => ({ ...item, x: item.x + epsilon, y: item.y - epsilon }));
+    const result = placeSpatialLabels(perturbed, bounds, perturbed, original);
+    for (const [id, box] of original) assert.deepEqual(result.get(id), box);
+  }
+  assert.equal(JSON.stringify([...original]), stored, 'Previous frame must not be mutated');
+});
+
+test('label transitions reject paths crossing through another identity', () => {
+  const from = new Map([['a', { x: 10, y: 10, w: 80, h: 26 }], ['b', { x: 120, y: 10, w: 80, h: 26 }]]);
+  const swapped = new Map([['a', from.get('b')!], ['b', from.get('a')!]]);
+  assert.equal(canInterpolateLabels(from, swapped), false);
+  const translated = new Map([...from].map(([id, box]) => [id, { ...box, x: box.x + 20, y: box.y + 10 }]));
+  assert.equal(canInterpolateLabels(from, translated), true);
+  assert.equal(canInterpolateLabels(from, from), true);
 });
 
 test('depth cues change monotonically without making background identities unreadable', () => {

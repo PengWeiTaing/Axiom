@@ -3,16 +3,17 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ArrowUpRight, BookOpen, CircleHelp, FileText, Image, Lightbulb, LocateFixed, Map as MapIcon, Minus, Plus, RotateCw } from '@lucide/vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { polygonHull } from 'd3-polygon';
 import { materials, regions, relations } from './data';
 import type { RegionId } from './model';
 import { buildSpatialLayout } from './spatial-layout';
-import { depthAppearance, findRearCrossings, placeSpatialLabels, spatialKinds, spatialNames, spatialTones } from './spatial-visuals';
+import { canInterpolateLabels, depthAppearance, findRearCrossings, placeSpatialLabels, spatialKinds, spatialNames, spatialRegionPatterns, spatialTones } from './spatial-visuals';
+import type { LabelBox } from './spatial-visuals';
 
 const props = defineProps<{ active: boolean }>();
 const emit = defineEmits<{ select: [id: string]; region: [id: RegionId]; reading: [] }>();
 const host = ref<HTMLElement | null>(null);
 const failed = ref(false), ready = ref(false);
+const moving = ref(false);
 const hovered = ref<string | null>(null), hoveredRegion = ref<RegionId | null>(null);
 const hoveredMaterial = computed(() => materials.find(item => item.id === hovered.value));
 const elements = new Map<string, Element>();
@@ -26,8 +27,10 @@ let renderer: THREE.WebGLRenderer | undefined, controls: OrbitControls | undefin
 let scene: THREE.Scene, camera: THREE.PerspectiveCamera;
 let points: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
 let observer: ResizeObserver;
-let frame = 0, lastTime = 0, width = 1, height = 1, homeDistance = 800;
-let gesture = false, disposed = false;
+let frame = 0, width = 1, height = 1, homeDistance = 800;
+let disposed = false, projectionDirty = true, resetLabels = true, fontsReady = false, gesture = false;
+let labelBoxes = new Map<string, LabelBox>();
+let labelMotion: { from: Map<string, LabelBox>; to: Map<string, LabelBox>; start: number; duration: number; slide: boolean } | null = null;
 let pointerDown: { x: number; y: number } | null = null;
 const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
 const vector = new THREE.Vector3();
@@ -89,7 +92,8 @@ function paintScene() {
     attrs('holes:' + edge.id, { d: gaps.get(edge.id)!.map(p => 'M ' + (p.x - 3) + ' ' + p.y + ' a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0').join(' ') });
   }
 }
-function placeLabels() {
+function placeLabels(now: number) {
+  if (!fontsReady) return;
   const bounds = { x: 18, y: 94, w: width - 36, h: height - 194 };
   const requests = nodes.map(node => {
     const el = elements.get('node:' + node.id) as HTMLElement;
@@ -99,63 +103,95 @@ function placeLabels() {
   for (const domain of domains) {
     const members = domain.members.map(node => projected.get(node.id)!);
     const center = members.reduce((sum, p) => ({ x: sum.x + p.x / members.length, y: sum.y + p.y / members.length }), { x: 0, y: 0 });
-    const padding = width < 650 ? 18 : 32;
-    const hull = polygonHull(members.flatMap(p => [[p.x - padding, p.y], [p.x, p.y - padding], [p.x + padding, p.y], [p.x, p.y + padding]] as [number, number][]));
-    const d = hull ? 'M ' + hull.map(p => p.join(' ')).join(' L ') + ' Z' : '';
-    attrs('field:' + domain.id, { d }); attrs('texture:' + domain.id, { d });
     const element = elements.get('domain:' + domain.id) as HTMLElement;
     const minY = Math.min(...members.map(p => p.y));
-    requests.push({ id: 'domain:' + domain.id, x: center.x, y: minY - padding - 38, w: element.offsetWidth, h: element.offsetHeight, priority: 40 });
+    requests.push({ id: 'domain:' + domain.id, x: center.x, y: minY - 58, w: element.offsetWidth, h: element.offsetHeight, priority: 40 });
   }
-  const boxes = placeSpatialLabels(requests, bounds, [...projected.values()]);
-  for (const request of requests) {
-    const element = elements.get(request.id) as HTMLElement, box = boxes.get(request.id);
-    element.style.visibility = box ? 'visible' : 'hidden';
+  const preferred = new Map<string, LabelBox>();
+  if (!resetLabels) for (const request of requests) {
+    const old = labelBoxes.get(request.id);
+    if (old) preferred.set(request.id, old);
+  }
+  const boxes = placeSpatialLabels(requests, bounds, [...projected.values()], preferred);
+  const distance = Math.max(0, ...[...boxes].map(([id, box]) => { const old = labelBoxes.get(id); return old ? Math.hypot(box.x - old.x, box.y - old.y) : 0; }));
+  if (!resetLabels && !motionQuery.matches && distance > 0.5) {
+    labelMotion = { from: labelBoxes, to: boxes, start: now, duration: Math.min(480, 260 + distance * 0.45), slide: canInterpolateLabels(labelBoxes, boxes) };
+    moving.value = true;
+  } else { labelBoxes = boxes; labelMotion = null; moving.value = gesture; }
+  resetLabels = false;
+}
+function applyLabelBoxes(now: number) {
+  const placementOpacity = new Map<string, number>();
+  if (labelMotion) {
+    const t = Math.min(1, (now - labelMotion.start) / labelMotion.duration), eased = t * t * (3 - 2 * t);
+    const motion = labelMotion;
+    labelBoxes = new Map([...motion.to].map(([id, box]) => {
+      const from = motion.from.get(id) || box;
+      if (!motion.slide) {
+        placementOpacity.set(id, Math.hypot(box.x - from.x, box.y - from.y) > 0.5 ? Math.abs(2 * t - 1) : 1);
+        return [id, t < 0.5 ? from : box];
+      }
+      return [id, { ...box, x: from.x + (box.x - from.x) * eased, y: from.y + (box.y - from.y) * eased }];
+    }));
+    if (t === 1) { labelMotion = null; moving.value = gesture; }
+  }
+  for (const [key, element] of elements) {
+    if (!key.startsWith('node:') && !key.startsWith('domain:')) continue;
+    const label = element as HTMLElement, box = labelBoxes.get(key);
+    label.style.setProperty('--placement-opacity', String(placementOpacity.get(key) ?? 1));
+    label.style.visibility = box ? 'visible' : 'hidden';
     if (!box) continue;
-    element.style.transform = 'translate(' + box.x + 'px, ' + box.y + 'px)';
-    if (request.id.startsWith('node:')) {
-      const id = request.id.slice(5), p = projected.get(id)!;
-      const endX = Math.max(box.x, Math.min(box.x + box.w, p.x));
-      const endY = Math.max(box.y, Math.min(box.y + box.h, p.y));
-      attrs('stem:' + id, { d: 'M ' + p.x + ' ' + p.y + ' L ' + endX + ' ' + endY, opacity: related(id) ? 0.3 : 0.08 });
-      element.style.visibility = p.depth > -1 && p.depth < 1 ? 'visible' : 'hidden';
+    label.style.transform = 'translate(' + box.x + 'px, ' + box.y + 'px)';
+    if (key.startsWith('node:')) {
+      const p = projected.get(key.slice(5))!;
+      label.style.visibility = p.depth > -1 && p.depth < 1 ? 'visible' : 'hidden';
     }
   }
 }
-function onGestureStart() { gesture = true; }
-function onGestureEnd() { gesture = false; requestRender(); }
+function paintLabelStems() {
+  for (const node of nodes) {
+    const box = labelBoxes.get('node:' + node.id), p = projected.get(node.id)!;
+    if (!box) continue;
+    const x = Math.max(box.x, Math.min(box.x + box.w, p.x)), y = Math.max(box.y, Math.min(box.y + box.h, p.y));
+    attrs('stem:' + node.id, { d: 'M ' + p.x + ' ' + p.y + ' L ' + x + ' ' + y, opacity: related(node.id) ? 0.3 : 0.08 });
+  }
+}
+function geometryChanged() { projectionDirty = true; requestRender(); }
+function onGestureStart() { gesture = true; labelMotion = null; moving.value = true; }
+function onGestureEnd() { gesture = false; geometryChanged(); }
 function render(now: number) {
   frame = 0;
   if (!renderer || !props.active || document.hidden || disposed || failed.value) return;
-  const changed = controls!.update(Math.min((now - lastTime) / 1000 || 0, 0.05));
-  lastTime = now;
   camera.updateMatrixWorld();
-  projectScene(); paintScene(); placeLabels(); renderer.render(scene, camera);
-  if (changed || gesture) requestRender();
+  if (projectionDirty) { projectScene(); if (!gesture) placeLabels(now); projectionDirty = false; }
+  applyLabelBoxes(now); paintScene(); paintLabelStems(); renderer.render(scene, camera);
+  if (labelMotion) requestRender();
 }
 function requestRender() {
   if (!frame && props.active && !document.hidden && !failed.value && !disposed) frame = requestAnimationFrame(render);
 }
 function visibilityChanged() {
+  if (labelMotion && (document.hidden || !props.active || motionQuery.matches)) { labelBoxes = labelMotion.to; labelMotion = null; moving.value = false; }
   if (document.hidden || !props.active) { cancelAnimationFrame(frame); frame = 0; hovered.value = null; hoveredRegion.value = null; }
   else requestRender();
 }
 function resetCamera() {
   if (!camera || !controls) return;
+  resetLabels = true;
   camera.position.set(0.8, 0.85, 1).normalize().multiplyScalar(homeDistance * 0.78);
   controls.target.set(0, 0, 0);
-  controls.update(); requestRender();
+  controls.update(); geometryChanged();
 }
 function zoom(amount: number) {
   if (!camera || !controls) return;
   const offset = camera.position.clone().sub(controls.target);
   const distance = THREE.MathUtils.clamp(offset.length() * amount, controls.minDistance, controls.maxDistance);
-  camera.position.copy(controls.target).add(offset.setLength(distance)); controls.update(); requestRender();
+  camera.position.copy(controls.target).add(offset.setLength(distance)); controls.update(); geometryChanged();
 }
 function turn() {
   if (!camera || !controls) return;
   const offset = camera.position.clone().sub(controls.target).applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 8);
-  camera.position.copy(controls.target).add(offset); controls.update(); requestRender();
+  camera.position.copy(controls.target).add(offset); controls.update(); geometryChanged();
 }
 function contextLost(event: Event) { event.preventDefault(); failed.value = true; cancelAnimationFrame(frame); frame = 0; }
 function canvasDown(event: PointerEvent) { pointerDown = { x: event.clientX, y: event.clientY }; }
@@ -171,6 +207,8 @@ function resize() {
   if (!host.value || !renderer) return;
   const bounds = host.value.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return;
+  if (ready.value && width === bounds.width && height === bounds.height) return;
+  resetLabels = true;
   width = bounds.width; height = bounds.height;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75)); renderer.setSize(width, height, false);
   points.material.uniforms.pixelRatio!.value = renderer.getPixelRatio();
@@ -180,7 +218,7 @@ function resize() {
   if (!ready.value) resetCamera();
   else camera.position.sub(controls!.target).multiplyScalar(homeDistance / oldDistance).add(controls!.target);
   controls!.minDistance = homeDistance * 0.5; controls!.maxDistance = homeDistance * 2.4;
-  ready.value = true; requestRender();
+  ready.value = true; geometryChanged();
 }
 
 onMounted(() => {
@@ -213,12 +251,13 @@ onMounted(() => {
     }));
     scene.add(points);
     controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; controls.dampingFactor = 0.08; controls.enablePan = false;
+    controls.enableDamping = false; controls.enablePan = false;
     controls.rotateSpeed = 0.55; controls.zoomSpeed = 0.7;
-    controls.addEventListener('change', requestRender); controls.addEventListener('start', onGestureStart); controls.addEventListener('end', onGestureEnd);
+    controls.addEventListener('change', geometryChanged);
+    controls.addEventListener('start', onGestureStart); controls.addEventListener('end', onGestureEnd);
     observer = new ResizeObserver(resize); observer.observe(host.value!);
     document.addEventListener('visibilitychange', visibilityChanged); motionQuery.addEventListener('change', visibilityChanged);
-    document.fonts.ready.then(() => { if (!disposed) requestRender(); });
+    document.fonts.ready.then(() => { if (!disposed) { fontsReady = true; resetLabels = true; geometryChanged(); } });
     resize();
   } catch { failed.value = true; }
 });
@@ -235,19 +274,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section ref="host" class="spatial-overview" :class="{ 'is-ready': ready, 'spatial-failed': failed, 'has-focus': hovered || hoveredRegion }" aria-label="Atlas 三维全貌">
+  <section ref="host" class="spatial-overview" :class="{ 'is-ready': ready, 'spatial-failed': failed, 'has-focus': hovered || hoveredRegion, 'is-moving': moving }" aria-label="Atlas 三维全貌">
     <div class="spatial-heading"><h1>Atlas</h1><button class="quiet-command" type="button" @click="emit('reading')"><MapIcon :size="17" />二维阅读</button></div>
     <template v-if="!failed">
-      <svg class="spatial-fields" aria-hidden="true">
-        <defs>
-          <pattern id="spatial-systems-lines" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)"><path d="M 0 0 L 0 12" stroke="#9bbfdf" stroke-width=".6" opacity=".15" /></pattern>
-          <pattern id="spatial-time-lines" width="18" height="18" patternUnits="userSpaceOnUse"><path d="M 0 2 L 5 2" stroke="#c9bc85" stroke-width=".7" opacity=".25" /></pattern>
-        </defs>
-        <g v-for="domain in domains" :key="domain.id" :class="`spatial-field field-${domain.id}`" :style="{ '--field-tone': spatialTones[domain.id] }">
-          <path :ref="el => bind(`field:${domain.id}`, el)" class="field-shape" :data-spatial-field="domain.id" />
-          <path :ref="el => bind(`texture:${domain.id}`, el)" :fill="domain.id === 'systems' || domain.id === 'time' ? `url(#spatial-${domain.id}-lines)` : 'none'" />
-        </g>
-      </svg>
       <svg class="spatial-connections" aria-hidden="true">
         <defs><linearGradient v-for="edge in relations" :id="`spatial-edge-${edge.id}`" :key="edge.id" :ref="el => bind(`gradient:${edge.id}`, el)" gradientUnits="userSpaceOnUse">
           <stop :ref="el => bind(`start:${edge.id}`, el)" offset="0" :stop-color="spatialTones[materials.find(item => item.id === edge.from)!.region]" />
@@ -263,14 +292,14 @@ onBeforeUnmount(() => {
         <path v-for="node in nodes" :key="node.id" :ref="el => bind(`stem:${node.id}`, el)" class="spatial-node-stem" :stroke="spatialTones[node.region]" />
       </svg>
       <button v-for="node in nodes" :key="node.id" :ref="el => bind(`node:${node.id}`, el)" class="spatial-hit" :class="{ 'is-active': hovered === node.id }" :style="{ '--node-tone': spatialTones[node.region] }" type="button"
-        :aria-label="`查看${node.material.title.replace('\n', '')}`" :title="`${spatialKinds[node.material.kind]}：${node.material.title.replace('\n', '')}`" :data-spatial-node="node.id"
+        :aria-label="`查看${node.material.title.replace('\n', '')}`" :title="`${spatialKinds[node.material.kind]}：${node.material.title.replace('\n', '')}`" :data-spatial-node="node.id" :data-region="node.region"
         @pointerenter="hovered = node.id" @pointerleave="hovered = null" @focus="hovered = node.id" @blur="hovered = null" @click="emit('select', node.id)">
-        <component :is="icons[node.material.kind]" :size="13" :stroke-width="1.6" aria-hidden="true" /><span>{{ spatialNames[node.id] || node.material.title.replace('\n', '') }}</span>
+        <span class="region-mark" :data-pattern="spatialRegionPatterns[node.region]" aria-hidden="true"></span><component :is="icons[node.material.kind]" :size="13" :stroke-width="1.6" aria-hidden="true" /><span>{{ spatialNames[node.id] || node.material.title.replace('\n', '') }}</span>
       </button>
       <button v-for="domain in domains" :key="domain.id" :ref="el => bind(`domain:${domain.id}`, el)" class="spatial-domain" :style="{ '--tone': spatialTones[domain.id] }"
         type="button" :aria-label="`展开${domain.title}`" :data-spatial-region="domain.id" @pointerenter="hoveredRegion = domain.id" @pointerleave="hoveredRegion = null"
         @focus="hoveredRegion = domain.id" @blur="hoveredRegion = null" @click="emit('region', domain.id)">
-        <span class="domain-name">{{ domain.title }}</span><span class="domain-count">{{ domain.members.length }} 个片段 <ArrowUpRight :size="13" /></span>
+        <span class="domain-name"><span class="region-mark" :data-pattern="spatialRegionPatterns[domain.id]" aria-hidden="true"></span>{{ domain.title }}</span><span class="domain-count">{{ domain.members.length }} 个片段 <ArrowUpRight :size="13" /></span>
       </button>
       <div class="spatial-controls" aria-label="三维视角">
         <button class="icon-button" type="button" aria-label="拉远三维视角" title="拉远" @click="zoom(1.16)"><Minus :size="17" /></button>

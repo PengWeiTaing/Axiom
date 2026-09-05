@@ -49,9 +49,8 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
         const labels = [...element.querySelectorAll('.spatial-hit, .spatial-domain')];
         const boxes = labels.map(el => el.getBoundingClientRect());
         const dots = [...element.querySelectorAll('.spatial-hit')];
-        const fieldStyles = [...element.querySelectorAll('.field-shape')].map(el => {
-          const css = getComputedStyle(el); return css.fill + css.strokeDasharray;
-        });
+        const markers = [...element.querySelectorAll('.spatial-domain .region-mark')];
+        const markerStyles = markers.map(el => getComputedStyle(el, '::before').borderLeftStyle);
         const alphas = [...element.querySelectorAll('.edge-ink')].map(el => Number(el.getAttribute('opacity')));
         return {
           visible: labels.every(el => getComputedStyle(el).visibility === 'visible'),
@@ -59,8 +58,9 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
           overlap: boxes.some((a, i) => boxes.some((b, j) => i !== j && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)),
           outside: boxes.some(box => box.left < 0 || box.right > innerWidth || box.top < 140 || box.bottom > innerHeight - 80),
           depthTiers: new Set(dots.map(el => el.dataset.depth)).size,
-          fields: new Set(fieldStyles).size,
-          contours: [...element.querySelectorAll('.field-shape')].every(el => el.getAttribute('d')?.endsWith('Z')),
+          regionPatterns: new Set(markerStyles).size,
+          regionCovers: element.querySelectorAll('.spatial-fields, .field-shape, polygon').length,
+          membership: dots.every(el => el.querySelector('.region-mark').dataset.pattern === element.querySelector('[data-spatial-region="' + el.dataset.region + '"] .region-mark').dataset.pattern),
           depthRange: Math.max(...alphas) - Math.min(...alphas),
           runningAnimations: element.getAnimations({ subtree: true }).filter(animation => animation.playState === 'running').length,
         };
@@ -68,14 +68,21 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
       check(staticReading.visible && staticReading.identities, `Unnamed or hidden node at ${width}`);
       check(!staticReading.overlap && !staticReading.outside, `Static identity collision at ${width}`);
       check(staticReading.depthTiers === 3 && staticReading.depthRange > 0.15, `Missing static depth cues at ${width}`);
-      check(staticReading.fields === 4 && staticReading.contours, `Undifferentiated regions at ${width}`);
+      check(staticReading.regionPatterns === 4 && staticReading.membership && staticReading.regionCovers === 0, `Region identity must not depend on covering polygons at ${width}`);
       check(staticReading.runningAnimations === 0, 'Default overview must not depend on continuous motion');
       if (width === 1440) {
+        const identityPositions = () => page.locator('.spatial-hit, .spatial-domain').evaluateAll(elements => elements.map(el => ({ transform: el.style.transform, width: el.getBoundingClientRect().width })));
+        const atRest = await identityPositions();
         await page.locator('[data-spatial-node="unfinished"]').hover();
         await settled();
+        check(JSON.stringify(await identityPositions()) === JSON.stringify(atRest), 'Node hover moved or resized the reading labels');
         const pulsing = await page.locator('.edge-active .edge-ink').evaluateAll(elements => elements.filter(el => el.getAnimations().some(animation => animation.playState === 'running')).length);
         check(pulsing === 6, 'Only the six actual focus connections should pulse');
         await page.waitForFunction(() => [...document.querySelectorAll('.edge-ink')].every(el => !el.getAnimations().some(animation => animation.playState === 'running')), null, { polling: 50, timeout: 3000 });
+        await page.mouse.move(10, 10); await settled();
+        await page.locator('[data-spatial-region="systems"]').hover(); await settled();
+        check(JSON.stringify(await identityPositions()) === JSON.stringify(atRest), 'Region hover moved the reading labels');
+        check(await page.locator('.spatial-hit[data-related="true"][data-region="systems"]').count() === 5, 'Region hover must emphasize exactly its five members');
         await page.mouse.move(10, 10); await settled();
       }
       const before = await pixels();
@@ -84,19 +91,31 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
       await page.getByRole('button', { name: '转动三维视角' }).click();
       await settled();
       const after = await pixels();
+      await settled();
       check(before.signature !== after.signature, `Rotation did not change rendered pixels at ${width}`);
       if (width === 1440) {
         const bounds = await page.locator('.spatial-canvas').boundingBox();
+        const positions = () => page.locator('.spatial-hit, .spatial-domain').evaluateAll(elements => elements.map(el => el.style.transform));
+        const locked = await positions();
         await page.mouse.move(bounds.x + 80, bounds.y + 180); await page.mouse.down();
-        await page.mouse.move(bounds.x + 200, bounds.y + 225, { steps: 6 }); await page.mouse.up();
+        for (let step = 1; step <= 24; step++) {
+          await page.mouse.move(bounds.x + 80 + step * 5, bounds.y + 180 + step * 1.875);
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+          const current = await positions();
+          check(JSON.stringify(current) === JSON.stringify(locked), `Labels switched position during camera drag at ${step}: ${JSON.stringify(current.map((value, i) => value === locked[i] ? null : [i, locked[i], value]).filter(Boolean))}`);
+        }
+        await page.mouse.up();
         await settled();
         check((await pixels()).signature !== after.signature, 'Pointer drag did not orbit the 3D scene');
+        const released = await positions();
+        await page.waitForTimeout(500);
+        check(JSON.stringify(await positions()) === JSON.stringify(released), 'Labels drifted after release');
       }
       const layout = await page.locator('.spatial-domain, .spatial-hit').evaluateAll(elements => {
         const boxes = elements.map(el => el.getBoundingClientRect());
         return { overflow: document.documentElement.scrollWidth > innerWidth, hidden: elements.some(el => getComputedStyle(el).visibility !== 'visible'), overlap: boxes.some((a, i) => boxes.some((b, j) => i !== j && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)) };
       });
-      check(!layout.overflow && !layout.overlap && !layout.hidden, `Overview label collision at ${width}`);
+      check(!layout.overflow && !layout.overlap && !layout.hidden, `Overview label collision at ${width}: ${JSON.stringify(layout)}`);
       const point = page.locator('[data-spatial-node="little"]');
       const getPosition = () => point.evaluate(el => {
         const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform);
@@ -141,7 +160,7 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
     await page.locator('.spatial-canvas').dispatchEvent('webglcontextlost', { cancelable: true });
     await page.getByRole('button', { name: '进入二维阅读' }).click();
     check(await page.locator('.atlas-overview').isVisible(), 'GPU failure did not retain the reading path');
-    return { passed: true, results, checks: ['canvas-only pixels', 'static node identity and depth', 'four region silhouettes', 'rotation and framing', 'all label collisions', 'domain and node identity', 'return orientation', 'bounded local pulse', 'reduced motion and hidden idle', 'GPU fallback'] };
+    return { passed: true, results, checks: ['canvas-only pixels', 'static node identity and depth', 'region membership without covering surfaces', 'locked labels during drag and hover', 'no post-release drift', 'rotation and framing', 'all label collisions', 'domain and node identity', 'return orientation', 'bounded local pulse', 'reduced motion and hidden idle', 'GPU fallback'] };
   } finally {
     page.off('pageerror', onError); page.off('console', onConsole);
     await page.emulateMedia({ reducedMotion: null });
