@@ -10,6 +10,15 @@
 
 > 当前产品事实以 `docs/PRODUCT_MODEL.md` 为准，债务清理以 `docs/DEBT_BOARD.md` 为准，演进总览见 `docs/PROJECT_EVOLUTION.md`。
 
+## 2026-09-05 新会话交接
+
+- 当前分支：`codex/axiom-product-core`。
+- 下一代产品研究已经完成并写入 `PRODUCT_MODEL.md`、`FRONTEND_ART_DIRECTION.md` 与 `docs/discovery_cortex/`；当前 Vue 前端仍是可运行旧基线，新形态尚未开始实现。
+- 研究中应继续保留：人和 Axiom 中枢严格分层、日常环境与 Foundry 分离、此刻到 Atlas 再到白板的连续认识运动、白板由 Axiom 生成而非用户维护、视觉显著性不能冒充真实性。
+- 2026-09-05 生成的第一张“夜行长卷”暗色概念图已被用户否决，没有进入仓库。下一会话不得沿用其星图式右侧关系场、大片空黑、信息图式下半区或整体构图。
+- “夜行长卷”当前只是研究代号，不是锁定风格。下一阶段应重新研究具体美学，先提出差异足够大的产品场景方案，再用真实 Axiom 内容做高保真原型；不要直接批量改现有 Vue 页面。
+- 开始前依次阅读 `PRODUCT_MODEL.md`、`FRONTEND_ART_DIRECTION.md`、`discovery_cortex/07_ATLAS_DISCOVERY_LANDSCAPE.md`、`08_WHITEBOARD_CO_DISCOVERY_ENVIRONMENT.md` 与 `09_ATLAS_WHITEBOARD_CONTINUUM.md`，并重新检查仓库状态，避免把研究目标误报为当前实现。
+
 当前主线：
 
 ```text
