@@ -1,0 +1,102 @@
+async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
+  const check = (value, message) => { if (!value) throw new Error(message); };
+  const errors = [];
+  const onError = error => errors.push(error.message);
+  const onConsole = message => { if (message.type() === 'error') errors.push(message.text()); };
+  page.on('pageerror', onError); page.on('console', onConsole);
+  page.setDefaultTimeout(8000);
+  await page.addInitScript(() => {
+    window.__atlasQaFrames = 0;
+    const original = window.requestAnimationFrame;
+    window.requestAnimationFrame = callback => original.call(window, time => { window.__atlasQaFrames++; callback(time); });
+  });
+  const settled = () => page.waitForFunction(() => {
+    const now = performance.now();
+    const before = window.__atlasQaStable;
+    const count = window.__atlasQaFrames;
+    if (!before || before.count !== count) window.__atlasQaStable = { count, since: now };
+    return before && before.count === count && now - before.since > 200;
+  }, null, { polling: 50, timeout: 5000 });
+  const pixels = async () => {
+    const png = await page.locator('.spatial-canvas').screenshot({ style: '.spatial-overview > :not(canvas) { visibility: hidden !important; }' });
+    return page.evaluate(async bytes => {
+      const image = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+      const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let count = 0, signature = 0, left = canvas.width, right = 0, top = canvas.height, bottom = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (Math.max(Math.abs(data[i] - 23), Math.abs(data[i + 1] - 25), Math.abs(data[i + 2] - 25)) < 16) continue;
+        const x = i / 4 % canvas.width, y = Math.floor(i / 4 / canvas.width);
+        count++; signature = (signature + (i + 1) * (data[i] + data[i + 1] * 2 + data[i + 2] * 3)) % 1000000007;
+        left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+      }
+      image.close(); return { count, signature, left, right, top, bottom, width: canvas.width, height: canvas.height };
+    }, [...png]);
+  };
+  const results = [];
+  try {
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: width > 650 ? 960 : 844 });
+      await page.goto(url);
+      await page.locator('.spatial-overview.is-ready').waitFor();
+      check(!await page.locator('.spatial-fallback').isVisible(), 'WebGL unexpectedly unavailable');
+      check(await page.locator('.spatial-domain').count() === 4, 'Expected four overview domains');
+      check(await page.locator('.spatial-hit').count() === 20, 'Overview must not invent extra nodes');
+      await page.getByRole('button', { name: '恢复三维全貌' }).click();
+      await settled();
+      const before = await pixels();
+      check(before.count > 300 && before.right - before.left > width * 0.35, `Blank or undersized 3D scene at ${width}`);
+      check(before.left > 2 && before.right < width - 2 && before.top > 75 && before.bottom < before.height - 70, `Clipped 3D scene at ${width}`);
+      await page.getByRole('button', { name: '转动三维视角' }).click();
+      await settled();
+      const after = await pixels();
+      check(before.signature !== after.signature, `Rotation did not change rendered pixels at ${width}`);
+      if (width === 1440) {
+        const bounds = await page.locator('.spatial-canvas').boundingBox();
+        await page.mouse.move(bounds.x + 80, bounds.y + 180); await page.mouse.down();
+        await page.mouse.move(bounds.x + 200, bounds.y + 225, { steps: 6 }); await page.mouse.up();
+        await settled();
+        check((await pixels()).signature !== after.signature, 'Pointer drag did not orbit the 3D scene');
+      }
+      const layout = await page.locator('.spatial-domain').evaluateAll(elements => {
+        const boxes = elements.map(el => el.getBoundingClientRect());
+        return { overflow: document.documentElement.scrollWidth > innerWidth, overlap: boxes.some((a, i) => boxes.some((b, j) => i !== j && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)) };
+      });
+      check(!layout.overflow && !layout.overlap, `Overview label collision at ${width}`);
+      const point = page.locator('[data-spatial-node="little"]');
+      const position = await point.getAttribute('style');
+      await page.getByRole('button', { name: '展开复杂性的秩序' }).click();
+      check(await page.getByLabel('所在领域').inputValue() === 'systems', 'Domain did not open matching 2D scope');
+      await page.getByRole('button', { name: '回到三维全貌' }).click();
+      await settled();
+      check(await point.getAttribute('style') === position, '3D orientation changed after returning');
+      await page.getByRole('button', { name: '恢复三维全貌' }).click();
+      await settled();
+      await point.click();
+      check((await page.locator('.material-detail h2').textContent()).includes('在途、产出与时间'), 'Point did not open the same material in 2D');
+      results.push({ width, visiblePixels: before.count, bounds: [before.left, before.top, before.right, before.bottom], rotated: true });
+    }
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(url);
+    await page.locator('.spatial-overview.is-ready').waitFor();
+    await settled();
+    await page.getByRole('button', { name: '二维阅读', exact: true }).click();
+    await settled();
+    const frameCount = await page.evaluate(() => window.__atlasQaFrames);
+    await page.getByRole('button', { name: '查找', exact: true }).click();
+    check(await page.evaluate(() => window.__atlasQaFrames) === frameCount, 'Hidden 3D scene kept rendering');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '回到三维全貌' }).click();
+    await settled();
+    check(errors.length === 0, errors.join('\n'));
+    // Simulate a lost GPU context without changing the user's browser configuration.
+    await page.locator('.spatial-canvas').dispatchEvent('webglcontextlost', { cancelable: true });
+    await page.getByRole('button', { name: '进入二维阅读' }).click();
+    check(await page.locator('.atlas-overview').isVisible(), 'GPU failure did not retain the reading path');
+    return { passed: true, results, checks: ['canvas-only pixels', 'rotation', 'framing', 'labels', 'domain and node identity', 'return orientation', 'reduced motion and hidden idle', 'GPU fallback'] };
+  } finally {
+    page.off('pageerror', onError); page.off('console', onConsole);
+    await page.emulateMedia({ reducedMotion: null });
+  }
+}

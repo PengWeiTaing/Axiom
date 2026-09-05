@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { ArrowRight, ArrowUpRight, Bookmark, Check, History, Search, X, CornerDownLeft, Link2, CircleHelp } from '@lucide/vue';
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { ArrowRight, ArrowUpRight, Bookmark, Check, History, Search, X, CornerDownLeft, Link2, CircleHelp, Orbit } from '@lucide/vue';
 import AtlasMap from './AtlasMap.vue';
 import KnowledgeBoard from './KnowledgeBoard.vue';
 import { deltaImage, materials, regions, relations } from './data';
@@ -8,9 +8,12 @@ import { parseStudyLocation, searchMaterials } from './model';
 import type { RegionId } from './model';
 
 const initial = parseStudyLocation(location.search, materials);
+const AtlasOverview3D = defineAsyncComponent(() => import('./AtlasOverview3D.vue'));
+const overview = ref(initial.overview);
+const overviewVisited = ref(initial.overview);
 const selected = ref<string | null>(initial.focus);
 const board = ref(initial.board);
-const region = ref<RegionId | null>(null);
+const region = ref<RegionId | null>(initial.region);
 const modal = ref<'search' | 'history' | null>(null);
 const query = ref('');
 const searchInput = ref<HTMLInputElement | null>(null);
@@ -40,16 +43,26 @@ function persist() {
 function notify(message: string) { clearTimeout(toastTimer); toast.value = message; toastTimer = setTimeout(() => toast.value = '', 3200); }
 function setLocation() {
   const url = new URL(location.href);
-  url.searchParams.delete('focus'); url.searchParams.delete('view');
-  if (selected.value) url.searchParams.set('focus', selected.value);
-  if (board.value) url.searchParams.set('view', 'board');
+  url.searchParams.delete('focus'); url.searchParams.delete('view'); url.searchParams.delete('region');
+  if (!overview.value) {
+    url.searchParams.set('view', board.value ? 'board' : 'map');
+    if (selected.value) url.searchParams.set('focus', selected.value);
+    if (region.value) url.searchParams.set('region', region.value);
+  }
   history.pushState({}, '', url);
 }
-function readLocation() { const state = parseStudyLocation(location.search, materials); selected.value = state.focus; board.value = state.board; }
+function readLocation() {
+  const state = parseStudyLocation(location.search, materials);
+  selected.value = state.focus; board.value = state.board; overview.value = state.overview; region.value = state.region;
+  if (state.overview) overviewVisited.value = true;
+}
+function enterOverview() { overviewVisited.value = true; overview.value = true; board.value = false; setLocation(); window.scrollTo(0, 0); }
+function enterReading() { overview.value = false; board.value = false; setLocation(); }
+function enterRegion(id: RegionId) { region.value = id; selected.value = null; enterReading(); }
 function remember(id: string) { recent.value = [id, ...recent.value.filter(item => item !== id)].slice(0, 12); persist(); }
 async function select(id: string) {
   if (!materials.some(item => item.id === id)) return;
-  selected.value = id; board.value = false; region.value = null; modal.value = null;
+  selected.value = id; board.value = false; overview.value = false; region.value = null; modal.value = null;
   remember(id); setLocation();
   await nextTick(); detailPane.value?.focus({ preventScroll: true });
 }
@@ -61,7 +74,7 @@ async function goBack() {
   if (selected.value) detailPane.value?.focus({ preventScroll: true });
   else if (previous) document.querySelector<HTMLButtonElement>(`.map-material[aria-label="${materials.find(item => item.id === previous)?.title.replace('\n', '')}"]`)?.focus({ preventScroll: true });
 }
-function enterBoard() { selected.value = 'unfinished'; board.value = true; setLocation(); window.scrollTo(0, 0); }
+function enterBoard() { selected.value = 'unfinished'; overview.value = false; board.value = true; setLocation(); window.scrollTo(0, 0); }
 function toggleSaved() { saved.value = !saved.value; persist(); notify(saved.value ? '已留在「待验证」中' : '已取消留存'); }
 function toggleRejected() { rejected.value = !rejected.value; persist(); notify(rejected.value ? '已标记异议，依据仍然保留' : '已撤回异议'); }
 async function openModal(kind: 'search' | 'history') {
@@ -72,7 +85,7 @@ async function openModal(kind: 'search' | 'history') {
 }
 function closeModal() { modal.value = null; returnFocus?.focus(); }
 function keydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') { if (modal.value) closeModal(); else if (selected.value) void goBack(); return; }
+  if (event.key === 'Escape') { if (modal.value) closeModal(); else if (!overview.value && selected.value) void goBack(); else if (!overview.value) enterOverview(); return; }
   if (modal.value && event.key === 'Tab') {
     const elements = [...(dialog.value?.querySelectorAll<HTMLElement>('button:not([disabled]), input, a[href]') || [])];
     const first = elements[0], last = elements[elements.length - 1];
@@ -99,7 +112,7 @@ onBeforeUnmount(() => { removeEventListener('popstate', readLocation); removeEve
   <div class="atlas-study" :class="{ 'board-is-open': board }">
     <header class="study-header">
       <a href="/app" class="wordmark" aria-label="Axiom 日常入口">axiom<span class="wordmark-period">.</span></a>
-      <div class="header-location"><span class="header-divider"></span><button type="button" @click="selected = null; board = false; region = null; setLocation()">Atlas</button><span class="demo-label">演示</span></div>
+      <div class="header-location"><span class="header-divider"></span><button type="button" @click="enterOverview">Atlas</button><span class="demo-label">演示</span></div>
       <nav aria-label="Atlas 导航">
         <button class="header-command" type="button" aria-label="查找" @click="openModal('search')"><Search :size="18" /><span>查找</span></button>
         <button class="header-command" type="button" aria-label="最近看过" @click="openModal('history')"><History :size="18" /><span>最近看过</span></button>
@@ -107,10 +120,11 @@ onBeforeUnmount(() => { removeEventListener('popstate', readLocation); removeEve
       </nav>
     </header>
 
+    <AtlasOverview3D v-if="overviewVisited" v-show="overview" :active="overview" @select="select" @region="enterRegion" @reading="enterReading" />
     <KnowledgeBoard v-show="board" :saved="saved" :rejected="rejected" @back="goBack" @save="toggleSaved" @reject="toggleRejected" />
-    <main v-show="!board" class="atlas-overview">
+    <main v-show="!board && !overview" class="atlas-overview">
       <div class="map-topline">
-        <div class="map-title"><h1>Atlas</h1></div>
+        <div class="map-title"><button class="icon-button return-overview" type="button" aria-label="回到三维全貌" title="回到三维全貌" @click="enterOverview"><Orbit :size="21" /></button><h1>Atlas</h1></div>
         <div v-if="!selected" class="region-selector"><label for="region-select">所在领域</label><select id="region-select" :value="region || (compactScreen ? 'practice' : '')" @change="region = (($event.target as HTMLSelectElement).value || null) as RegionId | null; selected = null; setLocation()"><option v-if="!compactScreen" value="">全部领域</option><option v-for="item in regions" :key="item.id" :value="item.id">{{ item.title }}</option></select></div>
       </div>
       <AtlasMap :selected="selected" :region="region" :rejected="rejected" @select="select" />

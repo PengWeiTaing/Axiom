@@ -5,7 +5,8 @@ import { runInNewContext } from 'node:vm';
 
 const modulePath = process.env.PLAYWRIGHT_MODULE;
 const { chromium } = await import(modulePath ? pathToFileURL(resolve(modulePath)).href : 'playwright');
-const source = await readFile(new URL('./atlas-study.browser.js', import.meta.url), 'utf8');
+const testFile = process.argv.includes('--spatial') ? './atlas-spatial.browser.js' : './atlas-study.browser.js';
+const source = await readFile(new URL(testFile, import.meta.url), 'utf8');
 // The same checked-in test function also runs directly through Playwright MCP.
 const run = runInNewContext(source, { URL });
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome', headless: true });

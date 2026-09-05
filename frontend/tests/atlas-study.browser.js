@@ -1,5 +1,6 @@
 // Run with Playwright MCP browser_run_code_unsafe(filename), against the isolated preview.
-async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
+async (page, baseUrl = 'http://127.0.0.1:4317/atlas-study.html') => {
+  const url = `${baseUrl}?view=map`;
   const key = 'axiom.atlas-study.v1';
   const check = (condition, message) => { if (!condition) throw new Error(message); };
   const errors = [];
@@ -100,14 +101,14 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
         });
         check(!layout.overflow && !layout.collisions.length, `Map layout failed: ${width}/${region}`);
       }
-      await page.goto(`${url}?focus=unfinished&view=board`);
+      await page.goto(`${baseUrl}?focus=unfinished&view=board`);
       await page.locator('.knowledge-board').waitFor({ state: 'visible' });
       check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Board overflow: ${width}`);
       await page.getByRole('button', { name: '回到图中的位置' }).click();
       await page.getByRole('button', { name: '关闭详情' }).click();
     }
     summary.push('Four widths and four regions: no overlapping node bounds or horizontal overflow; board fits all widths');
-    await page.goto(`${url}?focus=unknown&view=board`);
+    await page.goto(`${baseUrl}?focus=unknown&view=map`);
     check(!await page.locator('.knowledge-board').isVisible(), 'Invalid deep link opened board');
     check(await page.locator('.material-detail').count() === 0, 'Invalid deep link opened detail');
     await page.evaluate(key => localStorage.setItem(key, '{broken'), key);

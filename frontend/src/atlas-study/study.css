@@ -38,6 +38,7 @@ svg { flex: none; }
 .atlas-overview { --detail-width: 415px; height: calc(100svh - 76px); min-height: 650px; position: relative; display: flex; flex-direction: column; }
 .map-topline { position: absolute; top: 29px; left: 38px; right: 38px; display: flex; align-items: flex-start; justify-content: space-between; pointer-events: none; z-index: 2; }
 .map-title { display: flex; align-items: baseline; gap: 17px; }
+.return-overview { pointer-events: auto; align-self: center; }
 .map-title h1 { font-weight: 550; font-size: 32px; margin: 0; }
 .region-selector { pointer-events: auto; }
 .region-selector label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
@@ -274,4 +275,43 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+.spatial-overview { position: relative; height: calc(100svh - 76px); min-height: 660px; overflow: hidden; isolation: isolate; }
+.spatial-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.spatial-canvas:active { cursor: grabbing; }
+.spatial-heading { position: absolute; top: 29px; left: 38px; right: 38px; display: flex; align-items: center; justify-content: space-between; z-index: 5; pointer-events: none; }
+.spatial-heading h1 { margin: 0; font-size: 32px; font-weight: 550; }
+.spatial-heading button { pointer-events: auto; }
+.spatial-leaders { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.spatial-leaders path { stroke: #99a69c; stroke-width: .6; opacity: .2; fill: none; }
+.spatial-domain { position: absolute; top: 0; left: 0; text-align: left; padding: 8px 2px; z-index: 4; opacity: 0; }
+.is-ready .spatial-domain { opacity: 1; }
+.domain-name { display: block; font-size: 18px; font-weight: 520; color: var(--tone); line-height: 1.7; background: #171919; box-shadow: -5px 0 #171919, 5px 0 #171919; }
+.domain-count { display: flex; align-items: center; gap: 13px; margin-top: 4px; color: #9ea6a0; font-size: 11px; line-height: 1.6; background: #171919; width: fit-content; }
+.domain-count svg { opacity: 0; transition: opacity 150ms; }
+.spatial-domain:hover .domain-count svg, .spatial-domain:focus-visible .domain-count svg { opacity: 1; }
+.spatial-domain:hover .domain-name { color: #f0f1e8; }
+.spatial-hit { position: absolute; left: 0; top: 0; width: 26px; height: 26px; padding: 0; border-radius: 50%; }
+.spatial-hit:focus-visible { outline: 1px solid #becbc0; outline-offset: 2px; }
+.spatial-controls { position: absolute; right: 34px; bottom: 30px; display: flex; gap: 9px; z-index: 5; }
+.spatial-footer { position: absolute; bottom: 32px; left: 38px; right: 235px; display: flex; gap: 20px; align-items: center; min-height: 31px; pointer-events: none; color: #aab3ab; font-size: 12px; }
+.spatial-footer-separator { color: #58635a; margin: 0 15px; }
+.spatial-demo { margin-left: auto; color: #7e8a7e; font-size: 10px; }
+.spatial-caption { font-size: 15px; color: #d6ddcf; }
+.spatial-fallback { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; font-size: 16px; }
+.spatial-fallback button { justify-self: center; }
+.spatial-failed canvas { display: none; }
+@media (max-width: 649px) {
+  .spatial-overview { height: calc(100svh - 66px); min-height: 620px; }
+  .spatial-heading { top: 23px; left: 23px; right: 23px; }
+  .spatial-heading h1 { font-size: 27px; }
+  .spatial-heading .quiet-command { font-size: 12px; }
+  .domain-name { font-size: 15px; }
+  .domain-count { font-size: 10px; }
+  .spatial-controls { right: 19px; bottom: 28px; gap: 3px; }
+  .spatial-footer { left: 23px; right: 170px; bottom: 34px; font-size: 11px; }
+  .spatial-footer-separator { margin: 0 7px; }
+  .spatial-caption { position: absolute; bottom: 40px; left: 0; width: calc(100vw - 46px); font-size: 13px; }
+  .spatial-demo { display: none; }
 }

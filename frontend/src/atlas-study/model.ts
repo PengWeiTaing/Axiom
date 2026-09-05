@@ -59,5 +59,9 @@ export function parseStudyLocation(search: string, materials: AtlasMaterial[]) {
   const params = new URLSearchParams(search);
   const selected = params.get('focus');
   const focus = materials.some(item => item.id === selected) ? selected : null;
-  return { focus, board: focus === 'unfinished' && params.get('view') === 'board' };
+  const board = focus === 'unfinished' && params.get('view') === 'board';
+  const overview = !focus && params.get('view') !== 'map';
+  const area = params.get('region');
+  const region = ['practice', 'systems', 'attention', 'time'].includes(area || '') ? area as RegionId : null;
+  return { focus, board, overview, region };
 }

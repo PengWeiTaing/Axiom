@@ -10,6 +10,9 @@ export default defineConfig({
     outDir: 'dist/atlas-study',
     emptyOutDir: true,
     target: 'es2020',
-    rollupOptions: { input: fileURLToPath(new URL('./atlas-study.html', import.meta.url)) },
+    rollupOptions: {
+      input: fileURLToPath(new URL('./atlas-study.html', import.meta.url)),
+      output: { manualChunks: { three: ['three'], 'atlas-forces': ['d3-force-3d'] } },
+    },
   },
 });

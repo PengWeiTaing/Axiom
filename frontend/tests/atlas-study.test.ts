@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { averageCycleDays, neighborhood, parseStudyLocation, searchMaterials } from '../src/atlas-study/model.ts';
 import { materials, regions, relations } from '../src/atlas-study/data.ts';
+import { buildSpatialLayout } from '../src/atlas-study/spatial-layout.ts';
 
 test('curated sample has unique identities, valid relations and traceable research', () => {
   const ids = new Set(materials.map(item => item.id));
@@ -43,6 +44,36 @@ test('search matches Chinese content and rejects unknown deep links', () => {
   assert.equal(searchMaterials('等待 MIT', items).length, 1);
   assert.equal(searchMaterials('不存在', items).length, 0);
   assert.equal(searchMaterials('', items).length, 1);
-  assert.deepEqual(parseStudyLocation('?focus=unfinished&view=board', items), { focus: 'unfinished', board: true });
-  assert.deepEqual(parseStudyLocation('?focus=private-data&view=board', items), { focus: null, board: false });
+  assert.deepEqual(parseStudyLocation('?focus=unfinished&view=board', items), { focus: 'unfinished', board: true, overview: false, region: null });
+  assert.deepEqual(parseStudyLocation('?focus=private-data&view=board', items), { focus: null, board: false, overview: true, region: null });
+  assert.deepEqual(parseStudyLocation('?view=map&region=systems', items), { focus: null, board: false, overview: false, region: 'systems' });
+  assert.equal(parseStudyLocation('', items).overview, true);
+  assert.equal(parseStudyLocation('?region=private-data', items).region, null);
+});
+
+test('spatial layout is deterministic, relation-driven and genuinely three-dimensional', () => {
+  const original = JSON.stringify({ materials, relations });
+  const layout = buildSpatialLayout(materials, relations);
+  assert.equal(layout.length, materials.length);
+  assert.deepEqual(layout, buildSpatialLayout(materials, relations));
+  assert.deepEqual(layout, buildSpatialLayout(materials.map(item => ({ ...item, x: 999, y: -999 })).reverse(), relations));
+  const changed = buildSpatialLayout(materials, relations.slice(1));
+  assert.notDeepEqual(layout.map(node => [node.x, node.y, node.z]), changed.map(node => [node.x, node.y, node.z]));
+  const edges = new Set(relations.map(edge => [edge.from, edge.to].sort().join(':')));
+  const distances = { linked: [] as number[], unlinked: [] as number[] };
+  for (let i = 0; i < layout.length; i++) for (let j = i + 1; j < layout.length; j++) {
+    const a = layout[i]!, b = layout[j]!;
+    distances[edges.has([a.id, b.id].sort().join(':')) ? 'linked' : 'unlinked'].push(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+  }
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  assert.ok(mean(distances.linked) < mean(distances.unlinked) * 0.65);
+  assert.equal(JSON.stringify({ materials, relations }), original);
+  const axes = ['x', 'y', 'z'] as const;
+  const cov = axes.map(a => axes.map(b => layout.reduce((sum, node) => sum + node[a] * node[b], 0) / layout.length));
+  const [[a, b, c], [, d, e], [, , f]] = cov as [[number, number, number], [number, number, number], [number, number, number]];
+  const determinant = a * d * f + 2 * b * c * e - a * e * e - d * c * c - f * b * b;
+  assert.ok(determinant / (a + d + f) ** 3 > 0.008, 'Layout must not collapse into a plane');
+  for (const node of layout) assert.ok(axes.every(axis => Number.isFinite(node[axis])));
+  assert.deepEqual(buildSpatialLayout([], []), []);
+  assert.throws(() => buildSpatialLayout(materials, [{ ...relations[0]!, to: 'missing' }]));
 });
