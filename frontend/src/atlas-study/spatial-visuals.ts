@@ -34,6 +34,26 @@ export function depthAppearance(depth: number) {
 }
 
 interface Point { x: number; y: number; }
+export interface RibbonPoint extends Point { depth: number; }
+
+// A strip follows one existing edge; its caps never grow into a region-wide hull.
+export function ribbonTriangles(a: RibbonPoint, b: RibbonPoint, width: number): RibbonPoint[] {
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  if (![a.x, a.y, a.depth, b.x, b.y, b.depth, width].every(Number.isFinite) || length < 1 || width <= 0) return [];
+  if (a.depth <= -1 || a.depth >= 1 || b.depth <= -1 || b.depth >= 1) return [];
+  const radius = Math.min(width / 2, length * 0.24);
+  const dx = (b.x - a.x) / length, dy = (b.y - a.y) / length;
+  const at = (p: RibbonPoint, along: number, side: number) => ({ x: p.x + dx * along - dy * side, y: p.y + dy * along + dx * side, depth: p.depth });
+  const vertices = [at(a, 0, -radius), at(b, 0, -radius), at(a, 0, radius), at(a, 0, radius), at(b, 0, -radius), at(b, 0, radius)];
+  for (const [p, start] of [[a, Math.PI / 2], [b, -Math.PI / 2]] as const) {
+    for (let i = 0; i < 10; i++) {
+      const t = start + i * Math.PI / 10, u = t + Math.PI / 10;
+      vertices.push(p, at(p, Math.cos(t) * radius, Math.sin(t) * radius), at(p, Math.cos(u) * radius, Math.sin(u) * radius));
+    }
+  }
+  return vertices;
+}
+
 export interface ProjectedEdge {
   id: string;
   from: Point & { distance: number };
@@ -64,6 +84,49 @@ export function findRearCrossings(edges: ProjectedEdge[]) {
 export interface LabelRequest extends Point { id: string; w: number; h: number; priority: number; }
 export interface LabelBox extends Point { w: number; h: number; }
 type Box = LabelBox;
+export function followSpatialLabels(boxes: ReadonlyMap<string, Box>, before: ReadonlyMap<string, Point>, after: ReadonlyMap<string, Point>) {
+  return new Map([...boxes].map(([id, box]) => {
+    const a = before.get(id), b = after.get(id);
+    return [id, a && b ? { ...box, x: box.x + b.x - a.x, y: box.y + b.y - a.y } : { ...box }];
+  }));
+}
+
+// Resolve small collisions locally after projection, without choosing new label slots.
+export function separateFollowingLabels(boxes: ReadonlyMap<string, Box>, bounds: Box, anchors: Point[] = []) {
+  const result = new Map([...boxes].map(([id, box]) => [id, { ...box }]));
+  const entries = [...result.values()];
+  const move = (box: Box, dx: number, dy: number) => {
+    const x = box.x, y = box.y;
+    box.x = Math.max(bounds.x, Math.min(bounds.x + bounds.w - box.w, x + dx));
+    box.y = Math.max(bounds.y, Math.min(bounds.y + bounds.h - box.h, y + dy));
+    return { x: box.x - x, y: box.y - y };
+  };
+  const displacement = (a: Box, b: Box, gap: number) => {
+    const dx = a.x + a.w / 2 < b.x + b.w / 2 ? b.x - a.x - a.w - gap : b.x + b.w + gap - a.x;
+    const dy = a.y + a.h / 2 < b.y + b.h / 2 ? b.y - a.y - a.h - gap : b.y + b.h + gap - a.y;
+    return Math.abs(dx) < Math.abs(dy) ? { x: dx, y: 0 } : { x: 0, y: dy };
+  };
+  for (const box of entries) move(box, 0, 0);
+  for (let pass = 0; pass < 24; pass++) {
+    let changed = false;
+    for (let i = 0; i < entries.length; i++) for (let j = i + 1; j < entries.length; j++) {
+      const a = entries[i]!, b = entries[j]!;
+      if (!boxesOverlap(a, b, 7)) continue;
+      const d = displacement(a, b, 7.1), part = move(a, d.x / 2, d.y / 2);
+      const rest = move(b, part.x - d.x, part.y - d.y);
+      move(a, d.x + rest.x - part.x, d.y + rest.y - part.y);
+      changed = true;
+    }
+    for (const box of entries) for (const point of anchors) {
+      const dot = { x: point.x - 7, y: point.y - 7, w: 14, h: 14 };
+      if (!boxesOverlap(box, dot)) continue;
+      const d = displacement(box, dot, 0.1); move(box, d.x, d.y); changed = true;
+    }
+    if (!changed) break;
+  }
+  return result;
+}
+
 export function boxesOverlap(a: Box, b: Box, gap = 0) {
   return a.x < b.x + b.w + gap && a.x + a.w + gap > b.x && a.y < b.y + b.h + gap && a.y + a.h + gap > b.y;
 }
@@ -116,7 +179,7 @@ export function placeSpatialLabels(requests: LabelRequest[], bounds: Box, anchor
       const dy = Math.max(box.y - item.y, 0, item.y - box.y - box.h);
       const displacement = old ? (box.x - old.x) ** 2 + (box.y - old.y) ** 2 : 0;
       const oldReach = old ? Math.hypot(Math.max(old.x - item.x, 0, item.x - old.x - old.w), Math.max(old.y - item.y, 0, item.y - old.y - old.h)) : 0;
-      const score = dx * dx + dy * dy * 1.4 + displacement * (oldReach > 180 ? 1 : 12);
+      const score = dx * dx + dy * dy * 1.4 + displacement * (oldReach > 180 ? 0.15 : 4);
       if (score > bestScore || (score === bestScore && winner && (box.y > winner.y || (box.y === winner.y && box.x >= winner.x)))) return;
       if (!available(box)) return;
       winner = box; bestScore = score;

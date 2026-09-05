@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { averageCycleDays, neighborhood, parseStudyLocation, searchMaterials } from '../src/atlas-study/model.ts';
 import { materials, regions, relations } from '../src/atlas-study/data.ts';
 import { buildSpatialLayout } from '../src/atlas-study/spatial-layout.ts';
-import { boxesOverlap, canInterpolateLabels, depthAppearance, findRearCrossings, placeSpatialLabels, spatialKinds, spatialNames, spatialRegionPatterns, spatialTones } from '../src/atlas-study/spatial-visuals.ts';
+import { boxesOverlap, canInterpolateLabels, depthAppearance, findRearCrossings, followSpatialLabels, placeSpatialLabels, ribbonTriangles, separateFollowingLabels, spatialKinds, spatialNames, spatialRegionPatterns, spatialTones } from '../src/atlas-study/spatial-visuals.ts';
 
 test('every spatial dot has a short readable identity without losing its material kind', () => {
   assert.equal(new Set(Object.values(spatialNames)).size, materials.length);
@@ -16,8 +16,8 @@ test('every spatial dot has a short readable identity without losing its materia
   assert.equal(new Set(Object.values(spatialRegionPatterns)).size, regions.length);
 });
 
-test('label history absorbs tiny projection noise without side switching', () => {
-  const requests = Array.from({ length: 20 }, (_, i) => ({ id: String(i), x: 155 + (i % 3) * 12, y: 340 + Math.floor(i / 3) * 16, w: 96, h: 26, priority: i % 5 }));
+test('nearby label history absorbs tiny projection noise without side switching', () => {
+  const requests = Array.from({ length: 6 }, (_, i) => ({ id: String(i), x: 100 + (i % 2) * 110, y: 220 + Math.floor(i / 2) * 110, w: 96, h: 26, priority: i % 5 }));
   const bounds = { x: 18, y: 94, w: 284, h: 584 };
   const original = placeSpatialLabels(requests, bounds, requests);
   const stored = JSON.stringify([...original]);
@@ -27,6 +27,49 @@ test('label history absorbs tiny projection noise without side switching', () =>
     for (const [id, box] of original) assert.deepEqual(result.get(id), box);
   }
   assert.equal(JSON.stringify([...original]), stored, 'Previous frame must not be mutated');
+});
+
+test('names follow their own projected nodes without changing their local offset', () => {
+  const before = new Map([['a', { x: 10, y: 20 }], ['b', { x: 220, y: 70 }]]);
+  const after = new Map([['a', { x: 40, y: 9 }], ['b', { x: 205, y: 112 }]]);
+  const boxes = new Map([['a', { x: 24, y: 7, w: 90, h: 26 }], ['b', { x: 114, y: 57, w: 90, h: 26 }]]);
+  const snapshot = JSON.stringify([...boxes]);
+  const moved = followSpatialLabels(boxes, before, after);
+  assert.deepEqual(moved.get('a'), { x: 54, y: -4, w: 90, h: 26 });
+  assert.deepEqual(moved.get('b'), { x: 99, y: 99, w: 90, h: 26 });
+  assert.deepEqual(followSpatialLabels(moved, after, before), boxes);
+  assert.equal(JSON.stringify([...boxes]), snapshot);
+});
+
+test('following labels resolve local collisions without jumping to distant slots', () => {
+  const bounds = { x: 0, y: 0, w: 480, h: 320 };
+  const boxes = new Map([['a', { x: 80, y: 80, w: 100, h: 26 }], ['b', { x: 120, y: 103, w: 100, h: 26 }], ['c', { x: 250, y: 205, w: 100, h: 26 }]]);
+  const snapshot = JSON.stringify([...boxes]);
+  const result = separateFollowingLabels(boxes, bounds, [{ x: 300, y: 200 }]);
+  for (const [id, box] of result) {
+    assert.ok([...result].every(([other, value]) => id === other || !boxesOverlap(box, value)));
+    assert.ok(Math.hypot(box.x - boxes.get(id)!.x, box.y - boxes.get(id)!.y) < 8);
+  }
+  assert.deepEqual(separateFollowingLabels(result, bounds, [{ x: 300, y: 200 }]), result, 'A settled layout must not oscillate');
+  assert.equal(JSON.stringify([...boxes]), snapshot);
+  const nearEdge = new Map([['a', { x: -3, y: 270, w: 100, h: 26 }], ['b', { x: 25, y: 294, w: 100, h: 26 }]]);
+  const clamped = separateFollowingLabels(nearEdge, bounds);
+  assert.ok([...clamped.values()].every(box => box.x >= 0 && box.y >= 0 && box.x + box.w <= 480 && box.y + box.h <= 320));
+  assert.equal(boxesOverlap(clamped.get('a')!, clamped.get('b')!), false);
+});
+
+test('ribbon faces stay narrow and inherit actual endpoint depth', () => {
+  const a = { x: 20, y: 40, depth: 0.2 }, b = { x: 220, y: 40, depth: 0.8 };
+  const vertices = ribbonTriangles(a, b, 36);
+  assert.equal(vertices.length, 66);
+  assert.ok(vertices.every(p => p.x >= 2 && p.x <= 238 && p.y >= 22 && p.y <= 58));
+  assert.ok(vertices.every(p => p.depth === a.depth || p.depth === b.depth));
+  const short = ribbonTriangles(a, { ...b, x: 30 }, 36);
+  assert.ok(short.every(p => Math.abs(p.y - 40) <= 2.4 + 1e-6), 'A foreshortened edge must not become a large disk');
+  for (const other of [a, { ...b, depth: 1.1 }, { ...b, x: NaN }]) assert.deepEqual(ribbonTriangles(a, other, 36), []);
+  assert.deepEqual(ribbonTriangles(a, b, 0), []);
+  const diagonal = ribbonTriangles(a, { ...b, y: 140 }, 36);
+  assert.ok(diagonal.every(p => Math.abs((p.x - 20) * -100 + (p.y - 40) * 200) / Math.hypot(200, 100) <= 18 + 1e-6));
 });
 
 test('label transitions reject paths crossing through another identity', () => {

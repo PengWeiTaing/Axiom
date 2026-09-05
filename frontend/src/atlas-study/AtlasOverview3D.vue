@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { materials, regions, relations } from './data';
 import type { RegionId } from './model';
 import { buildSpatialLayout } from './spatial-layout';
-import { canInterpolateLabels, depthAppearance, findRearCrossings, placeSpatialLabels, spatialKinds, spatialNames, spatialRegionPatterns, spatialTones } from './spatial-visuals';
+import { canInterpolateLabels, depthAppearance, findRearCrossings, followSpatialLabels, placeSpatialLabels, ribbonTriangles, separateFollowingLabels, spatialKinds, spatialNames, spatialRegionPatterns, spatialTones } from './spatial-visuals';
 import type { LabelBox } from './spatial-visuals';
 
 const props = defineProps<{ active: boolean }>();
@@ -20,6 +20,8 @@ const elements = new Map<string, Element>();
 const nodes = buildSpatialLayout(materials, relations).map(node => ({ ...node, material: materials.find(item => item.id === node.id)! }));
 const positions = new Map(nodes.map(node => [node.id, new THREE.Vector3(node.x, node.y, node.z)]));
 const domains = regions.map(region => ({ ...region, members: nodes.filter(node => node.region === region.id) }));
+const ribbonEdges = relations.filter(edge => nodes.find(node => node.id === edge.from)!.region === nodes.find(node => node.id === edge.to)!.region);
+const ribbons = new Map<string, THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>>();
 const icons = { question: CircleHelp, note: FileText, research: BookOpen, image: Image, hypothesis: Lightbulb };
 const linked = computed(() => new Set(relations.filter(edge => edge.from === hovered.value || edge.to === hovered.value).flatMap(edge => [edge.from, edge.to])));
 const edgeKinds = { context: '关联', hypothesis: '待验证的联系', limit: '限制与反例' };
@@ -30,6 +32,7 @@ let observer: ResizeObserver;
 let frame = 0, width = 1, height = 1, homeDistance = 800;
 let disposed = false, projectionDirty = true, resetLabels = true, fontsReady = false, gesture = false;
 let labelBoxes = new Map<string, LabelBox>();
+let labelAnchors = new Map<string, { x: number; y: number }>();
 let labelMotion: { from: Map<string, LabelBox>; to: Map<string, LabelBox>; start: number; duration: number; slide: boolean } | null = null;
 let pointerDown: { x: number; y: number } | null = null;
 const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
@@ -54,6 +57,19 @@ function projectScene() {
     projected.set(node.id, { x: (vector.x + 1) * width / 2, y: (1 - vector.y) * height / 2, depth: vector.z, distance: (distances[index]! - near) / range, viewDistance: distances[index]! });
   });
 }
+function projectRibbons() {
+  const stripWidth = (width < 650 ? 23 : 36) * THREE.MathUtils.clamp(homeDistance * 0.78 / camera.position.distanceTo(controls!.target), 0.75, 1.3);
+  for (const edge of ribbonEdges) {
+    const mesh = ribbons.get(edge.id)!;
+    const vertices = ribbonTriangles(projected.get(edge.from)!, projected.get(edge.to)!, stripWidth);
+    const attribute = mesh.geometry.getAttribute('position');
+    vertices.forEach((p, index) => {
+      vector.set(p.x / width * 2 - 1, 1 - p.y / height * 2, p.depth).unproject(camera);
+      attribute.setXYZ(index, vector.x, vector.y, vector.z);
+    });
+    attribute.needsUpdate = true; mesh.geometry.setDrawRange(0, vertices.length);
+  }
+}
 function paintScene() {
   const color = new THREE.Color();
   const values = points.geometry.getAttribute('color'), sizes = points.geometry.getAttribute('size');
@@ -73,6 +89,15 @@ function paintScene() {
     }
   });
   for (const attribute of [values, sizes, opacity, rings]) attribute.needsUpdate = true;
+  for (const edge of ribbonEdges) {
+    const mesh = ribbons.get(edge.id)!;
+    const region = nodes.find(node => node.id === edge.from)!.region;
+    const depth = (projected.get(edge.from)!.distance + projected.get(edge.to)!.distance) / 2;
+    const relevant = hoveredRegion.value ? region === hoveredRegion.value : !hovered.value || linked.value.has(edge.from) && linked.value.has(edge.to);
+    // Opaque, background-mixed pigment uses the depth buffer, not stacked alpha blankets.
+    const pigment = (0.17 - depth * 0.05) * (relevant ? hoveredRegion.value ? 1.35 : 1 : 0.24);
+    mesh.material.color.set('#171919').convertLinearToSRGB().lerp(color.set(spatialTones[region]).convertLinearToSRGB(), pigment).convertSRGBToLinear();
+  }
   const gaps = findRearCrossings(relations.map(edge => {
     const a = projected.get(edge.from)!, b = projected.get(edge.to)!;
     return { id: edge.id, from: { x: a.x, y: a.y, distance: a.viewDistance }, to: { x: b.x, y: b.y, distance: b.viewDistance } };
@@ -92,21 +117,31 @@ function paintScene() {
     attrs('holes:' + edge.id, { d: gaps.get(edge.id)!.map(p => 'M ' + (p.x - 3) + ' ' + p.y + ' a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0').join(' ') });
   }
 }
-function placeLabels(now: number) {
-  if (!fontsReady) return;
-  const bounds = { x: 18, y: 94, w: width - 36, h: height - 194 };
-  const requests = nodes.map(node => {
-    const el = elements.get('node:' + node.id) as HTMLElement;
-    const p = projected.get(node.id)!;
-    return { id: 'node:' + node.id, x: p.x, y: p.y, w: el.offsetWidth, h: el.offsetHeight, priority: 10 + node.degree };
-  });
+function updateLabelAnchors() {
+  const next = new Map(nodes.map(node => ['node:' + node.id, { x: projected.get(node.id)!.x, y: projected.get(node.id)!.y }]));
   for (const domain of domains) {
     const members = domain.members.map(node => projected.get(node.id)!);
     const center = members.reduce((sum, p) => ({ x: sum.x + p.x / members.length, y: sum.y + p.y / members.length }), { x: 0, y: 0 });
-    const element = elements.get('domain:' + domain.id) as HTMLElement;
     const minY = Math.min(...members.map(p => p.y));
-    requests.push({ id: 'domain:' + domain.id, x: center.x, y: minY - 58, w: element.offsetWidth, h: element.offsetHeight, priority: 40 });
+    next.set('domain:' + domain.id, { x: center.x, y: minY - 58 });
   }
+  if (!resetLabels) {
+    labelBoxes = followSpatialLabels(labelBoxes, labelAnchors, next);
+    if (gesture) labelBoxes = separateFollowingLabels(labelBoxes, { x: 18, y: 94, w: width - 36, h: height - 194 }, [...projected.values()]);
+    if (labelMotion) {
+      labelMotion.from = followSpatialLabels(labelMotion.from, labelAnchors, next);
+      labelMotion.to = followSpatialLabels(labelMotion.to, labelAnchors, next);
+    }
+  }
+  labelAnchors = next;
+}
+function placeLabels(now: number) {
+  if (!fontsReady) return;
+  const bounds = { x: 18, y: 94, w: width - 36, h: height - 194 };
+  const requests = [...labelAnchors].map(([id, p]) => {
+    const el = elements.get(id) as HTMLElement;
+    return { id, ...p, w: el.offsetWidth, h: el.offsetHeight, priority: id.startsWith('domain:') ? 40 : 10 + nodes.find(node => 'node:' + node.id === id)!.degree };
+  });
   const preferred = new Map<string, LabelBox>();
   if (!resetLabels) for (const request of requests) {
     const old = labelBoxes.get(request.id);
@@ -144,16 +179,9 @@ function applyLabelBoxes(now: number) {
     label.style.transform = 'translate(' + box.x + 'px, ' + box.y + 'px)';
     if (key.startsWith('node:')) {
       const p = projected.get(key.slice(5))!;
+      label.dataset.anchorX = String(p.x); label.dataset.anchorY = String(p.y);
       label.style.visibility = p.depth > -1 && p.depth < 1 ? 'visible' : 'hidden';
     }
-  }
-}
-function paintLabelStems() {
-  for (const node of nodes) {
-    const box = labelBoxes.get('node:' + node.id), p = projected.get(node.id)!;
-    if (!box) continue;
-    const x = Math.max(box.x, Math.min(box.x + box.w, p.x)), y = Math.max(box.y, Math.min(box.y + box.h, p.y));
-    attrs('stem:' + node.id, { d: 'M ' + p.x + ' ' + p.y + ' L ' + x + ' ' + y, opacity: related(node.id) ? 0.3 : 0.08 });
   }
 }
 function geometryChanged() { projectionDirty = true; requestRender(); }
@@ -163,8 +191,8 @@ function render(now: number) {
   frame = 0;
   if (!renderer || !props.active || document.hidden || disposed || failed.value) return;
   camera.updateMatrixWorld();
-  if (projectionDirty) { projectScene(); if (!gesture) placeLabels(now); projectionDirty = false; }
-  applyLabelBoxes(now); paintScene(); paintLabelStems(); renderer.render(scene, camera);
+  if (projectionDirty) { projectScene(); projectRibbons(); updateLabelAnchors(); if (!gesture) placeLabels(now); projectionDirty = false; }
+  applyLabelBoxes(now); paintScene(); renderer.render(scene, camera);
   if (labelMotion) requestRender();
 }
 function requestRender() {
@@ -229,6 +257,12 @@ onMounted(() => {
     renderer.domElement.addEventListener('webglcontextlost', contextLost);
     renderer.domElement.addEventListener('pointerdown', canvasDown); renderer.domElement.addEventListener('pointerup', canvasUp);
     host.value!.prepend(renderer.domElement);
+    for (const edge of ribbonEdges) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(66 * 3), 3));
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, depthTest: true, depthWrite: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
+      mesh.frustumCulled = false; ribbons.set(edge.id, mesh); scene.add(mesh);
+    }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(nodes.flatMap(node => [node.x, node.y, node.z]), 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(nodes.length * 3), 3));
@@ -249,7 +283,7 @@ onMounted(() => {
           #include <colorspace_fragment>
         }`,
     }));
-    scene.add(points);
+    points.renderOrder = 1; scene.add(points);
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = false; controls.enablePan = false;
     controls.rotateSpeed = 0.55; controls.zoomSpeed = 0.7;
@@ -267,6 +301,8 @@ onBeforeUnmount(() => {
   disposed = true; cancelAnimationFrame(frame); observer?.disconnect();
   document.removeEventListener('visibilitychange', visibilityChanged); motionQuery.removeEventListener('change', visibilityChanged);
   controls?.dispose(); points?.geometry.dispose(); points?.material.dispose();
+  for (const mesh of ribbons.values()) { mesh.geometry.dispose(); mesh.material.dispose(); }
+  ribbons.clear();
   renderer?.domElement.removeEventListener('webglcontextlost', contextLost);
   renderer?.domElement.removeEventListener('pointerdown', canvasDown); renderer?.domElement.removeEventListener('pointerup', canvasUp);
   renderer?.dispose(); renderer?.domElement.remove();
@@ -274,7 +310,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section ref="host" class="spatial-overview" :class="{ 'is-ready': ready, 'spatial-failed': failed, 'has-focus': hovered || hoveredRegion, 'is-moving': moving }" aria-label="Atlas 三维全貌">
+  <section ref="host" class="spatial-overview" :class="{ 'is-ready': ready, 'spatial-failed': failed, 'has-focus': hovered || hoveredRegion, 'is-moving': moving }" :data-ribbon-relations="ribbonEdges.map(edge => edge.id).join(' ')" aria-label="Atlas 三维全貌">
     <div class="spatial-heading"><h1>Atlas</h1><button class="quiet-command" type="button" @click="emit('reading')"><MapIcon :size="17" />二维阅读</button></div>
     <template v-if="!failed">
       <svg class="spatial-connections" aria-hidden="true">
@@ -289,12 +325,11 @@ onBeforeUnmount(() => {
           <title>{{ edgeKinds[edge.kind] }}：{{ edge.statement }}</title>
           <path :ref="el => bind(`edge:${edge.id}`, el)" :stroke="`url(#spatial-edge-${edge.id})`" :mask="`url(#spatial-mask-${edge.id})`" :stroke-dasharray="edge.kind === 'hypothesis' ? '7 5' : edge.kind === 'limit' ? '2 4' : undefined" class="edge-ink" />
         </g></g>
-        <path v-for="node in nodes" :key="node.id" :ref="el => bind(`stem:${node.id}`, el)" class="spatial-node-stem" :stroke="spatialTones[node.region]" />
       </svg>
       <button v-for="node in nodes" :key="node.id" :ref="el => bind(`node:${node.id}`, el)" class="spatial-hit" :class="{ 'is-active': hovered === node.id }" :style="{ '--node-tone': spatialTones[node.region] }" type="button"
         :aria-label="`查看${node.material.title.replace('\n', '')}`" :title="`${spatialKinds[node.material.kind]}：${node.material.title.replace('\n', '')}`" :data-spatial-node="node.id" :data-region="node.region"
         @pointerenter="hovered = node.id" @pointerleave="hovered = null" @focus="hovered = node.id" @blur="hovered = null" @click="emit('select', node.id)">
-        <span class="region-mark" :data-pattern="spatialRegionPatterns[node.region]" aria-hidden="true"></span><component :is="icons[node.material.kind]" :size="13" :stroke-width="1.6" aria-hidden="true" /><span>{{ spatialNames[node.id] || node.material.title.replace('\n', '') }}</span>
+        <component :is="icons[node.material.kind]" :size="13" :stroke-width="1.6" aria-hidden="true" /><span>{{ spatialNames[node.id] || node.material.title.replace('\n', '') }}</span>
       </button>
       <button v-for="domain in domains" :key="domain.id" :ref="el => bind(`domain:${domain.id}`, el)" class="spatial-domain" :style="{ '--tone': spatialTones[domain.id] }"
         type="button" :aria-label="`展开${domain.title}`" :data-spatial-region="domain.id" @pointerenter="hoveredRegion = domain.id" @pointerleave="hoveredRegion = null"
