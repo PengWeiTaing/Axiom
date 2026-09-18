@@ -65,6 +65,14 @@ foreach ($processId in $stale) {
 if ($blocked) { exit 1 }
 
 # 2) 演示所需环境变量。
+#    令牌放在 scripts\firecup-secrets.local.ps1（已被 .gitignore 排除），
+#    这样每天开机不必重敲，也不会把 PAT 提交进仓库。
+$secretsFile = Join-Path $PSScriptRoot 'firecup-secrets.local.ps1'
+if (Test-Path $secretsFile) {
+    . $secretsFile
+    Write-Host '  [i] 已加载本机令牌配置 scripts\firecup-secrets.local.ps1' -ForegroundColor DarkGray
+}
+
 $env:AXIOM_ROOT = $repoRoot
 $env:AXIOM_PORT = "$Port"
 $env:AXIOM_HOST = '127.0.0.1'          # 只监听本机，答辩现场不对外暴露

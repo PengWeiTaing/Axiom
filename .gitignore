@@ -14,6 +14,10 @@ test-results/
 .claude/settings.local.json
 *.pdf
 
+# 本机演示用的令牌（扣子 PAT 等），永远不进仓库
+*.local.ps1
+*.local.sh
+
 # frontend (Vite + Vue v2 工程)
 frontend/node_modules/
 frontend/dist/
