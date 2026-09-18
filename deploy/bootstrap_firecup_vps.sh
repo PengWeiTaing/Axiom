@@ -3,7 +3,10 @@
 # 火山杯白板 — VPS 一键重建（Debian / Ubuntu）
 #
 # 用法（在 VPS 上以 root 或 sudo 执行）：
-#     sudo bash bootstrap_firecup_vps.sh your-domain.example
+#     curl -fsSL <本文件的 raw 地址> -o /tmp/bootstrap.sh
+#     sudo bash /tmp/bootstrap.sh your-domain.example
+#
+# 先下载再执行，不要 `curl | bash`：本脚本需要交互输入令牌，而管道会占用 stdin。
 #
 # 脚本会交互式询问扣子令牌，输入不回显、不进入 shell 历史。
 # 它是幂等的：重复执行只会更新代码与配置，不删除已有证书或数据。
@@ -30,6 +33,28 @@ step() { printf '\n\033[36m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[33m    [!] %s\033[0m\n' "$*"; }
 ok()   { printf '\033[32m    [+] %s\033[0m\n' "$*"; }
 
+# 交互输入一律走 fd 3 上的真实终端，而不是 stdin：用 `curl ... | bash` 时 stdin
+# 是脚本正文，read 会把脚本的下一行当成用户输入——令牌会变成一行代码写进配置。
+# -r 测试通过不代表真能打开（后台任务、无控制终端时会失败），所以直接试开。
+INTERACTIVE=1
+if ! exec 3</dev/tty 2>/dev/null; then
+    INTERACTIVE=0
+fi
+
+require_tty() {
+    [[ $INTERACTIVE -eq 1 ]] && return 0
+    cat >&2 <<EOF
+
+本脚本需要交互输入（扣子令牌、工作流 ID），但当前没有可用终端。
+如果你是用管道执行的，请改成两步——也方便你先看一眼脚本内容：
+
+    curl -fsSL https://raw.githubusercontent.com/PengWeiTaing/Axiom/codex/learning-board-v1/deploy/bootstrap_firecup_vps.sh -o /tmp/bootstrap.sh
+    less /tmp/bootstrap.sh
+    sudo bash /tmp/bootstrap.sh ${DOMAIN}
+EOF
+    exit 1
+}
+
 if ! command -v apt-get >/dev/null 2>&1; then
     echo "本脚本按 Debian / Ubuntu 编写，但这台机器上没有 apt-get。" >&2
     echo "系统信息：$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -a)" >&2
@@ -46,7 +71,8 @@ echo "    域名解析到  : ${DOMAIN_IP:-未解析}"
 if [[ -n "$SERVER_IP" && -n "$DOMAIN_IP" && "$SERVER_IP" != "$DOMAIN_IP" ]]; then
     warn "域名没有指向这台机器。证书签发会失败——先去 DNS 面板改 A 记录，等生效后再跑本脚本。"
     warn "如果只是想先把服务装好，可以继续；最后一步申请证书会跳过。"
-    read -r -p "    继续吗？[y/N] " cont
+    require_tty
+    read -r -u 3 -p "    继续吗？[y/N] " cont
     [[ "$cont" == "y" || "$cont" == "Y" ]] || exit 1
 elif [[ -z "$DOMAIN_IP" ]]; then
     warn "域名当前没有解析记录，后面的证书步骤会跳过。"
@@ -101,19 +127,22 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 if [[ -n "$EXISTING_TOKEN" ]]; then
-    read -r -p "    已存在扣子令牌，保留它吗？[Y/n] " keep
+    require_tty
+    read -r -u 3 -p "    已存在扣子令牌，保留它吗？[Y/n] " keep
     [[ "$keep" == "n" || "$keep" == "N" ]] && EXISTING_TOKEN=""
 fi
 
 COZE_TOKEN="$EXISTING_TOKEN"
 if [[ -z "$COZE_TOKEN" ]]; then
+    require_tty
     # -s 不回显，令牌不会出现在屏幕或 shell 历史里
-    read -r -s -p "    粘贴扣子 PAT（只需 workflow run 权限）: " COZE_TOKEN
+    read -r -s -u 3 -p "    粘贴扣子 PAT（只需 workflow run 权限）: " COZE_TOKEN
     echo
 fi
 
 COZE_WORKFLOW="$EXISTING_WORKFLOW"
-read -r -p "    扣子工作流 ID [${EXISTING_WORKFLOW:-必填}]: " input_workflow
+require_tty
+read -r -u 3 -p "    扣子工作流 ID [${EXISTING_WORKFLOW:-必填}]: " input_workflow
 [[ -n "$input_workflow" ]] && COZE_WORKFLOW="$input_workflow"
 
 if [[ -z "$COZE_TOKEN" || -z "$COZE_WORKFLOW" ]]; then
