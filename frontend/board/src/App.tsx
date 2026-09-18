@@ -338,21 +338,23 @@ const INITIAL_INTAKE_MESSAGES: IntakeMessage[] = [{
   text: '你现在想弄懂什么？可以只说一句，我会先和你确认清楚，再生成白板。',
 }]
 
+// 首页直达的三个演示。都命中本地确定性场景，点一下即时呈现，不调用远程工作流，
+// 因此断网或额度不足时同样可用。想看通用生成，在上方输入框自己写一个目标即可。
 const INTAKE_EXAMPLES = [
   {
-    label: '看懂概念',
-    prompt: '为什么定积分能算面积？',
-    description: '适合数学、理工和抽象概念：先讲直觉，再连到公式。',
+    label: '定积分',
+    prompt: '为什么定积分能算面积',
+    description: '拖动矩形条数，看有限和怎样逼近定积分。',
   },
   {
-    label: '解具体题',
-    prompt: '2 kg物体受10 N向右拉力和4 N向左摩擦力，求加速度并画受力图',
-    description: '适合数学、物理、化学和工程题：条件、步骤与图一起讲。',
+    label: '拉格朗日乘数法',
+    prompt: '拉格朗日乘数法为什么要求梯度平行',
+    description: '沿约束移动一个点，看两个梯度何时平行。',
   },
   {
-    label: '读懂材料',
-    prompt: '根据我粘贴的教材，梳理核心机制、对比关系和易错点',
-    description: '适合生物、计算机和人文材料：抓主线、做对比、找易错点。',
+    label: '简谐运动',
+    prompt: '简谐运动中位移速度加速度的相位关系',
+    description: '归一化后比较三条曲线的相位与极值位置。',
   },
 ]
 
@@ -997,7 +999,12 @@ function CompetitionBoardApp() {
                   key={example.label}
                   type="button"
                   className="intake-example"
-                  onClick={() => setDraft(example.prompt)}
+                  disabled={isGenerating}
+                  onClick={() => {
+                    // 三个演示都命中本地场景，没有需要澄清的歧义，直接出白板。
+                    setDraft('')
+                    void handleGenerate(example.prompt)
+                  }}
                 >
                   <span>{example.label}</span>
                   <strong>{example.prompt}</strong>
