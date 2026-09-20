@@ -6,15 +6,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { materials, regions, relations } from './data';
 import type { RegionId } from './model';
 import { buildSpatialLayout } from './spatial-layout';
-import { buildRegionSurface } from './region-surface';
-import { depthAppearance, parseSpatialVariant, selectAnchoredLabels, spatialKinds, spatialNames, spatialTones } from './spatial-visuals';
-import type { AnchoredLabel, SpatialVariant } from './spatial-visuals';
+import { depthAppearance, selectAnchoredLabels, spatialKinds, spatialNames, spatialTones } from './spatial-visuals';
+import type { AnchoredLabel } from './spatial-visuals';
 
 const props = defineProps<{ active: boolean }>();
 const emit = defineEmits<{ select: [id: string]; region: [id: RegionId]; reading: [] }>();
 const host = ref<HTMLElement | null>(null);
 const failed = ref(false), ready = ref(false), moving = ref(false);
-const variant = ref(parseSpatialVariant(location.search));
 const hovered = ref<string | null>(null), hoveredRegion = ref<RegionId | null>(null);
 const hoveredMaterial = computed(() => materials.find(item => item.id === hovered.value));
 const nodes = buildSpatialLayout(materials, relations).map(node => ({ ...node, material: materials.find(item => item.id === node.id)! }));
@@ -39,8 +37,6 @@ const domains = regions.map((region, index) => {
 const icons = { question: CircleHelp, note: FileText, research: BookOpen, image: Image, hypothesis: Lightbulb };
 const linked = computed(() => new Set(relations.filter(edge => edge.from === hovered.value || edge.to === hovered.value).flatMap(edge => [edge.from, edge.to])));
 const elements = new Map<string, HTMLElement>();
-const surfaces = new Map<RegionId, THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>>();
-const outlines = new Map<RegionId, THREE.LineLoop<THREE.BufferGeometry, THREE.LineBasicMaterial>>();
 const edges = new Map<string, THREE.Line<THREE.BufferGeometry, THREE.LineDashedMaterial>>();
 const projected = new Map<string, { x: number; y: number; z: number; depth: number }>();
 let renderer: THREE.WebGLRenderer | undefined, controls: OrbitControls | undefined;
@@ -60,12 +56,6 @@ function bind(id: string, element: unknown) {
 function isRelated(id: string) {
   return hovered.value ? linked.value.has(id) : !hoveredRegion.value || nodes.find(node => node.id === id)!.region === hoveredRegion.value;
 }
-function setVariant(value: SpatialVariant) {
-  variant.value = value;
-  const url = new URL(location.href); url.searchParams.set('composition', value);
-  history.replaceState({}, '', url);
-}
-function readVariant() { variant.value = parseSpatialVariant(location.search); }
 
 function project() {
   const distances = nodes.map(node => -vector.copy(positions.get(node.id)!).applyMatrix4(camera.matrixWorldInverse).z);
@@ -143,17 +133,8 @@ function paint() {
     if (line.visible) visibleEdges++;
     line.material.opacity = active ? 0.84 : focused ? 0.05 : local ? depthAppearance((projected.get(edge.from)!.depth + projected.get(edge.to)!.depth) / 2).edgeOpacity : 0.13;
   }
-  for (const domain of domains) {
-    const surface = surfaces.get(domain.id)!, outline = outlines.get(domain.id)!;
-    surface.visible = outline.visible = variant.value === 'surfaces';
-    const relevant = hoveredRegion.value ? hoveredRegion.value === domain.id : !hovered.value || nodes.find(node => node.id === hovered.value)?.region === domain.id;
-    const base = new THREE.Color('#121716');
-    surface.material.color.copy(base).lerp(color.set(spatialTones[domain.id]), relevant ? 0.055 : 0.012);
-    outline.material.opacity = relevant ? 0.14 : 0.04;
-  }
   host.value!.dataset.visibleEdges = String(visibleEdges);
   host.value!.dataset.activeEdges = String(activeEdges);
-  host.value!.dataset.surfaceCount = variant.value === 'surfaces' ? String(surfaces.size) : '0';
 }
 function render() {
   frame = 0;
@@ -213,14 +194,6 @@ onMounted(() => {
     renderer.domElement.setAttribute('aria-label', '三维知识全貌'); renderer.domElement.setAttribute('role', 'img'); renderer.domElement.className = 'spatial-canvas';
     renderer.domElement.addEventListener('webglcontextlost', contextLost);
     host.value!.prepend(renderer.domElement);
-    scene.add(new THREE.HemisphereLight('#eef2ff', '#565f55', 2.2));
-    const light = new THREE.DirectionalLight('#ffffff', 1.8); light.position.set(-220, 340, 440); scene.add(light);
-    for (const domain of domains) {
-      const { geometry, outline } = buildRegionSurface(domain.members);
-      const surface = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 1, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
-      const border = new THREE.LineLoop(outline, new THREE.LineBasicMaterial({ color: spatialTones[domain.id], transparent: true, opacity: 0.2, depthWrite: false }));
-      surfaces.set(domain.id, surface); outlines.set(domain.id, border); scene.add(surface, border);
-    }
     for (const edge of relations) {
       const geometry = new THREE.BufferGeometry().setFromPoints([positions.get(edge.from)!, positions.get(edge.to)!]);
       const a = nodes.find(node => node.id === edge.from)!, b = nodes.find(node => node.id === edge.to)!;
@@ -253,30 +226,26 @@ onMounted(() => {
     controls.enableDamping = false; controls.enablePan = false; controls.rotateSpeed = 0.5; controls.zoomSpeed = 0.65;
     controls.addEventListener('change', geometryChanged); controls.addEventListener('start', onGestureStart); controls.addEventListener('end', onGestureEnd);
     observer = new ResizeObserver(resize); observer.observe(host.value!);
-    document.addEventListener('visibilitychange', visibilityChanged); addEventListener('popstate', readVariant);
+    document.addEventListener('visibilitychange', visibilityChanged);
     document.fonts.ready.then(() => { if (!disposed) { fontsReady = true; geometryChanged(); } });
     resize();
   } catch { failed.value = true; }
 });
-watch([hovered, hoveredRegion, variant], requestRender);
+watch([hovered, hoveredRegion], requestRender);
 watch(() => props.active, visibilityChanged);
 onBeforeUnmount(() => {
   disposed = true; cancelAnimationFrame(frame); observer?.disconnect();
-  document.removeEventListener('visibilitychange', visibilityChanged); removeEventListener('popstate', readVariant);
+  document.removeEventListener('visibilitychange', visibilityChanged);
   controls?.dispose(); points?.geometry.dispose(); points?.material.dispose();
-  for (const object of [...surfaces.values(), ...outlines.values(), ...edges.values()]) { object.geometry.dispose(); object.material.dispose(); }
+  for (const object of edges.values()) { object.geometry.dispose(); object.material.dispose(); }
   renderer?.domElement.removeEventListener('webglcontextlost', contextLost); renderer?.dispose(); renderer?.domElement.remove();
 });
 </script>
 
 <template>
-  <section ref="host" class="spatial-overview" :class="{ 'is-ready': ready, 'spatial-failed': failed, 'has-focus': hovered || hoveredRegion, 'is-moving': moving }" :data-composition="variant" aria-label="Atlas 三维全貌">
+  <section ref="host" class="spatial-overview" :class="{ 'is-ready': ready, 'spatial-failed': failed, 'has-focus': hovered || hoveredRegion, 'is-moving': moving }" aria-label="Atlas 三维全貌">
     <div class="spatial-heading">
       <h1>Atlas<span>全貌</span></h1>
-      <div class="composition-switch" role="group" aria-label="区域呈现对照">
-        <button type="button" :aria-pressed="variant === 'points'" @click="setVariant('points')"><span>A</span>点群</button>
-        <button type="button" :aria-pressed="variant === 'surfaces'" @click="setVariant('surfaces')"><span>B</span>区域面</button>
-      </div>
       <button class="quiet-command spatial-reading" type="button" @click="emit('reading')"><MapIcon :size="17" />二维阅读</button>
     </div>
     <template v-if="!failed">

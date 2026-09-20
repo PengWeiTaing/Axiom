@@ -25,7 +25,7 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
       overlap: boxes.some((a, i) => boxes.some((b, j) => i !== j && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)),
       outside: boxes.some(box => box.left < 0 || box.right > innerWidth || box.top < 140 || box.bottom > innerHeight - 80),
       depthTiers: new Set(dots.map(el => el.dataset.depth)).size,
-      surfaceCount: Number(element.dataset.surfaceCount), visibleEdges: Number(element.dataset.visibleEdges),
+      comparisonControls: element.querySelectorAll('.composition-switch').length, visibleEdges: Number(element.dataset.visibleEdges),
       overflow: document.documentElement.scrollWidth > innerWidth,
       animations: element.getAnimations({ subtree: true }).filter(animation => animation.playState === 'running').length,
     };
@@ -51,24 +51,25 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
   try {
     for (const width of [1440, 768, 390, 320]) {
       await page.setViewportSize({ width, height: width > 650 ? 960 : 844 });
-      const start = new URL(url); start.searchParams.set('view', 'space'); start.searchParams.set('composition', 'points');
+      const start = new URL(url); start.searchParams.set('view', 'space'); start.searchParams.delete('composition');
       await page.goto(start.href); await page.locator('.spatial-overview.is-ready').waitFor();
       await page.evaluate(() => document.fonts.ready); await settled();
       check(!await page.locator('.spatial-fallback').isVisible(), 'WebGL unexpectedly unavailable');
-      check(await page.locator('.spatial-dot-hit').count() === 20, 'Comparison must use twenty real materials');
+      check(await page.locator('.spatial-dot-hit').count() === 20, 'Overview must use twenty real materials');
       const a = await inspect(), positions = await identityPositions(), before = await pixels();
       check(a.domains === 4 && a.labels >= 4 && a.labels < 20 && a.identities, `Missing meaningful overview identities at ${width}: ${JSON.stringify(a)}`);
       check(!a.overlap && !a.outside && !a.overflow && a.depthTiers === 3, `Unreadable static overview at ${width}: ${JSON.stringify(a)}`);
-      check(a.surfaceCount === 0 && a.visibleEdges === 19 && a.animations === 0, 'A must be static with a limited real bridge subset');
-      check(before.count > 100 && before.left > 5 && before.right < before.width - 5 && before.top > 80 && before.bottom < before.height - 70, `A canvas blank or badly framed at ${width}: ${JSON.stringify(before)}`);
-      await page.locator('.composition-switch button').nth(1).click(); await page.mouse.move(10, 80); await settled();
-      const b = await inspect(), filled = await pixels();
-      check(b.surfaceCount === 4 && b.visibleEdges === a.visibleEdges && b.labels === a.labels, 'B must only change the four topic surfaces');
-      check(JSON.stringify(await identityPositions()) === JSON.stringify(positions), 'A/B changed camera or label positions');
-      check(filled.count > before.count * 3 && filled.signature !== before.signature, 'Topic surfaces did not render in WebGL');
-      check(new URL(page.url()).searchParams.get('composition') === 'surfaces', 'Comparison deep link missing');
+      check(a.comparisonControls === 0 && a.visibleEdges === 19 && a.animations === 0, 'Overview must stay static without surface controls');
+      check(before.count > 100 && before.left > 5 && before.right < before.width - 5 && before.top > 80 && before.bottom < before.height - 70, `Point canvas blank or badly framed at ${width}: ${JSON.stringify(before)}`);
+      for (const composition of ['points', 'surfaces']) {
+        const legacy = new URL(start); legacy.searchParams.set('composition', composition);
+        await page.goto(legacy.href); await page.locator('.is-ready').waitFor(); await page.evaluate(() => document.fonts.ready); await settled();
+        check((await inspect()).comparisonControls === 0, 'Legacy link restored surface controls');
+        check(JSON.stringify(await identityPositions()) === JSON.stringify(positions), 'Legacy link changed camera or label positions');
+        check(JSON.stringify(await pixels()) === JSON.stringify(before), `Legacy ${composition} link changed point-only rendering`);
+      }
       await page.reload(); await page.locator('.is-ready').waitFor(); await page.evaluate(() => document.fonts.ready); await settled();
-      check(await page.locator('.composition-switch button').nth(1).getAttribute('aria-pressed') === 'true', 'Reload lost the selected composition');
+      check(JSON.stringify(await pixels()) === JSON.stringify(before), 'Reload restored topic surfaces');
       if (width === 1440) {
         const still = await identityPositions();
         await page.locator('[data-node-label="unfinished"]').hover(); await settled();
@@ -95,20 +96,20 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
         check(JSON.stringify(await identityPositions()) === JSON.stringify(stopped), 'Names drifted after gesture release');
       }
       await page.getByRole('button', { name: '转动三维视角' }).click(); await settled();
-      check((await pixels()).signature !== filled.signature, 'Rotation did not alter canvas pixels');
+      check((await pixels()).signature !== before.signature, 'Rotation did not alter canvas pixels');
       const rotated = await identityPositions();
       const reading = await inspect(); check(!reading.overlap && !reading.outside, `Rotation collisions at ${width}`);
       await page.getByRole('button', { name: '二维阅读', exact: true }).click();
       await page.getByRole('button', { name: '回到三维全貌' }).click(); await settled();
       check(JSON.stringify(await identityPositions()) === JSON.stringify(rotated), 'Returning from 2D lost the camera orientation');
-      check(await page.locator('.spatial-overview').getAttribute('data-composition') === 'surfaces', 'Returning from 2D lost composition');
+      check((await inspect()).comparisonControls === 0, 'Returning from 2D restored surface controls');
       await page.getByRole('button', { name: '恢复三维全貌' }).click(); await settled();
       await page.getByRole('button', { name: '展开复杂性的秩序' }).click();
       check(await page.getByLabel('所在领域').inputValue() === 'systems', 'Topic did not open matching reading scope');
       await page.getByRole('button', { name: '回到三维全貌' }).click(); await settled();
       await page.locator('[data-node-label="little"]').click();
       check((await page.locator('.material-detail h2').textContent()).includes('在途、产出与时间'), 'Material identity changed between 3D and 2D');
-      results.push({ width, pointsPixels: before.count, surfacePixels: filled.count, labels: a.labels, domains: a.domains });
+      results.push({ width, pointsPixels: before.count, legacyLinksMatch: true, labels: a.labels, domains: a.domains });
     }
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(url); await page.locator('.is-ready').waitFor(); await settled();
@@ -122,7 +123,7 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
     await page.getByRole('button', { name: '进入二维阅读' }).click();
     check(await page.locator('.atlas-overview').isVisible(), 'GPU failure lost the reading path');
     check(errors.length === 0, errors.join('\n'));
-    return { passed: true, results, checks: ['matched A/B identity and camera', 'real WebGL surfaces', 'semantic label budget', 'four named topics on mobile', 'anchored names throughout drag', 'no post-gesture drift', 'actual neighborhood', 'composition deep links', '2D and topic continuity', 'reduced motion and hidden idle', 'GPU fallback'] };
+    return { passed: true, results, checks: ['point-only rendering', 'legacy composition links stay point-only', 'semantic label budget', 'four named topics on mobile', 'anchored names throughout drag', 'no post-gesture drift', 'actual neighborhood', '2D and topic continuity', 'reduced motion and hidden idle', 'GPU fallback'] };
   } finally {
     page.off('pageerror', onError); page.off('console', onConsole); await page.emulateMedia({ reducedMotion: null });
   }

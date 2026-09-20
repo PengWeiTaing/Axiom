@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { averageCycleDays, neighborhood, parseStudyLocation, searchMaterials } from '../src/atlas-study/model.ts';
 import { materials, regions, relations } from '../src/atlas-study/data.ts';
 import { buildSpatialLayout } from '../src/atlas-study/spatial-layout.ts';
-import { buildRegionSurface } from '../src/atlas-study/region-surface.ts';
-import { boxesOverlap, depthAppearance, parseSpatialVariant, selectAnchoredLabels, spatialKinds, spatialNames, spatialTones } from '../src/atlas-study/spatial-visuals.ts';
+import { boxesOverlap, depthAppearance, selectAnchoredLabels, spatialKinds, spatialNames, spatialTones } from '../src/atlas-study/spatial-visuals.ts';
 
 test('every real dot retains its readable identity and content kind', () => {
   assert.equal(new Set(Object.values(spatialNames)).size, materials.length);
@@ -13,13 +12,6 @@ test('every real dot retains its readable identity and content kind', () => {
     assert.ok(spatialKinds[item.kind] && spatialTones[item.region]);
   }
   assert.equal(new Set(Object.values(spatialTones)).size, regions.length);
-});
-
-test('comparison links accept only the two visual compositions', () => {
-  assert.equal(parseSpatialVariant(''), 'points');
-  assert.equal(parseSpatialVariant('?composition=surfaces'), 'surfaces');
-  assert.equal(parseSpatialVariant('?composition=points&focus=little'), 'points');
-  assert.equal(parseSpatialVariant('?composition=private'), 'points');
 });
 
 test('label selection never changes a position and prefers readable landmarks', () => {
@@ -68,25 +60,6 @@ test('depth cues are continuous and keep distant material names readable', () =>
   assert.ok(near.edgeOpacity > middle.edgeOpacity && middle.edgeOpacity > far.edgeOpacity);
   assert.ok(far.labelOpacity >= 0.75 && near.pointSize <= 8);
   assert.deepEqual(depthAppearance(-3), near); assert.deepEqual(depthAppearance(3), far);
-});
-
-test('topic sheets use member geometry without mutating or inventing materials', () => {
-  const layout = buildSpatialLayout(materials, relations);
-  const original = JSON.stringify(layout);
-  for (const region of regions) {
-    const members = layout.filter(node => node.region === region.id);
-    const { geometry, outline } = buildRegionSurface(members);
-    assert.ok(geometry.index!.count > 0 && geometry.getAttribute('position').count < 500);
-    assert.ok([...geometry.getAttribute('position').array, ...geometry.getAttribute('normal').array].every(Number.isFinite));
-    const other = buildRegionSurface(members);
-    assert.deepEqual(geometry.getAttribute('position').array, other.geometry.getAttribute('position').array);
-    geometry.dispose(); outline.dispose(); other.geometry.dispose(); other.outline.dispose();
-  }
-  assert.equal(JSON.stringify(layout), original);
-  assert.throws(() => buildRegionSurface([]));
-  const single = buildRegionSurface(layout.slice(0, 1));
-  assert.ok([...single.geometry.getAttribute('normal').array].every(Number.isFinite));
-  single.geometry.dispose(); single.outline.dispose();
 });
 
 test('curated sample has unique identities, valid relations and traceable research', () => {

@@ -284,11 +284,6 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
 .spatial-heading h1 { margin: 0; font-size: 30px; font-weight: 600; display: flex; gap: 16px; align-items: center; }
 .spatial-heading h1 > span { font-size: 12px; color: #949e99; font-weight: 450; padding-left: 16px; border-left: 1px solid #414844; }
 .spatial-heading button { pointer-events: auto; }
-.composition-switch { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; border: 1px solid #3c423f; border-radius: 6px; background: #191c1b; pointer-events: auto; }
-.composition-switch button { display: flex; gap: 10px; align-items: center; height: 32px; padding: 0 15px; border-radius: 3px; font-size: 12px; color: #a4ada7; white-space: nowrap; }
-.composition-switch button span { font-size: 10px; opacity: .6; }
-.composition-switch button[aria-pressed="true"] { background: #343b37; color: #f0f2ed; }
-.composition-switch button:hover { color: #fff; }
 .spatial-domain { position: absolute; top: 0; left: 0; text-align: left; padding: 0 0 10px; z-index: 4; border-bottom: 1px solid color-mix(in srgb, var(--tone) 22%, transparent); }
 .domain-name { display: flex; align-items: center; gap: 12px; font-size: 21px; font-weight: 570; color: var(--tone); line-height: 1.6; white-space: nowrap; }
 .domain-name svg { opacity: 0; }
@@ -319,8 +314,6 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
   .spatial-heading { top: 23px; left: 23px; right: 23px; }
   .spatial-heading h1 { font-size: 26px; }
   .spatial-heading .quiet-command { font-size: 12px; }
-  .composition-switch { top: 58px; }
-  .composition-switch button { height: 29px; padding: 0 18px; }
   .domain-name { font-size: 14px; gap: 4px; }
   .domain-name svg { width: 10px; }
   .domain-count { font-size: 9px; gap: 8px; margin-top: 2px; }

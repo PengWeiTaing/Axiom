@@ -15,10 +15,6 @@ export const spatialKinds: Record<MaterialKind, string> = {
 export const spatialTones: Record<RegionId, string> = {
   practice: '#9edbc6', systems: '#a4c5ee', attention: '#e7b29d', time: '#d7cd92',
 };
-export type SpatialVariant = 'points' | 'surfaces';
-export function parseSpatialVariant(search: string): SpatialVariant {
-  return new URLSearchParams(search).get('composition') === 'surfaces' ? 'surfaces' : 'points';
-}
 
 // Depth never changes a name's width, importance or semantic category.
 export function depthAppearance(depth: number) {
