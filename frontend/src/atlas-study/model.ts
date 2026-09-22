@@ -38,6 +38,13 @@ export function neighborhood(id: string, relations: AtlasRelation[]) {
   return { first, second };
 }
 
+export function localReadingMaterials(items: AtlasMaterial[], links: AtlasRelation[], selected: string | null, region: RegionId | null) {
+  const active = items.find(item => item.id === selected);
+  if (!active) return items.filter(item => item.region === (region || 'practice'));
+  const { first } = neighborhood(active.id, links);
+  return [active, ...items.filter(item => first.has(item.id))];
+}
+
 export function searchMaterials(query: string, materials: AtlasMaterial[]) {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return materials.filter(item => item.featured);

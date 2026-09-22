@@ -83,6 +83,7 @@ svg { flex: none; }
 .map-material.is-dimmed { opacity: .18; }
 .map-material.is-second { opacity: .55; }
 .map-material.is-selected .material-title, .map-material:hover .material-title { color: #f4f3e9; }
+.map-material.is-selected .material-title, .map-material.is-selected.featured .material-title { font-size: 16px; font-weight: 550; }
 .map-material:hover, .map-material:focus-visible { opacity: 1; z-index: 3; }
 .map-material:hover .material-dot, .map-material.is-selected .material-dot { outline: 5px solid #b9cbb123; }
 .map-material:focus-visible { outline-offset: 10px; }
@@ -122,6 +123,7 @@ svg { flex: none; }
 .relation-item button svg { margin-top: 5px; color: #9cab97; }
 .relation-item p { color: #a8b09f; font-size: 12px; line-height: 1.9; margin: 8px 0 0; }
 .relation-item.limit p { color: #c19f8c; }
+.relation-region { display: block; color: var(--tone); font-size: 11px; margin-bottom: 7px; }
 .relation-state { color: #c4b18d; font-size: 10px; margin-top: 6px; display: block; }
 .detail-actions { margin-top: 20px; }
 .quiet-command { display: inline-flex; align-items: center; gap: 9px; font-size: 13px; color: #bdc7b5; padding: 10px 0; line-height: 1.7; text-align: left; }
@@ -221,13 +223,16 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
   .study-header nav { gap: 14px; }
   .header-command { min-width: 30px; min-height: 40px; justify-content: center; }
   .header-command span { display: none; }
-  .atlas-overview { min-height: 810px; height: calc(100svh - 66px); }
+  .atlas-overview { min-height: calc(100svh - 66px); height: auto; }
   .map-topline { position: relative; top: auto; left: auto; right: auto; margin: 0 23px; padding: 23px 0 18px; align-items: center; }
   .map-title h1 { font-size: 27px; }
   .region-selector select { max-width: 185px; font-size: 13px; }
-  .atlas-map { min-height: 655px; flex: 1; }
+  .atlas-map { min-height: 0; flex: none; }
+  .map-world { position: relative; display: flex; flex-direction: column; gap: 44px; padding: 40px 0 36px; width: 100%; }
+  .map-material { position: relative; transform: none; margin-left: var(--mobile-indent); width: calc(100% - var(--mobile-indent) - 25px); }
   .map-material .material-title { font-size: 16px; }
   .map-material.question.featured .material-title { font-size: 25px; }
+  .map-material.is-selected .material-title, .map-material.is-selected.featured .material-title { font-size: 16px; }
   .map-material .material-origin { font-size: 10px; }
   .map-material .material-excerpt { font-size: 12px; }
   .map-material.image img { display: none; }

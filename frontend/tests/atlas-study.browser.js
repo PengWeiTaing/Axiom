@@ -27,6 +27,33 @@ async (page, baseUrl = 'http://127.0.0.1:4317/atlas-study.html') => {
     await page.waitForFunction(() => document.querySelector('.map-material img')?.naturalWidth > 0);
     summary.push('20 materials, 22 relationships, NASA image loaded');
 
+    await page.getByLabel('所在领域').selectOption('systems');
+    await page.getByRole('button', { name: '放大', exact: true }).click();
+    await page.mouse.move(45, 210); await page.mouse.down();
+    await page.mouse.move(75, 235, { steps: 4 }); await page.mouse.up();
+    const scopePosition = await page.locator('.map-world').getAttribute('style');
+    await page.getByRole('button', { name: '在途、产出与时间', exact: true }).click();
+    check(new URL(page.url()).searchParams.get('region') === 'systems', 'Reading lost its originating topic');
+    check(await page.locator('.map-material.is-selected .material-excerpt').count() === 0, 'Selected map node duplicates the detail summary');
+    await page.locator('.relation-item button').filter({ hasText: '开始得更多' }).click();
+    check(await page.locator('.map-material.is-selected .material-title').evaluate(el => getComputedStyle(el).fontSize) === '16px', 'Selected map landmark is not compact');
+    check(await page.locator('.material-detail').evaluate(el => el.scrollTop) === 0, 'Related material did not open at its beginning');
+    await page.getByRole('button', { name: '把这个问题展开' }).click();
+    check(new URL(page.url()).searchParams.get('region') === 'systems', 'Board lost its originating topic');
+    await page.getByRole('button', { name: '回到图中的位置' }).click();
+    await page.getByRole('button', { name: '关闭详情' }).click();
+    check(await page.getByLabel('所在领域').inputValue() === 'systems', 'Closing a cross-topic detail lost its originating topic');
+    check(await page.locator('.map-world').getAttribute('style') === scopePosition, 'Closing detail lost the topic camera');
+    await page.goBack(); await page.locator('.material-detail').waitFor();
+    await page.goForward(); await page.locator('.material-detail').waitFor({ state: 'hidden' });
+    check(await page.getByLabel('所在领域').inputValue() === 'systems', 'History lost its topic');
+    await page.getByRole('button', { name: '在途、产出与时间', exact: true }).click();
+    await page.reload(); await page.locator('.material-detail').waitFor();
+    await page.getByRole('button', { name: '关闭详情' }).click();
+    check(await page.getByLabel('所在领域').inputValue() === 'systems', 'Reload lost the return topic');
+    await page.getByLabel('所在领域').selectOption('');
+    summary.push('Topic survives cross-topic reading, board, close, history and reload; camera returns in-session');
+
     await page.getByRole('button', { name: '开始得更多，为何完成得更少？', exact: true }).click();
     check(await page.locator('.edge-primary.edge-secondary').count() === 0, 'Primary and secondary edge styles must not overlap');
     await page.getByRole('button', { name: '放大', exact: true }).click();
@@ -108,6 +135,26 @@ async (page, baseUrl = 'http://127.0.0.1:4317/atlas-study.html') => {
       await page.getByRole('button', { name: '关闭详情' }).click();
     }
     summary.push('Four widths and four regions: no overlapping node bounds or horizontal overflow; board fits all widths');
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(`${baseUrl}?view=map&region=systems&focus=unfinished`);
+      await page.locator('.material-detail').waitFor();
+      check(await page.locator('.map-material').count() === 7, 'Compact focus must include center and all six direct neighbors');
+      for (const id of ['little', 'switch']) check(await page.locator(`[data-material-id="${id}"]`).count() === 1, `Missing cross-topic neighbor ${id}`);
+      check(await page.locator('.relation-region').count() === 2, 'Cross-topic context is not named in mobile detail');
+      check(await page.locator('.map-lines path').count() === 6, 'Compact graph invented or omitted a primary relationship');
+      const layout = await page.locator('.map-world').evaluate(element => {
+        const world = element.getBoundingClientRect(), nodes = [...element.querySelectorAll('.map-material')].map(el => el.getBoundingClientRect());
+        return { fits: nodes.every(box => box.left >= world.left && box.right <= world.right && box.bottom <= world.bottom),
+          overlaps: nodes.some((a, i) => nodes.some((b, j) => i !== j && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)) };
+      });
+      check(layout.fits && !layout.overlaps, `Compact neighborhood does not fit at ${width}`);
+      await page.getByRole('button', { name: '关闭详情' }).click();
+      check(await page.getByLabel('所在领域').inputValue() === 'systems', 'Mobile return lost its originating topic');
+      check(await page.locator('.map-material').count() === 5, 'Mobile return did not restore topic members');
+      check(await page.getByLabel('所在领域').evaluate(el => el === document.activeElement), 'Return focus was lost when the selected material is outside the topic');
+    }
+    summary.push('Compact reading includes cross-topic neighbors, labels their topics and restores topic scope');
     await page.goto(`${baseUrl}?focus=unknown&view=map`);
     check(!await page.locator('.knowledge-board').isVisible(), 'Invalid deep link opened board');
     check(await page.locator('.material-detail').count() === 0, 'Invalid deep link opened detail');

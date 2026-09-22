@@ -49,8 +49,8 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
   };
   const results = [];
   try {
-    for (const width of [1440, 768, 390, 320]) {
-      await page.setViewportSize({ width, height: width > 650 ? 960 : 844 });
+    for (const [width, height] of [[1440, 960], [1440, 800], [1366, 768], [1440, 720], [768, 960], [390, 844], [320, 740]]) {
+      await page.setViewportSize({ width, height });
       const start = new URL(url); start.searchParams.set('view', 'space'); start.searchParams.delete('composition');
       await page.goto(start.href); await page.locator('.spatial-overview.is-ready').waitFor();
       await page.evaluate(() => document.fonts.ready); await settled();
@@ -70,7 +70,7 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
       }
       await page.reload(); await page.locator('.is-ready').waitFor(); await page.evaluate(() => document.fonts.ready); await settled();
       check(JSON.stringify(await pixels()) === JSON.stringify(before), 'Reload restored topic surfaces');
-      if (width === 1440) {
+      if (width === 1440 && height === 960) {
         const still = await identityPositions();
         await page.locator('[data-node-label="unfinished"]').hover(); await settled();
         check(JSON.stringify(await identityPositions()) === JSON.stringify(still), 'Hover displaced labels');
@@ -109,7 +109,7 @@ async (page, url = 'http://127.0.0.1:4317/atlas-study.html') => {
       await page.getByRole('button', { name: '回到三维全貌' }).click(); await settled();
       await page.locator('[data-node-label="little"]').click();
       check((await page.locator('.material-detail h2').textContent()).includes('在途、产出与时间'), 'Material identity changed between 3D and 2D');
-      results.push({ width, pointsPixels: before.count, legacyLinksMatch: true, labels: a.labels, domains: a.domains });
+      results.push({ width, height, pointsPixels: before.count, legacyLinksMatch: true, labels: a.labels, domains: a.domains });
     }
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(url); await page.locator('.is-ready').waitFor(); await settled();

@@ -2,12 +2,16 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Minus, Plus, LocateFixed } from '@lucide/vue';
 import { deltaImage, materials, regions, relations } from './data';
-import { neighborhood } from './model';
+import { localReadingMaterials, neighborhood } from './model';
 import type { AtlasMaterial, RegionId } from './model';
+import { spatialNames } from './spatial-visuals';
 
 const props = defineProps<{ selected: string | null; region: RegionId | null; rejected: boolean }>();
 const emit = defineEmits<{ select: [id: string] }>();
 const viewport = ref<HTMLElement | null>(null);
+const world = ref<HTMLElement | null>(null);
+const mobilePositions = ref(new Map<string, { x: number; y: number }>());
+const contentHeight = ref(730);
 const width = ref(1440);
 const height = ref(760);
 const zoom = ref(1);
@@ -20,10 +24,10 @@ const scale = computed(() => fit.value * zoom.value);
 const context = computed(() => neighborhood(props.selected || '', relations));
 const selectedMaterial = computed(() => materials.find(item => item.id === props.selected));
 const visibleMaterials = computed(() => mobile.value
-  ? materials.filter(item => item.region === (props.region || selectedMaterial.value?.region || 'practice'))
+  ? localReadingMaterials(materials, relations, props.selected, props.region)
   : materials);
 const coordinates = computed(() => new Map(visibleMaterials.value.map((item, index) => [item.id,
-  mobile.value ? { x: 30 + (index % 2) * 28, y: index === 0 ? 40 : 210 + (index - 1) * 104 } : { x: item.x, y: item.y }])));
+  mobile.value ? mobilePositions.value.get(item.id) || { x: 30 + (index % 2) * 28, y: 40 } : { x: item.x, y: item.y }])));
 const visibleEdges = computed(() => relations.filter(edge => coordinates.value.has(edge.from) && coordinates.value.has(edge.to)));
 const basePan = computed(() => {
   if (mobile.value) return { x: 0, y: 0 };
@@ -31,10 +35,22 @@ const basePan = computed(() => {
   if (anchor) return { x: width.value * (props.selected ? 0.35 : 0.5) - anchor.x * scale.value, y: height.value * 0.42 - anchor.y * scale.value };
   return { x: (width.value - 1400 * scale.value) / 2, y: (height.value - 760 * scale.value) / 2 };
 });
-const worldStyle = computed(() => ({
+const worldStyle = computed(() => mobile.value ? {} : ({
   transform: `translate(${basePan.value.x + pan.value.x}px, ${basePan.value.y + pan.value.y}px) scale(${scale.value})`,
-  width: `${mobile.value ? width.value : 1400}px`, height: `${mobile.value ? 730 : 760}px`,
+  width: '1400px', height: '760px',
 }));
+
+function measureMobilePositions() {
+  if (!mobile.value || !world.value) return;
+  const bounds = world.value.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return;
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const element of world.value.querySelectorAll<HTMLElement>('[data-material-id]')) {
+    const dot = element.querySelector('.material-dot')!.getBoundingClientRect();
+    positions.set(element.dataset.materialId!, { x: dot.x - bounds.x + dot.width / 2, y: dot.y - bounds.y + dot.height / 2 });
+  }
+  mobilePositions.value = positions; contentHeight.value = bounds.height;
+}
 
 function nodeClass(item: AtlasMaterial) {
   return {
@@ -72,21 +88,32 @@ function wheel(event: WheelEvent) {
 }
 let observer: ResizeObserver;
 onMounted(() => {
-  observer = new ResizeObserver(([entry]) => {
-    if (entry && entry.contentRect.width > 0) { width.value = entry.contentRect.width; height.value = entry.contentRect.height; }
+  observer = new ResizeObserver(() => {
+    const bounds = viewport.value?.getBoundingClientRect();
+    if (bounds && bounds.width > 0) { width.value = bounds.width; height.value = bounds.height; }
+    measureMobilePositions();
   });
   if (viewport.value) observer.observe(viewport.value);
+  if (world.value) observer.observe(world.value);
 });
 onBeforeUnmount(() => observer?.disconnect());
-watch(() => [props.selected, props.region], resetCamera);
-watch(mobile, resetCamera);
+const cameras = new Map<string, { zoom: number; pan: { x: number; y: number } }>();
+const cameraKey = ([selected, region]: readonly (string | null)[]) => `${region || 'all'}:${selected || 'overview'}`;
+watch(() => [props.selected, props.region] as const, (current, previous) => {
+  if (previous && !mobile.value) cameras.set(cameraKey(previous), { zoom: zoom.value, pan: { ...pan.value } });
+  const saved = !mobile.value && cameras.get(cameraKey(current));
+  if (saved) { zoom.value = saved.zoom; pan.value = { ...saved.pan }; }
+  else resetCamera();
+});
+watch(mobile, () => { cameras.clear(); resetCamera(); });
+watch([visibleMaterials, mobile], measureMobilePositions, { flush: 'post' });
 </script>
 
 <template>
   <div ref="viewport" class="atlas-map" :class="{ 'is-dragging': dragging, 'has-focus': selected, 'is-mobile-map': mobile }"
     aria-label="认识地图" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="pointerUp" @wheel="wheel">
-    <div class="map-world" :class="{ 'without-transition': dragging }" :style="worldStyle">
-      <svg class="map-lines" :viewBox="`0 0 ${mobile ? width : 1400} ${mobile ? 730 : 760}`" aria-hidden="true">
+    <div ref="world" class="map-world" :class="{ 'without-transition': dragging }" :style="worldStyle">
+      <svg class="map-lines" :viewBox="`0 0 ${mobile ? width : 1400} ${mobile ? contentHeight : 760}`" aria-hidden="true">
         <path v-for="edge in visibleEdges" :key="edge.id"
           :d="`M ${point(edge.from).x} ${point(edge.from).y} L ${point(edge.to).x} ${point(edge.to).y}`"
           :class="[edge.kind, edgeClass(edge.from, edge.to), { 'is-rejected': rejected && edge.id === 'limit-wip' }]" />
@@ -98,18 +125,18 @@ watch(mobile, resetCamera);
           <h2>{{ area.title }}</h2>
         </div>
       </template>
-      <button v-for="item in visibleMaterials" :key="item.id" type="button" class="map-material" :class="[item.kind, `tone-${item.region}`, nodeClass(item), { featured: item.featured }]"
-        :style="{ left: `${point(item.id).x}px`, top: `${point(item.id).y}px`, width: `${mobile ? Math.min(width - point(item.id).x - 25, 295) : (item.width || 180)}px` }"
+      <button v-for="(item, index) in visibleMaterials" :key="item.id" type="button" class="map-material" :data-material-id="item.id" :class="[item.kind, `tone-${item.region}`, nodeClass(item), { featured: item.featured }]"
+        :style="mobile ? { '--mobile-indent': `${30 + (index % 2) * 28}px` } : { left: `${point(item.id).x}px`, top: `${point(item.id).y}px`, width: `${item.width || 180}px` }"
         :aria-label="item.title.replace('\n', '')" :aria-pressed="selected === item.id" @click="emit('select', item.id)">
         <span class="material-dot" aria-hidden="true"></span>
         <span class="material-content">
-          <template v-if="item.id === 'delta'">
+          <template v-if="item.id === 'delta' && item.id !== selected">
             <img v-if="!imageFailed" :src="deltaImage" alt="勒拿河三角洲的分支河道，NASA / USGS 卫星影像" width="177" height="112" @error="imageFailed = true" />
             <span v-else class="image-fallback">Landsat 7 / 勒拿河三角洲</span>
           </template>
-          <span v-if="item.featured && item.id !== 'delta'" class="material-origin">{{ item.provenance }}</span>
-          <span class="material-title">{{ item.title }}</span>
-          <span v-if="item.featured" class="material-excerpt" :class="{ formula: item.id === 'little' }">{{ item.summary }}</span>
+          <span v-if="item.featured && item.id !== 'delta' && item.id !== selected" class="material-origin">{{ item.provenance }}</span>
+          <span class="material-title">{{ item.id === selected ? spatialNames[item.id] : item.title }}</span>
+          <span v-if="item.featured && item.id !== selected" class="material-excerpt" :class="{ formula: item.id === 'little' }">{{ item.summary }}</span>
           <span v-if="selected === item.id" class="selection-mark">正在看</span>
         </span>
       </button>

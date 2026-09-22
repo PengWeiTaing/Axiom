@@ -29,10 +29,7 @@ const domains = regions.map((region, index) => {
   const members = nodes.filter(node => node.region === region.id);
   const center = new THREE.Vector3();
   members.forEach(node => center.addScaledVector(positions.get(node.id)!, 1 / members.length));
-  const anchor = center.clone();
-  anchor.y = Math.max(...members.map(node => node.y)) + 13;
-  const lowerAnchor = center.clone(); lowerAnchor.y = Math.min(...members.map(node => node.y)) - 13;
-  return { ...region, index, members, anchor, lowerAnchor };
+  return { ...region, index, members, center };
 });
 const icons = { question: CircleHelp, note: FileText, research: BookOpen, image: Image, hypothesis: Lightbulb };
 const linked = computed(() => new Set(relations.filter(edge => edge.from === hovered.value || edge.to === hovered.value).flatMap(edge => [edge.from, edge.to])));
@@ -79,11 +76,15 @@ function project() {
   });
   for (const domain of domains) {
     const below = width < 650 && (domain.id === 'attention' || domain.id === 'time');
-    vector.copy(below ? domain.lowerAnchor : domain.anchor).project(camera);
+    vector.copy(domain.center).project(camera);
     const el = elements.get('domain:' + domain.id);
     if (!el || vector.z <= -1 || vector.z >= 1) continue;
+    const members = domain.members.map(node => projected.get(node.id)!).filter(point => point.z > -1 && point.z < 1);
+    if (!members.length) continue;
+    // Keep a screen-space reading gap while following the projected topic, not the viewport.
+    const y = below ? Math.max(...members.map(point => point.y)) + 18 : Math.min(...members.map(point => point.y)) - el.offsetHeight - 14;
     labelRequests.push({ id: 'domain:' + domain.id, x: (vector.x + 1) * width / 2 - el.offsetWidth / 2,
-      y: (1 - vector.y) * height / 2 + (below ? 18 : -el.offsetHeight - (width < 650 ? 22 : 0)), w: el.offsetWidth, h: el.offsetHeight, priority: 200, domain: true });
+      y, w: el.offsetWidth, h: el.offsetHeight, priority: 200, domain: true });
   }
 }
 function paintLabels() {
@@ -93,7 +94,7 @@ function paintLabels() {
   const budget = close ? 20 : width < 650 ? 5 : width < 1000 ? 9 : 13;
   const requests = labelRequests.map(item => ({ ...item, priority: item.id === 'label:' + hovered.value ? 150 : item.priority }));
   const obstacles = [...projected.values()].filter(p => p.z > -1 && p.z < 1).map(p => ({ x: p.x - 6, y: p.y - 6, w: 12, h: 12 }));
-  visibleLabels = selectAnchoredLabels(requests, { x: 12, y: width < 650 ? 136 : 100, w: width - 24, h: height - (width < 650 ? 244 : 192) }, budget, visibleLabels, obstacles);
+  visibleLabels = selectAnchoredLabels(requests, { x: 12, y: width < 650 ? 100 : 80, w: width - 24, h: height - (width < 650 ? 208 : 172) }, budget, visibleLabels, obstacles);
   for (const [key, el] of elements) {
     if (!key.startsWith('label:') && !key.startsWith('domain:')) continue;
     const request = requests.find(item => item.id === key);

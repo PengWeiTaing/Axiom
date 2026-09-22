@@ -29,7 +29,12 @@ const storageKey = 'axiom.atlas-study.v1';
 const active = computed(() => materials.find(item => item.id === selected.value));
 const area = computed(() => regions.find(item => item.id === active.value?.region));
 const matches = computed(() => searchMaterials(query.value, materials));
-const activeRelations = computed(() => relations.filter(edge => edge.from === selected.value || edge.to === selected.value));
+const activeRelations = computed(() => relations
+  .filter(edge => edge.from === selected.value || edge.to === selected.value)
+  .map(edge => {
+    const material = materials.find(item => item.id === (edge.from === selected.value ? edge.to : edge.from))!;
+    return { ...edge, material, regionTitle: regions.find(item => item.id === material.region)!.title };
+  }));
 const kinds = { question: '一个问题', note: '一段记录', research: '外部研究', image: '影像材料', hypothesis: '待检验的想法' };
 let returnFocus: HTMLElement | null = null;
 let toastTimer: ReturnType<typeof setTimeout>;
@@ -62,17 +67,22 @@ function enterRegion(id: RegionId) { region.value = id; selected.value = null; e
 function remember(id: string) { recent.value = [id, ...recent.value.filter(item => item !== id)].slice(0, 12); persist(); }
 async function select(id: string) {
   if (!materials.some(item => item.id === id)) return;
-  selected.value = id; board.value = false; overview.value = false; region.value = null; modal.value = null;
+  if (overview.value) region.value = null;
+  selected.value = id; board.value = false; overview.value = false; modal.value = null;
   remember(id); setLocation();
-  await nextTick(); detailPane.value?.focus({ preventScroll: true });
+  await nextTick(); detailPane.value?.scrollTo({ top: 0 }); detailPane.value?.focus({ preventScroll: true });
 }
 async function goBack() {
   const previous = selected.value;
   if (board.value) board.value = false;
-  else { selected.value = null; region.value = null; }
+  else selected.value = null;
   setLocation(); await nextTick();
   if (selected.value) detailPane.value?.focus({ preventScroll: true });
-  else if (previous) document.querySelector<HTMLButtonElement>(`.map-material[aria-label="${materials.find(item => item.id === previous)?.title.replace('\n', '')}"]`)?.focus({ preventScroll: true });
+  else if (previous) {
+    const node = document.querySelector<HTMLButtonElement>(`.map-material[data-material-id="${previous}"]`);
+    if (node) node.focus({ preventScroll: true });
+    else document.getElementById('region-select')?.focus({ preventScroll: true });
+  }
 }
 function enterBoard() { selected.value = 'unfinished'; overview.value = false; board.value = true; setLocation(); window.scrollTo(0, 0); }
 function toggleSaved() { saved.value = !saved.value; persist(); notify(saved.value ? '已留在「待验证」中' : '已取消留存'); }
@@ -140,7 +150,8 @@ onBeforeUnmount(() => { removeEventListener('popstate', readLocation); removeEve
         <button v-if="active.id === 'unfinished'" class="primary-command" type="button" @click="enterBoard">把这个问题展开 <ArrowRight :size="19" /></button>
         <div class="detail-relations"><h3><Link2 :size="15" />相关线索</h3>
           <article v-for="edge in activeRelations" :key="edge.id" class="relation-item" :class="edge.kind">
-            <button type="button" @click="select(edge.from === selected ? edge.to : edge.from)">{{ materials.find(item => item.id === (edge.from === selected ? edge.to : edge.from))?.title.replace('\n', '') }}<ArrowUpRight :size="14" /></button>
+            <span v-if="edge.material.region !== active.region" class="relation-region" :class="`tone-${edge.material.region}`">{{ edge.regionTitle }}</span>
+            <button type="button" @click="select(edge.material.id)">{{ edge.material.title.replace('\n', '') }}<ArrowUpRight :size="14" /></button>
             <span v-if="edge.kind === 'hypothesis'" class="relation-state">{{ rejected && edge.id === 'limit-wip' ? '已标记异议' : '尚待验证' }}</span>
             <p>{{ edge.statement }}</p>
           </article>

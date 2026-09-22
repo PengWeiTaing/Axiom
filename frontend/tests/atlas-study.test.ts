@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { averageCycleDays, neighborhood, parseStudyLocation, searchMaterials } from '../src/atlas-study/model.ts';
+import { averageCycleDays, localReadingMaterials, neighborhood, parseStudyLocation, searchMaterials } from '../src/atlas-study/model.ts';
 import { materials, regions, relations } from '../src/atlas-study/data.ts';
 import { buildSpatialLayout } from '../src/atlas-study/spatial-layout.ts';
 import { boxesOverlap, depthAppearance, selectAnchoredLabels, spatialKinds, spatialNames, spatialTones } from '../src/atlas-study/spatial-visuals.ts';
@@ -80,6 +80,30 @@ test('first and second degree context remain distinct', () => {
   const edge = (from: string, to: string) => ({ id: from + to, from, to, kind: 'context' as const, statement: '' });
   const result = neighborhood('a', [edge('a', 'b'), edge('b', 'c'), edge('c', 'a'), edge('c', 'd')]);
   assert.deepEqual([...result.first].sort(), ['b', 'c']); assert.deepEqual([...result.second], ['d']);
+});
+
+test('compact reading includes every direct relation across topic boundaries', () => {
+  const original = JSON.stringify({ materials, relations });
+  const items = localReadingMaterials(materials, relations, 'unfinished', 'time');
+  const expected = ['unfinished', ...neighborhood('unfinished', relations).first];
+  assert.equal(items[0]?.id, 'unfinished');
+  assert.deepEqual(items.map(item => item.id).sort(), expected.sort());
+  assert.equal(new Set(items.map(item => item.id)).size, items.length);
+  assert.ok(items.some(item => item.id === 'little' && item.region === 'systems'));
+  assert.ok(items.some(item => item.id === 'switch' && item.region === 'attention'));
+  for (const region of regions) {
+    assert.deepEqual(localReadingMaterials(materials, relations, null, region.id), materials.filter(item => item.region === region.id));
+  }
+  assert.deepEqual(localReadingMaterials(materials, relations, 'missing', null), materials.filter(item => item.region === 'practice'));
+  assert.deepEqual(localReadingMaterials(materials, [], 'unfinished', null).map(item => item.id), ['unfinished']);
+  assert.equal(JSON.stringify({ materials, relations }), original);
+});
+
+test('focused and board links retain the originating reading scope', () => {
+  for (const view of ['map', 'board']) {
+    assert.deepEqual(parseStudyLocation(`?view=${view}&focus=unfinished&region=systems`, materials),
+      { focus: 'unfinished', board: view === 'board', overview: false, region: 'systems' });
+  }
 });
 
 test('average cycle calculation is finite and uses consistent units', () => {
