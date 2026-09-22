@@ -282,7 +282,9 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
-.spatial-overview { position: relative; height: calc(100svh - 76px); min-height: 660px; overflow: hidden; isolation: isolate; }
+.spatial-overview { position: relative; height: calc(100svh - 76px); min-height: 660px; overflow: hidden; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr); }
+.spatial-overview.has-preview { grid-template-columns: minmax(0, 1fr) 320px; }
+.spatial-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; outline: none; }
 .spatial-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; z-index: 0; }
 .spatial-canvas:active { cursor: grabbing; }
 .spatial-heading { position: absolute; top: 29px; left: 38px; right: 38px; display: flex; align-items: center; justify-content: space-between; z-index: 5; pointer-events: none; }
@@ -314,6 +316,39 @@ input[type='range'] { width: 100%; accent-color: #c4d1ac; height: 15px; display:
 .spatial-fallback { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; font-size: 16px; }
 .spatial-fallback button { justify-self: center; }
 .spatial-failed .spatial-canvas { display: none !important; pointer-events: none; }
+.spatial-preview { min-height: 0; min-width: 0; display: flex; flex-direction: column; background: #1b1e1d; border-left: 1px solid #383f3b; outline: none; }
+.preview-top { display: flex; align-items: center; gap: 8px; padding: 18px 18px 8px 24px; flex: none; }
+.preview-top > span { color: var(--tone); font-size: 12px; flex: 1; }
+.preview-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 15px 24px 24px; scrollbar-width: thin; }
+.preview-kind { display: flex; gap: 8px; align-items: center; font-size: 11px; color: #a9b2ad; }
+.preview-body h2 { font-size: 22px; font-weight: 560; line-height: 1.6; margin: 13px 0 10px; white-space: pre-line; text-wrap: pretty; overflow-wrap: anywhere; }
+.preview-summary { font-size: 14px; line-height: 1.8; color: #d1d7d2; margin: 0 0 16px; }
+.preview-boundary { font-size: 12px; line-height: 1.9; color: #aab5b0; margin: 0 0 16px; }
+.preview-source { display: flex; align-items: center; gap: 6px; width: fit-content; font-size: 11px; line-height: 1.8; color: #9eaaa3; }
+a.preview-source:hover { color: #e7e7e1; }
+.preview-image { width: 100%; height: auto; aspect-ratio: 177 / 112; object-fit: cover; margin: 0 0 14px; }
+.preview-links { margin-top: 24px; border-top: 1px solid #383f3b; }
+.preview-links h3 { display: flex; justify-content: space-between; font-size: 11px; font-weight: 450; color: #9eaaa3; margin: 16px 0 8px; }
+.preview-links h3 > span { font-variant-numeric: tabular-nums; }
+.preview-links button { display: flex; gap: 9px; width: 100%; min-height: 42px; padding: 8px 0; align-items: center; text-align: left; border-bottom: 1px solid #2d3530; font-size: 13px; }
+.preview-links button:hover { color: #fff; }
+.preview-link-title { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.preview-links small { font-size: 10px; color: #b6b4a0; flex: none; }
+.preview-links .preview-limit { color: #c39b88; }
+.preview-links button > svg { color: #8e9d94; }
+.preview-bottom { flex: none; padding: 8px 24px 15px; border-top: 1px solid #383f3b; }
+.preview-bottom button { width: 100%; justify-content: space-between; color: #e0e6e0; min-height: 40px; }
+@media (max-width: 999px) {
+  .spatial-overview.has-preview { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) min(310px, 40svh); }
+  .spatial-preview { border-left: 0; border-top: 1px solid #383f3b; }
+  .preview-top { padding: 7px 18px 0 24px; }
+  .preview-body { padding-top: 8px; }
+  .preview-body h2 { font-size: 19px; margin: 8px 0; }
+  .preview-bottom { padding: 2px 24px 5px; }
+  .has-preview .spatial-heading { top: 15px; }
+  .has-preview .spatial-footer { bottom: 15px; }
+  .has-preview .spatial-controls { bottom: 12px; }
+}
 @media (max-width: 649px) {
   .spatial-overview { height: calc(100svh - 66px); min-height: 620px; }
   .spatial-heading { top: 23px; left: 23px; right: 23px; }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ArrowUpRight, BookOpen, CircleHelp, FileText, Image, Lightbulb, LocateFixed, Map as MapIcon, Minus, Plus, RotateCw } from '@lucide/vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -8,12 +8,17 @@ import type { RegionId } from './model';
 import { buildSpatialLayout } from './spatial-layout';
 import { depthAppearance, selectAnchoredLabels, spatialKinds, spatialNames, spatialTones } from './spatial-visuals';
 import type { AnchoredLabel } from './spatial-visuals';
+import AtlasSpatialPreview from './AtlasSpatialPreview.vue';
 
-const props = defineProps<{ active: boolean }>();
+const props = defineProps<{ active: boolean; rejected: boolean }>();
 const emit = defineEmits<{ select: [id: string]; region: [id: RegionId]; reading: [] }>();
 const host = ref<HTMLElement | null>(null);
 const failed = ref(false), ready = ref(false), moving = ref(false);
 const hovered = ref<string | null>(null), hoveredRegion = ref<RegionId | null>(null);
+const previewTrail = ref<string[]>([]);
+const previewId = computed(() => previewTrail.value[previewTrail.value.length - 1] || null);
+const previewPane = ref<InstanceType<typeof AtlasSpatialPreview> | null>(null);
+const attention = computed(() => previewId.value || hovered.value);
 const hoveredMaterial = computed(() => materials.find(item => item.id === hovered.value));
 const nodes = buildSpatialLayout(materials, relations).map(node => ({ ...node, material: materials.find(item => item.id === node.id)! }));
 const leftLabels = new Set(['unfinished', 'week-note', 'attention-note', 'little', 'pause', 'waiting']);
@@ -32,7 +37,7 @@ const domains = regions.map((region, index) => {
   return { ...region, index, members, center };
 });
 const icons = { question: CircleHelp, note: FileText, research: BookOpen, image: Image, hypothesis: Lightbulb };
-const linked = computed(() => new Set(relations.filter(edge => edge.from === hovered.value || edge.to === hovered.value).flatMap(edge => [edge.from, edge.to])));
+const linked = computed(() => new Set(relations.filter(edge => edge.from === attention.value || edge.to === attention.value).flatMap(edge => [edge.from, edge.to])));
 const elements = new Map<string, HTMLElement>();
 const edges = new Map<string, THREE.Line<THREE.BufferGeometry, THREE.LineDashedMaterial>>();
 const projected = new Map<string, { x: number; y: number; z: number; depth: number }>();
@@ -51,7 +56,31 @@ function bind(id: string, element: unknown) {
   if (element instanceof HTMLElement) elements.set(id, element); else elements.delete(id);
 }
 function isRelated(id: string) {
-  return hovered.value ? linked.value.has(id) : !hoveredRegion.value || nodes.find(node => node.id === id)!.region === hoveredRegion.value;
+  return attention.value ? id === attention.value || linked.value.has(id) : !hoveredRegion.value || nodes.find(node => node.id === id)!.region === hoveredRegion.value;
+}
+
+function preview(id: string) {
+  if (id !== previewId.value) previewTrail.value = [...previewTrail.value.slice(-19), id];
+  hovered.value = null; hoveredRegion.value = null;
+  void previewPane.value?.focus();
+}
+async function closePreview() {
+  const id = previewId.value;
+  if (!id) return;
+  previewTrail.value = []; hovered.value = null; hoveredRegion.value = null;
+  await nextTick(); resize();
+  requestAnimationFrame(() => {
+    if (disposed || !props.active) return;
+    const target = id ? elements.get('hit:' + id) : null;
+    (target && getComputedStyle(target).visibility === 'visible' ? target : host.value)?.focus({ preventScroll: true });
+  });
+}
+function escapePreview(event: KeyboardEvent) {
+  if (previewId.value) { event.preventDefault(); event.stopPropagation(); void closePreview(); }
+}
+function readCurrent() {
+  if (previewId.value) emit('select', previewId.value);
+  else emit('reading');
 }
 
 function project() {
@@ -92,7 +121,7 @@ function paintLabels() {
   const distance = camera.position.distanceTo(controls!.target);
   const close = distance < homeDistance * 0.84;
   const budget = close ? 20 : width < 650 ? 5 : width < 1000 ? 9 : 13;
-  const requests = labelRequests.map(item => ({ ...item, priority: item.id === 'label:' + hovered.value ? 150 : item.priority }));
+  const requests = labelRequests.map(item => ({ ...item, priority: item.id === 'label:' + attention.value ? (previewId.value ? 300 : 150) : item.priority }));
   const obstacles = [...projected.values()].filter(p => p.z > -1 && p.z < 1).map(p => ({ x: p.x - 6, y: p.y - 6, w: 12, h: 12 }));
   visibleLabels = selectAnchoredLabels(requests, { x: 12, y: width < 650 ? 100 : 80, w: width - 24, h: height - (width < 650 ? 208 : 172) }, budget, visibleLabels, obstacles);
   for (const [key, el] of elements) {
@@ -112,9 +141,9 @@ function paint() {
   nodes.forEach((node, index) => {
     const appearance = depthAppearance(projected.get(node.id)!.depth), relevant = isRelated(node.id);
     color.set(spatialTones[node.region]); colors.setXYZ(index, color.r, color.g, color.b);
-    sizes.setX(index, hovered.value === node.id ? 20 : appearance.pointSize + (node.material.featured ? 1 : 0));
+    sizes.setX(index, attention.value === node.id ? 20 : appearance.pointSize + (node.material.featured ? 1 : 0));
     alphas.setX(index, appearance.pointOpacity * (relevant ? 1 : 0.28));
-    halos.setX(index, hovered.value === node.id ? 1 : 0);
+    halos.setX(index, attention.value === node.id ? 1 : 0);
     for (const prefix of ['label:', 'hit:']) {
       const el = elements.get(prefix + node.id);
       if (el) { el.dataset.depth = appearance.tier; el.dataset.related = String(relevant); el.style.setProperty('--depth-opacity', String(appearance.labelOpacity)); }
@@ -126,8 +155,8 @@ function paint() {
     const line = edges.get(edge.id)!;
     const a = nodes.find(node => node.id === edge.from)!, b = nodes.find(node => node.id === edge.to)!;
     const local = a.region === b.region;
-    const active = hovered.value ? edge.from === hovered.value || edge.to === hovered.value : !!hoveredRegion.value && (a.region === hoveredRegion.value || b.region === hoveredRegion.value);
-    const focused = hovered.value || hoveredRegion.value;
+    const active = attention.value ? edge.from === attention.value || edge.to === attention.value : !!hoveredRegion.value && (a.region === hoveredRegion.value || b.region === hoveredRegion.value);
+    const focused = attention.value || hoveredRegion.value;
     if (active) activeEdges++;
     // One real bridge per topic pair; the rest emerge only on attention.
     line.visible = local || overviewBridges.has(edge.id) || !!active;
@@ -182,6 +211,7 @@ function resize() {
   camera.aspect = width / height; camera.updateProjectionMatrix();
   const oldDistance = homeDistance;
   homeDistance = Math.max(740, 310 / Math.tan(THREE.MathUtils.degToRad(20)) / Math.min(1.12, camera.aspect));
+  if (previewId.value) homeDistance = Math.max(homeDistance, 210 / Math.tan(THREE.MathUtils.degToRad(20)) * height / Math.max(160, height - 180));
   if (!ready.value) resetCamera();
   else camera.position.sub(controls!.target).multiplyScalar(homeDistance / oldDistance).add(controls!.target);
   controls!.minDistance = homeDistance * 0.5; controls!.maxDistance = homeDistance * 2.1;
@@ -232,8 +262,9 @@ onMounted(() => {
     resize();
   } catch { failed.value = true; }
 });
-watch([hovered, hoveredRegion], requestRender);
-watch(() => props.active, visibilityChanged);
+watch([attention, hoveredRegion], requestRender);
+watch(() => props.active, () => { visibilityChanged(); if (props.active && previewId.value) void previewPane.value?.focus(); });
+defineExpose({ closePreview });
 onBeforeUnmount(() => {
   disposed = true; cancelAnimationFrame(frame); observer?.disconnect();
   document.removeEventListener('visibilitychange', visibilityChanged);
@@ -244,20 +275,23 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section ref="host" class="spatial-overview" :class="{ 'is-ready': ready, 'spatial-failed': failed, 'has-focus': hovered || hoveredRegion, 'is-moving': moving }" aria-label="Atlas 三维全貌">
+  <section class="spatial-overview" :class="{ 'is-ready': ready, 'spatial-failed': failed, 'has-focus': attention || hoveredRegion, 'is-moving': moving, 'has-preview': previewId && !failed }" aria-label="Atlas 三维全貌" @keydown.esc="escapePreview">
+    <div ref="host" class="spatial-stage" tabindex="-1">
     <div class="spatial-heading">
       <h1>Atlas<span>全貌</span></h1>
-      <button class="quiet-command spatial-reading" type="button" @click="emit('reading')"><MapIcon :size="17" />二维阅读</button>
+      <button class="quiet-command spatial-reading" type="button" @click="readCurrent"><MapIcon :size="17" />二维阅读</button>
     </div>
     <template v-if="!failed">
       <template v-for="node in nodes" :key="node.id">
         <button :ref="el => bind(`hit:${node.id}`, el)" class="spatial-dot-hit" type="button" :data-spatial-node="node.id" :data-region="node.region"
           :aria-label="`查看${node.material.title.replace('\n', '')}`" :title="`${spatialKinds[node.material.kind]}：${node.material.title.replace('\n', '')}`"
-          @pointerenter="hovered = node.id" @pointerleave="hovered = null" @focus="hovered = node.id" @blur="hovered = null" @click="emit('select', node.id)"></button>
-        <button :ref="el => bind(`label:${node.id}`, el)" class="spatial-hit" :class="{ 'is-active': hovered === node.id, 'is-landmark': node.material.featured }"
+          :aria-expanded="previewId === node.id" aria-controls="spatial-preview"
+          @pointerenter="hovered = node.id" @pointerleave="hovered = null" @focus="hovered = node.id" @blur="hovered = null" @click="preview(node.id)"></button>
+        <button :ref="el => bind(`label:${node.id}`, el)" class="spatial-hit" :class="{ 'is-active': attention === node.id, 'is-landmark': node.material.featured }"
           :style="{ '--node-tone': spatialTones[node.region] }" type="button" :data-node-label="node.id" :data-region="node.region" tabindex="-1"
-          :aria-label="`阅读${node.material.title.replace('\n', '')}`" :title="`${spatialKinds[node.material.kind]}：${node.material.title.replace('\n', '')}`"
-          @pointerenter="hovered = node.id" @pointerleave="hovered = null" @click="emit('select', node.id)">
+          :aria-label="`预览${node.material.title.replace('\n', '')}`" :title="`${spatialKinds[node.material.kind]}：${node.material.title.replace('\n', '')}`"
+          :aria-expanded="previewId === node.id" aria-controls="spatial-preview"
+          @pointerenter="hovered = node.id" @pointerleave="hovered = null" @click="preview(node.id)">
           <span>{{ spatialNames[node.id] }}</span>
         </button>
       </template>
@@ -274,10 +308,13 @@ onBeforeUnmount(() => {
         <button class="icon-button" type="button" aria-label="恢复三维全貌" title="恢复全貌" @click="resetCamera"><LocateFixed :size="18" /></button>
       </div>
     </template>
-    <div v-else class="spatial-fallback"><p>三维画面暂时无法显示。</p><button class="quiet-command" type="button" @click="emit('reading')">进入二维阅读 <ArrowUpRight :size="16" /></button></div>
+    <div v-else class="spatial-fallback"><p>三维画面暂时无法显示。</p><button class="quiet-command" type="button" @click="readCurrent">进入二维阅读 <ArrowUpRight :size="16" /></button></div>
     <footer class="spatial-footer">
-      <span v-if="hoveredMaterial" class="spatial-caption"><component :is="icons[hoveredMaterial.kind]" :size="16" /><span>{{ hoveredMaterial.title.replace('\n', '') }}</span><small>{{ spatialKinds[hoveredMaterial.kind] }}</small></span>
+      <span v-if="hoveredMaterial && !previewId" class="spatial-caption"><component :is="icons[hoveredMaterial.kind]" :size="16" /><span>{{ hoveredMaterial.title.replace('\n', '') }}</span><small>{{ spatialKinds[hoveredMaterial.kind] }}</small></span>
       <span v-else>4 个领域<span class="spatial-footer-separator">/</span>20 个片段</span><span class="spatial-demo">演示集合</span>
     </footer>
+    </div>
+    <AtlasSpatialPreview v-if="previewId && !failed" ref="previewPane" :id="previewId" :can-back="previewTrail.length > 1" :rejected="rejected"
+      @select="preview" @close="closePreview" @back="previewTrail.pop()" @read="readCurrent" />
   </section>
 </template>

@@ -11,6 +11,7 @@ const initial = parseStudyLocation(location.search, materials);
 const AtlasOverview3D = defineAsyncComponent(() => import('./AtlasOverview3D.vue'));
 const overview = ref(initial.overview);
 const overviewVisited = ref(initial.overview);
+const overviewPane = ref<{ closePreview: () => Promise<void> } | null>(null);
 const selected = ref<string | null>(initial.focus);
 const board = ref(initial.board);
 const region = ref<RegionId | null>(initial.region);
@@ -65,6 +66,11 @@ function enterOverview() { overviewVisited.value = true; overview.value = true; 
 function enterReading() { overview.value = false; board.value = false; setLocation(); }
 function enterRegion(id: RegionId) { region.value = id; selected.value = null; enterReading(); }
 function remember(id: string) { recent.value = [id, ...recent.value.filter(item => item !== id)].slice(0, 12); persist(); }
+function readPreview(id: string) {
+  region.value = materials.find(item => item.id === id)?.region || null;
+  overview.value = false;
+  void select(id);
+}
 async function select(id: string) {
   if (!materials.some(item => item.id === id)) return;
   if (overview.value) region.value = null;
@@ -95,7 +101,7 @@ async function openModal(kind: 'search' | 'history') {
 }
 function closeModal() { modal.value = null; returnFocus?.focus(); }
 function keydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') { if (modal.value) closeModal(); else if (!overview.value && selected.value) void goBack(); else if (!overview.value) enterOverview(); return; }
+  if (event.key === 'Escape') { if (modal.value) closeModal(); else if (overview.value) void overviewPane.value?.closePreview(); else if (selected.value) void goBack(); else enterOverview(); return; }
   if (modal.value && event.key === 'Tab') {
     const elements = [...(dialog.value?.querySelectorAll<HTMLElement>('button:not([disabled]), input, a[href]') || [])];
     const first = elements[0], last = elements[elements.length - 1];
@@ -130,7 +136,7 @@ onBeforeUnmount(() => { removeEventListener('popstate', readLocation); removeEve
       </nav>
     </header>
 
-    <AtlasOverview3D v-if="overviewVisited" v-show="overview" :active="overview" @select="select" @region="enterRegion" @reading="enterReading" />
+    <AtlasOverview3D v-if="overviewVisited" v-show="overview" ref="overviewPane" :active="overview" :rejected="rejected" @select="readPreview" @region="enterRegion" @reading="enterReading" />
     <KnowledgeBoard v-show="board" :saved="saved" :rejected="rejected" @back="goBack" @save="toggleSaved" @reject="toggleRejected" />
     <main v-show="!board && !overview" class="atlas-overview">
       <div class="map-topline">
