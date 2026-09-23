@@ -414,7 +414,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
   width: 100%;
   min-height: 70px;
   display: grid;
-  grid-template-columns: 28px 24px minmax(100px, 0.55fr) minmax(180px, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   text-align: left;
@@ -436,13 +436,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
   color: var(--text-1);
   font-size: 16px;
   font-weight: 620;
-}
-
-.index-context small {
-  color: var(--text-4);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-align: right;
 }
 
 .index-system > button {

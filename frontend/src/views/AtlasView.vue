@@ -2512,16 +2512,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   border-left: 1px solid var(--line-warm);
 }
 
-.toolbar-title::after {
-  content: '03';
-  position: absolute;
-  top: -4px;
-  right: -30px;
-  color: var(--text-5);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
 .toolbar-title strong {
   font-family: var(--font-display);
   font-size: 27px;

@@ -360,13 +360,22 @@ DECORATIVE_NODE = re.compile(
     r">\s*(\d{2}\s*/\s*[A-Z][A-Z ]*|[A-Z]{2,}[A-Z ]*(?:\s*/\s*[A-Z0-9][A-Z0-9 +]*)+)\s*<"
 )
 
+# 编号也可以由 CSS 伪元素生成，模板扫描看不见。
+# AtlasView 的 `content: '03'` 就是这样在标题旁挂了一个装饰序号。
+DECORATIVE_CONTENT = re.compile(r"content:\s*['\"](\s*\d{1,2}\s*|[A-Z][A-Z /]+)['\"]")
+
 
 def check_chinese_first(files: list[Path]) -> list[str]:
     errors: list[str] = []
     for path in files:
+        text = path.read_text(encoding="utf-8")
+        for match in DECORATIVE_CONTENT.finditer(text):
+            line = text.count("\n", 0, match.start()) + 1
+            errors.append(
+                f"{rel(path)}:{line} 伪元素生成装饰编号（纲领 8.2）：{match.group(0)}"
+            )
         if path.suffix != ".vue":
             continue
-        text = path.read_text(encoding="utf-8")
         for match in BRAND_DECLARATION.finditer(text):
             line = text.count("\n", 0, match.start()) + 1
             errors.append(
