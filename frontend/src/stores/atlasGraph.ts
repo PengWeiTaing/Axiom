@@ -3,6 +3,8 @@ import { defineStore } from 'pinia'
 import { apiRequest } from '@/api/client'
 import type { AtlasEdge, AtlasGraphPayload, AtlasNode } from '@/atlas/types'
 
+type LodMode = 'overview' | 'semantic' | 'tags' | 'structure' | 'relations'
+
 const CACHE_TTL = 30_000
 
 export const useAtlasGraphStore = defineStore('atlasGraph', () => {
@@ -12,6 +14,9 @@ export const useAtlasGraphStore = defineStore('atlasGraph', () => {
   const lastLoaded = ref(0)
   const selectedId = ref<string | null>(null)
   const hoveredId = ref<string | null>(null)
+  const lod = ref<LodMode>('overview')
+  const showStructural = ref(true)
+  const showSemantic = ref(true)
 
   const nodeMap = computed(() => new Map((data.value?.nodes || []).map(node => [node.id, node])))
 
@@ -26,11 +31,18 @@ export const useAtlasGraphStore = defineStore('atlasGraph', () => {
   const visibleEdges = computed(() => {
     if (!data.value) return []
     return data.value.edges.filter(edge => {
-      // 语义关系要有足够证据才进入全局视图，结构归属直接显示。
-      // 这是原「总览」档的行为，现在是唯一行为——用户不再管理图谱显示设置
-      // （纲领 7.6）。置信度门槛不随视距放宽：镜头推近不能让未证实的联系
-      // 获得展示资格。真正的距离自适应在 atlas-study 原型中验证后再迁入。
-      if (edge.edge_class === 'semantic') {
+      if (edge.edge_class === 'structural' && !showStructural.value) return false
+      if (edge.edge_class === 'semantic' && !showSemantic.value) return false
+      if (lod.value === 'structure') return edge.edge_class === 'structural'
+      if (lod.value === 'relations') return edge.edge_class === 'semantic'
+      if (lod.value === 'tags') {
+        if (edge.edge_class === 'structural') return edge.visible_by_default
+        return edge.visible_by_default && edge.strength >= 0.9
+      }
+      if (lod.value === 'semantic' && edge.edge_class === 'structural') {
+        return edge.visible_by_default && edge.strength >= 0.9
+      }
+      if (lod.value === 'overview' && edge.edge_class === 'semantic') {
         return edge.visible_by_default && edge.confidence >= 0.88
       }
       return true
@@ -75,6 +87,9 @@ export const useAtlasGraphStore = defineStore('atlasGraph', () => {
     focusedEdges,
     visibleEdges,
     nodeMap,
+    lod,
+    showStructural,
+    showSemantic,
     load,
     selectNode,
     selectNeighbor,

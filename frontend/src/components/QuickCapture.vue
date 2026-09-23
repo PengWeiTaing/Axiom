@@ -124,6 +124,7 @@ defineExpose({ show, close });
       <section class="capture-plane" role="dialog" aria-modal="true" aria-label="记录">
         <header class="capture-head">
           <div>
+            <span>AXIOM / INTAKE</span>
             <strong>先接住，再理解。</strong>
           </div>
           <button type="button" title="关闭" aria-label="关闭记录" @click="close">

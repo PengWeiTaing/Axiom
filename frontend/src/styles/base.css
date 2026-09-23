@@ -126,6 +126,7 @@ a:hover {
 
 .eyebrow {
   color: var(--text-4);
+  font-family: var(--font-mono);
   font-size: var(--fs-1);
   font-weight: 600;
   font-variant-numeric: tabular-nums;

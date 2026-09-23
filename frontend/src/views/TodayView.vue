@@ -376,6 +376,7 @@ watch(() => props.revision, load);
   <main class="now-view">
     <header class="folio-head">
       <div class="folio-identity">
+        <span>01 / NOW</span>
         <strong>{{ greeting }}</strong>
       </div>
       <p>{{ dateLabel }}</p>
@@ -682,6 +683,9 @@ watch(() => props.revision, load);
   font-weight: 600;
 }
 
+.folio-identity span {
+  color: var(--focus);
+}
 
 .folio-identity strong {
   color: var(--text-1);

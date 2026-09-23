@@ -166,6 +166,9 @@ watch(
   () => [
     store.data,
     renderEdges.value.length,
+    store.lod,
+    store.showSemantic,
+    store.showStructural,
     graphScale.value,
   ],
   () => {
@@ -1173,7 +1176,10 @@ function edgeOpacity(edge: AtlasEdge): number {
 function labelVisible(node: AtlasNode): boolean {
   if (store.selectedId === node.id || store.hoveredId === node.id) return true
   if (isFallbackNode(node) && node.type !== 'lifeline') return false
-  // 地标与重要的次级节点显示名称，其余退入背景（纲领 7.6）。
+  if (store.lod === 'structure') return node.layer <= 3 && node.visible_label
+  if (store.lod === 'semantic') return node.layer <= 2 || (node.layer === 3 && node.weight >= 0.9)
+  if (store.lod === 'tags') return node.layer <= 2
+  if (store.lod === 'relations') return node.layer <= 2 || (node.layer === 3 && node.weight >= 0.72)
   return node.layer <= 1 || (node.layer === 2 && node.weight >= 0.72)
 }
 
@@ -1369,6 +1375,13 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
           </small>
         </div>
       </div>
+      <nav class="segmented atlas-tabs" aria-label="Atlas 视图">
+        <button :class="{ active: store.lod === 'overview' }" @click="store.lod = 'overview'">总览</button>
+        <button :class="{ active: store.lod === 'semantic' }" @click="store.lod = 'semantic'">语义</button>
+        <button :class="{ active: store.lod === 'tags' }" @click="store.lod = 'tags'">标签</button>
+        <button :class="{ active: store.lod === 'structure' }" @click="store.lod = 'structure'">结构</button>
+        <button :class="{ active: store.lod === 'relations' }" @click="store.lod = 'relations'">关系</button>
+      </nav>
       <div class="toolbar-actions">
         <button class="icon-btn" type="button" title="重置视角" aria-label="重置视角" @click="resetCamera">
           <Crosshair :size="17" :stroke-width="1.7" />
@@ -1734,8 +1747,9 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   gap: var(--s-4);
   min-height: 68px;
   padding: 12px 20px;
-  border-bottom: 1px solid var(--line-1);
-  background: var(--surface-1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  background: rgba(8, 9, 12, 0.78);
+  backdrop-filter: blur(14px);
 }
 
 .toolbar-title {
@@ -1777,6 +1791,10 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   background: rgba(255, 255, 255, 0.035);
   border-radius: var(--r-1);
   border: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.atlas-tabs {
+  justify-self: center;
 }
 
 .segmented button,
@@ -1830,7 +1848,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   gap: 14px;
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: var(--fs-1);
+  font-size: 10px;
 }
 
 .panel-kicker {
@@ -1931,8 +1949,9 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   gap: 14px;
   min-height: 68px;
   padding: 12px 20px;
-  border-bottom: 1px solid var(--line-1);
-  background: var(--surface-1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  background: rgba(8, 9, 12, 0.82);
+  backdrop-filter: blur(14px);
 }
 
 .local-toolbar div {
@@ -2033,7 +2052,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .local-node text {
   fill: var(--text-2);
-  font-size: var(--map-label);
+  font-size: 10px;
   paint-order: stroke;
   stroke: rgba(7, 9, 13, 0.94);
   stroke-width: 3px;
@@ -2048,7 +2067,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .local-node.role-secondary text {
   fill: var(--text-4);
-  font-size: var(--map-label-minor);
+  font-size: 9px;
 }
 
 .local-panel {
@@ -2060,8 +2079,9 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   width: 350px;
   overflow: auto;
   padding: 28px 24px 32px;
-  border-left: 1px solid var(--line-2);
-  background: var(--surface-1);
+  border-left: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(12, 14, 18, 0.88);
+  backdrop-filter: blur(18px);
 }
 
 .focus-metrics {
@@ -2290,7 +2310,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 .relation-confidence strong {
   color: #7f9dbd;
   font-family: var(--font-mono);
-  font-size: var(--fs-1);
+  font-size: 10px;
   font-weight: 550;
 }
 
@@ -2368,6 +2388,16 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .atlas-tabs {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    overflow-x: auto;
+  }
+
+  .atlas-tabs button {
+    flex: 1 0 auto;
   }
 
   .atlas-footnote {
@@ -2470,6 +2500,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 }
 
 .toolbar-title,
+.atlas-tabs,
 .toolbar-actions {
   position: absolute;
   top: 24px;
@@ -2482,6 +2513,16 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   gap: 13px;
   padding: 8px 0 8px 15px;
   border-left: 1px solid var(--line-warm);
+}
+
+.toolbar-title::after {
+  content: '03';
+  position: absolute;
+  top: -4px;
+  right: -30px;
+  color: var(--text-5);
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
 
 .toolbar-title strong {
@@ -2504,6 +2545,11 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   background: var(--focus);
   box-shadow: 0 0 16px rgba(225, 165, 88, 0.28);
   transform: none;
+}
+
+.atlas-tabs {
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .segmented {
@@ -2738,6 +2784,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   }
 
   .toolbar-title,
+  .atlas-tabs,
   .toolbar-actions {
     position: static;
     transform: none;
@@ -2767,6 +2814,17 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
     grid-column: 2;
     grid-row: 1;
     align-self: center;
+  }
+
+  .atlas-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .atlas-tabs button {
+    flex: 1 0 auto;
   }
 
   .local-toolbar {

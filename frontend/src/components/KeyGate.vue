@@ -18,14 +18,21 @@ async function submit() {
 
 <template>
   <main class="gate">
+    <header class="gate-head">
+      <span>Axiom / Private Edition</span>
+      <span>01</span>
+    </header>
+
     <section class="gate-cover" aria-labelledby="gate-title">
       <div class="gate-title">
         <span class="gate-seal"><LockKeyhole :size="18" :stroke-width="1.45" /></span>
+        <p>PERSONAL CORTEX</p>
         <h1 id="gate-title">Axiom</h1>
         <strong>私有外脑</strong>
       </div>
 
       <div class="gate-entry">
+        <span class="entry-index">PRIVATE ACCESS / 01</span>
         <h2>回来，继续。</h2>
         <form @submit.prevent="submit">
           <input class="visually-hidden" type="text" name="username" autocomplete="username" value="axiom" tabindex="-1" aria-hidden="true" />
@@ -38,9 +45,13 @@ async function submit() {
           </button>
         </form>
         <p v-if="auth.lastError" class="gate-error">{{ auth.lastError }}</p>
-        <p class="gate-local">密钥只保存在这台设备上</p>
+        <p class="gate-local">LOCAL DEVICE / ENCRYPTED TRANSIT</p>
       </div>
     </section>
+
+    <footer class="gate-foot">
+      <span>LOCAL FIRST</span><i /><span>PRIVATE CORTEX / 01</span>
+    </footer>
   </main>
 </template>
 
@@ -75,10 +86,28 @@ async function submit() {
   pointer-events: none;
 }
 
+.gate-head,
+.gate-foot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  color: var(--text-4);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.gate-head {
+  min-height: 44px;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line-2);
+}
+
 .gate-cover {
   position: relative;
   z-index: 1;
-  min-height: calc(100vh - 44px);
+  min-height: calc(100vh - 140px);
   display: grid;
   grid-template-columns: minmax(420px, 1.35fr) minmax(380px, 0.65fr);
   align-items: center;
@@ -104,10 +133,13 @@ async function submit() {
   border-radius: 50%;
 }
 
+.gate-title p,
+.entry-index,
 .gate-local {
   color: var(--text-4);
-  font-size: var(--fs-1);
-  font-weight: 520;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 580;
 }
 
 .gate-title h1 {
@@ -138,6 +170,10 @@ async function submit() {
   border-left: 1px solid var(--line-2);
 }
 
+.entry-index {
+  color: var(--focus-bright);
+}
+
 .gate-entry h2 {
   margin-top: 20px;
   color: var(--text-1);
@@ -160,7 +196,8 @@ async function submit() {
 
 .gate-entry label > span {
   color: var(--text-4);
-  font-size: var(--fs-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 560;
 }
 
@@ -226,6 +263,18 @@ async function submit() {
   animation: checking 800ms var(--ease) infinite alternate;
 }
 
+.gate-foot {
+  min-height: 42px;
+  gap: 12px;
+  border-top: 1px solid var(--line-2);
+}
+
+.gate-foot i {
+  flex: 1;
+  height: 1px;
+  background: var(--line-1);
+}
+
 @keyframes checking {
   to { opacity: 0.3; transform: translateX(5px); }
 }
@@ -247,7 +296,7 @@ async function submit() {
   }
 
   .gate-cover {
-    min-height: calc(100vh - 36px);
+    min-height: calc(100vh - 118px);
     grid-template-columns: 1fr;
     align-content: center;
   }
@@ -279,5 +328,7 @@ async function submit() {
   .gate-entry form {
     margin-top: 42px;
   }
+
+  .gate-foot span:last-child { display: none; }
 }
 </style>

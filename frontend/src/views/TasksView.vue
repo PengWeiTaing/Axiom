@@ -229,7 +229,9 @@ onMounted(() => {
   <main class="tasks-view">
     <header class="topbar">
       <div>
+        <p class="eyebrow">04 / ACTION</p>
         <h1>行动索引</h1>
+        <span>COMMITMENTS / NEXT STEPS / HISTORY</span>
       </div>
       <button class="refresh-btn" type="button" title="刷新行动" aria-label="刷新行动" :disabled="loadingToday || loadingList" @click="refreshAll">
         <RefreshCw :size="17" :class="{ spinning: loadingToday || loadingList }" />
@@ -266,6 +268,7 @@ onMounted(() => {
       <details class="panel create-panel">
         <summary class="panel-head">
           <div>
+            <p class="eyebrow">NEW / 01</p>
             <h2>记下一步</h2>
           </div>
           <Plus :size="18" />
@@ -315,6 +318,7 @@ onMounted(() => {
       <div class="panel today-panel">
         <div class="panel-head">
           <div>
+            <p class="eyebrow">CURRENT / 02</p>
             <h2>今天与逾期</h2>
           </div>
           <small>{{ overdueTasks.length + todayTasks.length }} 项</small>
@@ -366,6 +370,7 @@ onMounted(() => {
     <section class="panel list-panel">
       <div class="panel-head">
         <div>
+          <p class="eyebrow">ARCHIVE / 03</p>
           <h2>行动档案</h2>
         </div>
         <div class="filters">
@@ -502,6 +507,7 @@ onMounted(() => {
   color: var(--text-3);
   font-family: var(--font-mono);
   font-size: var(--fs-1);
+  text-transform: uppercase;
   letter-spacing: 0;
 }
 

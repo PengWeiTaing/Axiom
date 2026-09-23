@@ -184,6 +184,7 @@ onMounted(loadOverview);
   <main class="recent-view">
     <header class="topbar">
       <div>
+        <p class="eyebrow">Recent</p>
         <h1>近况</h1>
       </div>
       <button class="refresh-btn" type="button" :disabled="loading" @click="loadOverview">
@@ -217,6 +218,7 @@ onMounted(loadOverview);
       <div class="panel backlog-panel">
         <div class="panel-head">
           <div>
+            <p class="eyebrow">Backlog</p>
             <h2>处理积压</h2>
           </div>
           <strong>{{ backlog?.total ?? 0 }}</strong>
@@ -256,6 +258,7 @@ onMounted(loadOverview);
       <div class="panel artifacts-panel">
         <div class="panel-head">
           <div>
+            <p class="eyebrow">Artifacts</p>
             <h2>自动化产物</h2>
           </div>
           <strong>{{ overview?.artifacts.total ?? 0 }}</strong>
@@ -296,6 +299,7 @@ onMounted(loadOverview);
     <section class="panel recent-panel">
       <div class="panel-head">
         <div>
+          <p class="eyebrow">Timeline</p>
           <h2>最近记录</h2>
         </div>
         <span class="updated-at" v-if="overview">

@@ -132,6 +132,7 @@ onMounted(loadQueue);
   <main class="processing-view">
     <header class="topbar">
       <div>
+        <p class="eyebrow">Processing</p>
         <h1>处理工作台</h1>
       </div>
       <button class="refresh-btn" type="button" :disabled="loading" @click="loadQueue">
@@ -159,6 +160,7 @@ onMounted(loadQueue);
       <article class="panel next-panel" :class="{ empty: !hasBacklog }">
         <div class="panel-head">
           <div>
+            <p class="eyebrow">Next</p>
             <h2>全局下一条</h2>
           </div>
           <span class="state-pill">{{ hasBacklog ? '待处理' : '已清空' }}</span>
@@ -188,6 +190,7 @@ onMounted(loadQueue);
       <section class="panel groups-panel">
         <div class="panel-head">
           <div>
+            <p class="eyebrow">Groups</p>
             <h2>队列分组</h2>
           </div>
           <strong>{{ backlog?.groups.length ?? 0 }}</strong>
@@ -250,6 +253,7 @@ onMounted(loadQueue);
     <section v-if="lastMarked.length" class="panel changed-panel">
       <div class="panel-head">
         <div>
+          <p class="eyebrow">Last Action</p>
           <h2>刚处理的记录</h2>
         </div>
         <strong>{{ lastMarked.length }}</strong>
@@ -310,6 +314,7 @@ onMounted(loadQueue);
   margin: 0 0 var(--s-1);
   color: var(--text-4);
   font-size: var(--fs-1);
+  text-transform: uppercase;
   letter-spacing: 0;
 }
 

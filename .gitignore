@@ -31,8 +31,3 @@ screenshots/
 desktop/node_modules/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
-
-# 自动化产物与运行时状态 — 不入库
-artifacts/
-runtime/
-.openclaw/

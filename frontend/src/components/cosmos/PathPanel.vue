@@ -124,9 +124,9 @@ function kindBadge(entityId: string): string {
 .path-entity:hover { background: var(--surface-2); }
 
 .path-kind {
-  width: 18px; height: 18px;
+  width: 16px; height: 16px;
   display: flex; align-items: center; justify-content: center;
-  font-size: var(--fs-1); color: var(--accent);
+  font-size: 9px; color: var(--accent);
   border: 1px solid var(--accent); border-radius: var(--r-1);
   flex-shrink: 0;
 }
