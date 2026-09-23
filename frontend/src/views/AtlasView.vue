@@ -166,7 +166,6 @@ watch(
   () => [
     store.data,
     renderEdges.value.length,
-    store.lod,
     store.showSemantic,
     store.showStructural,
     graphScale.value,
@@ -1176,10 +1175,7 @@ function edgeOpacity(edge: AtlasEdge): number {
 function labelVisible(node: AtlasNode): boolean {
   if (store.selectedId === node.id || store.hoveredId === node.id) return true
   if (isFallbackNode(node) && node.type !== 'lifeline') return false
-  if (store.lod === 'structure') return node.layer <= 3 && node.visible_label
-  if (store.lod === 'semantic') return node.layer <= 2 || (node.layer === 3 && node.weight >= 0.9)
-  if (store.lod === 'tags') return node.layer <= 2
-  if (store.lod === 'relations') return node.layer <= 2 || (node.layer === 3 && node.weight >= 0.72)
+  // 地标与重要的次级节点显示名称，其余退入背景（纲领 7.6）。
   return node.layer <= 1 || (node.layer === 2 && node.weight >= 0.72)
 }
 
@@ -1375,13 +1371,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
           </small>
         </div>
       </div>
-      <nav class="segmented atlas-tabs" aria-label="Atlas 视图">
-        <button :class="{ active: store.lod === 'overview' }" @click="store.lod = 'overview'">总览</button>
-        <button :class="{ active: store.lod === 'semantic' }" @click="store.lod = 'semantic'">语义</button>
-        <button :class="{ active: store.lod === 'tags' }" @click="store.lod = 'tags'">标签</button>
-        <button :class="{ active: store.lod === 'structure' }" @click="store.lod = 'structure'">结构</button>
-        <button :class="{ active: store.lod === 'relations' }" @click="store.lod = 'relations'">关系</button>
-      </nav>
       <div class="toolbar-actions">
         <button class="icon-btn" type="button" title="重置视角" aria-label="重置视角" @click="resetCamera">
           <Crosshair :size="17" :stroke-width="1.7" />
@@ -1790,10 +1779,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   background: rgba(255, 255, 255, 0.035);
   border-radius: var(--r-1);
   border: 1px solid rgba(255, 255, 255, 0.055);
-}
-
-.atlas-tabs {
-  justify-self: center;
 }
 
 .segmented button,
@@ -2387,16 +2372,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
     white-space: nowrap;
   }
 
-  .atlas-tabs {
-    grid-column: 1 / -1;
-    justify-self: stretch;
-    overflow-x: auto;
-  }
-
-  .atlas-tabs button {
-    flex: 1 0 auto;
-  }
-
   .atlas-footnote {
     display: none;
   }
@@ -2497,7 +2472,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 }
 
 .toolbar-title,
-.atlas-tabs,
 .toolbar-actions {
   position: absolute;
   top: 24px;
@@ -2532,11 +2506,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   background: var(--focus);
   box-shadow: 0 0 16px rgba(225, 165, 88, 0.28);
   transform: none;
-}
-
-.atlas-tabs {
-  left: 50%;
-  transform: translateX(-50%);
 }
 
 .segmented {
@@ -2771,7 +2740,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   }
 
   .toolbar-title,
-  .atlas-tabs,
   .toolbar-actions {
     position: static;
     transform: none;
@@ -2801,17 +2769,6 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
     grid-column: 2;
     grid-row: 1;
     align-self: center;
-  }
-
-  .atlas-tabs {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    width: 100%;
-    overflow-x: auto;
-  }
-
-  .atlas-tabs button {
-    flex: 1 0 auto;
   }
 
   .local-toolbar {
