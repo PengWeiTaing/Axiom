@@ -34,7 +34,7 @@
 
 ### 环境注记
 
-- 后端默认 `AXIOM_ROOT = E:\optxiom`，而 `scripts/seed_atlas_demo_data.py` 的 `--root` 默认是仓库目录，两者指向不同的库。本地查看演示数据需要显式设置 `AXIOM_ROOT` 指向仓库，否则读到空库。
+- 后端默认 `AXIOM_ROOT = E:/opt/axiom`，而 `scripts/seed_atlas_demo_data.py` 的 `--root` 默认是仓库目录，两者指向不同的库。本地查看演示数据需要显式设置 `AXIOM_ROOT` 指向仓库，否则读到空库。
 - 本轮生成的演示数据已从备份还原，`db/axiom.db` 回到动手前状态（该库本就只含演示内容，且被 `.gitignore` 排除）。
 - `.gitignore` 缺少 `artifacts/`（1.1 GB）、`runtime/`、`.openclaw/`，一次 `git add -A` 会把自动化产物提交进仓库。本轮的补充随回退一并撤销，这个缺口仍然存在。
 
