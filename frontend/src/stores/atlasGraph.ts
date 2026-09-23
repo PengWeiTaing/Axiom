@@ -12,8 +12,6 @@ export const useAtlasGraphStore = defineStore('atlasGraph', () => {
   const lastLoaded = ref(0)
   const selectedId = ref<string | null>(null)
   const hoveredId = ref<string | null>(null)
-  const showStructural = ref(true)
-  const showSemantic = ref(true)
 
   const nodeMap = computed(() => new Map((data.value?.nodes || []).map(node => [node.id, node])))
 
@@ -28,8 +26,6 @@ export const useAtlasGraphStore = defineStore('atlasGraph', () => {
   const visibleEdges = computed(() => {
     if (!data.value) return []
     return data.value.edges.filter(edge => {
-      if (edge.edge_class === 'structural' && !showStructural.value) return false
-      if (edge.edge_class === 'semantic' && !showSemantic.value) return false
       // 语义关系要有足够证据才进入全局视图，结构归属直接显示。
       // 这是原「总览」档的行为，现在是唯一行为——用户不再管理图谱显示设置
       // （纲领 7.6）。置信度门槛不随视距放宽：镜头推近不能让未证实的联系
@@ -79,8 +75,6 @@ export const useAtlasGraphStore = defineStore('atlasGraph', () => {
     focusedEdges,
     visibleEdges,
     nodeMap,
-    showStructural,
-    showSemantic,
     load,
     selectNode,
     selectNeighbor,

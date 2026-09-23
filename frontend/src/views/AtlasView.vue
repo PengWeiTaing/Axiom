@@ -166,8 +166,6 @@ watch(
   () => [
     store.data,
     renderEdges.value.length,
-    store.showSemantic,
-    store.showStructural,
     graphScale.value,
   ],
   () => {
