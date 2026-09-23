@@ -356,7 +356,7 @@ a.preview-source:hover { color: #e7e7e1; }
   .spatial-heading .quiet-command { font-size: 12px; }
   .domain-name { font-size: 14px; gap: 4px; }
   .domain-name svg { width: 10px; }
-  .domain-count { font-size: 9px; gap: 8px; margin-top: 2px; }
+  .domain-count { font-size: 10px; gap: 8px; margin-top: 2px; }
   .spatial-domain { padding-bottom: 6px; }
   .spatial-hit, .spatial-hit.is-landmark { font-size: 12px; }
   .spatial-controls { right: 19px; bottom: 28px; gap: 3px; }

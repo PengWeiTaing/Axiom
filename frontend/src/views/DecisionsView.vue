@@ -169,9 +169,7 @@ onMounted(() => {
   <main class="decisions-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">06 / DECISION</p>
         <h1>决定索引</h1>
-        <span>CONTEXT / CHOICE / EXPECTATION / OUTCOME</span>
       </div>
       <button class="refresh-btn" type="button" title="刷新决定" aria-label="刷新决定" :disabled="loading" @click="refreshAll">
         <RefreshCw :size="17" :class="{ spinning: loading }" />
@@ -208,7 +206,6 @@ onMounted(() => {
       <details class="panel create-panel">
         <summary class="panel-head">
           <div>
-            <p class="eyebrow">NEW / 01</p>
             <h2>记下一次选择</h2>
           </div>
           <Plus :size="18" />
@@ -262,7 +259,6 @@ onMounted(() => {
       <section class="panel list-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">ARCHIVE / 02</p>
             <h2>选择与结果</h2>
           </div>
           <div class="filters">
@@ -381,7 +377,6 @@ onMounted(() => {
   color: var(--text-3);
   font-family: var(--font-mono);
   font-size: var(--fs-1);
-  text-transform: uppercase;
   letter-spacing: 0;
 }
 

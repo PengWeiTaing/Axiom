@@ -604,7 +604,7 @@ function isDetailField(fn: string): boolean {
 .detail-loading, .detail-error { font-size: var(--fs-2); color: var(--text-4); padding: var(--s-2); }
 .btn-retry { background: none; border: 1px solid var(--accent); border-radius: var(--r-1); color: var(--accent); cursor: pointer; font-size: var(--fs-1); margin-left: var(--s-1); }
 
-.section-title { font-size: var(--fs-1); color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
+.section-title { font-size: var(--fs-1); color: var(--text-3); }
 
 .field-row {
   display: flex; align-items: flex-start; gap: var(--s-1); padding: 3px 0; position: relative;
@@ -690,8 +690,8 @@ function isDetailField(fn: string): boolean {
 .assoc-summary-conf { color: var(--text-4); font-size: 10px; flex-shrink: 0; }
 .assoc-summary-arrow { color: var(--text-4); flex-shrink: 0; }
 .assoc-summary-kind {
-  width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;
-  font-size: 8px; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-1);
+  width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-1); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-1);
   flex-shrink: 0;
 }
 .assoc-summary-title {

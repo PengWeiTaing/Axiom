@@ -208,9 +208,7 @@ onMounted(() => {
   <main class="memories-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">05 / MEMORY</p>
         <h1>记忆索引</h1>
-        <span>FACTS / PREFERENCES / GOALS / EVENTS</span>
       </div>
       <button class="refresh-btn" type="button" title="刷新记忆" aria-label="刷新记忆" :disabled="loading" @click="refreshAll">
         <RefreshCw :size="17" :class="{ spinning: loading }" />
@@ -247,7 +245,6 @@ onMounted(() => {
       <details class="panel create-panel">
         <summary class="panel-head">
           <div>
-            <p class="eyebrow">NEW / 01</p>
             <h2>保留一条记忆</h2>
           </div>
           <Plus :size="18" />
@@ -290,7 +287,6 @@ onMounted(() => {
       <section class="panel list-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">ARCHIVE / 02</p>
             <h2>长期记忆</h2>
           </div>
           <div class="filters">
@@ -421,7 +417,6 @@ onMounted(() => {
   color: var(--text-3);
   font-family: var(--font-mono);
   font-size: var(--fs-1);
-  text-transform: uppercase;
   letter-spacing: 0;
 }
 

@@ -1747,9 +1747,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   gap: var(--s-4);
   min-height: 68px;
   padding: 12px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
-  background: rgba(8, 9, 12, 0.78);
-  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line-1);
+  background: var(--surface-1);
 }
 
 .toolbar-title {
@@ -1848,7 +1847,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   gap: 14px;
   color: var(--text-5);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-1);
 }
 
 .panel-kicker {
@@ -1949,9 +1948,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   gap: 14px;
   min-height: 68px;
   padding: 12px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
-  background: rgba(8, 9, 12, 0.82);
-  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line-1);
+  background: var(--surface-1);
 }
 
 .local-toolbar div {
@@ -2052,7 +2050,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .local-node text {
   fill: var(--text-2);
-  font-size: 10px;
+  font-size: var(--map-label);
   paint-order: stroke;
   stroke: rgba(7, 9, 13, 0.94);
   stroke-width: 3px;
@@ -2067,7 +2065,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 
 .local-node.role-secondary text {
   fill: var(--text-4);
-  font-size: 9px;
+  font-size: var(--map-label-minor);
 }
 
 .local-panel {
@@ -2079,9 +2077,8 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
   width: 350px;
   overflow: auto;
   padding: 28px 24px 32px;
-  border-left: 1px solid rgba(255, 255, 255, 0.055);
-  background: rgba(12, 14, 18, 0.88);
-  backdrop-filter: blur(18px);
+  border-left: 1px solid var(--line-2);
+  background: var(--surface-1);
 }
 
 .focus-metrics {
@@ -2310,7 +2307,7 @@ function localEdgeClass(entry: LocalEdge): Record<string, boolean> {
 .relation-confidence strong {
   color: #7f9dbd;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-1);
   font-weight: 550;
 }
 

@@ -201,7 +201,6 @@ onMounted(() => {
   <main class="system-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">System</p>
         <h1>系统治理</h1>
       </div>
       <div class="top-actions">
@@ -253,7 +252,6 @@ onMounted(() => {
       <div class="panel status-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Health</p>
             <h2>运行状态</h2>
           </div>
           <span class="state-pill" :data-state="system?.integrity.ok ? 'good' : 'warn'">
@@ -291,7 +289,6 @@ onMounted(() => {
       <div class="panel tables-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Tables</p>
             <h2>数据表</h2>
           </div>
           <small>{{ tableRows.length }} 张</small>
@@ -316,7 +313,6 @@ onMounted(() => {
       <div class="panel audit-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Audit</p>
             <h2>审计日志</h2>
           </div>
           <small>{{ audit?.total ?? 0 }} 条</small>
@@ -348,7 +344,6 @@ onMounted(() => {
       <div class="panel logs-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Logs</p>
             <h2>日志尾部</h2>
           </div>
           <small>{{ logs?.lines ?? 0 }} 行</small>

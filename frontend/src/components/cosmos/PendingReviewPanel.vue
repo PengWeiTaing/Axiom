@@ -151,8 +151,8 @@ function focusEntity(id: string) {
 }
 
 .pending-kind {
-  width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;
-  font-size: 8px; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-1);
+  width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-1); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-1);
   flex-shrink: 0;
 }
 

@@ -162,8 +162,6 @@ const nowDate = computed(() => new Date(now.value));
 .entry-type {
   font-size: var(--fs-1);
   color: var(--text-4);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 .entry.skel .entry-summary,
@@ -175,20 +173,13 @@ const nowDate = computed(() => new Date(now.value));
 .skel-bar {
   height: 12px;
   width: 60%;
-  background: linear-gradient(
-    90deg,
-    var(--surface-2) 0%,
-    var(--surface-3) 50%,
-    var(--surface-2) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
-  border-radius: 4px;
+  background: var(--surface-3);
+  animation: skel-pulse 1.4s ease-in-out infinite alternate;
+  border-radius: var(--r-2);
 }
 
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+@keyframes skel-pulse {
+  to { opacity: 0.45; }
 }
 
 .empty,

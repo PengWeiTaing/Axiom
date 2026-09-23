@@ -161,7 +161,6 @@ onMounted(loadIndex);
     <aside class="line-rail">
       <header>
         <div>
-          <p class="eyebrow">Context</p>
           <h2>项目与生活线</h2>
         </div>
         <span>{{ lifelines.length }}</span>

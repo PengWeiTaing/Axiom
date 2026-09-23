@@ -1,4 +1,9 @@
-"""Guard the Atlas visual language against the previous debug-style layout."""
+"""守护 Atlas 的功能契约，不锁死它的构图。
+
+这里断言的是"3D 场景、2D 聚焦、关系治理入口仍然存在且可被测试驱动"，
+以及"调试期的网格、滑杆、骨架图不再回来"。分栏高度一类的像素构图
+交给 docs/FRONTEND_ART_DIRECTION.md 演进，不在这里固化。
+"""
 
 from __future__ import annotations
 
@@ -25,8 +30,6 @@ def main() -> int:
         'data-testid="relation-accept"',
         'data-testid="relation-delete"',
         "canGovernRelation(selectedLocalRelation)",
-        "height: calc(66% - 64px)",
-        "height: calc(50% - 64px)",
     )
     for fragment in required:
         if fragment not in text:

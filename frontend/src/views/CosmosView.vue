@@ -349,7 +349,7 @@ async function start() {
     const div = document.createElement('div')
     const cnt = countMap.get(n.id) || 0
     div.textContent = String(cnt)
-    div.style.cssText = 'font-size:9px;color:var(--text-4);font-family:var(--font-mono);text-align:center;'
+    div.style.cssText = 'font-size:var(--map-label-minor);color:var(--text-4);font-family:var(--font-mono);text-align:center;'
     const label = new CSS2DObject(div)
     label.position.copy(n.position.clone().add(new THREE.Vector3(0, -0.07, 0)))
     sceneObjs.scene.add(label)

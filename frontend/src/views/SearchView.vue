@@ -341,9 +341,7 @@ onBeforeUnmount(() => {
   <main class="library-view">
     <header class="library-head">
       <div class="library-title">
-        <span>02 / LIBRARY</span>
         <h1>资料库</h1>
-        <p>RECORDS / OBJECTS / CONTEXT</p>
       </div>
       <nav aria-label="资料库视图">
         <button type="button" :class="{ active: libraryPane === 'search' }" @click="selectLibraryPane('search')">
@@ -499,9 +497,6 @@ onBeforeUnmount(() => {
   font-weight: 640;
 }
 
-.library-title p {
-  display: none;
-}
 
 .library-head nav {
   display: flex;

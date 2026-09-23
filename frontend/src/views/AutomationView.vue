@@ -219,7 +219,6 @@ onMounted(() => {
   <main class="automation-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Automation</p>
         <h1>自动化中心</h1>
       </div>
       <button class="refresh-btn" type="button" :disabled="loadingJobs || loadingRuns" @click="refreshAll">
@@ -258,7 +257,6 @@ onMounted(() => {
       <div class="panel jobs-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Jobs</p>
             <h2>可执行任务</h2>
           </div>
           <small>{{ jobs.length }} 项</small>
@@ -289,7 +287,6 @@ onMounted(() => {
       <div class="panel runs-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Runs</p>
             <h2>运行记录</h2>
           </div>
         </div>
@@ -342,7 +339,6 @@ onMounted(() => {
       <aside class="panel detail-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Detail</p>
             <h2>记录详情</h2>
           </div>
         </div>
@@ -420,7 +416,6 @@ onMounted(() => {
   margin: 0 0 var(--s-1);
   color: var(--accent);
   font-size: var(--fs-1);
-  text-transform: uppercase;
   letter-spacing: 0;
 }
 

@@ -1,45 +1,69 @@
 /*
- * Axiom / Night Field
+ * Axiom / 夜行长卷
  *
- * A native dark workspace built from graphite, warm type and restrained
- * mineral signals. Depth comes from luminance and proximity, never from
- * inverted paper colours, neon gradients or decorative glass.
+ * 依据 docs/FRONTEND_ART_DIRECTION.md。验收由
+ * scripts/check_frontend_art_direction.py 实算，不是比对字符串。
+ *
+ * 暗场（第 9.1 节）
+ *   底色是中性偏冷的墨黑，不是绿黑——绿黑容易联想到终端、军用设备
+ *   和生物科技。深度来自明度与邻近关系，不来自反相纸色、霓虹渐变
+ *   或装饰玻璃。正文保持温白，与冷底形成呼吸感而非对抗。
+ *
+ * 分隔线（第 3.3 / 13 节）
+ *   去卡片化之后，细线承担了主要的结构表达。三级各有认识角色，
+ *   既拒绝"低对比细线铺满页面、精致但看不清"，也拒绝把所有内容
+ *   对齐成企业后台的硬网格：
+ *     line-1  装饰性分段——旁边必须另有排版线索，允许低于 AA
+ *     line-2  承载结构的边界——AA 非文本下限 3.0:1
+ *     line-3  交互与焦点边界——4.5:1
+ *
+ * 矿物色（第 9.2 节）
+ *   低占比、多来源，避免单一绿色或紫蓝控制整套界面。颜色必须
+ *   同时配合文字、形态或纹理，不能独立承载状态。
  */
 
 :root {
   color-scheme: dark;
 
-  --surface-0: #0b0e0c;
-  --surface-1: #101410;
-  --surface-2: #161b16;
-  --surface-3: #1e251f;
-  --surface-4: #2e3730;
-  --surface-raised: rgba(17, 21, 17, 0.97);
+  --surface-0: #0b0c0e;
+  --surface-1: #101216;
+  --surface-2: #161920;
+  --surface-3: #1e2229;
+  --surface-4: #2e333c;
+  --surface-raised: rgba(17, 19, 23, 0.97);
 
   --text-1: #f2f1eb;
-  --text-2: #d5d8cf;
-  --text-3: #a9afa5;
-  --text-4: #7d857c;
-  --text-5: #596159;
+  --text-2: #d7d6d0;
+  --text-3: #aeaca6;
+  --text-4: #86847e;
+  --text-5: #7c7b76;
 
-  --line-1: rgba(235, 239, 229, 0.075);
-  --line-2: rgba(235, 239, 229, 0.14);
-  --line-3: rgba(235, 239, 229, 0.26);
-  --line-warm: rgba(211, 109, 82, 0.38);
+  --line-1: rgba(238, 236, 230, 0.235);
+  --line-2: rgba(238, 236, 230, 0.365);
+  --line-3: rgba(238, 236, 230, 0.51);
+  --line-warm: rgba(211, 109, 82, 0.55);
 
-  --accent: #8ea797;
+  /* 矿物色：语义名是主用法，颜色名保留给仍在引用的样式。 */
+  --intent: #d36d52;
+  --space: #7ca4c8;
+  --continuity: #8ea797;
+  --time: #d0b56e;
+  --tension: #b197b2;
+
+  --vermilion: var(--intent);
+  --cobalt: var(--space);
+  --violet: var(--tension);
+  --yellow: var(--time);
+
+  --accent: var(--continuity);
   --accent-bright: #b8cabc;
   --accent-dim: rgba(142, 167, 151, 0.14);
   --accent-glow: rgba(142, 167, 151, 0.075);
-  --focus: #d36d52;
+  --focus: var(--intent);
   --focus-bright: #ed8d72;
   --focus-dim: rgba(211, 109, 82, 0.13);
   --success: #82a98f;
-  --info: #7fa1bd;
-  --cobalt: #7ca4c8;
-  --vermilion: #d36d52;
-  --violet: #b197b2;
-  --yellow: #d0b56e;
+  --info: var(--space);
 
   --warm: var(--focus);
   --warn: #d1a060;
@@ -59,12 +83,19 @@
   --s-7: 48px;
   --s-8: 64px;
 
+  /* 字体链只写随工程安装或系统提供的家族名（第 8.1 节）。 */
   --font-ui:
-    "OpenAI Sans SC", "OpenAI Sans", "Inter Variable", "Noto Sans SC Variable",
-    "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+    "Inter Variable", "Noto Sans SC Variable", "PingFang SC",
+    "Microsoft YaHei UI", system-ui, sans-serif;
   --font-sans: var(--font-ui);
   --font-display: var(--font-ui);
-  --font-mono: var(--font-ui);
+  /*
+   * 等宽只作用于数字、标识和代码片段。字体回退按字符生效，
+   * 所以中文仍然落到 Noto Sans SC，不会因为等宽链而断裂。
+   */
+  --font-mono:
+    ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono",
+    "Liberation Mono", "Noto Sans SC Variable", "PingFang SC", monospace;
 
   --fs-1: 11px;
   --fs-2: 12px;
@@ -74,6 +105,10 @@
   --fs-6: 22px;
   --fs-7: 34px;
   --fs-display: 58px;
+
+  /* 地图内标签：图内容自有尺度，不是界面字号。只允许 Atlas / Cosmos 使用。 */
+  --map-label: 10px;
+  --map-label-minor: 9px;
 
   --lh-tight: 1.2;
   --lh-base: 1.58;
@@ -86,7 +121,7 @@
   --t-drawer: 320ms;
 
   --glass-blur: none;
-  --glass-bg: rgba(16, 20, 16, 0.97);
+  --glass-bg: rgba(16, 18, 22, 0.97);
   --shadow-1: 0 14px 34px rgba(0, 0, 0, 0.24);
   --shadow-2: 0 30px 90px rgba(0, 0, 0, 0.46);
 

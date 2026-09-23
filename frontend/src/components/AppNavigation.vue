@@ -4,9 +4,7 @@ import {
   Archive,
   Brain,
   CalendarDays,
-  CheckSquare2,
   CircleDot,
-  FileStack,
   GitFork,
   Inbox,
   LibraryBig,
@@ -26,19 +24,19 @@ const emit = defineEmits<{ capture: [] }>();
 const mode = useModeStore();
 const indexOpen = ref(false);
 
-const primaryItems: { key: PrimaryMode; label: string; index: string; icon: Component }[] = [
-  { key: 'today', label: '此刻', index: '01', icon: CircleDot },
-  { key: 'library', label: '资料库', index: '02', icon: LibraryBig },
-  { key: 'atlas', label: 'Atlas', index: '03', icon: Orbit },
+const primaryItems: { key: PrimaryMode; label: string; icon: Component }[] = [
+  { key: 'today', label: '此刻', icon: CircleDot },
+  { key: 'library', label: '资料库', icon: LibraryBig },
+  { key: 'atlas', label: 'Atlas', icon: Orbit },
 ];
 
-const contextItems: { key: AppMode; label: string; code: string; icon: Component }[] = [
-  { key: 'processing', label: '待整理', code: 'INPUT', icon: Inbox },
-  { key: 'tasks', label: '行动', code: 'ACTION', icon: ListTodo },
-  { key: 'memories', label: '记忆', code: 'MEMORY', icon: Brain },
-  { key: 'decisions', label: '决定', code: 'DECISION', icon: GitFork },
-  { key: 'timeline', label: '时间', code: 'TIMELINE', icon: CalendarDays },
-  { key: 'recent', label: '回顾', code: 'RECENT', icon: Archive },
+const contextItems: { key: AppMode; label: string; icon: Component }[] = [
+  { key: 'processing', label: '待整理', icon: Inbox },
+  { key: 'tasks', label: '行动', icon: ListTodo },
+  { key: 'memories', label: '记忆', icon: Brain },
+  { key: 'decisions', label: '决定', icon: GitFork },
+  { key: 'timeline', label: '时间', icon: CalendarDays },
+  { key: 'recent', label: '回顾', icon: Archive },
 ];
 
 const systemItems: { key: AppMode; label: string; icon: Component }[] = [
@@ -94,7 +92,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
   <nav class="app-navigation" :class="{ 'over-atlas': mode.mode === 'atlas' }" aria-label="主要导航">
     <button class="brand" type="button" aria-label="返回此刻" @click="select('today')">
       <span class="brand-name">Axiom</span>
-      <span class="brand-state">personal cortex</span>
     </button>
 
     <div class="primary-navigation">
@@ -108,7 +105,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
       >
         <component :is="item.icon" class="chapter-icon" :size="18" :stroke-width="1.55" />
         <span>{{ item.label }}</span>
-        <small>{{ item.index }}</small>
       </button>
 
       <button class="capture-link" type="button" title="记录（N）" aria-label="记录" @click="openCapture">
@@ -126,7 +122,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
       >
         <component :is="item.icon" class="chapter-icon" :size="18" :stroke-width="1.55" />
         <span>{{ item.label }}</span>
-        <small>{{ item.index }}</small>
       </button>
     </div>
 
@@ -153,7 +148,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
     <aside v-if="indexOpen" class="index-sheet" aria-label="Axiom 索引">
       <header class="index-head">
         <div>
-          <span class="index-kicker">Axiom / Index</span>
           <h2>索引</h2>
         </div>
         <button type="button" title="关闭" aria-label="关闭索引" @click="indexOpen = false">
@@ -165,16 +159,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
         <section class="index-context">
           <p>在需要时进入</p>
           <button
-            v-for="(item, itemIndex) in contextItems"
+            v-for="item in contextItems"
             :key="item.key"
             type="button"
             :class="{ active: mode.mode === item.key }"
             @click="select(item.key)"
           >
-            <span class="index-number">{{ String(itemIndex + 1).padStart(2, '0') }}</span>
             <component :is="item.icon" :size="17" :stroke-width="1.45" />
             <strong>{{ item.label }}</strong>
-            <small>{{ item.code }}</small>
           </button>
         </section>
 
@@ -193,11 +185,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
         </section>
       </div>
 
-      <footer class="index-foot">
-        <FileStack :size="15" />
-        <span>PRIVATE INDEX / 06 + 03</span>
-        <CheckSquare2 :size="15" />
-      </footer>
     </aside>
   </Transition>
 </template>
@@ -248,12 +235,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
   line-height: 1;
 }
 
-.brand-state {
-  color: var(--text-5);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 560;
-}
 
 .primary-navigation {
   display: flex;
@@ -283,12 +264,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
   background: transparent;
 }
 
-.chapter-link small {
-  grid-column: 2;
-  color: var(--text-5);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
 
 .chapter-icon {
   display: none;
@@ -393,14 +368,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
   border-bottom: 1px solid var(--line-2);
 }
 
-.index-kicker,
-.index-context > p,
-.index-system > p {
-  color: var(--focus);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-}
 
 .index-head h2 {
   margin-top: 21px;
@@ -464,11 +431,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
   color: var(--focus);
 }
 
-.index-number {
-  color: var(--text-5);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
 
 .index-context strong {
   color: var(--text-1);
@@ -500,20 +462,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown));
   color: var(--text-1);
 }
 
-.index-foot {
-  min-height: 50px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-4);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  border-top: 1px solid var(--line-2);
-}
 
-.index-foot svg:last-child {
-  margin-left: auto;
-}
 
 .index-sheet-enter-active,
 .index-sheet-leave-active {

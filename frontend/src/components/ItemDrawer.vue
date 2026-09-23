@@ -727,7 +727,6 @@ onBeforeUnmount(() => {
   width: max-content;
   color: var(--chip-accent, var(--text-5));
   font-size: 11px;
-  text-transform: uppercase;
   letter-spacing: 0;
   padding-left: 8px;
   border-left: 2px solid currentColor;
@@ -908,7 +907,6 @@ onBeforeUnmount(() => {
   font-size: var(--fs-1);
   color: var(--text-4);
   min-width: 36px;
-  text-transform: uppercase;
   letter-spacing: 0;
 }
 

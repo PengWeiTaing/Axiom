@@ -247,7 +247,6 @@ onMounted(() => {
   <main class="timeline-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Timeline</p>
         <h1>时间流</h1>
       </div>
       <button class="refresh-btn" type="button" :disabled="loading" @click="loadTimeline(true)">
@@ -278,7 +277,6 @@ onMounted(() => {
       <aside class="panel filter-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Scope</p>
             <h2>范围</h2>
           </div>
         </div>
@@ -321,7 +319,6 @@ onMounted(() => {
 
         <div class="event-panel" aria-label="时间事件详情">
           <template v-if="activeEntry">
-            <p class="eyebrow">Selected</p>
             <h3>{{ entryTitle(activeEntry) }}</h3>
             <dl>
               <div>
@@ -353,7 +350,6 @@ onMounted(() => {
       <section class="panel activity-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Activity</p>
             <h2>活动</h2>
           </div>
           <small>第 {{ page }} / {{ totalPages }} 页</small>
