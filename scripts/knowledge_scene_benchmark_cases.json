@@ -1,0 +1,639 @@
+{
+  "schema_version": "1.0",
+  "name": "Axiom 通用知识白板确定性跨学科基准",
+  "description": "20 个固定学习目标；所有硬检查均由本地规则完成，不使用模型裁判。",
+  "expected_domain_counts": {
+    "数学": 4,
+    "物理": 4,
+    "化学": 3,
+    "生物": 3,
+    "计算机": 3,
+    "人文": 3
+  },
+  "cases": [
+    {
+      "id": "M01",
+      "domain": "数学",
+      "goal": "从差商推导 f(x)=x² 在 x₀=1 处的导数，并用割线趋于切线解释 h→0；只保留概念关键步，不展开基础分配律。",
+      "source_text": "",
+      "subject_terms": ["数学", "微积分", "高等数学"],
+      "target_text_any": [["差商", "割线"], ["切线", "瞬时变化率"]],
+      "correctness": [
+        {"id": "difference-quotient", "description": "差商化为 2+h", "any": ["2\\s*\\+\\s*h", "h\\s*\\+\\s*2"]},
+        {"id": "derivative-value", "description": "导数或极限等于 2", "any": ["(导数|斜率|极限)[^。；]{0,24}(等于|为|=)\\s*2(?![0-9.])", "f['′]?\\s*\\(?1\\)?\\s*=\\s*2(?![0-9.])"]},
+        {"id": "no-early-zero", "description": "不能在差商仍含除以 h 时直接令 h=0", "none": ["(直接|先)令\\s*h\\s*=\\s*0[^。；]{0,30}(差商|除)"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["limit_microscope"],
+        "allowed": ["limit_microscope", "equation_morph"],
+        "learning_action": "观察割线斜率随 h 缩小而逼近切线斜率",
+        "assertions": [
+          {"type": "demo_field", "kind": "limit_microscope", "path": "data.expression", "equals_normalized_any": ["x^2"]},
+          {"type": "demo_field", "kind": "limit_microscope", "path": "data.x0", "numeric_equals": 1, "tolerance": 1e-9}
+        ]
+      }
+    },
+    {
+      "id": "M02",
+      "domain": "数学",
+      "goal": "用黎曼和解释 ∫₀^π sin(x)dx，并说明 n 增大、Δx 减小时矩形和为什么趋于定积分。",
+      "source_text": "",
+      "subject_terms": ["数学", "微积分", "高等数学"],
+      "target_text_any": [["黎曼和", "矩形和"], ["sin", "正弦"]],
+      "correctness": [
+        {"id": "integral-value", "description": "积分值为 2", "any": ["(积分值|定积分|结果)[^。；]{0,30}(等于|为|=)\\s*2(?![0-9.])", "(?:∫|\\\\int)[^。；]{0,100}=\\s*2(?![0-9.])", "lim[^。；]{0,40}S[^。；]{0,20}=\\s*2(?![0-9.])"]},
+        {"id": "convergence", "description": "说明 n 增大、Δx 减小和收敛", "all": ["n", "(Δx|delta\\s*x|\\\\Delta\\s*x)", "(趋近|逼近|收敛)"]},
+        {"id": "no-wrong-function", "description": "不得把本题替换成 x²", "none": ["x[²^]2[^。；]{0,30}(黎曼|积分|矩形)", "(黎曼|积分|矩形)[^。；]{0,30}x[²^]2"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["riemann_sum"],
+        "forbidden": ["function_plot"],
+        "learning_action": "观察矩形和随分割数收敛",
+        "assertions": [
+          {"type": "demo_field", "kind": "riemann_sum", "path": "data.expression", "equals_normalized_any": ["sin(x)"]},
+          {"type": "demo_field", "kind": "riemann_sum", "path": "data.domain", "numeric_sequence_equals": [0, 3.141592653589793], "tolerance": 0.01}
+        ]
+      }
+    },
+    {
+      "id": "M03",
+      "domain": "数学",
+      "goal": "某病患病率为1%，检测灵敏度95%，健康者误报率5%。用贝叶斯公式求检测阳性后真正患病的概率，并解释基率作用。",
+      "source_text": "",
+      "subject_terms": ["数学", "概率", "概率论", "统计"],
+      "target_text_any": [["贝叶斯", "条件概率"], ["基率", "先验"]],
+      "correctness": [
+        {"id": "joint-positive", "description": "患病且阳性的联合概率为 0.0095", "any": ["0\\.0095", "0\\.95%"]},
+        {"id": "false-positive-joint", "description": "健康且阳性的联合概率为 0.0495", "any": ["0\\.0495", "4\\.95%"]},
+        {"id": "posterior", "description": "后验概率约为 16.1%", "any": ["16\\.(?:0?1|10)\\s*%", "0\\.161(?![0-9])"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_any": ["probability_bars", "concept_map"],
+        "allowed": ["probability_bars", "concept_map"],
+        "learning_action": "把先验、联合概率和后验建立为同一组数量关系",
+        "assertions": [
+          {"type": "demo_text_any", "kind_any": ["probability_bars", "concept_map"], "patterns": ["16\\.0?1?", "0\\.161", "后验", "真正患病"]}
+        ]
+      }
+    },
+    {
+      "id": "M04",
+      "domain": "数学",
+      "goal": "在单位圆 x²+y²=1 上最大化 f=x+2y，给出拉格朗日乘数法的几何解释、候选点和比较结论。",
+      "source_text": "这是指定例题，不得替换目标函数或约束。",
+      "subject_terms": ["数学", "微积分", "高等数学", "多元"],
+      "target_text_any": [["拉格朗日", "梯度"], ["单位圆", "约束"]],
+      "correctness": [
+        {"id": "maximum-point", "description": "最大点方向为 (1,2)/√5", "any": ["\\(?\\s*1\\s*/\\s*√\\s*5\\s*,\\s*2\\s*/\\s*√\\s*5\\s*\\)?", "\\frac\\{1\\}\\{\\sqrt\\{5\\}\\}[^。；]{0,30}\\frac\\{2\\}\\{\\sqrt\\{5\\}\\}", "\\(?\\s*√\\s*5\\s*/\\s*5\\s*,\\s*2\\s*√\\s*5\\s*/\\s*5\\s*\\)?"]},
+        {"id": "maximum-value", "description": "最大值为 √5", "any": ["最大值[^。；]{0,20}(为|=)\\s*√5", "最大值[^。；]{0,30}\\sqrt\\{5\\}"]},
+        {"id": "necessary-condition", "description": "梯度平行只给出候选必要条件", "all": ["(必要条件|候选条件|候选点)", "(比较|验证|判定)"], "none": ["梯度平行[^。；]{0,24}(充分条件|必然是极值)"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["constrained_extremum_2d"],
+        "forbidden": ["geometry", "function_plot"],
+        "learning_action": "观察目标等高线与约束曲线相切时梯度平行",
+        "assertions": [
+          {"type": "demo_field", "kind": "constrained_extremum_2d", "path": "data.constraint.radius", "numeric_equals": 1, "tolerance": 1e-9},
+          {"type": "demo_field", "kind": "constrained_extremum_2d", "path": "data.objective.coefficients", "numeric_sequence_equals": [1, 2], "tolerance": 1e-9},
+          {"type": "demo_field", "kind": "constrained_extremum_2d", "path": "data.extremum", "equals_normalized_any": ["maximum"]}
+        ]
+      }
+    },
+    {
+      "id": "P01",
+      "domain": "物理",
+      "goal": "质量2kg的物体只受水平方向向右10N拉力和向左4N摩擦力。用受力图说明合力并求加速度。",
+      "source_text": "忽略竖直方向；只分析题目给出的两个水平力。",
+      "subject_terms": ["物理", "力学"],
+      "target_text_any": [["牛顿第二定律", "合力"], ["加速度", "受力"]],
+      "correctness": [
+        {
+          "id": "net-force",
+          "description": "合力为 6N 向右",
+          "typed": {"type": "quantity_relation", "entity_patterns": ["(?:合力|净力|合外力|F_?\\{?(?:net|合)\\}?)"], "expected": 6, "tolerance": 0.001, "unit": "newton", "direction_patterns": ["(?:向|朝)?右(?:方|侧|向)?"], "max_distance": 44},
+          "oracle_examples": {
+            "accept": ["水平合力为 6 N，方向向右。", "F_{net}=10-4=6 N，向右。"],
+            "reject": ["水平合力为 60 N，方向向右。", "合力为 6 N，方向向左。", "合力 6 N 向左，加速度 3 m/s² 向右。"]
+          }
+        },
+        {
+          "id": "acceleration",
+          "description": "加速度为 3m/s² 向右",
+          "typed": {"type": "quantity_relation", "entity_patterns": ["(?:加速度|(?<![A-Za-z])a(?![A-Za-z]))"], "expected": 3, "tolerance": 0.001, "unit": "acceleration", "direction_patterns": ["(?:向|朝)?右(?:方|侧|向)?"], "max_distance": 52},
+          "oracle_examples": {
+            "accept": ["加速度为 3 m/s²，方向向右。", "a=3 m·s⁻²，向右。", "a=6/2=3 m/s²，向右。"],
+            "reject": ["a=30 m/s²，方向向右。", "a=3 m/s²，方向向左。", "合力 6 N 向右，加速度 3 m/s² 向左。"]
+          }
+        },
+        {
+          "id": "subtraction",
+          "description": "相反方向的力相减",
+          "typed": {
+            "type": "expression_relation",
+            "entity_patterns": ["(?:F_?net|合力|净力|合外力)"],
+            "expression_patterns": ["(?<![0-9.])10(?:\\.0+)?(?:N-4(?:\\.0+)?N=6(?:\\.0+)?N|-4(?:\\.0+)?=6(?:\\.0+)?)(?![0-9.])"],
+            "normalize_math": true,
+            "max_span": 96
+          },
+          "oracle_examples": {
+            "accept": ["F_{\\mathrm{net}}=10\\,\\mathrm{N}-4\\,\\mathrm{N}=6\\,\\mathrm{N}", "合力:10 N-4 N=6 N。", "F_net=10-4=6。"],
+            "reject": ["F_net=10 N+4 N=14 N。", "F_net=4 N-10 N=-6 N。", "F_net=10 N-4 N=-6 N。"]
+          }
+        }
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["force_diagram"],
+        "allowed": ["force_diagram", "equation_morph"],
+        "learning_action": "把力的方向与矢量和映射到加速度方向",
+        "assertions": [
+          {"type": "force_vector", "label_patterns": ["拉力", "10"], "magnitude": 10, "angle_any": [0, 360], "tolerance": 1e-6},
+          {"type": "force_vector", "label_patterns": ["摩擦", "4"], "magnitude": 4, "angle_any": [180, -180], "tolerance": 1e-6}
+        ]
+      }
+    },
+    {
+      "id": "P02",
+      "domain": "物理",
+      "goal": "50匝、面积0.02m²的线圈中，垂直纸面向外的磁场在2s内从0.1T均匀增至0.8T。以逆时针电动势为正，求感应电动势并判断电流方向。",
+      "source_text": "线圈电阻为正，磁场正方向为出纸面。",
+      "subject_terms": ["物理", "电磁"],
+      "target_text_any": [["法拉第", "电磁感应"], ["楞次", "方向"]],
+      "correctness": [
+        {
+          "id": "emf",
+          "description": "电动势为 -0.35V",
+          "typed": {"type": "quantity_relation", "entity_patterns": ["(?:感应)?电动势|\\\\mathcal\\s*\\{?E\\}?|(?<![A-Za-z])emf(?![A-Za-z])"], "expected": -0.35, "tolerance": 0.001, "unit": "volt", "max_distance": 52},
+          "oracle_examples": {
+            "accept": ["感应电动势为 -0.35 V。", "电动势为 -350 mV。", "\\mathcal E=-0.35\\,\\mathrm{V}。"],
+            "reject": ["电动势为 +0.35 V，方向顺时针。", "电动势为 -3.5 V。"]
+          }
+        },
+        {
+          "id": "direction",
+          "description": "感应电流为顺时针",
+          "typed": {"type": "scoped_relation", "required_all": ["(?:感应)?电流", "顺时针"], "max_span": 44},
+          "oracle_examples": {
+            "accept": ["感应电流沿顺时针方向。", "电流不是逆时针，而是顺时针。"],
+            "reject": ["感应电流为逆时针。", "感应电流不是顺时针。"]
+          }
+        },
+        {
+          "id": "lenz",
+          "description": "方向反抗磁通量增加",
+          "typed": {"type": "scoped_relation", "required_all": ["磁通", "(?:增加|增大)", "(?:反抗|阻碍|抵抗)"], "max_span": 72},
+          "oracle_examples": {
+            "accept": ["感应效应阻碍磁通量的增加。"],
+            "reject": ["磁通量增加时不需要阻碍这种变化。", "磁通量增加，感应效应促进其继续增加。"]
+          }
+        }
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["field_experiment"],
+        "allowed": ["field_experiment", "linked_lab", "equation_morph"],
+        "learning_action": "观察磁通变化率、电动势符号与电流方向的联动",
+        "assertions": [
+          {"type": "demo_field", "kind": "field_experiment", "path": "data.turns", "numeric_equals": 50, "tolerance": 1e-9},
+          {"type": "demo_field", "kind": "field_experiment", "path": "data.area", "numeric_equals": 0.02, "tolerance": 1e-9},
+          {"type": "demo_field", "kind": "field_experiment", "path": "data.field_start", "numeric_equals": 0.1, "tolerance": 1e-9},
+          {"type": "demo_field", "kind": "field_experiment", "path": "data.field_end", "numeric_equals": 0.8, "tolerance": 1e-9},
+          {"type": "demo_field", "kind": "field_experiment", "path": "data.change_duration_s", "numeric_equals": 2, "tolerance": 1e-9}
+        ]
+      }
+    },
+    {
+      "id": "P03",
+      "domain": "物理",
+      "goal": "从简谐运动 x(t)=Acos(ωt+φ) 连续推导 v(t)、a(t)，分别说明外层求导、内层求导以及速度和加速度的相位关系。",
+      "source_text": "不要把普通代数整理单列成推导步骤。",
+      "subject_terms": ["物理", "普通物理", "力学"],
+      "target_text_any": [["简谐", "谐振"], ["相位", "速度"]],
+      "correctness": [
+        {"id": "velocity", "description": "速度为 -Aωsin(ωt+φ)", "any": ["v[^。；]{0,24}=\\s*[-−]\\s*A\\s*(?:[·*]?\\s*)(?:ω|\\\\omega)[^。；]{0,20}(?:sin|\\\\sin)"]},
+        {"id": "acceleration", "description": "加速度为 -ω²x", "any": ["a[^。；]{0,30}=\\s*[-−]\\s*(?:ω|\\\\omega)\\s*(?:²|\\^\\s*(?:2|\\{\\s*2\\s*\\}))\\s*(?:[·*]?\\s*)x", "[-−]\\s*A\\s*(?:[·*]?\\s*)(?:ω|\\\\omega)\\s*(?:²|\\^\\s*(?:2|\\{\\s*2\\s*\\}))\\s*(?:[·*]?\\s*)cos"]},
+        {"id": "phase", "description": "速度相差 π/2、加速度反相", "all": ["(π/2|二分之π|90[^0-9]{0,4}度)", "(反相|π|180)"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["equation_morph"],
+        "required_any": ["function_plot", "linked_lab"],
+        "allowed": ["equation_morph", "function_plot", "linked_lab"],
+        "learning_action": "把连续求导与三条相位曲线建立映射",
+        "assertions": [
+          {"type": "demo_text_all", "kind_any": ["function_plot", "linked_lab"], "patterns": ["x", "v", "a"]}
+        ]
+      }
+    },
+    {
+      "id": "P04",
+      "domain": "物理",
+      "goal": "忽略空气阻力，以20m/s、仰角30°抛出物体，取g=10m/s²。用共享时间参数解释水平和竖直运动，并求飞行时间、最大高度和射程。",
+      "source_text": "发射点与落地点等高。",
+      "subject_terms": ["物理", "力学"],
+      "target_text_any": [["抛体", "抛物"], ["水平", "竖直"]],
+      "correctness": [
+        {
+          "id": "flight-time",
+          "description": "飞行时间为 2s",
+          "typed": {"type": "quantity_relation", "entity_patterns": ["(?:(?:飞行|滞空|运动)时间|(?<![A-Za-z])T(?![A-Za-z]))"], "expected": 2, "tolerance": 0.001, "unit": "second", "max_distance": 44},
+          "oracle_examples": {
+            "accept": ["飞行时间 T=2 s。", "滞空时间约为 2.000 秒。"],
+            "reject": ["T=20 s。", "飞行时间为 0.2 s。"]
+          }
+        },
+        {
+          "id": "height",
+          "description": "最大高度为 5m",
+          "typed": {"type": "quantity_relation", "entity_patterns": ["(?:最大高度|最高点高度|(?<![A-Za-z])H(?![A-Za-z]))"], "expected": 5, "tolerance": 0.01, "unit": "meter", "max_distance": 44},
+          "oracle_examples": {
+            "accept": ["最大高度约为 5 m。", "H=5.000 米。"],
+            "reject": ["H=50 m。", "最大高度为 0.5 m。"]
+          }
+        },
+        {
+          "id": "range",
+          "description": "射程为 20√3m 或约34.6m",
+          "typed_any": [
+            {"type": "quantity_relation", "entity_patterns": ["(?:射程|水平位移|(?<![A-Za-z])R(?![A-Za-z]))"], "expected": 34.6410161514, "tolerance": 0.1, "unit": "meter", "max_distance": 52},
+            {"type": "expression_relation", "entity_patterns": ["(?:射程|水平位移|(?<![A-Za-z])R(?![A-Za-z]))"], "expression_patterns": ["20\\s*(?:√\\s*3|\\\\sqrt\\s*\\{?\\s*3\\s*\\}?)"], "unit": "meter", "max_span": 64}
+          ],
+          "oracle_examples": {
+            "accept": ["射程约为 34.641 m。", "射程约为 3.4641e1 m。", "射程 R=20√3 m。", "射程为 20\\sqrt{3}\\,\\mathrm{m}。"],
+            "reject": ["射程为 134.6 m。", "射程为 20√5 m。"]
+          }
+        }
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["linked_lab"],
+        "allowed": ["linked_lab", "equation_morph"],
+        "learning_action": "拖动同一时间参数同时观察位置与速度分量",
+        "assertions": [
+          {"type": "demo_field", "kind": "linked_lab", "path": "data.parameter.id", "equals_normalized_any": ["t"]},
+          {"type": "demo_text_all", "kind_any": ["linked_lab"], "patterns": ["x", "y"]}
+        ]
+      }
+    },
+    {
+      "id": "C01",
+      "domain": "化学",
+      "goal": "乙酸/乙酸根缓冲液中 pKa=4.76，二者浓度都为0.10mol/L。用 Henderson–Hasselbalch 公式求pH，并解释二者同比稀释10倍后pH与缓冲容量如何变化。",
+      "source_text": "按理想稀溶液近似讨论。",
+      "subject_terms": ["化学", "分析化学", "物理化学"],
+      "target_text_any": [["缓冲", "Henderson"], ["pH", "pKa"]],
+      "correctness": [
+        {
+          "id": "ph",
+          "description": "初始 pH 为 4.76",
+          "typed": {"type": "quantity_relation", "entity_patterns": ["(?<![A-Za-z])pH(?![A-Za-z])"], "expected": 4.76, "tolerance": 0.005, "max_distance": 32},
+          "oracle_examples": {
+            "accept": ["pH≈4.76。", "初始 pH=4.760。"],
+            "reject": ["pH=14.76。", "pKa=4.76，但 pH=5.76。"]
+          }
+        },
+        {
+          "id": "dilution-ph",
+          "description": "同比稀释后理想 pH 基本不变",
+          "typed": {"type": "scoped_relation", "required_all": ["(?:同比|同时|等比例)", "稀释", "(?<![A-Za-z])pH(?![A-Za-z])", "(?:基本)?不变"], "max_span": 72},
+          "oracle_examples": {
+            "accept": ["二者等比例稀释十倍后，理想 pH 基本不变。"],
+            "reject": ["二者等比例稀释十倍后，pH 明显下降。"]
+          }
+        },
+        {
+          "id": "capacity",
+          "description": "稀释后缓冲容量下降",
+          "typed": {"type": "scoped_relation", "required_all": ["(?:稀释|总浓度降低)", "缓冲容量", "(?:下降|减小|降低)"], "max_span": 64},
+          "oracle_examples": {
+            "accept": ["稀释后缓冲容量降低。"],
+            "reject": ["稀释后缓冲容量升高。"]
+          }
+        }
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["linked_lab"],
+        "allowed": ["linked_lab", "equation_morph"],
+        "learning_action": "改变酸碱比并观察 pH，而不是把总浓度误作唯一变量",
+        "assertions": [
+          {"type": "demo_field_regex", "kind": "linked_lab", "path": "data.readouts.*.expression", "patterns": ["4\\.76.*log", "log.*4\\.76"]}
+        ]
+      }
+    },
+    {
+      "id": "C02",
+      "domain": "化学",
+      "goal": "一级反应 A→产物，k=0.20min⁻¹、[A]₀=1.0mol/L。推导浓度—时间关系，求5min时浓度和半衰期，并展示指数衰减。",
+      "source_text": "",
+      "subject_terms": ["化学", "物理化学", "反应动力学"],
+      "target_text_any": [["一级反应", "动力学"], ["半衰期", "浓度"]],
+      "correctness": [
+        {"id": "concentration", "description": "5min 时浓度约 0.3679mol/L", "any": ["0\\.36(?:7|8)[0-9]*\\s*(?:mol/L|M)", "e(?:⁻¹|\\^\\{?-?1\\}?)"]},
+        {"id": "half-life", "description": "半衰期约 3.47min", "any": ["3\\.4[67]\\s*min", "ln\\s*2\\s*/\\s*0\\.20"]},
+        {"id": "law", "description": "浓度按 exp(-kt) 衰减", "any": ["exp\\s*\\(\\s*[-−]\\s*k.?t\\s*\\)", "e[^。；]{0,8}[-−]\\s*kt"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["function_plot"],
+        "allowed": ["function_plot", "equation_morph"],
+        "learning_action": "观察一级反应浓度的指数衰减",
+        "assertions": [
+          {"type": "demo_field_regex", "kind": "function_plot", "path": "data.series.*.expression", "patterns": ["exp\\([-−]0\\.2\\*?x\\)", "e\\^\\([-−]0\\.2\\*?x\\)"]}
+        ]
+      }
+    },
+    {
+      "id": "C03",
+      "domain": "化学",
+      "goal": "解释标准 Zn|Zn²⁺||Cu²⁺|Cu 原电池：标出阳极、阴极、电子流向、盐桥离子迁移，并由 E°(Cu²⁺/Cu)=+0.34V、E°(Zn²⁺/Zn)=-0.76V 求电池电势。",
+      "source_text": "盐桥含惰性电解质，按原电池自发放电讨论。",
+      "subject_terms": ["化学", "电化学"],
+      "target_text_any": [["原电池", "电化学"], ["阳极", "阴极"]],
+      "correctness": [
+        {
+          "id": "electrodes",
+          "description": "Zn 为阳极氧化，Cu 为阴极还原",
+          "typed_all": [
+            {"type": "scoped_relation", "required_all": ["(?:Zn|锌)(?:极)?", "阳极", "氧化"], "max_span": 52},
+            {"type": "scoped_relation", "required_all": ["(?:Cu|铜)(?:极)?", "阴极", "还原"], "max_span": 52}
+          ],
+          "oracle_examples": {
+            "accept": ["Zn 极是阳极，发生氧化；Cu 极是阴极，发生还原。"],
+            "reject": ["Zn 极是阴极并还原；Cu 极是阳极并氧化。", "Zn 不是阳极氧化，Cu 不是阴极还原。"]
+          }
+        },
+        {
+          "id": "electron-direction",
+          "description": "电子从 Zn 流向 Cu",
+          "typed": {"type": "directed_relation", "actor_patterns": ["电子"], "source_patterns": ["(?:Zn|锌)(?:极)?"], "target_patterns": ["(?:Cu|铜)(?:极)?"], "connector_patterns": ["(?:流向|到达|传给|→)"], "max_span": 72},
+          "oracle_examples": {
+            "accept": ["电子从 Zn 极流向 Cu 极。", "Zn 极放出的电子经外电路到达 Cu 极。"],
+            "reject": ["电子从 Cu 极流向 Zn 极。", "电子不是从 Zn 流向 Cu，而是从 Cu 流向 Zn。"]
+          }
+        },
+        {
+          "id": "cell-voltage",
+          "description": "标准电池电势为 1.10V",
+          "typed": {"type": "quantity_relation", "entity_patterns": ["(?:标准)?(?:电池电势|电动势|E(?:°|0)?_?\\{?(?:cell|电池)\\}?)"], "expected": 1.1, "tolerance": 0.005, "unit": "volt", "max_distance": 52},
+          "oracle_examples": {
+            "accept": ["标准电池电势为 1.100 V。", "E°cell=1100 mV。", "E_{cell}=0.34-(-0.76)=1.10 V。"],
+            "reject": ["电池电势为 11.10 V。", "电池电势为 1.10e1 V。", "电池电势为 -1.10 V。"]
+          }
+        },
+        {
+          "id": "no-electron-salt-bridge",
+          "description": "不得说电子通过盐桥",
+          "typed": {"type": "forbidden_relation", "subject_patterns": ["电子"], "predicate_patterns": ["(?:通过|流经)"], "object_patterns": ["盐桥"], "max_span": 44},
+          "oracle_examples": {
+            "accept": ["电子不通过盐桥。", "不得说电子通过盐桥。"],
+            "reject": ["电子通过盐桥从锌极移动到铜极。", "电子不通过盐桥，却又通过盐桥。"]
+          }
+        }
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_any": ["concept_map", "process"],
+        "allowed": ["concept_map", "process", "equation_morph"],
+        "learning_action": "沿电极反应和外电路追踪电子与离子方向",
+        "assertions": [
+          {"type": "demo_text_all", "kind_any": ["concept_map", "process"], "patterns": ["Zn|锌", "Cu|铜", "电子"]}
+        ]
+      }
+    },
+    {
+      "id": "B01",
+      "domain": "生物",
+      "goal": "比较光合作用光反应和卡尔文循环的物质与能量转化，并说明两者如何相互依赖。",
+      "source_text": "暗反应是不直接使用光，不等于能在黑暗中脱离光反应持续正常进行。",
+      "subject_terms": ["生物", "生物学", "植物生理"],
+      "target_text_any": [["光合作用", "光反应"], ["卡尔文", "暗反应"]],
+      "correctness": [
+        {"id": "forward-carriers", "description": "ATP 和 NADPH 从光反应供应卡尔文循环", "all": ["ATP", "NADPH", "(供应|提供|流向)"]},
+        {"id": "return-carriers", "description": "ADP/Pi/NADP+ 返回光反应", "all": ["ADP", "(Pi|磷酸)", "NADP[⁺+]", "(返回|回到|回流)"]},
+        {"id": "no-independent-dark", "description": "不得宣称暗反应可在黑暗中独立持续", "none": ["暗反应[^。；]{0,28}(可|能够)[^。；]{0,16}(黑暗|无光)[^。；]{0,16}(独立|持续|正常)"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["concept_map"],
+        "allowed": ["concept_map"],
+        "learning_action": "观察能量载体的前向供应与回流闭环",
+        "assertions": [
+          {"type": "concept_edge", "from_patterns": ["光反应"], "to_patterns": ["卡尔文|暗反应"], "edge_patterns": ["ATP|NADPH"]},
+          {"type": "concept_edge", "from_patterns": ["卡尔文|暗反应"], "to_patterns": ["光反应"], "edge_patterns": ["ADP|NADP|Pi|磷酸"]}
+        ]
+      }
+    },
+    {
+      "id": "B02",
+      "domain": "生物",
+      "goal": "区分 DNA 复制、转录和翻译，重点说明基因表达的 DNA→RNA→蛋白质路线；不要把复制列作基因表达步骤。",
+      "source_text": "按细胞中的经典中心法则讲解，不展开病毒例外。",
+      "subject_terms": ["生物", "生物学", "分子生物学"],
+      "target_text_any": [["复制", "DNA"], ["转录", "翻译"]],
+      "correctness": [
+        {"id": "replication", "description": "复制是 DNA 到 DNA", "any": ["DNA\\s*(→|到)[^。；]{0,8}DNA", "复制[^。；]{0,24}DNA[^。；]{0,16}DNA"]},
+        {"id": "expression", "description": "表达主线是 DNA→RNA→蛋白质", "all": ["DNA", "RNA", "蛋白"]},
+        {"id": "replication-not-expression-step", "description": "复制不是基因表达步骤", "any": ["复制[^。；]{0,30}(不属于|不是)[^。；]{0,12}(基因表达|表达步骤)", "基因表达[^。；]{0,30}(不包括|不含)复制"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["concept_map"],
+        "allowed": ["concept_map"],
+        "learning_action": "比较三种信息传递方向并突出表达主线",
+        "assertions": [
+          {"type": "concept_edge", "from_patterns": ["^DNA$"], "to_patterns": ["^RNA$"]},
+          {"type": "concept_edge", "from_patterns": ["^RNA$"], "to_patterns": ["蛋白"]}
+        ]
+      }
+    },
+    {
+      "id": "B03",
+      "domain": "生物",
+      "goal": "按时间顺序解释神经元动作电位：阈值、去极化、复极化、超极化以及离子通道状态；说明钠钾泵的角色。",
+      "source_text": "重点区分电压门控通道造成的快速电位变化与钠钾泵维持长期离子梯度。",
+      "subject_terms": ["生物", "生物学", "神经生物学", "生理学"],
+      "target_text_any": [["动作电位", "神经元"], ["去极化", "复极化"]],
+      "correctness": [
+        {
+          "id": "sodium",
+          "description": "Na+ 内流导致快速去极化",
+          "typed": {"type": "scoped_relation", "required_all": ["Na[⁺+]", "内流", "去极化"], "forbidden_any": ["Na[⁺+][^。；]{0,16}(?<!不)(?<!不会)(?<!不是)(?<!并非)外流"], "max_span": 52},
+          "oracle_examples": {
+            "accept": ["Na+ 通道开放，Na+ 内流造成快速去极化。"],
+            "reject": ["Na+ 外流、K+ 内流造成去极化。"]
+          }
+        },
+        {
+          "id": "potassium",
+          "description": "K+ 外流参与复极化",
+          "typed": {"type": "scoped_relation", "required_all": ["K[⁺+]", "外流", "复极化"], "forbidden_any": ["K[⁺+][^。；]{0,16}(?<!不)(?<!不会)(?<!不是)(?<!并非)内流"], "max_span": 52},
+          "oracle_examples": {
+            "accept": ["K+ 通道开放后 K+ 外流，膜发生复极化。"],
+            "reject": ["K+ 内流、Na+ 外流造成复极化。"]
+          }
+        },
+        {
+          "id": "pump-role",
+          "description": "钠钾泵维持梯度，不直接造成快速复极化",
+          "typed_all": [
+            {"type": "scoped_relation", "required_all": ["钠钾泵", "(?:维持|恢复)", "(?:梯度|浓度差)"], "max_span": 60},
+            {"type": "forbidden_relation", "subject_patterns": ["钠钾泵"], "predicate_patterns": ["(?:直接|主要)[^。；]{0,12}(?:导致|造成)"], "object_patterns": ["复极化"], "max_span": 60}
+          ],
+          "oracle_examples": {
+            "accept": ["钠钾泵维持离子梯度，并不直接导致快速复极化。"],
+            "reject": ["钠钾泵维持离子梯度，并直接导致复极化。"]
+          }
+        }
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["process"],
+        "allowed": ["process", "concept_map"],
+        "learning_action": "沿时间顺序追踪通道状态与膜电位变化",
+        "assertions": [
+          {"type": "process_order", "patterns": ["阈值", "去极化", "复极化", "超极化"]}
+        ]
+      }
+    },
+    {
+      "id": "CS01",
+      "domain": "计算机",
+      "goal": "在有序数组 [1,3,5,7,9,11,13] 中查找11，用过程演示二分查找每一步的候选区间、不变量和时间复杂度。",
+      "source_text": "中点下标采用向下取整。",
+      "subject_terms": ["计算机", "算法", "数据结构"],
+      "target_text_any": [["二分查找", "二分搜索"], ["候选区间", "不变量"]],
+      "correctness": [
+        {"id": "steps", "description": "先比较7，再在右半区比较11并找到", "all": ["7", "11", "(右半|右侧|右区间)"]},
+        {"id": "complexity", "description": "时间复杂度为 O(log n)", "any": ["O\\s*\\(\\s*log\\s*n\\s*\\)"]},
+        {"id": "sorted-boundary", "description": "二分查找要求有序", "all": ["有序", "(前提|要求|必须)"], "none": ["无序数组[^。；]{0,18}(也可|仍可)[^。；]{0,12}二分"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["process"],
+        "allowed": ["process"],
+        "learning_action": "观察候选区间按比较结果减半",
+        "assertions": [
+          {"type": "demo_text_all", "kind_any": ["process"], "patterns": ["7", "11", "右"]}
+        ]
+      }
+    },
+    {
+      "id": "CS02",
+      "domain": "计算机",
+      "goal": "比较递归计算 Fibonacci 与加入记忆化后的调用结构，解释重叠子问题及时间、空间复杂度。规定 F(0)=0、F(1)=1。",
+      "source_text": "",
+      "subject_terms": ["计算机", "算法", "动态规划"],
+      "target_text_any": [["Fibonacci", "斐波那契"], ["记忆化", "重叠子问题"]],
+      "correctness": [
+        {"id": "naive-time", "description": "朴素递归是指数时间", "any": ["(指数时间|指数级)", "O\\s*\\(\\s*2\\^?n\\s*\\)", "O\\s*\\(\\s*φ\\^?n\\s*\\)"]},
+        {"id": "memo-time", "description": "记忆化为 O(n) 时间", "any": ["记忆化[^。；]{0,30}O\\s*\\(\\s*n\\s*\\)", "O\\s*\\(\\s*n\\s*\\)[^。；]{0,30}记忆化"]},
+        {"id": "memo-space", "description": "记忆化空间为 O(n)", "all": ["空间", "O\\s*\\(\\s*n\\s*\\)"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["concept_map"],
+        "allowed": ["concept_map", "process"],
+        "learning_action": "把重复调用合并为共享子问题",
+        "assertions": [
+          {"type": "demo_text_any", "kind_any": ["concept_map"], "patterns": ["F\\(?3\\)?", "F3", "重复", "共享"]}
+        ]
+      }
+    },
+    {
+      "id": "CS03",
+      "domain": "计算机",
+      "goal": "用有向图 A→B=2、A→C=1、B→C=-3 解释 Dijkstra 为什么要求非负边，并展示普通实现提前确定 C 后失败的过程。",
+      "source_text": "讨论把已取出的顶点距离视为最终值的标准 Dijkstra 实现。",
+      "subject_terms": ["计算机", "算法", "图论"],
+      "target_text_any": [["Dijkstra", "最短路"], ["非负", "负权"]],
+      "correctness": [
+        {"id": "counterexample", "description": "真正的 A 到 C 最短距离为 -1", "any": ["(最短距离|最短路)[^。；]{0,20}-\\s*1", "2\\s*[-−+]\\s*3\\s*=\\s*-\\s*1"]},
+        {"id": "premature-finalization", "description": "C=1 被提前确定后会漏掉经 B 的 -1", "all": ["C", "1", "(提前|过早|已确定|最终)", "-\\s*1"]},
+        {"id": "nonnegative-invariant", "description": "非负边保证已确定距离不再下降", "all": ["非负", "(不再|不能)[^。；]{0,16}(下降|变小|改进)"]},
+        {"id": "no-negative-support", "description": "不得声称普通 Dijkstra 支持负边", "none": ["Dijkstra[^。；]{0,24}(可以|能够|适用)[^。；]{0,12}负(权|边)"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["concept_map"],
+        "allowed": ["concept_map", "process"],
+        "learning_action": "在带权图上观察过早确定顶点造成的错误",
+        "assertions": [
+          {"type": "concept_edge", "from_patterns": ["^A$"], "to_patterns": ["^B$"], "edge_patterns": ["^2(?:\\.0+)?$"]},
+          {"type": "concept_edge", "from_patterns": ["^A$"], "to_patterns": ["^C$"], "edge_patterns": ["^1(?:\\.0+)?$"]},
+          {"type": "concept_edge", "from_patterns": ["^B$"], "to_patterns": ["^C$"], "edge_patterns": ["^-3(?:\\.0+)?$"]}
+        ]
+      }
+    },
+    {
+      "id": "H01",
+      "domain": "人文",
+      "goal": "解释英国工业革命为何不能归因于单一发明，沿能源、市场、资本与制度、劳动力和技术扩散建立多因素因果链，并保留社会代价。",
+      "source_text": "结论限定在解释英国率先工业化的主要条件，不写成历史必然论。",
+      "subject_terms": ["历史", "人文", "世界史"],
+      "target_text_any": [["工业革命", "工业化"], ["英国", "多因素"]],
+      "correctness": [
+        {"id": "multiple-causes", "description": "至少覆盖能源、市场、资本/制度、劳动力", "all": ["能源|煤", "市场", "资本|制度", "劳动力|劳动"]},
+        {"id": "social-cost", "description": "保留劳动、城市或环境等社会代价", "any": ["社会代价", "劳动条件", "城市问题", "环境代价", "贫富"]},
+        {"id": "no-single-cause", "description": "不得归因于单一发明或历史必然", "none": ["仅仅?因为[^。；]{0,24}发明", "唯一原因", "历史必然"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["concept_map"],
+        "allowed": ["concept_map", "timeline"],
+        "learning_action": "观察多项条件如何汇合并形成反馈",
+        "assertions": [
+          {"type": "demo_text_all", "kind_any": ["concept_map"], "patterns": ["能源|煤", "市场", "资本|制度", "劳动"]}
+        ]
+      }
+    },
+    {
+      "id": "H02",
+      "domain": "人文",
+      "goal": "比较第一人称限知与第三人称全知叙事，围绕信息范围、可靠性、亲密感和悬念说明各自效果；不分析具体作品。",
+      "source_text": "",
+      "subject_terms": ["文学", "人文", "叙事学", "语言文学"],
+      "target_text_any": [["第一人称", "限知"], ["第三人称", "全知"]],
+      "correctness": [
+        {"id": "first-person", "description": "第一人称受叙述者认知范围限制且可能不可靠", "all": ["第一人称", "(限制|限知)", "(不可靠|可靠性)"]},
+        {"id": "omniscient", "description": "全知叙事可进入多个角色或跨越时空", "all": ["第三人称|全知", "(多个角色|多个人物|跨越时空|信息范围)"]},
+        {"id": "no-objectivity-equation", "description": "第三人称全知不自动等于绝对客观", "none": ["第三人称[^。；]{0,18}(必然|完全|绝对)[^。；]{0,10}(客观|可靠)"]}
+      ],
+      "demo_policy": {
+        "mode": "forbidden",
+        "required_block_any": ["comparison"],
+        "learning_action": "本题以文字比较为主体，不需要动态演示",
+        "assertions": []
+      }
+    },
+    {
+      "id": "H03",
+      "domain": "人文",
+      "goal": "用夏季气温、冰淇淋销量和溺水人数的例子区分相关、时间先后与因果，解释混杂变量，并说明随机对照或自然实验为何能增强因果证据。",
+      "source_text": "不得把冰淇淋销量写成溺水的原因。",
+      "subject_terms": ["社会科学", "逻辑", "统计", "方法论", "人文"],
+      "target_text_any": [["相关", "因果"], ["混杂", "气温"]],
+      "correctness": [
+        {"id": "confounder", "description": "气温共同影响冰淇淋销量与溺水", "all": ["气温", "冰淇淋", "溺水", "(共同|同时|混杂)"]},
+        {"id": "correlation-not-causation", "description": "相关和时间先后都不足以单独证明因果", "all": ["相关", "(不能|不足以)[^。；]{0,14}(证明|推出)因果"]},
+        {"id": "stronger-evidence", "description": "随机对照或自然实验能增强识别", "any": ["随机对照", "自然实验"]},
+        {"id": "no-false-edge", "description": "不得说冰淇淋导致溺水", "none": ["冰淇淋[^。；]{0,18}(导致|造成|引起)溺水"]}
+      ],
+      "demo_policy": {
+        "mode": "required",
+        "required_all": ["concept_map"],
+        "allowed": ["concept_map"],
+        "learning_action": "在因果图中识别共同原因而不是虚假直接边",
+        "assertions": [
+          {"type": "concept_edge", "from_patterns": ["气温"], "to_patterns": ["冰淇淋"]},
+          {"type": "concept_edge", "from_patterns": ["气温"], "to_patterns": ["溺水"]},
+          {"type": "concept_no_edge", "from_patterns": ["冰淇淋"], "to_patterns": ["溺水"]}
+        ]
+      }
+    }
+  ]
+}

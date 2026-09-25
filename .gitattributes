@@ -1,0 +1,12 @@
+# 服务器脚本必须保持 LF：CRLF 会让 Linux 上的 bash 报 $'\r': command not found
+*.sh text eol=lf
+
+# Keep Vite's source and generated board shell stable across Windows builds.
+frontend/board/index.html text eol=lf
+core/static/board/index.html text eol=lf
+
+core/static/board/assets/*.js linguist-generated=true whitespace=-trailing-space
+core/static/board/assets/*.css linguist-generated=true
+core/static/board/assets/*.woff binary
+core/static/board/assets/*.woff2 binary
+core/static/board/assets/*.ttf binary

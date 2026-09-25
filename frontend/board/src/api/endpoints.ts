@@ -1,6 +1,53 @@
 /* API 端点 — 类型化封装 + 后端响应 → 前端类型适配 */
-import { apiRequest } from './client'
+import { apiRequest, firecupApiRequest } from './client'
 import type { Board, Widget, WidgetEvent, ReviewItem, BoardNode, LayoutUpdate } from '../types'
+import type { SceneRenderer, StructuredSceneContent } from '../knowledge-scene/schema'
+
+export const CURRENT_KNOWLEDGE_SCENE_QUALITY_VERSION = '1.7'
+
+export interface KnowledgeSceneManifest {
+  schema_version: string
+  scene_id: string
+  template_id: string
+  title: string
+  topic: string
+  subject: string
+  learning_goal: string
+  renderer: SceneRenderer
+  content?: StructuredSceneContent
+  learning_path: Array<{ id: string; label: string }>
+  capabilities: string[]
+  generation: {
+    provider: 'coze' | 'demo'
+    workflow_id: string
+    generated_at: string
+    fallback_reason: string
+    quality_status: 'approved'
+    quality_score: number
+    quality_version: string
+  }
+}
+
+export type KnowledgeSceneJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+
+export interface KnowledgeSceneJobProgress {
+  percent?: number | null
+  stage: string
+  message?: string
+}
+
+export interface KnowledgeSceneJobCreated {
+  job_id: string
+  status: KnowledgeSceneJobStatus
+  status_url?: string
+  retry_after_ms?: number
+}
+
+export interface KnowledgeSceneJob extends KnowledgeSceneJobCreated {
+  progress: KnowledgeSceneJobProgress
+  scene?: KnowledgeSceneManifest
+  error?: unknown
+}
 
 // ---- 适配器：后端 JSON → 前端类型 ----
 
@@ -150,4 +197,96 @@ export async function createBoard(title: string): Promise<Board> {
     }),
   })
   return adaptBoard(raw)
+}
+
+export async function generateKnowledgeScene(
+  goal: string,
+  sourceText = '',
+): Promise<KnowledgeSceneManifest> {
+  const response = await firecupApiRequest<{ scene: KnowledgeSceneManifest }>(
+    '/api/learning/knowledge-scenes/generate',
+    {
+      method: 'POST',
+      body: JSON.stringify({ goal, source_text: sourceText }),
+    },
+  )
+  return requireApprovedKnowledgeScene(response?.scene)
+}
+
+function isKnowledgeSceneJobStatus(value: unknown): value is KnowledgeSceneJobStatus {
+  return value === 'queued' || value === 'running' || value === 'succeeded' || value === 'failed'
+}
+
+function validateJobIdentity(value: unknown): asserts value is KnowledgeSceneJobCreated {
+  if (!value || typeof value !== 'object') {
+    throw new Error('生成服务返回了无效的任务信息')
+  }
+  const job = value as Partial<KnowledgeSceneJobCreated>
+  if (typeof job.job_id !== 'string' || !job.job_id.trim() || !isKnowledgeSceneJobStatus(job.status)) {
+    throw new Error('生成服务返回了无效的任务信息')
+  }
+}
+
+/** Runtime quality check shared by both the synchronous fallback and async jobs. */
+export function requireApprovedKnowledgeScene(scene: unknown): KnowledgeSceneManifest {
+  if (!scene || typeof scene !== 'object') {
+    throw new Error('生成任务已完成，但没有返回可用白板；当前白板已保留')
+  }
+  const candidate = scene as Partial<KnowledgeSceneManifest>
+  if (candidate.generation?.quality_status !== 'approved') {
+    throw new Error('生成结果未通过 Axiom 教学质量门，当前白板已保留')
+  }
+  if (candidate.generation.quality_version !== CURRENT_KNOWLEDGE_SCENE_QUALITY_VERSION) {
+    throw new Error('生成结果来自旧版教学质量策略，当前白板已保留；请重新生成')
+  }
+  return candidate as KnowledgeSceneManifest
+}
+
+export async function createKnowledgeSceneJob(
+  goal: string,
+  sourceText = '',
+  signal?: AbortSignal,
+): Promise<KnowledgeSceneJobCreated> {
+  const response = await firecupApiRequest<KnowledgeSceneJobCreated>(
+    '/api/learning/knowledge-scenes/jobs',
+    {
+      method: 'POST',
+      body: JSON.stringify({ goal, source_text: sourceText }),
+      signal,
+    },
+  )
+  validateJobIdentity(response)
+  return response
+}
+
+function resolveKnowledgeSceneJobPath(jobId: string, statusUrl?: string) {
+  const fallback = `/api/learning/knowledge-scenes/jobs/${encodeURIComponent(jobId)}`
+  if (!statusUrl) return fallback
+
+  try {
+    const parsed = new URL(statusUrl, 'https://axiom.invalid')
+    const allowedPrefix = '/api/learning/knowledge-scenes/jobs/'
+    if (!parsed.pathname.startsWith(allowedPrefix)) return fallback
+    return `${parsed.pathname}${parsed.search}`
+  } catch {
+    return fallback
+  }
+}
+
+export async function getKnowledgeSceneJob(
+  jobId: string,
+  options: { signal?: AbortSignal; statusUrl?: string } = {},
+): Promise<KnowledgeSceneJob> {
+  const response = await firecupApiRequest<KnowledgeSceneJob>(
+    resolveKnowledgeSceneJobPath(jobId, options.statusUrl),
+    { signal: options.signal },
+  )
+  validateJobIdentity(response)
+  if (response.job_id !== jobId) {
+    throw new Error('生成服务返回了不匹配的任务信息')
+  }
+  if (!response.progress || typeof response.progress !== 'object') {
+    throw new Error('生成服务没有返回任务进度')
+  }
+  return response
 }

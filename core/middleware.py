@@ -88,7 +88,13 @@ def register_middleware(app):
     @app.after_request
     def add_security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        if request.path.startswith("/static/board/knowledge-scenes/"):
+            # Knowledge scenes are rendered in the same-origin competition
+            # shell.  Keep cross-origin embedding blocked.
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+            response.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         if request.path.startswith("/static/v2/") or request.path.startswith("/static/board/"):

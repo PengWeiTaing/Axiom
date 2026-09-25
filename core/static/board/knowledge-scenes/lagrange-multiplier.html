@@ -1,0 +1,992 @@
+<section id="axiom-lagrange-scene" data-tone="ink" aria-label="拉格朗日乘数法的文字主线与约束几何演示">
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #axiom-lagrange-scene {
+      --als-bg: #0b0f13;
+      --als-ink: #f2eee5;
+      --als-muted: #969da7;
+      --als-faint: rgba(242, 238, 229, 0.14);
+      --als-line: rgba(242, 238, 229, 0.2);
+      --als-cyan: #5ad3d1;
+      --als-yellow: #f2c14e;
+      --als-blue: #79a9ff;
+      --als-red: #ee7674;
+      position: relative;
+      min-height: 900px;
+      overflow-x: clip;
+      overflow-y: visible;
+      color: var(--als-ink);
+      background: var(--als-bg);
+      font-family: "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      transition: color 240ms ease, background 240ms ease;
+    }
+
+    #axiom-lagrange-scene[data-tone="paper"] {
+      --als-bg: #fff;
+      --als-ink: #17191d;
+      --als-muted: #626971;
+      --als-faint: rgba(23, 25, 29, 0.12);
+      --als-line: rgba(23, 25, 29, 0.18);
+      --als-cyan: #087f91;
+      --als-yellow: #a66a00;
+      --als-blue: #2867b2;
+      --als-red: #b74642;
+    }
+
+    #axiom-lagrange-scene,
+    #axiom-lagrange-scene * {
+      box-sizing: border-box;
+    }
+
+    #axiom-lagrange-scene button,
+    #axiom-lagrange-scene input {
+      font: inherit;
+    }
+
+    #axiom-lagrange-scene button {
+      color: inherit;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+    }
+
+    #axiom-lagrange-scene .als-page {
+      width: min(1240px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 40px 0 112px;
+    }
+
+    #axiom-lagrange-scene .als-title,
+    #axiom-lagrange-scene .als-copy,
+    #axiom-lagrange-scene .als-summary {
+      width: min(500px, 100%);
+      margin-right: auto;
+      margin-left: auto;
+    }
+
+    #axiom-lagrange-scene .als-title {
+      padding: 4px 0 38px;
+    }
+
+    #axiom-lagrange-scene .als-kicker {
+      margin: 0 0 17px;
+      color: var(--als-cyan);
+      font-size: 12px;
+      letter-spacing: .14em;
+    }
+
+    #axiom-lagrange-scene h1,
+    #axiom-lagrange-scene h2,
+    #axiom-lagrange-scene h3 {
+      font-family: Georgia, "Times New Roman", "Songti SC", serif;
+      font-weight: 500;
+    }
+
+    #axiom-lagrange-scene h1 {
+      max-width: 500px;
+      margin: 0;
+      font-size: clamp(32px, 3vw, 38px);
+      line-height: 1.28;
+      letter-spacing: -.025em;
+    }
+
+    #axiom-lagrange-scene .als-lead {
+      margin: 18px 0 0;
+      color: var(--als-muted);
+      font-size: 15px;
+      line-height: 1.9;
+    }
+
+    #axiom-lagrange-scene .als-row {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(400px, 500px) minmax(220px, 1fr);
+      gap: clamp(22px, 3vw, 48px);
+      align-items: start;
+    }
+
+    #axiom-lagrange-scene .als-copy {
+      grid-column: 2;
+      padding: 34px 0 70px;
+    }
+
+    #axiom-lagrange-scene .als-copy h2 {
+      margin: 0 0 24px;
+      font-size: clamp(24px, 2.2vw, 28px);
+      line-height: 1.45;
+      letter-spacing: -.015em;
+    }
+
+    #axiom-lagrange-scene .als-copy p {
+      margin: 0 0 18px;
+      font-size: 16px;
+      line-height: 2;
+    }
+
+    #axiom-lagrange-scene .als-copy p:last-child {
+      margin-bottom: 0;
+    }
+
+    #axiom-lagrange-scene .als-formula {
+      margin: 24px 0;
+      padding: 4px 0;
+      color: var(--als-ink);
+      font-family: "Cambria Math", "STIX Two Math", Georgia, serif;
+      font-size: clamp(20px, 2vw, 26px);
+      line-height: 1.65;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    #axiom-lagrange-scene .als-formula small {
+      display: block;
+      margin-top: 5px;
+      color: var(--als-muted);
+      font-family: "Source Han Sans SC", "Noto Sans SC", sans-serif;
+      font-size: 11px;
+      letter-spacing: .04em;
+      white-space: normal;
+    }
+
+    #axiom-lagrange-scene .als-em {
+      color: var(--als-cyan);
+    }
+
+    #axiom-lagrange-scene .als-warn {
+      margin-top: 24px !important;
+      padding-left: 16px;
+      color: var(--als-muted);
+      border-left: 2px solid var(--als-yellow);
+      font-size: 14px !important;
+    }
+
+    #axiom-lagrange-scene .als-demo {
+      width: min(100%, 340px);
+      margin: 54px 0 0;
+      align-self: start;
+    }
+
+    #axiom-lagrange-scene .als-demo[data-side="left"] {
+      grid-column: 1;
+      grid-row: 1;
+      justify-self: end;
+    }
+
+    #axiom-lagrange-scene .als-demo[data-side="right"] {
+      grid-column: 3;
+      grid-row: 1;
+      justify-self: start;
+    }
+
+    #axiom-lagrange-scene .als-demo figcaption {
+      margin-bottom: 14px;
+      color: var(--als-muted);
+      font-size: 11px;
+      line-height: 1.5;
+      letter-spacing: .06em;
+    }
+
+    #axiom-lagrange-scene .als-demo svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    #axiom-lagrange-scene .als-demo svg text {
+      fill: var(--als-muted);
+      font-family: "Source Han Sans SC", "Noto Sans SC", sans-serif;
+      font-size: 10px;
+    }
+
+    #axiom-lagrange-scene .als-demo svg [data-role="f-label"],
+    #axiom-lagrange-scene .als-demo svg [data-role="target-label"] { fill: var(--als-yellow); }
+    #axiom-lagrange-scene .als-demo svg [data-role="g-label"] { fill: var(--als-cyan); }
+    #axiom-lagrange-scene .als-demo svg [data-role="t-label"] { fill: var(--als-red); }
+    #axiom-lagrange-scene .als-demo svg [data-role="q-label"] { fill: var(--als-blue); }
+
+    #axiom-lagrange-scene .als-demo-actions {
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      margin: 12px 0 0;
+    }
+
+    #axiom-lagrange-scene.als-js .als-demo-actions {
+      display: flex;
+    }
+
+    #axiom-lagrange-scene .als-replay {
+      min-height: 38px;
+      padding: 4px 0;
+      color: var(--als-cyan);
+      font-size: 11px;
+      letter-spacing: .05em;
+    }
+
+    #axiom-lagrange-scene .als-replay:disabled {
+      cursor: default;
+      opacity: .35;
+    }
+
+    #axiom-lagrange-scene .als-readout {
+      color: var(--als-muted);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+    }
+
+    #axiom-lagrange-scene .als-constraint-bg {
+      fill: none;
+      stroke: var(--als-faint);
+      stroke-width: 1;
+    }
+
+    #axiom-lagrange-scene .als-contour {
+      fill: none;
+      stroke: var(--als-blue);
+      stroke-width: 1.1;
+      opacity: .25;
+    }
+
+    #axiom-lagrange-scene .als-contour-active {
+      stroke: var(--als-blue);
+      stroke-width: 2;
+      opacity: .9;
+    }
+
+    #axiom-lagrange-scene .als-constraint {
+      fill: color-mix(in srgb, var(--als-cyan) 4%, transparent);
+      stroke: var(--als-cyan);
+      stroke-width: 2.2;
+    }
+
+    #axiom-lagrange-scene .als-target-point {
+      fill: none;
+      stroke: var(--als-yellow);
+      stroke-width: 1.2;
+      stroke-dasharray: 3 4;
+      opacity: .75;
+    }
+
+    #axiom-lagrange-scene .als-q-point {
+      fill: var(--als-bg);
+      stroke: var(--als-blue);
+      stroke-width: 1.6;
+      opacity: .78;
+    }
+
+    #axiom-lagrange-scene .als-tangent {
+      stroke: var(--als-muted);
+      stroke-width: 1.4;
+      stroke-dasharray: 5 5;
+    }
+
+    #axiom-lagrange-scene .als-vector-f,
+    #axiom-lagrange-scene .als-vector-g,
+    #axiom-lagrange-scene .als-vector-t {
+      fill: none;
+      stroke-linecap: round;
+      stroke-width: 2.4;
+    }
+
+    #axiom-lagrange-scene .als-vector-f { stroke: var(--als-yellow); }
+    #axiom-lagrange-scene .als-vector-g { stroke: var(--als-cyan); }
+    #axiom-lagrange-scene .als-vector-t { stroke: var(--als-red); }
+
+    #axiom-lagrange-scene .als-point {
+      fill: var(--als-ink);
+      stroke: var(--als-bg);
+      stroke-width: 2;
+      cursor: grab;
+    }
+
+    #axiom-lagrange-scene .als-point:active { cursor: grabbing; }
+
+    #axiom-lagrange-scene .als-slider {
+      display: grid;
+      gap: 7px;
+      margin-top: 8px;
+      color: var(--als-muted);
+      font-size: 10px;
+    }
+
+    #axiom-lagrange-scene .als-slider input {
+      width: 100%;
+      accent-color: var(--als-cyan);
+    }
+
+    #axiom-lagrange-scene .als-zero-meter {
+      display: grid;
+      gap: 10px;
+      padding: 8px 0 2px;
+    }
+
+    #axiom-lagrange-scene .als-zero-meter__track {
+      position: relative;
+      height: 2px;
+      background: var(--als-faint);
+    }
+
+    #axiom-lagrange-scene .als-zero-meter__center {
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      width: 1px;
+      height: 12px;
+      background: var(--als-muted);
+    }
+
+    #axiom-lagrange-scene .als-zero-meter__value {
+      position: absolute;
+      top: -3px;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      background: var(--als-red);
+      border-radius: 50%;
+      transform: translateX(-50%);
+      transition: left 80ms linear, background 220ms ease;
+    }
+
+    #axiom-lagrange-scene .als-zero-meter.is-zero .als-zero-meter__value {
+      background: var(--als-yellow);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--als-yellow) 16%, transparent);
+    }
+
+    #axiom-lagrange-scene .als-zero-meter p {
+      margin: 0;
+      color: var(--als-muted);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    #axiom-lagrange-scene .als-zero-meter strong {
+      color: var(--als-ink);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-weight: 400;
+    }
+
+    #axiom-lagrange-scene .als-proof {
+      display: grid;
+      gap: 18px;
+      padding-top: 3px;
+    }
+
+    #axiom-lagrange-scene .als-proof-group {
+      display: grid;
+      gap: 10px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--als-faint);
+    }
+
+    #axiom-lagrange-scene .als-proof-group:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    #axiom-lagrange-scene .als-proof-label {
+      color: var(--als-muted);
+      font-size: 10px;
+      letter-spacing: .06em;
+    }
+
+    #axiom-lagrange-scene .als-proof-step {
+      min-height: 28px;
+      color: var(--als-ink);
+      font-family: "Cambria Math", "STIX Two Math", Georgia, serif;
+      font-size: 17px;
+      line-height: 1.5;
+      opacity: 1;
+      transition: opacity 420ms ease, color 420ms ease;
+    }
+
+    #axiom-lagrange-scene.als-js .als-proof-step.is-pending { opacity: .25; }
+    #axiom-lagrange-scene .als-proof-step.is-active { color: var(--als-yellow); opacity: 1; }
+    #axiom-lagrange-scene .als-proof-step.is-done { opacity: .68; }
+    #axiom-lagrange-scene .als-proof-conclusion { color: var(--als-cyan); font-size: 21px; }
+
+    #axiom-lagrange-scene .als-token-f { color: var(--als-yellow); }
+    #axiom-lagrange-scene .als-token-g { color: var(--als-cyan); }
+    #axiom-lagrange-scene .als-token-t { color: var(--als-red); }
+
+    #axiom-lagrange-scene .als-token-ghost {
+      position: fixed;
+      z-index: 50;
+      margin: 0;
+      pointer-events: none;
+      white-space: nowrap;
+      will-change: transform, opacity;
+    }
+
+    #axiom-lagrange-scene .als-example-proof {
+      display: grid;
+      gap: 12px;
+      padding-top: 2px;
+    }
+
+    #axiom-lagrange-scene .als-example-proof > div {
+      color: var(--als-muted);
+      font-family: "Cambria Math", "STIX Two Math", Georgia, serif;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    #axiom-lagrange-scene .als-example-proof > div:last-child {
+      color: var(--als-yellow);
+      font-size: 19px;
+    }
+
+    #axiom-lagrange-scene .als-case-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    #axiom-lagrange-scene .als-case-pair div {
+      padding-top: 12px;
+      border-top: 1px solid var(--als-faint);
+    }
+
+    #axiom-lagrange-scene .als-case-pair strong,
+    #axiom-lagrange-scene .als-case-pair span {
+      display: block;
+    }
+
+    #axiom-lagrange-scene .als-case-pair strong {
+      color: var(--als-cyan);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    #axiom-lagrange-scene .als-case-pair span {
+      margin-top: 7px;
+      color: var(--als-muted);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    #axiom-lagrange-scene .als-summary {
+      padding: 50px 0 36px;
+      border-top: 1px solid var(--als-faint);
+    }
+
+    #axiom-lagrange-scene .als-summary h2 {
+      margin: 0 0 22px;
+      font-size: 24px;
+    }
+
+    #axiom-lagrange-scene .als-summary p {
+      margin: 0 0 14px;
+      font-size: 15px;
+      line-height: 1.9;
+    }
+
+    @media (max-width: 980px) {
+      #axiom-lagrange-scene .als-page {
+        width: min(640px, calc(100% - 40px));
+      }
+
+      #axiom-lagrange-scene .als-row {
+        display: block;
+      }
+
+      #axiom-lagrange-scene .als-copy {
+        width: 100%;
+      }
+
+      #axiom-lagrange-scene .als-row > .als-demo {
+        display: block;
+        width: min(420px, 100%);
+        margin: -20px auto 54px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      #axiom-lagrange-scene .als-page {
+        width: calc(100% - 32px);
+        padding-top: 50px;
+      }
+
+      #axiom-lagrange-scene .als-title {
+        padding-bottom: 34px;
+      }
+
+      #axiom-lagrange-scene h1 {
+        padding-right: 48px;
+        font-size: 31px;
+      }
+
+      #axiom-lagrange-scene .als-copy {
+        padding: 30px 0 56px;
+      }
+
+      #axiom-lagrange-scene .als-copy h2 {
+        font-size: 25px;
+      }
+
+      #axiom-lagrange-scene .als-copy p {
+        font-size: 15px;
+        line-height: 1.92;
+      }
+
+      #axiom-lagrange-scene .als-formula {
+        overflow-x: auto;
+        font-size: 19px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #axiom-lagrange-scene *,
+      #axiom-lagrange-scene *::before,
+      #axiom-lagrange-scene *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .001ms !important;
+        animation-delay: 0ms !important;
+        transition-duration: .001ms !important;
+      }
+    }
+  </style>
+
+  <article class="als-page">
+    <header class="als-title">
+      <p class="als-kicker">多元微积分 · 约束极值</p>
+      <h1>为什么极值点的两个梯度平行</h1>
+      <p class="als-lead">拉格朗日乘数法不是凭空增加一个 λ。它把“只能沿约束移动”翻译成一个切向条件，再把这个条件写成梯度关系。</p>
+    </header>
+
+    <section class="als-row">
+      <div class="als-copy">
+        <h2>约束先改变了可以移动的方向</h2>
+        <p>设可行点满足 <span class="als-em">g(x,y)=0</span>。经过可行点 P 取一条仍留在约束曲线上的正则轨迹 r(s)，并记它在 P 处的非零切向量为 t。</p>
+        <div class="als-formula" aria-label="r 零等于 P，r 在零处的导数等于 t">
+          r(0)=P，　r′(0)=t≠0
+          <small>演示中取 P(θ)=(cosθ,sinθ)，t=P′(θ)=(−sinθ,cosθ)。</small>
+        </div>
+        <p>无约束时可以向任意方向试探；有约束时，一阶允许方向只剩切线方向。后面的极值条件都针对这条切线，而不是针对整个平面。</p>
+        <p>同一条目标函数等高线与圆交于 P、Q。随着 θ 增大，P、Q 沿圆合并；二点合一时，穿过圆的割线恰好退化为相切的最后一条等高线。</p>
+      </div>
+
+      <figure class="als-demo als-constraint-demo" data-side="left" data-demo-id="constraint">
+        <figcaption>P、Q 合一时，当前等高线从割线退化为切线</figcaption>
+        <svg class="als-constraint-svg" viewBox="0 0 340 280" role="img" aria-label="点沿单位圆移动，目标函数等高线和两个梯度同步变化">
+          <defs>
+            <marker id="als-arrow-f" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path fill="var(--als-yellow)" d="M0 0L8 4L0 8Z" /></marker>
+            <marker id="als-arrow-g" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path fill="var(--als-cyan)" d="M0 0L8 4L0 8Z" /></marker>
+            <marker id="als-arrow-t" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path fill="var(--als-red)" d="M0 0L8 4L0 8Z" /></marker>
+          </defs>
+          <line class="als-constraint-bg" x1="24" y1="140" x2="316" y2="140" />
+          <line class="als-constraint-bg" x1="170" y1="18" x2="170" y2="260" />
+          <g aria-hidden="true">
+            <line class="als-contour" x1="26" y1="37" x2="314" y2="181" />
+            <line class="als-contour" x1="26" y1="77" x2="314" y2="221" />
+            <line class="als-contour" x1="26" y1="117" x2="314" y2="261" />
+          </g>
+          <circle class="als-constraint" cx="170" cy="140" r="88" />
+          <circle class="als-target-point" cx="209.35" cy="61.29" r="7" />
+          <text data-role="target-label" x="217" y="54">P*</text>
+          <line class="als-contour-active" data-role="contour" x1="79.67" y1="-3.55" x2="339.04" y2="126.14" />
+          <line class="als-tangent" data-role="tangent" x1="266.60" y1="89.91" x2="152.11" y2="32.67" />
+          <line class="als-vector-f" data-role="grad-f" x1="209.35" y1="61.29" x2="233.35" y2="13.29" marker-end="url(#als-arrow-f)" />
+          <line class="als-vector-g" data-role="grad-g" x1="209.35" y1="61.29" x2="230.82" y2="18.36" marker-end="url(#als-arrow-g)" />
+          <line class="als-vector-t" data-role="t-vector" x1="209.35" y1="61.29" x2="170.00" y2="41.61" marker-end="url(#als-arrow-t)" />
+          <circle class="als-q-point" data-role="q-point" cx="209.35" cy="61.29" r="4.5" />
+          <circle class="als-point" data-role="point" cx="209.35" cy="61.29" r="5.5" tabindex="0" aria-label="可拖动的约束点 P" />
+          <text data-role="q-label" x="195" y="77">Q</text>
+          <text data-role="point-label" x="217" y="53" opacity="0">P</text>
+          <text data-role="f-label" x="239" y="9" fill="var(--als-yellow)">∇f</text>
+          <text data-role="g-label" x="214" y="35" fill="var(--als-cyan)">∇g</text>
+          <text data-role="t-label" x="161" y="37" fill="var(--als-red)">t</text>
+          <text x="26" y="25">f(x,y)=x+2y 的等高线</text>
+          <text x="222" y="248">g(x,y)=x²+y²−1=0</text>
+        </svg>
+        <label class="als-slider">
+          <span>沿约束移动 P</span>
+          <input data-role="theta" type="range" min="-3.1416" max="3.1416" step="0.005" value="1.107" />
+        </label>
+        <div class="als-demo-actions">
+          <button class="als-replay" type="button" data-replay="constraint">重演移动</button>
+          <span class="als-readout" data-role="coordinate">P=(0.45, 0.89)</span>
+        </div>
+      </figure>
+
+    </section>
+
+    <section class="als-row">
+      <div class="als-copy">
+        <h2>极值要求切向的一阶变化为零</h2>
+        <p>沿约束曲线把目标函数写成一元复合函数 f(r(s))。极大点在任一可行方向都不能一阶增大，极小点都不能一阶减小；两种情况下，这个可微一元函数在 s=0 处的导数都必须为 0。</p>
+        <div class="als-formula" aria-label="f 沿 r 的导数等于 f 的梯度点乘 t，极值点处等于零">
+          d/ds f(r(s))│<sub>s=0</sub> = <span class="als-token-f">∇f(P)</span>·<span class="als-token-t">t</span> = 0
+          <small>右图中 ∇f·t=−sinθ+2cosθ；这句话只说“目标梯度垂直于可行切线”。</small>
+        </div>
+        <p>若点乘为正，沿 t 移动会使 f 增大；若点乘为负，沿 −t 移动会使 f 增大。只有点乘为 0，P 才可能成为约束极值点。</p>
+      </div>
+
+      <figure class="als-demo als-meter-demo" data-side="right" data-demo-id="meter">
+        <figcaption>沿切线的一阶变化</figcaption>
+        <div class="als-zero-meter" data-role="meter">
+          <div class="als-zero-meter__track"><i class="als-zero-meter__center"></i><i class="als-zero-meter__value" data-role="meter-dot"></i></div>
+          <p><strong data-role="directional-value">∇f·t = 0.00</strong><br />不为 0 时，总有一个切向方向能让 f 增大或减小。</p>
+        </div>
+      </figure>
+    </section>
+
+    <section class="als-row">
+      <div class="als-copy">
+        <h2>同一条切线，把两个梯度联系起来</h2>
+        <p>约束轨迹始终满足 g(r(s))=0。对它求导，得到 <span class="als-token-g">∇g(P)</span>·<span class="als-token-t">t</span>=0，所以约束梯度也是这条切线的法向量。</p>
+        <p>在平面里，正则约束点的法空间是一维的。只要 <span class="als-token-g">∇g(P)≠0</span>，它就张成这个法空间；而 ∇f(P) 也在其中。因此存在实数 λ（包括 λ=0），使：</p>
+        <div class="als-formula als-em" aria-label="f 的梯度等于拉格朗日乘数乘 g 的梯度">∇f(P) = λ∇g(P)</div>
+        <p>λ 只是两个法向量之间的比例。它不是额外的几何对象，也不是“为了求解而强行增加的未知数”。</p>
+      </div>
+
+      <figure class="als-demo als-proof-demo" data-side="right" data-demo-id="proof">
+        <figcaption>两条推导在同一个切向量 t 处汇合</figcaption>
+        <div class="als-proof" data-proof="gradient">
+          <div class="als-proof-group">
+            <span class="als-proof-label">约束保持不变</span>
+            <div class="als-proof-step" data-step="0"><span data-key="constraint" class="als-token-g">g(r(s))</span> = 0</div>
+            <div class="als-proof-step" data-step="1"><span data-key="constraint" class="als-token-g">∇g(P)</span>·<span data-key="t" class="als-token-t">t</span> = 0</div>
+          </div>
+          <div class="als-proof-group">
+            <span class="als-proof-label">目标在极值点一阶不变</span>
+            <div class="als-proof-step" data-step="2">d/ds <span data-key="objective" class="als-token-f">f(r(s))</span>│<sub>s=0</sub> = 0</div>
+            <div class="als-proof-step" data-step="3"><span data-key="objective" class="als-token-f">∇f(P)</span>·<span data-key="t" class="als-token-t">t</span> = 0</div>
+          </div>
+          <div class="als-proof-step als-proof-conclusion" data-step="4"><span data-key="objective" class="als-token-f">∇f(P)</span> = λ<span data-key="constraint" class="als-token-g">∇g(P)</span></div>
+        </div>
+        <div class="als-demo-actions"><button class="als-replay" type="button" data-replay="proof">重演推导</button></div>
+      </figure>
+    </section>
+
+    <section class="als-row">
+      <div class="als-copy">
+        <h2>把几何条件写成一组可解的方程</h2>
+        <p>以单位圆上最大化 f(x,y)=x+2y 为例。目标梯度固定为 (1,2)，约束梯度为 (2x,2y)。梯度平行条件与原约束必须同时成立。</p>
+        <div class="als-formula" aria-label="一二等于拉姆达乘二 x 二 y，同时 x 平方加 y 平方等于一">
+          (1,2)=λ(2x,2y)，　x²+y²=1
+        </div>
+        <p>前一个方程说明 (x,y) 与 (1,2) 同向或反向；再由单位长度约束确定两个候选点。</p>
+        <div class="als-formula" aria-label="x y 等于正负一二除以根号五">
+          (x,y)=±(1,2)/√5
+          <small>代回 f：最大值为 √5，最小值为 −√5。</small>
+        </div>
+        <p class="als-warn">候选点还要代回目标函数比较。拉格朗日方程给出必要候选，并不自动判断最大或最小。</p>
+      </div>
+
+      <figure class="als-demo als-example-demo" data-side="left" data-demo-id="example">
+        <figcaption>同一个方向关系从向量传到候选点</figcaption>
+        <div class="als-example-proof" data-proof="example">
+          <div><span class="als-token-f">(1,2)</span> = λ<span class="als-token-g">(2x,2y)</span></div>
+          <div>(x,y) ∥ (1,2)</div>
+          <div>x²+y²=1</div>
+          <div>(x,y)=±(1,2)/√5</div>
+          <div>f<sub>max</sub>=√5</div>
+        </div>
+        <div class="als-demo-actions"><button class="als-replay" type="button" data-replay="example">重演求解</button><span class="als-readout" data-role="objective-value">f(P)=2.24</span></div>
+      </figure>
+    </section>
+
+    <section class="als-row">
+      <div class="als-copy">
+        <h2>这个条件什么时候还不够</h2>
+        <p>梯度平行是正则约束下的一阶必要条件。使用前至少检查三件事：候选点满足原约束；约束梯度在该点不为 0；所有候选点和必要的边界情形都被比较。</p>
+        <p>若 ∇g(P)=0，约束的法向量在 P 处失效，刚才“两个向量都垂直于同一条切线”的推理不能直接使用。即使梯度平行成立，也可能只是约束上的非极值驻点或非严格极值。</p>
+      </div>
+
+      <figure class="als-demo als-cases-demo" data-side="right" data-demo-id="cases">
+        <figcaption>必要条件与最终判定不是同一步</figcaption>
+        <div class="als-case-pair">
+          <div><strong>先筛候选</strong><span>∇f=λ∇g<br />g=0<br />∇g≠0</span></div>
+          <div><strong>再作判定</strong><span>代回比较<br />或检查约束上的二阶变化</span></div>
+        </div>
+      </figure>
+    </section>
+
+    <section class="als-summary">
+      <h2>小结</h2>
+      <p>约束把可行的一阶移动压缩到切线方向。</p>
+      <p>约束极值要求目标函数沿每个可行切向量的一阶变化为 0。</p>
+      <p>∇g 和 ∇f 都垂直于同一条切线，因此在正则点处存在 ∇f=λ∇g。</p>
+      <p>方程只产生候选点；极值类型仍需比较或作二阶判断。</p>
+    </section>
+  </article>
+
+  <script>
+    (() => {
+      const root = document.getElementById("axiom-lagrange-scene");
+      if (!root) return;
+      root.classList.add("als-js");
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const applyTheme = (theme) => {
+        const tone = theme === "light" ? "paper" : "ink";
+        root.dataset.tone = tone;
+        const surface = theme === "dark" ? "#0b0f13" : "#ffffff";
+        document.documentElement.style.colorScheme = theme;
+        document.documentElement.style.backgroundColor = surface;
+        document.body.style.backgroundColor = surface;
+        try { localStorage.setItem("axiom.scene.theme", theme); } catch {}
+      };
+      const storedTheme = (() => {
+        try { return localStorage.getItem("axiom.scene.theme") === "light" ? "light" : "dark"; }
+        catch { return "dark"; }
+      })();
+      applyTheme(storedTheme);
+
+      window.addEventListener("message", (event) => {
+        if (event.origin !== window.location.origin || event.source !== window.parent) return;
+        if (event.data?.type !== "axiom:set-scene-theme") return;
+        if (event.data.theme !== "dark" && event.data.theme !== "light") return;
+        applyTheme(event.data.theme);
+      });
+
+      const svg = root.querySelector(".als-constraint-svg");
+      const slider = root.querySelector('[data-role="theta"]');
+      const point = root.querySelector('[data-role="point"]');
+      const targetTheta = Math.atan2(2, 1);
+      const startTheta = 0.35;
+      const cx = 170;
+      const cy = 140;
+      const radius = 88;
+      let theta = reduceMotion ? targetTheta : startTheta;
+      let frame = 0;
+      let constraintTimer = 0;
+      let proofTimer = 0;
+      let dragging = false;
+
+      const role = (name) => root.querySelector('[data-role="' + name + '"]');
+      const setLine = (name, x1, y1, x2, y2) => {
+        const line = role(name);
+        line.setAttribute("x1", x1.toFixed(2));
+        line.setAttribute("y1", y1.toFixed(2));
+        line.setAttribute("x2", x2.toFixed(2));
+        line.setAttribute("y2", y2.toFixed(2));
+      };
+      const setText = (name, x, y) => {
+        const text = role(name);
+        text.setAttribute("x", x.toFixed(2));
+        text.setAttribute("y", y.toFixed(2));
+      };
+
+      const renderTheta = (next) => {
+        theta = next;
+        const cos = Math.cos(theta);
+        const sin = Math.sin(theta);
+        const px = cx + radius * cos;
+        const py = cy - radius * sin;
+        const tx = -sin;
+        const ty = -cos;
+        const contourX = 2 / Math.sqrt(5);
+        const contourY = 1 / Math.sqrt(5);
+        const directional = -sin + 2 * cos;
+        const normalizedDirectional = Math.max(-1, Math.min(1, directional / Math.sqrt(5)));
+        const nearZero = Math.abs(directional) < 0.045;
+        const level = cos + 2 * sin;
+        const qxMath = 2 * level / 5 - cos;
+        const qyMath = 4 * level / 5 - sin;
+        const qx = cx + radius * qxMath;
+        const qy = cy - radius * qyMath;
+
+        point.setAttribute("cx", px.toFixed(2));
+        point.setAttribute("cy", py.toFixed(2));
+        role("q-point").setAttribute("cx", qx.toFixed(2));
+        role("q-point").setAttribute("cy", qy.toFixed(2));
+        role("q-point").style.opacity = nearZero ? ".18" : ".78";
+        setText("q-label", qx - 14, qy + 16);
+        role("q-label").style.opacity = nearZero ? "0" : ".78";
+        setText("point-label", px + 8, py - 8);
+        role("point-label").style.opacity = nearZero ? "0" : "1";
+        setLine("tangent", px - tx * 64, py - ty * 64, px + tx * 64, py + ty * 64);
+        setLine("contour", px - contourX * 145, py - contourY * 145, px + contourX * 145, py + contourY * 145);
+        const vectorScale = 24;
+        const tangentLength = 44;
+        const gradFEndX = px + vectorScale;
+        const gradFEndY = py - 2 * vectorScale;
+        const gradGEndX = px + 2 * cos * vectorScale;
+        const gradGEndY = py - 2 * sin * vectorScale;
+        setLine("grad-f", px, py, gradFEndX, gradFEndY);
+        setLine("grad-g", px, py, gradGEndX, gradGEndY);
+        setLine("t-vector", px, py, px + tx * tangentLength, py + ty * tangentLength);
+        setText("f-label", gradFEndX + 6, gradFEndY - 4);
+        setText("g-label", gradGEndX - 17, gradGEndY + 17);
+        setText("t-label", px + tx * tangentLength - 9, py + ty * tangentLength - 5);
+
+        slider.value = theta.toFixed(3);
+        role("coordinate").textContent = "P=(" + cos.toFixed(2) + ", " + sin.toFixed(2) + ")";
+        role("directional-value").textContent = "∇f·t = " + directional.toFixed(2);
+        role("objective-value").textContent = "f(P)=" + level.toFixed(2);
+        role("meter-dot").style.left = ((normalizedDirectional + 1) * 50).toFixed(1) + "%";
+        role("meter").classList.toggle("is-zero", nearZero);
+      };
+
+      const stopMotion = () => {
+        window.clearTimeout(constraintTimer);
+        cancelAnimationFrame(frame);
+      };
+
+      const playConstraint = () => {
+        stopMotion();
+        if (reduceMotion) {
+          renderTheta(targetTheta);
+          return;
+        }
+        const from = startTheta;
+        const duration = 7600;
+        let start = 0;
+        renderTheta(from);
+        const tick = (time) => {
+          if (!start) start = time;
+          const progress = Math.min(1, (time - start) / duration);
+          const eased = .5 - Math.cos(progress * Math.PI) / 2;
+          renderTheta(from + (targetTheta - from) * eased);
+          if (progress < 1) frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+      };
+
+      const thetaFromPointer = (event) => {
+        const box = svg.getBoundingClientRect();
+        const x = (event.clientX - box.left) / box.width * 340;
+        const y = (event.clientY - box.top) / box.height * 280;
+        return Math.atan2(-(y - cy), x - cx);
+      };
+
+      slider.addEventListener("input", (event) => {
+        stopMotion();
+        renderTheta(Number(event.target.value));
+      });
+      point.addEventListener("pointerdown", (event) => {
+        stopMotion();
+        dragging = true;
+        point.setPointerCapture(event.pointerId);
+        renderTheta(thetaFromPointer(event));
+      });
+      point.addEventListener("pointermove", (event) => {
+        if (dragging) renderTheta(thetaFromPointer(event));
+      });
+      point.addEventListener("pointerup", () => { dragging = false; });
+      point.addEventListener("pointercancel", () => { dragging = false; });
+
+      const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, reduceMotion ? 0 : ms));
+
+      const moveMatchingTokens = async (source, target) => {
+        if (reduceMotion) return;
+        const sourceTokens = [...source.querySelectorAll("[data-key]")];
+        const jobs = sourceTokens.map((token) => {
+          const key = token.getAttribute("data-key");
+          const destination = target.querySelector('[data-key="' + key + '"]');
+          if (!destination) return Promise.resolve();
+          const a = token.getBoundingClientRect();
+          const b = destination.getBoundingClientRect();
+          const ghost = token.cloneNode(true);
+          ghost.classList.add("als-token-ghost");
+          ghost.style.left = a.left + "px";
+          ghost.style.top = a.top + "px";
+          ghost.style.width = a.width + "px";
+          root.appendChild(ghost);
+          token.style.opacity = ".18";
+          destination.style.opacity = "0";
+          return ghost.animate([
+            { transform: "translate(0,0)", opacity: .75 },
+            { transform: "translate(" + (b.left - a.left) + "px," + (b.top - a.top) + "px)", opacity: 1 }
+          ], { duration: 1350, easing: "cubic-bezier(.22,.72,.24,1)", fill: "forwards" }).finished.catch(() => {}).then(() => {
+            ghost.remove();
+            token.style.opacity = "";
+            destination.style.opacity = "";
+          });
+        });
+        await Promise.all(jobs);
+      };
+
+      const playProof = async () => {
+        const replay = root.querySelector('[data-replay="proof"]');
+        if (replay.disabled) return;
+        replay.disabled = true;
+        const proof = root.querySelector('[data-proof="gradient"]');
+        const steps = [...proof.querySelectorAll(".als-proof-step")];
+        steps.forEach((step, index) => {
+          step.classList.toggle("is-pending", index > 0);
+          step.classList.remove("is-active", "is-done");
+        });
+        steps[0].classList.add("is-active");
+        await wait(900);
+        for (let index = 1; index < steps.length; index += 1) {
+          const source = steps[index - 1];
+          const target = steps[index];
+          target.classList.remove("is-pending");
+          target.classList.add("is-active");
+          if (index === 3 || index === steps.length - 1) {
+            await Promise.all([
+              moveMatchingTokens(source, target),
+              moveMatchingTokens(steps[1], target),
+            ]);
+          } else {
+            await moveMatchingTokens(source, target);
+          }
+          source.classList.remove("is-active");
+          source.classList.add("is-done");
+          await wait(index === steps.length - 1 ? 1200 : 760);
+        }
+        steps[steps.length - 1].classList.remove("is-active");
+        replay.disabled = false;
+      };
+
+      const playExample = async () => {
+        const replay = root.querySelector('[data-replay="example"]');
+        if (replay.disabled) return;
+        replay.disabled = true;
+        const rows = [...root.querySelectorAll('[data-proof="example"] > div')];
+        rows.forEach((row, index) => {
+          row.style.opacity = index === 0 ? "1" : ".22";
+          row.style.transform = index === 0 ? "none" : "translateY(5px)";
+        });
+        if (reduceMotion) {
+          rows.forEach((row) => {
+            row.style.opacity = "1";
+            row.style.transform = "none";
+          });
+          replay.disabled = false;
+          return;
+        }
+        for (let index = 1; index < rows.length; index += 1) {
+          await wait(950);
+          rows[index].animate([
+            { opacity: .22, transform: "translateY(5px)" },
+            { opacity: 1, transform: "translateY(0)" }
+          ], { duration: 1100, easing: "ease-out", fill: "forwards" });
+        }
+        await wait(1100);
+        replay.disabled = false;
+      };
+
+      root.querySelectorAll("[data-replay]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const name = button.getAttribute("data-replay");
+          if (name === "constraint") playConstraint();
+          if (name === "proof") playProof();
+          if (name === "example") playExample();
+        });
+      });
+
+      renderTheta(theta);
+      if (!reduceMotion && "IntersectionObserver" in window) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting || entry.target.dataset.played === "true") return;
+            entry.target.dataset.played = "true";
+            if (entry.target.matches(".als-constraint-demo")) constraintTimer = window.setTimeout(playConstraint, 480);
+            if (entry.target.matches(".als-proof-demo")) proofTimer = window.setTimeout(playProof, 520);
+          });
+        }, { threshold: .35 });
+        root.querySelectorAll(".als-constraint-demo,.als-proof-demo").forEach((demo) => observer.observe(demo));
+      } else {
+        renderTheta(targetTheta);
+      }
+    })();
+  </script>
+</section>
