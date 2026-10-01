@@ -1,5 +1,7 @@
 # Human Context
 
+> 换到 Mac 时从 [当前交接](MAC_HANDOFF.md) 和 [迁移说明](MAC_MIGRATION.md) 开始。2026-10-01 已再次确认：Claude 前一轮视觉开发已回退，迁移不恢复它。
+
 这份文档给人看。DeepWiki 是主要阅读入口，这里保留一份更短的接手清单。
 
 ## 一句话判断

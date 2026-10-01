@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 .env
 db/*.db
+db/*.db-wal
+db/*.db-shm
 data/inbox/*
 data/archive/*
 data/reviews/*
@@ -31,3 +33,9 @@ screenshots/
 desktop/node_modules/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+
+# Local automation output and private migration material
+/artifacts/
+/runtime/
+/.openclaw/
+/.migration-private/

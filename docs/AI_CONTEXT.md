@@ -1,5 +1,7 @@
 # AI Context
 
+> 2026-10-01 换机入口：先读 `MAC_HANDOFF.md` 与最新 `ITERATION_LOG.md`，不要把 09-23 已撤回的 Claude 改动当成当前实现。迁移恢复见 `MAC_MIGRATION.md`。
+
 这份文档给 AI 协作代理使用。它记录当前运行事实、协作方式和架构决策规则。
 
 ## 核心目标
