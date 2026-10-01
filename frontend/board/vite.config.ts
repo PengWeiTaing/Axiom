@@ -17,13 +17,6 @@ export default defineConfig(({ command }) => ({
     sourcemap: false,
     target: 'es2020',
     chunkSizeWarningLimit: 650,
-    rollupOptions: {
-      output: {
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name][extname]',
-      },
-    },
   },
   server: {
     port: 5174,

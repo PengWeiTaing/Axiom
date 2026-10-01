@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 .env
 db/*.db
+db/*.db-wal
+db/*.db-shm
 data/inbox/*
 data/archive/*
 data/reviews/*
@@ -13,6 +15,10 @@ playwright-report/
 test-results/
 .claude/settings.local.json
 *.pdf
+
+# 本机演示用的令牌（扣子 PAT 等），永远不进仓库
+*.local.ps1
+*.local.sh
 
 # frontend (Vite + Vue v2 工程)
 frontend/node_modules/

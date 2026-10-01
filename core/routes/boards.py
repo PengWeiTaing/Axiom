@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
 import uuid
 
-from flask import request
+from flask import jsonify, request
 
 from core._common import (
     error_response,
@@ -19,7 +21,187 @@ from core.boards.mastery import mastery_bucket, now_iso
 USER_ID = "default"
 
 
+# ---- Local competition demo: asynchronous knowledge-scene jobs ----
+#
+# 线上由独立的 core.firecup_gateway 提供 /jobs 端点（见 docs/fire-cup/GATEWAY.md），
+# 它刻意不加载 Axiom 的个人资料、任务、记忆与管理接口。但比赛前端只调用 /jobs，
+# 所以单进程本地演示时 /board 会拿不到白板。打开 AXIOM_FIRECUP_LOCAL_JOBS=1 即可在
+# 本服务上补齐同名端点；默认关闭，线上部署行为不变。
+
+_LOCAL_JOB_STORES: dict[bool, object] = {}
+_LOCAL_JOB_STORE_LOCK = threading.Lock()
+
+
+def _firecup_local_jobs_enabled() -> bool:
+    return os.environ.get("AXIOM_FIRECUP_LOCAL_JOBS", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _local_job_store(allow_remote: bool):
+    """Build one in-memory job store per remote-execution policy.
+
+    未认证访客只能拿到离线样例，和同步的 /generate 端点保持同一条积分边界：
+    公开页面不会替你消耗扣子积分。
+    """
+    with _LOCAL_JOB_STORE_LOCK:
+        store = _LOCAL_JOB_STORES.get(allow_remote)
+        if store is not None:
+            return store
+
+        from core.firecup_gateway import (
+            GatewaySettings,
+            GenerationCoordinator,
+            GenerationJobStore,
+            GenerationUnavailableError,
+        )
+
+        settings = GatewaySettings.from_env()
+
+        def scene_generator(goal: str, source_text: str):
+            from core.boards.knowledge_scene import (
+                SceneGenerationUnavailableError,
+                generate_knowledge_scene,
+            )
+
+            try:
+                return generate_knowledge_scene(
+                    goal,
+                    source_text=source_text,
+                    allow_remote=allow_remote,
+                )
+            except SceneGenerationUnavailableError as exc:
+                raise GenerationUnavailableError(str(exc)) from exc
+
+        # 本地演示不需要跨重启恢复任务，用内存库避免和网关争抢同一个 SQLite 文件。
+        store = GenerationJobStore(
+            db_path=":memory:",
+            ttl_seconds=settings.job_ttl_seconds,
+            max_entries=settings.job_max_entries,
+            queue_max_entries=settings.job_queue_max_entries,
+            busy_wait_seconds=settings.inflight_wait_seconds,
+            coordinator=GenerationCoordinator(
+                cache_ttl_seconds=settings.cache_ttl_seconds,
+                cache_max_entries=settings.cache_max_entries,
+                inflight_wait_seconds=settings.inflight_wait_seconds,
+            ),
+            scene_generator=scene_generator,
+        )
+        _LOCAL_JOB_STORES[allow_remote] = store
+        return store
+
+
+def _register_local_knowledge_scene_jobs(app):
+    from core.firecup_gateway import (
+        JOB_RUNNING_RETRY_AFTER_MS,
+        JobExpiredError,
+        JobNotFoundError,
+        JobQueueFullError,
+    )
+
+    jobs_path = "/api/learning/knowledge-scenes/jobs"
+
+    @app.route(jobs_path, methods=["POST"])
+    def learning_create_knowledge_scene_job():
+        body = request.get_json(silent=True) or {}
+        goal = str(body.get("goal") or "").strip()
+        if not goal:
+            return error_response(400, "missing_goal", "goal 不能为空")
+
+        source_text = str(body.get("source_text") or "").strip()
+        if len(goal) > 240:
+            return error_response(400, "goal_too_long", "goal 最多 240 个字符")
+        if len(source_text) > 12000:
+            return error_response(400, "source_too_long", "source_text 最多 12000 个字符")
+
+        store = _local_job_store(require_key() is None)
+        try:
+            snapshot, reuse = store.submit(goal, source_text)
+        except JobQueueFullError as exc:
+            return error_response(429, "job_queue_full", str(exc))
+
+        job_id = snapshot["job_id"]
+        # 结构与网关逐字段对齐，前端在两种部署下走同一条代码路径。
+        response = jsonify(
+            {
+                "ok": True,
+                **snapshot,
+                "status_url": f"{jobs_path}/{job_id}",
+                "request": {**snapshot.get("request", {}), "reuse": reuse},
+                "retry_after_ms": snapshot.get(
+                    "retry_after_ms", JOB_RUNNING_RETRY_AFTER_MS
+                ),
+            }
+        )
+        response.status_code = 202
+        return response
+
+    @app.route(f"{jobs_path}/<job_id>", methods=["GET"])
+    def learning_get_knowledge_scene_job(job_id: str):
+        preferred = require_key() is None
+        expired = False
+        for allow_remote in (preferred, not preferred):
+            store = _LOCAL_JOB_STORES.get(allow_remote)
+            if store is None:
+                continue
+            try:
+                snapshot = store.get(job_id)
+            except JobExpiredError:
+                expired = True
+                continue
+            except JobNotFoundError:
+                continue
+            return jsonify({"ok": True, **snapshot})
+
+        if expired:
+            return error_response(410, "job_expired", "生成任务结果已过期，请重新提交")
+        return error_response(404, "job_not_found", "未找到生成任务")
+
+
 def register_routes(app):
+
+    # ---- Competition knowledge scene ----
+
+    @app.route("/api/learning/knowledge-scenes/generate", methods=["POST"])
+    def learning_generate_knowledge_scene():
+        """Plan one safe, template-backed learning scene.
+
+        Unauthenticated visitors can use the local fixture so the competition
+        demo opens without setup.  Remote Coze execution still requires the
+        normal Axiom key, preventing a public page from spending points.
+        """
+        body = request.get_json(silent=True) or {}
+        goal = str(body.get("goal") or "").strip()
+        if not goal:
+            return error_response(400, "missing_goal", "goal 不能为空")
+
+        source_text = str(body.get("source_text") or "").strip()
+        if len(goal) > 240:
+            return error_response(400, "goal_too_long", "goal 最多 240 个字符")
+        if len(source_text) > 12000:
+            return error_response(400, "source_too_long", "source_text 最多 12000 个字符")
+
+        from core.boards.knowledge_scene import (
+            SceneGenerationUnavailableError,
+            generate_knowledge_scene,
+        )
+
+        allow_remote = require_key() is None
+        try:
+            scene = generate_knowledge_scene(
+                goal,
+                source_text=source_text,
+                allow_remote=allow_remote,
+            )
+        except SceneGenerationUnavailableError as exc:
+            return error_response(503, "knowledge_scene_unavailable", str(exc))
+        return ok_response({"scene": scene})
+
+    if _firecup_local_jobs_enabled():
+        _register_local_knowledge_scene_jobs(app)
 
     # ---- Board CRUD ----
 

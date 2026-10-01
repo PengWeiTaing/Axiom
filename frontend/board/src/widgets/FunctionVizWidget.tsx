@@ -50,13 +50,12 @@ function tokenize(expr: string): Token[] {
 
     // 数字
     if (/[0-9.]/.test(ch)) {
-      let num = ''
-      while (i < expr.length && /[0-9.]/.test(expr[i])) {
-        num += expr[i]
-        i++
-      }
-      const val = parseFloat(num)
-      if (isNaN(val)) throw new ExpressionError(`无效数字: ${num}`)
+      const match = expr.slice(i).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/)
+      if (!match) throw new ExpressionError(`无效数字: ${expr.slice(i, i + 8)}`)
+      const num = match[0]
+      i += num.length
+      const val = Number(num)
+      if (!Number.isFinite(val)) throw new ExpressionError(`无效数字: ${num}`)
       tokens.push({ type: 'number', value: val })
       continue
     }
@@ -117,12 +116,12 @@ function parseAddSub(ctx: ParserContext): number {
 }
 
 function parseMulDiv(ctx: ParserContext): number {
-  let left = parsePower(ctx)
+  let left = parseUnary(ctx)
   while (ctx.pos < ctx.tokens.length) {
     const tok = ctx.tokens[ctx.pos]
     if (tok.type === 'op' && (tok.value === '*' || tok.value === '/')) {
       ctx.pos++
-      const right = parsePower(ctx)
+      const right = parseUnary(ctx)
       if (tok.value === '*') left = left * right
       else {
         if (right === 0) throw new ExpressionError('除零错误')
@@ -136,27 +135,25 @@ function parseMulDiv(ctx: ParserContext): number {
 }
 
 function parsePower(ctx: ParserContext): number {
-  let left = parseUnary(ctx)
-  while (ctx.pos < ctx.tokens.length) {
-    const tok = ctx.tokens[ctx.pos]
-    if (tok.type === 'op' && tok.value === '^') {
-      ctx.pos++
-      const right = parseUnary(ctx)
-      left = Math.pow(left, right)
-    } else {
-      break
-    }
+  const left = parsePrimary(ctx)
+  const tok = ctx.tokens[ctx.pos]
+  if (tok?.type === 'op' && tok.value === '^') {
+    ctx.pos++
+    // Power is right-associative, and binds more tightly than a leading sign:
+    // -x^2 = -(x^2), while 2^-2 remains valid.
+    return Math.pow(left, parseUnary(ctx))
   }
   return left
 }
 
 function parseUnary(ctx: ParserContext): number {
   const tok = ctx.tokens[ctx.pos]
-  if (tok && tok.type === 'op' && tok.value === '-') {
+  if (tok && tok.type === 'op' && (tok.value === '-' || tok.value === '+')) {
     ctx.pos++
-    return -parsePrimary(ctx)
+    const value = parseUnary(ctx)
+    return tok.value === '-' ? -value : value
   }
-  return parsePrimary(ctx)
+  return parsePower(ctx)
 }
 
 function parsePrimary(ctx: ParserContext): number {
@@ -235,7 +232,7 @@ function applyFunction(name: string, args: number[]): number {
 }
 
 /** 安全求值 */
-function safeEval(expr: string, vars: Record<string, number>): number {
+export function safeEval(expr: string, vars: Record<string, number>): number {
   const tokens = tokenize(expr)
   const ctx: ParserContext = { tokens, pos: 0, vars }
   const result = parseExpression(ctx)
@@ -245,7 +242,7 @@ function safeEval(expr: string, vars: Record<string, number>): number {
   return result
 }
 
-class ExpressionError extends Error {
+export class ExpressionError extends Error {
   constructor(msg: string) {
     super(msg)
     this.name = 'ExpressionError'

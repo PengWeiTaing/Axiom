@@ -1,0 +1,1982 @@
+<section id="axiom-motion-spine" data-tone="paper" aria-label="Axiom 平面区域面积文字主脊与局部数学演示">
+  <style>
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    #axiom-motion-spine {
+      --ams-paper: #ffffff;
+      --ams-ink: #191d21;
+      --ams-muted: #687179;
+      --ams-dot: rgba(75, 88, 99, 0.17);
+      --ams-grid: #c9d1d7;
+      --ams-axis: #4f5961;
+      --ams-blue: #197f9d;
+      --ams-amber: #bf7d16;
+      --ams-red: #c45047;
+      --ams-green: #4c9581;
+      --ams-soft-blue: rgba(25, 127, 157, 0.14);
+      --ams-soft-green: rgba(76, 149, 129, 0.18);
+      position: relative;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      box-sizing: border-box;
+      background: var(--ams-paper);
+      color: var(--ams-ink);
+      font-family: "Segoe UI", "Microsoft YaHei UI", "Noto Sans SC", sans-serif;
+      font-weight: 400;
+    }
+
+    #axiom-motion-spine[data-tone="dark"] {
+      --ams-paper: #0b0f13;
+      --ams-ink: #f0f2ed;
+      --ams-muted: #a9b2ba;
+      --ams-dot: rgba(198, 211, 220, 0.15);
+      --ams-grid: #56616a;
+      --ams-axis: #d3d9dd;
+      --ams-blue: #61c4dc;
+      --ams-amber: #efbf57;
+      --ams-red: #ff8d83;
+      --ams-green: #72cfb7;
+      --ams-soft-blue: rgba(97, 196, 220, 0.14);
+      --ams-soft-green: rgba(114, 207, 183, 0.18);
+    }
+
+    #axiom-motion-spine *,
+    #axiom-motion-spine *::before,
+    #axiom-motion-spine *::after {
+      box-sizing: border-box;
+    }
+
+    #axiom-motion-spine .ams-scroll {
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      touch-action: auto;
+      background-color: var(--ams-paper);
+      background-image: radial-gradient(circle, var(--ams-dot) 1.05px, transparent 1.25px);
+      background-size: 30px 30px;
+    }
+
+  #axiom-motion-spine .ams-article {
+    --ams-side: clamp(18px, 6vw, 52px);
+    position: relative;
+    width: min(680px, calc(100% - 2 * var(--ams-side)));
+      margin-left: var(--ams-side);
+      padding: 58px 0 76px;
+      user-select: text;
+    }
+
+    #axiom-motion-spine h1,
+    #axiom-motion-spine h2,
+    #axiom-motion-spine p,
+    #axiom-motion-spine figure {
+      margin-top: 0;
+    }
+
+    #axiom-motion-spine h1,
+    #axiom-motion-spine h2,
+    #axiom-motion-spine strong {
+      font-weight: 500;
+    }
+
+    #axiom-motion-spine .ams-header,
+    #axiom-motion-spine .ams-section {
+      width: 100%;
+      margin-left: 0;
+    }
+
+    #axiom-motion-spine .ams-header {
+      margin-bottom: 54px;
+    }
+
+    #axiom-motion-spine .ams-header h1 {
+      margin-bottom: 8px;
+    }
+
+    #axiom-motion-spine .ams-section {
+      margin-bottom: 58px;
+    }
+
+    #axiom-motion-spine .ams-section h2 {
+      margin-bottom: 12px;
+    }
+
+    #axiom-motion-spine .ams-section p {
+      margin-bottom: 12px;
+    }
+
+    #axiom-motion-spine .ams-section p:last-child {
+      margin-bottom: 0;
+    }
+
+    #axiom-motion-spine .ams-muted {
+      color: var(--ams-muted);
+    }
+
+    #axiom-motion-spine .ams-math,
+    #axiom-motion-spine .ams-live-formula {
+      font-family: Cambria, "Times New Roman", serif;
+      letter-spacing: 0.012em;
+    }
+
+    #axiom-motion-spine p:not(.ams-formula) > .ams-math,
+    #axiom-motion-spine .ams-live-formula > .ams-math {
+      white-space: nowrap;
+    }
+
+    #axiom-motion-spine .ams-formula {
+      margin-left: 0;
+      color: var(--ams-ink);
+      font-weight: 500;
+    }
+
+    #axiom-motion-spine .ams-inline-note {
+      margin-left: 0;
+      color: var(--ams-red);
+    }
+
+    #axiom-motion-spine .ams-sem-upper {
+      color: var(--ams-blue);
+    }
+
+    #axiom-motion-spine .ams-sem-lower {
+      color: var(--ams-amber);
+    }
+
+    #axiom-motion-spine .ams-sem-width {
+      color: var(--ams-green);
+    }
+
+    #axiom-motion-spine .ams-sem-alert {
+      color: var(--ams-red);
+    }
+
+    #axiom-motion-spine .ams-sem-result {
+      color: var(--ams-green);
+    }
+
+    #axiom-motion-spine .ams-demo {
+      position: relative;
+      width: min(540px, 100%);
+      margin: 17px 0 26px;
+      padding: 0;
+      pointer-events: auto;
+    }
+
+    #axiom-motion-spine .ams-demo svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: hidden;
+    }
+
+    #axiom-motion-spine .ams-demo-actions {
+      display: none;
+      justify-content: flex-start;
+      min-height: 36px;
+      margin-bottom: 2px;
+    }
+
+    #axiom-motion-spine.ams-js .ams-demo-actions {
+      display: flex;
+    }
+
+    #axiom-motion-spine .ams-replay {
+      border: 0;
+      background: transparent;
+      color: var(--ams-muted);
+      font: inherit;
+      font-weight: 400;
+      cursor: pointer;
+    }
+
+    #axiom-motion-spine .ams-replay {
+      min-height: 36px;
+      padding: 7px 0;
+      border-bottom: 0;
+      font-size: 14px;
+    }
+
+    #axiom-motion-spine .ams-replay:hover {
+      color: var(--ams-ink);
+    }
+
+    #axiom-motion-spine .ams-equation-demo {
+      width: min(560px, 100%);
+    }
+
+    #axiom-motion-spine .ams-proof {
+      position: relative;
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    #axiom-motion-spine .ams-proof-step {
+      position: relative;
+      min-height: 50px;
+      padding: 7px 0 9px;
+      opacity: 1;
+      transition: opacity 180ms ease;
+    }
+
+    #axiom-motion-spine .ams-proof-reason {
+      min-height: 18px;
+      margin-bottom: 2px;
+      color: var(--ams-muted);
+      font-size: 14px;
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+    }
+
+    #axiom-motion-spine .ams-proof-equation {
+      position: relative;
+      min-height: 31px;
+      color: var(--ams-ink);
+      font-family: Cambria, "Times New Roman", serif;
+      font-size: 21px;
+      line-height: 1.48;
+      font-variant-numeric: lining-nums;
+    }
+
+    #axiom-motion-spine .ams-proof-token {
+      display: inline-block;
+      position: relative;
+      transform-origin: center;
+    }
+
+    #axiom-motion-spine .ams-proof-token[data-token-id$="-s"],
+    #axiom-motion-spine .ams-proof-token[data-token-id$="-eq"] {
+      margin-right: 0.18em;
+    }
+
+    #axiom-motion-spine .ams-proof.ams-is-playing .ams-proof-step.is-pending {
+      opacity: 0.26;
+    }
+
+    #axiom-motion-spine .ams-proof.ams-is-playing .ams-proof-step.is-resolved {
+      opacity: 0.56;
+    }
+
+    #axiom-motion-spine .ams-proof-step.is-active .ams-proof-reason {
+      color: var(--ams-blue);
+    }
+
+    #axiom-motion-spine .ams-proof-step.is-active .ams-proof-equation::before {
+      content: "";
+      position: absolute;
+      left: -10px;
+      top: 0.2em;
+      width: 2px;
+      height: 1.1em;
+      background: var(--ams-green);
+      border-radius: 2px;
+    }
+
+    #axiom-motion-spine .ams-match-ghost {
+      position: absolute;
+      z-index: 8;
+      margin: 0;
+      pointer-events: none;
+      white-space: nowrap;
+      color: inherit;
+      font: inherit;
+      transform-origin: center;
+    }
+
+    #axiom-motion-spine .ams-cancel-ghost::after {
+      content: "";
+      position: absolute;
+      left: -3px;
+      right: -3px;
+      top: 52%;
+      height: 1.5px;
+      background: var(--ams-red);
+      transform: rotate(-18deg);
+      transform-origin: center;
+    }
+
+    #axiom-motion-spine .ams-proof-branch-word {
+      margin: 0 0.35em;
+      color: var(--ams-muted);
+      font-family: inherit;
+      font-size: 0.72em;
+    }
+
+    #axiom-motion-spine .ams-proof-mobile-break {
+      display: none;
+    }
+
+    #axiom-motion-spine .ams-proof-rule {
+      display: inline-block;
+      margin: 2px 0 5px;
+      padding-bottom: 1px;
+      border-bottom: 1px solid var(--ams-axis);
+      color: var(--ams-muted);
+      font-family: Cambria, "Times New Roman", serif;
+      font-size: 16px;
+    }
+
+    #axiom-motion-spine .ams-frac {
+      display: inline-grid;
+      grid-template-rows: auto auto;
+      min-width: 1.05em;
+      margin: 0 0.08em;
+      vertical-align: -0.42em;
+      text-align: center;
+      line-height: 1.02;
+    }
+
+    #axiom-motion-spine .ams-frac > span:first-child {
+      padding: 0 0.12em 0.06em;
+      border-bottom: 1px solid currentColor;
+    }
+
+    #axiom-motion-spine .ams-frac > span:last-child {
+      padding: 0.04em 0.12em 0;
+    }
+
+    #axiom-motion-spine .ams-proof-endpoints {
+      margin-top: 3px;
+    }
+
+    #axiom-motion-spine .ams-endpoints {
+      display: flex;
+      align-items: center;
+      width: 190px;
+      margin-top: 8px;
+      color: var(--ams-muted);
+      font-family: Cambria, "Times New Roman", serif;
+    }
+
+    #axiom-motion-spine .ams-endpoint-line {
+      position: relative;
+      flex: 1;
+      height: 1px;
+      margin: 0 8px;
+      background: var(--ams-axis);
+    }
+
+    #axiom-motion-spine .ams-endpoint-line::before,
+    #axiom-motion-spine .ams-endpoint-line::after {
+      content: "";
+      position: absolute;
+      top: -3px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ams-red);
+    }
+
+    #axiom-motion-spine .ams-endpoint-line::before {
+      left: -1px;
+    }
+
+    #axiom-motion-spine .ams-endpoint-line::after {
+      right: -1px;
+    }
+
+    #axiom-motion-spine .ams-plot-axis,
+    #axiom-motion-spine .ams-cut-axis {
+      stroke: var(--ams-axis);
+      stroke-width: 1.5;
+    }
+
+    #axiom-motion-spine .ams-plot-grid {
+      stroke: var(--ams-grid);
+      stroke-width: 1;
+      opacity: 0.66;
+    }
+
+    #axiom-motion-spine .ams-curve-upper {
+      fill: none;
+      stroke: var(--ams-blue);
+      stroke-width: 3.2;
+    }
+
+    #axiom-motion-spine .ams-curve-lower {
+      fill: none;
+      stroke: var(--ams-amber);
+      stroke-width: 3.2;
+    }
+
+    #axiom-motion-spine .ams-area-base {
+      fill: var(--ams-green);
+      fill-opacity: 0.08;
+    }
+
+    #axiom-motion-spine .ams-area-progress {
+      fill: var(--ams-green);
+      fill-opacity: 0.24;
+    }
+
+    #axiom-motion-spine .ams-probe-band {
+      fill: var(--ams-red);
+      fill-opacity: 0.78;
+      stroke: var(--ams-red);
+      stroke-width: 1.4;
+    }
+
+    #axiom-motion-spine .ams-probe-point {
+      fill: var(--ams-paper);
+      stroke-width: 3;
+    }
+
+    #axiom-motion-spine .ams-probe-point.is-upper {
+      stroke: var(--ams-blue);
+    }
+
+    #axiom-motion-spine .ams-probe-point.is-lower {
+      stroke: var(--ams-amber);
+    }
+
+    #axiom-motion-spine .ams-bracket-height,
+    #axiom-motion-spine .ams-bracket-width {
+      fill: none;
+      stroke-linecap: round;
+      stroke-width: 1.8;
+    }
+
+    #axiom-motion-spine .ams-bracket-height {
+      stroke: var(--ams-red);
+    }
+
+    #axiom-motion-spine .ams-bracket-width {
+      stroke: var(--ams-green);
+    }
+
+    #axiom-motion-spine .ams-plot-text,
+    #axiom-motion-spine .ams-cut-text,
+    #axiom-motion-spine .ams-riemann-text {
+      fill: var(--ams-ink);
+      font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      font-size: 21px;
+      font-weight: 500;
+    }
+
+    #axiom-motion-spine .ams-plot-label-height {
+      fill: var(--ams-red);
+    }
+
+    #axiom-motion-spine .ams-plot-label-width {
+      fill: var(--ams-green);
+    }
+
+    #axiom-motion-spine .ams-plot-hit {
+      fill: transparent;
+      cursor: ew-resize;
+      touch-action: none;
+    }
+
+    #axiom-motion-spine .ams-live-formula {
+      margin-top: 5px;
+      color: var(--ams-muted);
+    }
+
+    #axiom-motion-spine .ams-riemann-rect {
+      fill: var(--ams-blue);
+      fill-opacity: 0.22;
+      stroke: var(--ams-blue);
+      stroke-width: 1;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    #axiom-motion-spine .ams-riemann-rect.is-muted {
+      fill-opacity: 0.06;
+      stroke-opacity: 0.22;
+    }
+
+    #axiom-motion-spine .ams-riemann-rect.is-focused {
+      fill-opacity: 0.58;
+      stroke-width: 2;
+    }
+
+    #axiom-motion-spine .ams-riemann-focus {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #axiom-motion-spine .ams-riemann-focus.is-visible {
+      opacity: 1;
+    }
+
+    #axiom-motion-spine .ams-riemann-brace-height,
+    #axiom-motion-spine .ams-riemann-brace-width {
+      fill: none;
+      stroke-linecap: round;
+      stroke-width: 1.8;
+    }
+
+    #axiom-motion-spine .ams-riemann-brace-height {
+      stroke: var(--ams-red);
+    }
+
+    #axiom-motion-spine .ams-riemann-brace-width {
+      stroke: var(--ams-green);
+    }
+
+    #axiom-motion-spine .ams-riemann-height-label {
+      fill: var(--ams-red);
+    }
+
+    #axiom-motion-spine .ams-riemann-width-label {
+      fill: var(--ams-green);
+    }
+
+    #axiom-motion-spine .ams-riemann-count {
+      fill: var(--ams-muted);
+    }
+
+    #axiom-motion-spine .ams-riemann-formulas,
+    #axiom-motion-spine .ams-evaluation-demo {
+      position: relative;
+      margin-top: 8px;
+    }
+
+    #axiom-motion-spine .ams-evaluation-demo {
+      width: min(560px, 100%);
+    }
+
+    #axiom-motion-spine .ams-cut-vertical {
+      stroke: var(--ams-red);
+      stroke-width: 7;
+      stroke-linecap: round;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    #axiom-motion-spine .ams-cut-horizontal {
+      stroke: var(--ams-green);
+      stroke-width: 7;
+      stroke-linecap: round;
+      opacity: 0;
+      transform: scaleX(0);
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    #axiom-motion-spine .ams-cut-formulas {
+      display: grid;
+      gap: 5px;
+      margin-top: 6px;
+      font-family: Cambria, "Times New Roman", serif;
+      color: var(--ams-ink);
+    }
+
+    #axiom-motion-spine .ams-summary::after {
+      content: "";
+      display: block;
+      width: 230px;
+      height: 2px;
+      margin-top: 18px;
+      background: var(--ams-amber);
+      opacity: 0.66;
+    }
+
+    #axiom-motion-spine .ams-attribution {
+      margin-top: 30px;
+      padding-bottom: 30px;
+      color: var(--ams-muted);
+      font-size: 12px;
+    }
+
+    #axiom-motion-spine .ams-attribution a {
+      color: inherit;
+      text-underline-offset: 2px;
+      white-space: nowrap;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-article {
+      width: 390px;
+      margin-right: auto;
+      margin-left: auto;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-header {
+      margin-bottom: 70px;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-section {
+      margin-bottom: 92px;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-section:nth-of-type(-n+6) {
+      margin-bottom: 120px;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-summary {
+      margin-bottom: 0;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-demo[data-side] {
+      position: absolute;
+      z-index: 2;
+      margin: 0;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-demo[data-side]::after {
+      content: "";
+      position: absolute;
+      top: 25px;
+      width: 24px;
+      border-top: 1px solid var(--ams-grid);
+      opacity: 0.62;
+      pointer-events: none;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-demo[data-side="left"]::after {
+      right: -26px;
+    }
+
+    #axiom-motion-spine.ams-side-layout .ams-demo[data-side="right"]::after {
+      left: -26px;
+    }
+
+    #axiom-motion-spine .ams-demo-appendix {
+      display: none;
+    }
+
+    #axiom-motion-spine.ams-appendix-layout .ams-demo-appendix {
+      display: block;
+      width: min(680px, calc(100% - 2 * clamp(18px, 6vw, 52px)));
+      margin-left: clamp(18px, 6vw, 52px);
+      padding-bottom: 70px;
+    }
+
+    #axiom-motion-spine.ams-appendix-layout .ams-demo-appendix .ams-demo {
+      width: 100%;
+      margin: 0 0 72px;
+    }
+
+    #axiom-motion-spine.ams-appendix-layout .ams-demo-appendix .ams-demo:last-child {
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 480px) {
+      #axiom-motion-spine .ams-article {
+        padding-top: 42px;
+        padding-bottom: 60px;
+      }
+
+      #axiom-motion-spine .ams-proof-equation {
+        font-size: 18px;
+      }
+
+      #axiom-motion-spine .ams-proof-step {
+        min-height: 48px;
+        padding-top: 6px;
+        padding-bottom: 8px;
+      }
+
+      #axiom-motion-spine .ams-proof-reason {
+        font-size: 14px;
+      }
+
+      #axiom-motion-spine .ams-replay {
+        min-height: 42px;
+        padding-top: 9px;
+        padding-bottom: 9px;
+      }
+
+      #axiom-motion-spine .ams-proof-mobile-break {
+        display: block;
+        height: 0;
+      }
+
+      #axiom-motion-spine .ams-bound-lower {
+        margin-left: 1.35em;
+      }
+
+      #axiom-motion-spine .ams-demo {
+        width: 100%;
+      }
+
+      #axiom-motion-spine .ams-plot-text,
+      #axiom-motion-spine .ams-cut-text,
+      #axiom-motion-spine .ams-riemann-text {
+        font-size: 22px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #axiom-motion-spine .ams-match-ghost {
+        display: none;
+      }
+    }
+  </style>
+
+  <div class="ams-scroll">
+    <article class="ams-article">
+      <header class="ams-header">
+        <p class="ams-muted">高数 6A-1</p>
+        <h1>平面区域面积</h1>
+        <p>本节目标：把两条曲线围成的区域写成定积分。</p>
+      </header>
+
+      <section class="ams-section">
+        <h2>这个知识点解决什么问题</h2>
+        <p>平面上几条曲线围成一块区域，要求这块区域的面积。以 <span class="ams-math ams-sem-upper">y = x</span> 和 <span class="ams-math ams-sem-lower">y = x²</span> 为例，先确定区域边界，再把区域切成细条相加。</p>
+      </section>
+
+      <section class="ams-section">
+        <h2>先求交点</h2>
+        <p id="ams-anchor-intersection">左右边界来自两条曲线的交点。令 <span class="ams-math">x = x²</span>，把等式移到一边并因式分解：</p>
+
+        <figure class="ams-demo ams-equation-demo ams-intersection-demo" data-side="right" data-anchor="#ams-anchor-intersection" aria-label="从 x 等于 x 平方连续变形到两个交点的公式推导">
+          <div class="ams-demo-actions"><button class="ams-replay" type="button" data-replay="intersection">重演推导</button></div>
+          <div class="ams-proof" data-proof="intersection">
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">交点满足</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token ams-sem-upper" data-token-id="i0-lhs-x">x</span>
+                <span class="ams-proof-token" data-token-id="i0-eq">=</span>
+                <span class="ams-proof-token ams-sem-lower" data-token-id="i0-rhs-x2">x²</span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">移项</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token ams-sem-upper" data-token-id="i1-lhs-x" data-from="i0-lhs-x">x</span>
+                <span class="ams-proof-token" data-token-id="i1-minus" data-phase="1">−</span>
+                <span class="ams-proof-token ams-sem-lower" data-token-id="i1-x2" data-from="i0-rhs-x2" data-relation="rewrite" data-phase="1">x²</span>
+                <span class="ams-proof-token" data-token-id="i1-eq" data-from="i0-eq">=</span>
+                <span class="ams-proof-token ams-sem-alert" data-token-id="i1-zero" data-phase="2">0</span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">因式分解</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token ams-sem-upper" data-token-id="i2-factor" data-from="i1-lhs-x">x</span><span class="ams-proof-token" data-token-id="i2-open" data-phase="2">(</span><span class="ams-proof-token" data-token-id="i2-one" data-phase="1">1</span><span class="ams-proof-token" data-token-id="i2-minus" data-from="i1-minus" data-phase="1">−</span><span class="ams-proof-token ams-sem-lower" data-token-id="i2-inner-x" data-from="i1-x2" data-relation="rewrite" data-phase="1">x</span><span class="ams-proof-token" data-token-id="i2-close" data-phase="2">)</span>
+                <span class="ams-proof-token" data-token-id="i2-eq" data-from="i1-eq">=</span>
+                <span class="ams-proof-token ams-sem-alert" data-token-id="i2-zero" data-from="i1-zero">0</span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">两根</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token ams-sem-upper" data-token-id="i3-left-x" data-from="i2-factor" data-relation="copy" data-phase="1">x</span>
+                <span class="ams-proof-token" data-token-id="i3-left-eq" data-from="i2-eq" data-relation="copy" data-phase="1">=</span>
+                <span class="ams-proof-token ams-sem-alert" data-token-id="i3-left-zero" data-from="i2-zero" data-relation="copy" data-phase="1">0</span>
+                <span class="ams-proof-token ams-proof-branch-word" data-token-id="i3-or" data-phase="2">或</span>
+                <span class="ams-proof-token ams-sem-lower" data-token-id="i3-right-x" data-from="i2-inner-x" data-relation="rewrite" data-phase="3">x</span>
+                <span class="ams-proof-token" data-token-id="i3-right-eq" data-from="i2-eq" data-relation="copy" data-phase="3">=</span>
+                <span class="ams-proof-token" data-token-id="i3-one" data-from="i2-one" data-relation="rewrite" data-phase="3">1</span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">积分区间</div>
+              <div class="ams-proof-equation">
+                <div class="ams-endpoints ams-proof-endpoints" aria-hidden="true"><span class="ams-proof-token" data-token-id="i4-zero" data-from="i3-left-zero" data-relation="copy">0</span><span class="ams-endpoint-line"></span><span class="ams-proof-token" data-token-id="i4-one" data-from="i3-one" data-relation="copy">1</span></div>
+              </div>
+            </div>
+          </div>
+        </figure>
+
+        <p>所以积分区间是 <span class="ams-math">[0,1]</span>。</p>
+        <p class="ams-inline-note">积分上下限不能凭图估计，先解交点。</p>
+      </section>
+
+      <section class="ams-section">
+        <h2>判断谁在上面，再写一条竖条</h2>
+        <p>在 <span class="ams-math">0 &lt; x &lt; 1</span> 内取 <span class="ams-math">x = 1/2</span>：<span class="ams-math ams-sem-upper">x = 1/2</span>，<span class="ams-math ams-sem-lower">x² = 1/4</span>。所以 <span class="ams-math ams-sem-upper">y = x</span> 在上，<span class="ams-math ams-sem-lower">y = x²</span> 在下。</p>
+        <p>在 <span class="ams-math">x</span> 处取一个宽为 <span class="ams-math ams-sem-width">dx</span> 的窄条。把高度记为 <span class="ams-math">h = <span class="ams-sem-upper">x</span> − <span class="ams-sem-lower">x²</span></span>，因此：</p>
+        <p id="ams-anchor-probe" class="ams-formula ams-math"><span data-micro-area>dS</span> = (<span data-micro-height><span class="ams-sem-upper">x</span> − <span class="ams-sem-lower">x²</span></span>)<span class="ams-sem-width" data-micro-width>dx</span></p>
+
+        <figure class="ams-demo ams-probe-demo" data-side="left" data-anchor="#ams-anchor-probe" data-auto-demo="probe" aria-label="可直接拖动的竖切片、累积区域、微元高度与宽度">
+          <div class="ams-demo-actions"><button class="ams-replay" type="button" data-replay="probe">扫过区域</button></div>
+          <svg class="ams-probe-svg" viewBox="0 0 520 285" role="img" aria-labelledby="ams-probe-title ams-probe-desc">
+            <title id="ams-probe-title">两曲线之间随 x 移动的竖切片</title>
+            <desc id="ams-probe-desc">拖动图中的竖切片，切片两端、高度、宽度、累积区域和数字同时更新。</desc>
+            <line class="ams-plot-grid" x1="60" y1="185" x2="470" y2="185"></line>
+            <line class="ams-plot-grid" x1="60" y1="140" x2="470" y2="140"></line>
+            <line class="ams-plot-grid" x1="60" y1="95" x2="470" y2="95"></line>
+            <line class="ams-plot-grid" x1="160" y1="45" x2="160" y2="230"></line>
+            <line class="ams-plot-grid" x1="260" y1="45" x2="260" y2="230"></line>
+            <line class="ams-plot-grid" x1="360" y1="45" x2="360" y2="230"></line>
+            <line class="ams-plot-axis" x1="48" y1="230" x2="482" y2="230"></line>
+            <line class="ams-plot-axis" x1="60" y1="242" x2="60" y2="32"></line>
+            <path class="ams-area-base" d="M 60 230 L 460 50 C 360 185 260 230 60 230 Z"></path>
+            <path class="ams-area-progress" d="M 60 230 L 240 149 C 190 206 125 228 60 230 Z"></path>
+            <path class="ams-curve-upper" d="M 60 230 L 460 50"></path>
+            <path class="ams-curve-lower" d="M 60 230 C 260 230 360 185 460 50"></path>
+            <path class="ams-probe-band" d="M 237 150 L 243 148 L 243 194 L 237 196 Z"></path>
+            <circle class="ams-probe-point is-upper" cx="240" cy="149" r="5"></circle>
+            <circle class="ams-probe-point is-lower" cx="240" cy="194" r="5"></circle>
+            <path class="ams-bracket-height" d="M 253 149 h 8 M 257 149 V 194 M 253 194 h 8"></path>
+            <path class="ams-bracket-width" d="M 237 239 v 6 M 237 242 H 243 M 243 239 v 6"></path>
+            <text class="ams-plot-text" x="51" y="256">0</text>
+            <text class="ams-plot-text" x="453" y="256">1</text>
+            <text class="ams-plot-text ams-plot-label-height" x="258" y="132">h</text>
+            <text class="ams-plot-text ams-plot-label-width" x="224" y="276">dx</text>
+            <rect class="ams-plot-hit" x="45" y="30" width="440" height="235"></rect>
+          </svg>
+          <div class="ams-live-formula">取 <span class="ams-math">x = <span data-live-x>0.45</span></span>，高 <span class="ams-math">h = <span data-live-upper>0.45</span> − <span data-live-lower>0.20</span> = <span data-live-height>0.25</span></span>。可直接拖动红色窄条。</div>
+        </figure>
+
+        <p class="ams-inline-note">写成“下 − 上”会得到负值；长度本身不会为负。</p>
+      </section>
+
+      <section class="ams-section">
+        <h2>把所有细条加起来</h2>
+        <p id="ams-anchor-riemann">先用有限个窄条近似。窄条继续分裂，宽度趋近于零，有限和就过渡为定积分。</p>
+
+        <figure class="ams-demo ams-riemann-demo" data-side="left" data-anchor="#ams-anchor-riemann" data-auto-demo="riemann" aria-label="矩形先从零高度升到两曲线之间，再逐条标出高度和宽度，最后细分到三十二条并过渡为积分">
+          <div class="ams-demo-actions"><button class="ams-replay" type="button" data-replay="riemann">重演细分</button></div>
+          <svg class="ams-riemann-svg" viewBox="0 0 520 245" role="img" aria-labelledby="ams-riemann-title ams-riemann-desc">
+            <title id="ams-riemann-title">黎曼窄条逐次细分</title>
+            <desc id="ams-riemann-desc">矩形从零高度依次升起；一个窄条被突出并标出高度 hᵢ 等于 xᵢ 减 xᵢ²，以及宽度 Δx；焦点沿相邻窄条移动后，矩形细分为十六和三十二条。</desc>
+            <line class="ams-plot-axis" x1="48" y1="205" x2="482" y2="205"></line>
+            <line class="ams-plot-axis" x1="60" y1="216" x2="60" y2="30"></line>
+            <path class="ams-area-base" d="M 60 205 L 460 35 C 360 163 260 205 60 205 Z"></path>
+            <g class="ams-riemann-rects">
+              <rect class="ams-riemann-rect" x="60" y="194" width="50" height="10"></rect>
+              <rect class="ams-riemann-rect" x="110" y="171" width="50" height="28"></rect>
+              <rect class="ams-riemann-rect" x="160" y="149" width="50" height="39"></rect>
+              <rect class="ams-riemann-rect" x="210" y="126" width="50" height="44"></rect>
+              <rect class="ams-riemann-rect" x="260" y="104" width="50" height="44"></rect>
+              <rect class="ams-riemann-rect" x="310" y="81" width="50" height="39"></rect>
+              <rect class="ams-riemann-rect" x="360" y="59" width="50" height="28"></rect>
+              <rect class="ams-riemann-rect" x="410" y="36" width="50" height="11"></rect>
+            </g>
+            <path class="ams-curve-upper" d="M 60 205 L 460 35"></path>
+            <path class="ams-curve-lower" d="M 60 205 C 260 205 360 163 460 35"></path>
+            <g class="ams-riemann-focus" aria-hidden="true">
+              <path class="ams-riemann-brace-height" d="M 154 171 h 8 M 158 171 V 199 M 154 199 h 8"></path>
+              <path class="ams-riemann-brace-width" d="M 110 213 v 6 M 110 216 H 160 M 160 213 v 6"></path>
+              <text class="ams-riemann-text ams-riemann-height-label" x="110" y="155">hᵢ</text>
+              <text class="ams-riemann-text ams-riemann-width-label" x="122" y="240">Δx</text>
+            </g>
+            <text class="ams-riemann-text ams-riemann-count" x="74" y="32">8 条</text>
+          </svg>
+          <div class="ams-proof ams-riemann-formulas" data-proof="riemann">
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">单条高 hᵢ = xᵢ − xᵢ²，宽 Δx；各窄条相加</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token" data-token-id="r0-s">S</span>
+                <span class="ams-proof-token" data-token-id="r0-approx">≈</span>
+                <span class="ams-proof-token ams-sem-alert" data-token-id="r0-sum">Σ</span>
+                <span class="ams-proof-token" data-token-id="r0-open">[</span><span class="ams-proof-token ams-sem-upper" data-token-id="r0-upper">xᵢ</span><span class="ams-proof-token" data-token-id="r0-minus">−</span><span class="ams-proof-token ams-sem-lower" data-token-id="r0-lower">xᵢ²</span><span class="ams-proof-token" data-token-id="r0-close">]</span>
+                <span class="ams-proof-token ams-sem-width" data-token-id="r0-dx">Δx</span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">令矩形数 n → ∞，同时 Δx → 0</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token" data-token-id="r1-s" data-from="r0-s">S</span>
+                <span class="ams-proof-token" data-token-id="r1-eq" data-from="r0-approx" data-relation="rewrite">=</span>
+                <span class="ams-proof-token" data-token-id="r1-lim">limₙ→∞</span>
+                <span class="ams-proof-token ams-sem-alert" data-token-id="r1-sum" data-from="r0-sum">Σ</span>
+                <span class="ams-proof-token" data-token-id="r1-open" data-from="r0-open">[</span><span class="ams-proof-token ams-sem-upper" data-token-id="r1-upper" data-from="r0-upper">xᵢ</span><span class="ams-proof-token" data-token-id="r1-minus" data-from="r0-minus">−</span><span class="ams-proof-token ams-sem-lower" data-token-id="r1-lower" data-from="r0-lower">xᵢ²</span><span class="ams-proof-token" data-token-id="r1-close" data-from="r0-close">]</span>
+                <span class="ams-proof-token ams-sem-width" data-token-id="r1-dx" data-from="r0-dx">Δx</span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">极限记为定积分：Σ → ∫，xᵢ → x，Δx → dx</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token" data-token-id="r2-s" data-from="r1-s">S</span>
+                <span class="ams-proof-token" data-token-id="r2-eq" data-from="r1-eq">=</span>
+                <span class="ams-proof-token ams-sem-alert" data-token-id="r2-integral" data-from="r1-lim r1-sum" data-relation="merge">∫₀¹</span>
+                <span class="ams-proof-token" data-token-id="r2-open" data-from="r1-open">[</span><span class="ams-proof-token ams-sem-upper" data-token-id="r2-upper" data-from="r1-upper" data-relation="rewrite">x</span><span class="ams-proof-token" data-token-id="r2-minus" data-from="r1-minus">−</span><span class="ams-proof-token ams-sem-lower" data-token-id="r2-lower" data-from="r1-lower" data-relation="rewrite">x²</span><span class="ams-proof-token" data-token-id="r2-close" data-from="r1-close">]</span>
+                <span class="ams-proof-token ams-sem-width" data-token-id="r2-dx" data-from="r1-dx" data-relation="rewrite">dx</span>
+              </div>
+            </div>
+          </div>
+        </figure>
+
+        <p>因此面积为：</p>
+        <p class="ams-formula ams-math">S = ∫<sub>0</sub><sup>1</sup>(x − x²)dx</p>
+        <p id="ams-anchor-evaluation">求原函数并代入上下限：</p>
+
+        <figure class="ams-demo ams-evaluation-demo" data-side="right" data-anchor="#ams-anchor-evaluation" aria-label="积分结果按相同项逐行传递的公式推导">
+          <div class="ams-demo-actions"><button class="ams-replay" type="button" data-replay="evaluation">重演计算</button></div>
+          <div class="ams-proof" data-proof="evaluation">
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">原式</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token" data-token-id="e0-s">S</span><span class="ams-proof-token" data-token-id="e0-eq">=</span>
+                <span class="ams-proof-token ams-sem-alert" data-token-id="e0-int">∫₀¹</span><span class="ams-proof-token" data-token-id="e0-open">(</span><span class="ams-proof-token ams-sem-upper" data-token-id="e0-upper">x</span><span class="ams-proof-token" data-token-id="e0-minus">−</span><span class="ams-proof-token ams-sem-lower" data-token-id="e0-lower">x²</span><span class="ams-proof-token" data-token-id="e0-close">)</span><span class="ams-proof-token ams-sem-width" data-token-id="e0-dx">dx</span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">求原函数</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token" data-token-id="e1-s" data-from="e0-s">S</span><span class="ams-proof-token" data-token-id="e1-eq" data-from="e0-eq">=</span>
+                <span class="ams-proof-token" data-token-id="e1-open" data-from="e0-int e0-open" data-relation="merge">[</span><span class="ams-proof-token ams-sem-upper" data-token-id="e1-upper" data-from="e0-upper e0-dx" data-relation="derive">x²/2</span><span class="ams-proof-token" data-token-id="e1-minus" data-from="e0-minus">−</span><span class="ams-proof-token ams-sem-lower" data-token-id="e1-lower" data-from="e0-lower e0-dx" data-relation="derive">x³/3</span><span class="ams-proof-token" data-token-id="e1-close" data-from="e0-close" data-relation="rewrite">]</span><span class="ams-proof-token ams-sem-width" data-token-id="e1-low" data-from="e0-int" data-relation="split" data-phase="2">₀</span><span class="ams-proof-token ams-sem-width" data-token-id="e1-high" data-from="e0-int" data-relation="split" data-phase="2">¹</span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">微积分基本定理：代入 1 与 0</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token" data-token-id="e2-s" data-from="e1-s">S</span><span class="ams-proof-token" data-token-id="e2-eq" data-from="e1-eq">=</span>
+                <span class="ams-proof-token" data-token-id="e2-open-a" data-from="e1-open" data-relation="copy" data-phase="1">(</span><span class="ams-proof-token ams-sem-upper" data-token-id="e2-a-one" data-from="e1-high" data-relation="copy" data-phase="1">1</span><span class="ams-proof-token ams-sem-upper" data-token-id="e2-a-upper-rest" data-from="e1-upper" data-relation="rewrite" data-phase="1">²/2</span><span class="ams-proof-token" data-token-id="e2-a-minus" data-from="e1-minus" data-relation="copy" data-phase="1">−</span><span class="ams-proof-token ams-sem-lower" data-token-id="e2-a-one-b" data-from="e1-high" data-relation="copy" data-phase="1">1</span><span class="ams-proof-token ams-sem-lower" data-token-id="e2-a-lower-rest" data-from="e1-lower" data-relation="rewrite" data-phase="1">³/3</span><span class="ams-proof-token" data-token-id="e2-close-a" data-from="e1-close" data-relation="copy" data-phase="1">)</span>
+                <span class="ams-proof-token" data-token-id="e2-outer-minus" data-from="e1-minus" data-relation="copy" data-phase="2" data-cancel-out>−</span><span class="ams-proof-mobile-break"></span><span class="ams-bound-lower"><span class="ams-proof-token" data-token-id="e2-open-b" data-from="e1-open" data-relation="copy" data-phase="3" data-cancel-out>(</span><span class="ams-proof-token ams-sem-upper" data-token-id="e2-b-zero" data-from="e1-low" data-relation="copy" data-phase="3" data-cancel-out>0</span><span class="ams-proof-token ams-sem-upper" data-token-id="e2-b-upper-rest" data-from="e1-upper" data-relation="copy" data-phase="3" data-cancel-out>²/2</span><span class="ams-proof-token" data-token-id="e2-b-minus" data-from="e1-minus" data-relation="copy" data-phase="3" data-cancel-out>−</span><span class="ams-proof-token ams-sem-lower" data-token-id="e2-b-zero-b" data-from="e1-low" data-relation="copy" data-phase="3" data-cancel-out>0</span><span class="ams-proof-token ams-sem-lower" data-token-id="e2-b-lower-rest" data-from="e1-lower" data-relation="copy" data-phase="3" data-cancel-out>³/3</span><span class="ams-proof-token" data-token-id="e2-close-b" data-from="e1-close" data-relation="copy" data-phase="3" data-cancel-out>)</span></span>
+              </div>
+            </div>
+            <div class="ams-proof-step" data-cancel-phase="1">
+              <div class="ams-proof-reason">下限项为 0</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token" data-token-id="e3-s" data-from="e2-s">S</span><span class="ams-proof-token" data-token-id="e3-eq" data-from="e2-eq">=</span>
+                <span class="ams-proof-token ams-frac ams-sem-upper" data-token-id="e3-frac-a" data-from="e2-a-one e2-a-upper-rest" data-relation="merge" data-phase="2"><span>1</span><span>2</span></span>
+                <span class="ams-proof-token" data-token-id="e3-minus" data-from="e2-a-minus" data-phase="2">−</span>
+                <span class="ams-proof-token ams-frac ams-sem-lower" data-token-id="e3-frac-b" data-from="e2-a-one-b e2-a-lower-rest" data-relation="merge" data-phase="2"><span>1</span><span>3</span></span>
+              </div>
+            </div>
+            <div class="ams-proof-step">
+              <div class="ams-proof-reason">结果</div>
+              <div class="ams-proof-equation">
+                <span class="ams-proof-token" data-token-id="e4-s" data-from="e3-s">S</span><span class="ams-proof-token" data-token-id="e4-eq" data-from="e3-eq">=</span>
+                <span class="ams-proof-token ams-frac ams-sem-result" data-token-id="e4-frac" data-from="e3-frac-a e3-minus e3-frac-b" data-relation="merge" data-final-answer><span>1</span><span>6</span></span>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      <section class="ams-section">
+        <h2>得到一般形式</h2>
+        <p>如果在 <span class="ams-math">[a,b]</span> 上，<span class="ams-math ams-sem-upper">f(x)</span> 始终位于 <span class="ams-math ams-sem-lower">g(x)</span> 上方，那么：</p>
+        <p class="ams-formula ams-math">S = ∫<sub>a</sub><sup>b</sup>[<span class="ams-sem-upper">f(x)</span> − <span class="ams-sem-lower">g(x)</span>]dx</p>
+        <p>对 <span class="ams-math">x</span> 积分写“上减下”；积分上下限来自左右交点。</p>
+        <p class="ams-inline-note">上下关系在区间内交换时，必须在交换点分段。</p>
+      </section>
+
+      <section class="ams-section">
+        <h2>竖切与横切是同一块面积</h2>
+        <p id="ams-anchor-cut">竖切时，高度是 <span class="ams-math">x − x²</span>；横切时，同一区域的左边界是 <span class="ams-math">x = y</span>，右边界是 <span class="ams-math">x = √y</span>。</p>
+
+        <figure class="ams-demo ams-cut-demo" data-side="left" data-anchor="#ams-anchor-cut" data-auto-demo="cut" aria-label="同一区域中的竖切片收回后横切片生长">
+          <div class="ams-demo-actions"><button class="ams-replay" type="button" data-replay="cut">切换切法</button></div>
+          <svg class="ams-cut-svg" viewBox="0 0 520 255" role="img" aria-labelledby="ams-cut-title ams-cut-desc">
+            <title id="ams-cut-title">竖切与横切的几何对应</title>
+            <desc id="ams-cut-desc">红色竖切片和绿色横切片在同一区域中交替出现；两种切法得到同一面积。</desc>
+            <line class="ams-plot-grid" x1="60" y1="165" x2="470" y2="165"></line>
+            <line class="ams-plot-grid" x1="60" y1="110" x2="470" y2="110"></line>
+            <line class="ams-cut-axis" x1="48" y1="205" x2="482" y2="205"></line>
+            <line class="ams-cut-axis" x1="60" y1="216" x2="60" y2="30"></line>
+            <path class="ams-area-base" d="M 60 205 L 460 35 C 360 163 260 205 60 205 Z"></path>
+            <path class="ams-curve-upper" d="M 60 205 L 460 35"></path>
+            <path class="ams-curve-lower" d="M 60 205 C 260 205 360 163 460 35"></path>
+            <line class="ams-cut-vertical" x1="292" y1="106" x2="292" y2="148"></line>
+            <line class="ams-cut-horizontal" x1="228" y1="134" x2="319" y2="134"></line>
+          </svg>
+          <div class="ams-cut-formulas">
+            <span>竖切：S = ∫₀¹(x − x²)dx</span>
+            <span>横切：S = ∫₀¹(√y − y)dy</span>
+          </div>
+        </figure>
+
+        <p>切法不同，微元方向不同；被覆盖的几何区域没有改变，所以两式都等于 <span class="ams-math">1/6</span>。</p>
+      </section>
+
+      <section class="ams-section">
+        <h2>做题顺序</h2>
+        <p>求交点 → 选 <span class="ams-math">dx</span> 或 <span class="ams-math">dy</span> → 判断上下或左右 → 列式计算。</p>
+        <p>面积结果不会为负。出现负数通常说明“上减下”或“右减左”写反了，不应直接取绝对值掩盖错误。</p>
+      </section>
+
+      <section class="ams-section">
+        <h2>自测</h2>
+        <p>求 <span class="ams-math">y = 4 − x²</span> 与 <span class="ams-math">y = 0</span> 围成的面积。交点为 <span class="ams-math">x = −2，2</span>，正确列式是：</p>
+        <p class="ams-formula ams-math">S = ∫<sub>−2</sub><sup>2</sup>(4 − x²)dx</p>
+        <p class="ams-muted">答案：<span class="ams-math">32/3</span></p>
+      </section>
+
+      <section class="ams-section ams-summary">
+        <h2>小结</h2>
+        <p>对 <span class="ams-math">x</span> 积分：上减下。</p>
+        <p>对 <span class="ams-math">y</span> 积分：右减左。</p>
+      </section>
+      <footer class="ams-attribution">
+        演示编排改编自 <a href="https://github.com/3b1b/videos/tree/e1cd3ef171c1eb21fa7bc23511dc1e9a20fe4359" target="_blank" rel="noreferrer">3Blue1Brown videos</a>，按 <a href="https://github.com/3b1b/videos/blob/e1cd3ef171c1eb21fa7bc23511dc1e9a20fe4359/LICENSE.txt" target="_blank" rel="noreferrer">CC BY-NC-SA 4.0</a> 使用。
+      </footer>
+    </article>
+    <aside class="ams-demo-appendix" aria-label="本节演示"></aside>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById("axiom-motion-spine");
+      if (!root) return;
+      root.classList.add("ams-js");
+
+      const scroll = root.querySelector(".ams-scroll");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+      // 3b1b-style pacing: one mathematical action per beat, with a readable
+      // hold before the next state instead of making every token move at once.
+      const PROOF_TIMING = Object.freeze({
+        mapped: 900,
+        derived: 1100,
+        split: 650,
+        mergeSource: 650,
+        mergeTarget: 700,
+        cancel: 850,
+        reasonIn: 360,
+        tokenIn: 520,
+        tokenDelay: 120,
+        phaseGap: 200,
+        firstHold: 900,
+        stepHold: 1000,
+        finalHold: 1400,
+        answerPulse: 900
+      });
+      const DEMO_TIMING = Object.freeze({
+        linkedPulse: 820,
+        probeSweep: 4600,
+        rectMorph: 820,
+        rectFade: 720,
+        rectStagger: 70,
+        focusFirst: 1000,
+        focusNext: 650,
+        focusRelease: 340,
+        splitStagger: 34,
+        rectPulse: 560,
+        sigmaPulse: 1000,
+        riemannLead: 340,
+        riemannPause: 460,
+        splitPause: 500,
+        cutRetract: 560,
+        cutGrow: 760,
+        autoStart: 480
+      });
+      const article = root.querySelector(".ams-article");
+      const demoAppendix = root.querySelector(".ams-demo-appendix");
+      const sideDemos = [...root.querySelectorAll(".ams-demo[data-side][data-anchor]")];
+      const demoHomes = sideDemos.map((demo) => ({
+        demo,
+        parent: demo.parentNode,
+        next: demo.nextSibling
+      }));
+      let sideLayoutFrame = 0;
+      let observedRootWidth = 0;
+
+      const restoreDemosToTextAnchors = () => {
+        demoHomes.forEach(({ demo, parent, next }) => {
+          if (demo.parentNode === parent) return;
+          parent.insertBefore(demo, next);
+        });
+      };
+
+      const moveDemosToAppendix = () => {
+        sideDemos.forEach((demo) => demoAppendix.appendChild(demo));
+      };
+
+      const clearSideDemoStyles = () => {
+        sideDemos.forEach((demo) => {
+          demo.style.removeProperty("top");
+          demo.style.removeProperty("left");
+          demo.style.removeProperty("width");
+        });
+        scroll.style.removeProperty("min-height");
+      };
+
+      const layoutSideDemos = () => {
+        sideLayoutFrame = 0;
+        const rootWidth = root.getBoundingClientRect().width;
+        const useSideLayout = rootWidth >= 980;
+        root.classList.toggle("ams-side-layout", useSideLayout);
+        root.classList.toggle("ams-appendix-layout", !useSideLayout);
+
+        if (!useSideLayout) {
+          clearSideDemoStyles();
+          moveDemosToAppendix();
+          return;
+        }
+
+        restoreDemosToTextAnchors();
+
+        const articleRect = article.getBoundingClientRect();
+        const gap = 28;
+        const outerSpace = 8;
+        const railWidth = Math.floor(Math.min(286, (rootWidth - articleRect.width) / 2 - gap - outerSpace));
+        if (railWidth < 250) {
+          root.classList.remove("ams-side-layout");
+          root.classList.add("ams-appendix-layout");
+          clearSideDemoStyles();
+          moveDemosToAppendix();
+          return;
+        }
+
+        const lastBottom = { left: 0, right: 0 };
+        sideDemos.forEach((demo) => {
+          const side = demo.getAttribute("data-side") === "right" ? "right" : "left";
+          const anchor = root.querySelector(demo.getAttribute("data-anchor"));
+          if (!anchor) return;
+
+          demo.style.width = `${railWidth}px`;
+          demo.style.left = side === "left"
+            ? `${-(railWidth + gap)}px`
+            : `${articleRect.width + gap}px`;
+
+          const anchorTop = anchor.getBoundingClientRect().top - articleRect.top;
+          const top = Math.max(12, anchorTop - 8, lastBottom[side] + 36);
+          demo.style.top = `${Math.round(top)}px`;
+          lastBottom[side] = top + demo.getBoundingClientRect().height;
+        });
+
+        const furthestDemo = Math.max(lastBottom.left, lastBottom.right);
+        scroll.style.minHeight = `${Math.ceil(Math.max(article.offsetHeight, furthestDemo + 70))}px`;
+      };
+
+      const scheduleSideLayout = () => {
+        if (sideLayoutFrame) window.cancelAnimationFrame(sideLayoutFrame);
+        sideLayoutFrame = window.requestAnimationFrame(layoutSideDemos);
+      };
+
+      scheduleSideLayout();
+      window.addEventListener("resize", scheduleSideLayout, { passive: true });
+      if ("ResizeObserver" in window) {
+        const sideResizeObserver = new ResizeObserver((entries) => {
+          const nextWidth = Math.round(entries[0].contentRect.width);
+          if (nextWidth === observedRootWidth) return;
+          observedRootWidth = nextWidth;
+          scheduleSideLayout();
+        });
+        sideResizeObserver.observe(root);
+      }
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(scheduleSideLayout).catch(() => {});
+      }
+
+      const applyTheme = (theme) => {
+        const dark = theme === "dark";
+        root.setAttribute("data-tone", dark ? "dark" : "paper");
+        const surface = dark ? "#0b0f13" : "#ffffff";
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        document.documentElement.style.backgroundColor = surface;
+        document.body.style.backgroundColor = surface;
+        try { localStorage.setItem("axiom.scene.theme", theme); } catch {}
+      };
+
+      const storedTheme = (() => {
+        try { return localStorage.getItem("axiom.scene.theme") === "light" ? "light" : "dark"; }
+        catch { return "dark"; }
+      })();
+      applyTheme(storedTheme);
+
+      window.addEventListener("message", (event) => {
+        if (event.origin !== window.location.origin || event.source !== window.parent) return;
+        if (event.data?.type !== "axiom:set-scene-theme") return;
+        if (event.data.theme !== "dark" && event.data.theme !== "light") return;
+        applyTheme(event.data.theme);
+      });
+
+      /*
+       * Formula-part matching is adapted from 3Blue1Brown ManimGL's
+       * TransformMatchingParts / TransformMatchingStrings implementation.
+       * Source: manimlib/animation/transform_matching_parts.py
+       *
+       * MIT License
+       * Copyright (c) 2020-2023 3Blue1Brown LLC
+       *
+       * Permission is hereby granted, free of charge, to any person obtaining a copy
+       * of this software and associated documentation files (the "Software"), to deal
+       * in the Software without restriction, including without limitation the rights
+       * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       * copies of the Software, and to permit persons to whom the Software is
+       * furnished to do so, subject to the following conditions:
+       *
+       * The above copyright notice and this permission notice shall be included in all
+       * copies or substantial portions of the Software.
+       *
+       * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+       * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+       * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+       * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+       * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+       * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+       * SOFTWARE.
+       *
+       * The staged proof choreography additionally adapts scene structure from
+       * 3b1b/videos commit e1cd3ef171c1eb21fa7bc23511dc1e9a20fe4359:
+       * _2017/eoc/chapter8.py FundamentalTheorem.write_antiderivative and
+       * _2023/gauss_int/integral.py CylinderIntegral. Those scene structures are
+       * used under CC BY-NC-SA 4.0; the visible attribution is at the page end.
+       */
+      const proofToken = (step, id) => step.querySelector(`[data-token-id="${id}"]`);
+
+      const makeMatchGhost = (proof, sourceToken, extraClass = "") => {
+        const proofRect = proof.getBoundingClientRect();
+        const from = sourceToken.getBoundingClientRect();
+        const ghost = sourceToken.cloneNode(true);
+        ghost.removeAttribute("data-token-id");
+        ghost.removeAttribute("data-from");
+        ghost.classList.add("ams-match-ghost");
+        if (extraClass) ghost.classList.add(extraClass);
+        ghost.style.left = `${from.left - proofRect.left}px`;
+        ghost.style.top = `${from.top - proofRect.top}px`;
+        ghost.style.width = `${from.width}px`;
+        ghost.style.height = `${from.height}px`;
+        proof.appendChild(ghost);
+        return { ghost, from };
+      };
+
+      const relationCurve = (relation, index, total) => {
+        const centered = index - (total - 1) / 2;
+        if (relation === "copy" || relation === "split") return { x: centered * 18, y: -16 - Math.abs(centered) * 4 };
+        if (relation === "merge") return { x: centered * 14, y: 10 + Math.abs(centered) * 3 };
+        if (relation === "derive" || relation === "substitute") return { x: centered * 10, y: -12 };
+        if (relation === "rewrite") return { x: centered * 8, y: -7 };
+        return { x: centered * 6, y: 0 };
+      };
+
+      const matchedVisibilityLocks = new WeakMap();
+      const lockMatchedSource = (sourceToken) => {
+        let state = matchedVisibilityLocks.get(sourceToken);
+        if (!state) {
+          state = { count: 0, original: sourceToken.style.visibility };
+          matchedVisibilityLocks.set(sourceToken, state);
+        }
+        state.count += 1;
+        sourceToken.style.visibility = "hidden";
+        return () => {
+          state.count -= 1;
+          if (state.count <= 0) {
+            sourceToken.style.visibility = state.original;
+            matchedVisibilityLocks.delete(sourceToken);
+          }
+        };
+      };
+
+      const animateMappedToken = (proof, sourceToken, targetToken, relation, index, total, revealTarget) => {
+        const { ghost, from } = makeMatchGhost(proof, sourceToken);
+        const keepSource = relation === "copy";
+        const releaseSource = keepSource ? () => {} : lockMatchedSource(sourceToken);
+        const to = targetToken.getBoundingClientRect();
+        const dx = to.left - from.left;
+        const dy = to.top - from.top;
+        const curve = relationCurve(relation, index, total);
+        const morph = ["rewrite", "derive", "substitute", "merge"].includes(relation);
+        const duration = relation === "derive" || relation === "substitute"
+          ? PROOF_TIMING.derived
+          : PROOF_TIMING.mapped;
+
+        const ghostAnimation = ghost.animate([
+          { transform: "translate3d(0,0,0) scale(1)", opacity: keepSource ? 0.12 : 0.96 },
+          { transform: `translate3d(${dx * 0.12}px,${dy * 0.12}px,0) scale(1)`, opacity: 0.96, offset: 0.12 },
+          { transform: `translate3d(${dx * 0.52 + curve.x}px,${dy * 0.52 + curve.y}px,0) scale(${morph ? 1.04 : 1})`, opacity: 1, offset: 0.52 },
+          { transform: `translate3d(${dx}px,${dy}px,0) scale(${morph ? 0.9 : 1})`, opacity: 0 }
+        ], {
+          duration,
+          easing: "cubic-bezier(0.22,0.72,0.24,1)",
+          fill: "forwards"
+        });
+
+        const targetFinished = revealTarget
+          ? targetToken.animate([
+              { opacity: 0, transform: "scale(0.9)" },
+              { opacity: 0, transform: "scale(0.94)", offset: 0.55 },
+              { opacity: 1, transform: "scale(1)" }
+            ], {
+              duration,
+              easing: "cubic-bezier(0.22,0.72,0.24,1)",
+              fill: "forwards"
+            }).finished.catch(() => {})
+          : Promise.resolve();
+
+        return Promise.all([
+          ghostAnimation.finished.catch(() => {}),
+          targetFinished
+        ]).then(() => {
+          ghost.remove();
+          releaseSource();
+          targetToken.style.opacity = "1";
+          targetToken.style.transform = "";
+        });
+      };
+
+      const animateSplitToken = (sourceToken, targetToken, order, pulseSource) => {
+        const delay = Math.min(order * 46, 320);
+        const targetFinished = targetToken.animate([
+          { opacity: 0, transform: "translateY(4px) scale(0.94)" },
+          { opacity: 1, transform: "translateY(0) scale(1)" }
+        ], {
+          duration: PROOF_TIMING.split,
+          delay,
+          easing: "cubic-bezier(0.22,0.72,0.24,1)",
+          fill: "forwards"
+        }).finished.catch(() => {});
+        const sourceFinished = pulseSource ? sourceToken.animate([
+          { transform: "scale(1)", opacity: 1 },
+          { transform: "scale(1.06)", opacity: 1, offset: 0.5 },
+          { transform: "scale(1)", opacity: 0.72 }
+        ], { duration: PROOF_TIMING.split, easing: "ease-in-out" }).finished.catch(() => {}) : Promise.resolve();
+        return Promise.all([targetFinished, sourceFinished]).then(() => {
+          targetToken.style.opacity = "1";
+          targetToken.style.transform = "";
+        });
+      };
+
+      const animateMergeToken = (sourceTokens, targetToken, order) => {
+        const delay = Math.min(order * 40, 260);
+        const sourceFinished = sourceTokens.map((sourceToken, index) => sourceToken.animate([
+          { opacity: 0.56, transform: "scale(1)" },
+          { opacity: 1, transform: `scale(${index === 0 ? 1.06 : 1.035})`, offset: 0.48 },
+          { opacity: 0.62, transform: "scale(1)" }
+        ], {
+          duration: PROOF_TIMING.mergeSource,
+          delay: index * 40,
+          easing: "ease-in-out"
+        }).finished.catch(() => {}));
+        const targetFinished = targetToken.animate([
+          { opacity: 0, transform: "translateY(4px) scale(0.9)" },
+          { opacity: 0, transform: "translateY(3px) scale(0.94)", offset: 0.42 },
+          { opacity: 1, transform: "translateY(0) scale(1)" }
+        ], {
+          duration: PROOF_TIMING.mergeTarget,
+          delay,
+          easing: "cubic-bezier(0.22,0.72,0.24,1)",
+          fill: "forwards"
+        }).finished.catch(() => {});
+        return Promise.all([...sourceFinished, targetFinished]).then(() => {
+          targetToken.style.opacity = "1";
+          targetToken.style.transform = "";
+        });
+      };
+
+      const animateCancellation = (_proof, sourceToken) => {
+        sourceToken.classList.add("ams-cancel-ghost");
+        const animation = sourceToken.animate([
+          { opacity: 0.62, transform: "scale(1)", offset: 0 },
+          { opacity: 1, transform: "scale(1.04)", offset: 0.25 },
+          { opacity: 1, transform: "scale(1)", offset: 0.68 },
+          { opacity: 0.34, transform: "scale(0.9)" }
+        ], { duration: PROOF_TIMING.cancel, easing: "ease-out", fill: "forwards" });
+        return animation.finished.catch(() => {}).then(() => {
+          sourceToken.classList.remove("ams-cancel-ghost");
+          sourceToken.style.opacity = "";
+          sourceToken.style.transform = "";
+        });
+      };
+
+      const animateProofTransition = async (proof, sourceStep, targetStep) => {
+        const targetTokens = [...targetStep.querySelectorAll(".ams-proof-token")];
+        targetTokens.forEach((token) => { token.style.opacity = "0"; });
+        targetStep.classList.remove("is-pending");
+
+        const reason = targetStep.querySelector(".ams-proof-reason");
+        if (reason) {
+          await reason.animate([
+            { opacity: 0, transform: "translateY(4px)" },
+            { opacity: 1, transform: "translateY(0)" }
+          ], { duration: PROOF_TIMING.reasonIn, easing: "ease-out", fill: "forwards" }).finished.catch(() => {});
+        }
+
+        // Browser equivalent of Manim's AnimationGroup / LaggedStart:
+        // targets may declare data-phase so mathematical actions occur in order.
+        const phaseJobs = new Map();
+        const splitSources = new Set();
+        const addPhaseJob = (phaseValue, job) => {
+          const numericPhase = Number(phaseValue);
+          const phase = Number.isFinite(numericPhase) ? numericPhase : 0;
+          if (!phaseJobs.has(phase)) phaseJobs.set(phase, []);
+          phaseJobs.get(phase).push(job);
+        };
+
+        targetTokens.forEach((targetToken, targetOrder) => {
+          const sourceIds = (targetToken.getAttribute("data-from") || "").trim().split(/\s+/).filter(Boolean);
+          const relation = targetToken.getAttribute("data-relation") || (sourceIds.length > 1 ? "merge" : "match");
+          const phase = targetToken.getAttribute("data-phase") || "0";
+          if (sourceIds.length === 0) {
+            addPhaseJob(phase, () => {
+              const animation = targetToken.animate([
+                { opacity: 0, transform: "translateY(5px) scale(0.84)" },
+                { opacity: 1, transform: "translateY(0) scale(1)" }
+              ], { duration: PROOF_TIMING.tokenIn, delay: PROOF_TIMING.tokenDelay, easing: "cubic-bezier(0.22,0.72,0.24,1)", fill: "forwards" });
+              return animation.finished.catch(() => {}).then(() => { targetToken.style.opacity = "1"; });
+            });
+            return;
+          }
+
+          if (relation === "split" && sourceIds.length === 1) {
+            const sourceId = sourceIds[0];
+            const sourceToken = proofToken(sourceStep, sourceId);
+            if (sourceToken) {
+              const pulseSource = !splitSources.has(sourceId);
+              splitSources.add(sourceId);
+              addPhaseJob(phase, () => animateSplitToken(sourceToken, targetToken, targetOrder, pulseSource));
+            }
+            return;
+          }
+
+          if (relation === "merge" && sourceIds.length > 1) {
+            const sourceTokens = sourceIds.map((sourceId) => proofToken(sourceStep, sourceId)).filter(Boolean);
+            if (sourceTokens.length) {
+              addPhaseJob(phase, () => animateMergeToken(sourceTokens, targetToken, targetOrder));
+            }
+            return;
+          }
+
+          sourceIds.forEach((sourceId, index) => {
+            const sourceToken = proofToken(sourceStep, sourceId);
+            if (sourceToken) {
+              addPhaseJob(phase, () => animateMappedToken(proof, sourceToken, targetToken, relation, index, sourceIds.length, index === 0));
+            }
+          });
+        });
+
+        const cancellationPhase = targetStep.getAttribute("data-cancel-phase") || "0";
+        sourceStep.querySelectorAll("[data-cancel-out]").forEach((token) => {
+          addPhaseJob(cancellationPhase, () => animateCancellation(proof, token));
+        });
+
+        let activated = false;
+        for (const phase of [...phaseJobs.keys()].sort((a, b) => a - b)) {
+          await Promise.all(phaseJobs.get(phase).map((job) => job()));
+          if (!activated) {
+            targetStep.classList.add("is-active");
+            activated = true;
+          }
+          if (!reduceMotion && phaseJobs.size > 1) await wait(PROOF_TIMING.phaseGap);
+        }
+        if (!activated) targetStep.classList.add("is-active");
+        targetTokens.forEach((token) => {
+          token.style.opacity = "1";
+          token.style.transform = "";
+        });
+      };
+
+      const playProof = async (proof) => {
+        if (!proof) return;
+        const steps = [...proof.querySelectorAll(":scope > .ams-proof-step")];
+        if (steps.length < 2) return;
+        const run = Number(proof.dataset.run || 0) + 1;
+        proof.dataset.run = String(run);
+        if (typeof proof.getAnimations === "function") {
+          proof.getAnimations({ subtree: true }).forEach((animation) => animation.cancel());
+        }
+        proof.querySelectorAll(".ams-match-ghost").forEach((ghost) => ghost.remove());
+
+        steps.forEach((step, index) => {
+          step.classList.remove("is-active", "is-resolved", "is-pending");
+          step.querySelectorAll(".ams-proof-token").forEach((token) => {
+            token.style.opacity = "";
+            token.style.transform = "";
+          });
+          if (index > 0) step.classList.add("is-pending");
+        });
+
+        if (reduceMotion) {
+          steps.forEach((step) => step.classList.remove("is-pending", "is-active", "is-resolved"));
+          return;
+        }
+
+        proof.classList.add("ams-is-playing");
+        steps[0].classList.add("is-active");
+        await wait(PROOF_TIMING.firstHold);
+
+        for (let index = 1; index < steps.length; index += 1) {
+          if (Number(proof.dataset.run) !== run) return;
+          const source = steps[index - 1];
+          const target = steps[index];
+          source.classList.remove("is-active");
+          source.classList.add("is-resolved");
+          await animateProofTransition(proof, source, target);
+          await wait(index === steps.length - 1 ? PROOF_TIMING.finalHold : PROOF_TIMING.stepHold);
+        }
+
+        if (Number(proof.dataset.run) === run) {
+          const finalAnswer = steps[steps.length - 1].querySelector("[data-final-answer]");
+          if (finalAnswer) {
+            await finalAnswer.animate([
+              { transform: "scale(1)" },
+              { transform: "scale(1.14)", offset: 0.5 },
+              { transform: "scale(1)" }
+            ], { duration: PROOF_TIMING.answerPulse, easing: "ease-in-out" }).finished.catch(() => {});
+          }
+          proof.classList.remove("ams-is-playing");
+          steps.forEach((step) => step.classList.remove("is-pending", "is-active", "is-resolved"));
+        }
+      };
+
+      const intersectionDemo = root.querySelector(".ams-intersection-demo");
+      const evaluationDemo = root.querySelector(".ams-evaluation-demo");
+
+      const plot = root.querySelector(".ams-probe-svg");
+      const areaBase = root.querySelector(".ams-probe-demo .ams-area-base");
+      const areaProgress = root.querySelector(".ams-area-progress");
+      const upperPath = root.querySelector(".ams-probe-demo .ams-curve-upper");
+      const lowerPath = root.querySelector(".ams-probe-demo .ams-curve-lower");
+      const probeBand = root.querySelector(".ams-probe-band");
+      const probeUpper = root.querySelector(".ams-probe-point.is-upper");
+      const probeLower = root.querySelector(".ams-probe-point.is-lower");
+      const heightBracket = root.querySelector(".ams-bracket-height");
+      const widthBracket = root.querySelector(".ams-bracket-width");
+      const heightLabel = root.querySelector(".ams-plot-label-height");
+      const widthLabel = root.querySelector(".ams-plot-label-width");
+      const liveX = root.querySelector("[data-live-x]");
+      const liveUpper = root.querySelector("[data-live-upper]");
+      const liveLower = root.querySelector("[data-live-lower]");
+      const liveHeight = root.querySelector("[data-live-height]");
+      const microArea = root.querySelector("[data-micro-area]");
+      const microHeight = root.querySelector("[data-micro-height]");
+      const microWidth = root.querySelector("[data-micro-width]");
+
+      const plotPoint = (x, y, baseY = 230, height = 180) => ({
+        x: 60 + x * 400,
+        y: baseY - y * height
+      });
+
+      const curvePath = (fn, baseY = 230, height = 180) => {
+        const points = [];
+        for (let index = 0; index <= 100; index += 1) {
+          const x = index / 100;
+          const point = plotPoint(x, fn(x), baseY, height);
+          points.push(`${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`);
+        }
+        return points.join(" ");
+      };
+
+      const regionPath = (endX = 1, baseY = 230, height = 180) => {
+        const samples = Math.max(4, Math.ceil(endX * 100));
+        const points = [];
+        for (let index = 0; index <= samples; index += 1) {
+          const x = endX * index / samples;
+          points.push(plotPoint(x, x, baseY, height));
+        }
+        for (let index = samples; index >= 0; index -= 1) {
+          const x = endX * index / samples;
+          points.push(plotPoint(x, x * x, baseY, height));
+        }
+        return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ") + " Z";
+      };
+
+      upperPath.setAttribute("d", curvePath((x) => x));
+      lowerPath.setAttribute("d", curvePath((x) => x * x));
+      areaBase.setAttribute("d", regionPath());
+
+      // Adapted from 3b1b/videos _2017/eoc/chapter1.py:
+      // AreaUnderParabola.move_right_point_to and PlayingTowardsDADX.describe_sliver
+      // (CC BY-NC-SA 4.0), with a pointer-driven browser ValueTracker equivalent.
+      let probeX = 0.45;
+      let probeRun = 0;
+      let probeDragging = false;
+
+      const updateProbe = (value) => {
+        probeX = clamp(value, 0.06, 0.94);
+        const upper = plotPoint(probeX, probeX);
+        const lower = plotPoint(probeX, probeX * probeX);
+        const halfWidth = 4.2;
+        const labelOnLeft = probeX > 0.72;
+        const bracketX = upper.x + (labelOnLeft ? -14 : 14);
+        const labelX = labelOnLeft ? bracketX - 24 : bracketX + 8;
+        const labelY = clamp((upper.y + lower.y) / 2 + 7, 42, 220);
+        const widthY = 242;
+        const plotRect = plot.getBoundingClientRect();
+        const screenHeight = Math.abs(lower.y - upper.y) * (plotRect.height / 285);
+        const showHeightAnnotation = screenHeight >= 24;
+
+        probeBand.setAttribute("d", `M ${upper.x - halfWidth} ${upper.y} L ${upper.x + halfWidth} ${upper.y} L ${lower.x + halfWidth} ${lower.y} L ${lower.x - halfWidth} ${lower.y} Z`);
+        probeUpper.setAttribute("cx", upper.x.toFixed(2));
+        probeUpper.setAttribute("cy", upper.y.toFixed(2));
+        probeLower.setAttribute("cx", lower.x.toFixed(2));
+        probeLower.setAttribute("cy", lower.y.toFixed(2));
+        heightBracket.setAttribute("d", `M ${bracketX - 4} ${upper.y} h 8 M ${bracketX} ${upper.y} V ${lower.y} M ${bracketX - 4} ${lower.y} h 8`);
+        heightBracket.style.opacity = showHeightAnnotation ? "1" : "0";
+        widthBracket.setAttribute("d", `M ${upper.x - halfWidth} ${widthY - 3} v 6 M ${upper.x - halfWidth} ${widthY} H ${upper.x + halfWidth} M ${upper.x + halfWidth} ${widthY - 3} v 6`);
+        heightLabel.setAttribute("x", labelX.toFixed(2));
+        heightLabel.setAttribute("y", labelY.toFixed(2));
+        heightLabel.style.opacity = showHeightAnnotation ? "1" : "0";
+        widthLabel.setAttribute("x", (upper.x - 9).toFixed(2));
+        widthLabel.setAttribute("y", "276");
+        areaProgress.setAttribute("d", regionPath(probeX));
+
+        const lowerValue = probeX * probeX;
+        const heightValue = probeX - lowerValue;
+        liveX.textContent = probeX.toFixed(2);
+        liveUpper.textContent = probeX.toFixed(2);
+        liveLower.textContent = lowerValue.toFixed(2);
+        liveHeight.textContent = heightValue.toFixed(2);
+      };
+
+      const easeInOut = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+      const pulseLinkedObjects = (elements) => Promise.all(elements.filter(Boolean).map((element) => (
+        element.animate([
+          { opacity: 0.34 },
+          { opacity: 1, offset: 0.34 },
+          { opacity: 0.66, offset: 0.68 },
+          { opacity: 1 }
+        ], { duration: DEMO_TIMING.linkedPulse, easing: "ease-in-out" }).finished.catch(() => {})
+      )));
+
+      const playProbe = async () => {
+        const run = ++probeRun;
+        if (reduceMotion) {
+          updateProbe(0.72);
+          return;
+        }
+        updateProbe(0.45);
+        await pulseLinkedObjects([microArea, probeBand]);
+        if (run !== probeRun) return;
+        await pulseLinkedObjects([heightBracket, heightLabel, microHeight]);
+        if (run !== probeRun) return;
+        await pulseLinkedObjects([widthBracket, widthLabel, microWidth]);
+        if (run !== probeRun) return;
+        const started = performance.now();
+        const duration = DEMO_TIMING.probeSweep;
+        const from = 0.08;
+        const to = 0.92;
+
+        const frame = (now) => {
+          if (run !== probeRun) return;
+          const t = clamp((now - started) / duration, 0, 1);
+          updateProbe(from + (to - from) * easeInOut(t));
+          if (t < 1) window.requestAnimationFrame(frame);
+        };
+        window.requestAnimationFrame(frame);
+      };
+
+      const eventToProbeX = (event) => {
+        const rect = plot.getBoundingClientRect();
+        const svgX = (event.clientX - rect.left) / rect.width * 520;
+        return (svgX - 60) / 400;
+      };
+
+      plot.addEventListener("pointerdown", (event) => {
+        probeRun += 1;
+        probeDragging = true;
+        plot.setPointerCapture(event.pointerId);
+        updateProbe(eventToProbeX(event));
+      });
+
+      plot.addEventListener("pointermove", (event) => {
+        if (!probeDragging) return;
+        updateProbe(eventToProbeX(event));
+      });
+
+      const stopProbeDrag = (event) => {
+        if (!probeDragging) return;
+        probeDragging = false;
+        if (plot.hasPointerCapture(event.pointerId)) plot.releasePointerCapture(event.pointerId);
+      };
+
+      plot.addEventListener("pointerup", stopProbeDrag);
+      plot.addEventListener("pointercancel", stopProbeDrag);
+      updateProbe(probeX);
+
+      const riemannDemo = root.querySelector(".ams-riemann-demo");
+      const riemannSvg = root.querySelector(".ams-riemann-svg");
+      const rectLayer = root.querySelector(".ams-riemann-rects");
+      const riemannCount = root.querySelector(".ams-riemann-count");
+      const riemannFocus = root.querySelector(".ams-riemann-focus");
+      const riemannHeightBrace = root.querySelector(".ams-riemann-brace-height");
+      const riemannWidthBrace = root.querySelector(".ams-riemann-brace-width");
+      const riemannHeightLabel = root.querySelector(".ams-riemann-height-label");
+      const riemannWidthLabel = root.querySelector(".ams-riemann-width-label");
+      const riemannUpper = root.querySelector(".ams-riemann-demo .ams-curve-upper");
+      const riemannLower = root.querySelector(".ams-riemann-demo .ams-curve-lower");
+      const riemannArea = root.querySelector(".ams-riemann-demo .ams-area-base");
+      const riemannFormulas = root.querySelector(".ams-riemann-formulas");
+      let riemannRects = [];
+      let riemannRun = 0;
+
+      const riemannPoint = (x, y) => ({ x: 60 + x * 400, y: 205 - y * 170 });
+      const rectGeometry = (a, b) => {
+        const mid = (a + b) / 2;
+        const upper = riemannPoint(mid, mid);
+        const lower = riemannPoint(mid, mid * mid);
+        return {
+          x: 60 + a * 400,
+          y: upper.y,
+          width: (b - a) * 400,
+          height: Math.max(1, lower.y - upper.y)
+        };
+      };
+
+      const writeRectGeometry = (element, geometry) => {
+        element.setAttribute("x", geometry.x.toFixed(2));
+        element.setAttribute("y", geometry.y.toFixed(2));
+        element.setAttribute("width", geometry.width.toFixed(2));
+        element.setAttribute("height", geometry.height.toFixed(2));
+      };
+
+      const animateRectGeometry = (element, from, to, duration = DEMO_TIMING.rectMorph) => new Promise((resolve) => {
+        if (reduceMotion) {
+          writeRectGeometry(element, to);
+          resolve();
+          return;
+        }
+        const started = performance.now();
+        const frame = (now) => {
+          const t = clamp((now - started) / duration, 0, 1);
+          const e = easeInOut(t);
+          writeRectGeometry(element, {
+            x: from.x + (to.x - from.x) * e,
+            y: from.y + (to.y - from.y) * e,
+            width: from.width + (to.width - from.width) * e,
+            height: from.height + (to.height - from.height) * e
+          });
+          if (t < 1) window.requestAnimationFrame(frame);
+          else resolve();
+        };
+        window.requestAnimationFrame(frame);
+      });
+
+      /*
+       * Scene choreography in this Riemann sequence is adapted from the
+       * 3Blue1Brown videos repository, commit e1cd3ef171c1eb21fa7bc23511dc1e9a20fe4359:
+       *   _2017/eoc/chapter8.py, FundamentalTheorem.show_f_dx_sum
+       *   _2017/eoc/chapter8.py, FundamentalTheorem.show_rects_approaching_area
+       *   _2017/eoc/chapter1.py, AreaUnderParabola.show_area
+       * Original scene code: Copyright 3Blue1Brown, CC BY-NC-SA 4.0.
+       * Changes: responsive SVG geometry, two-curve strips, pointer-safe replay,
+       * reduced-motion fallback, and static text-first presentation.
+       */
+      const resetRiemann = (count = 8, flat = false) => {
+        rectLayer.replaceChildren();
+        riemannRects = [];
+        for (let index = 0; index < count; index += 1) {
+          const a = index / count;
+          const b = (index + 1) / count;
+          const element = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          element.setAttribute("class", "ams-riemann-rect");
+          const target = rectGeometry(a, b);
+          writeRectGeometry(element, flat ? {
+            x: target.x,
+            y: target.y + target.height,
+            width: target.width,
+            height: 0.6
+          } : target);
+          element.style.opacity = flat ? "0.16" : "1";
+          rectLayer.appendChild(element);
+          riemannRects.push({ element, a, b });
+        }
+        riemannCount.textContent = `${count} 条`;
+      };
+
+      const riseRiemannRects = async (run) => {
+        await Promise.all(riemannRects.map(async (item, index) => {
+          if (!reduceMotion) await wait(index * DEMO_TIMING.rectStagger);
+          if (run !== riemannRun) return;
+          const target = rectGeometry(item.a, item.b);
+          const flat = {
+            x: target.x,
+            y: target.y + target.height,
+            width: target.width,
+            height: 0.6
+          };
+          const fade = item.element.animate([
+            { opacity: 0.16 },
+            { opacity: 1 }
+          ], { duration: DEMO_TIMING.rectFade, easing: "cubic-bezier(0.22,0.72,0.24,1)", fill: "forwards" });
+          await Promise.all([
+            animateRectGeometry(item.element, flat, target),
+            fade.finished.catch(() => {})
+          ]);
+          item.element.style.opacity = "1";
+        }));
+      };
+
+      const setRiemannFocus = (index) => {
+        const item = riemannRects[index];
+        if (!item) return;
+        const geometry = rectGeometry(item.a, item.b);
+        riemannRects.forEach((candidate, candidateIndex) => {
+          candidate.element.classList.toggle("is-focused", candidateIndex === index);
+          candidate.element.classList.toggle("is-muted", candidateIndex !== index);
+        });
+
+        const braceX = geometry.x + geometry.width + 7;
+        const lowerY = geometry.y + geometry.height;
+        const widthY = 216;
+        riemannHeightBrace.setAttribute("d", `M ${braceX - 4} ${geometry.y} h 8 M ${braceX} ${geometry.y} V ${lowerY} M ${braceX - 4} ${lowerY} h 8`);
+        riemannWidthBrace.setAttribute("d", `M ${geometry.x} ${widthY - 3} v 6 M ${geometry.x} ${widthY} H ${geometry.x + geometry.width} M ${geometry.x + geometry.width} ${widthY - 3} v 6`);
+        riemannHeightLabel.setAttribute("x", clamp(geometry.x, 70, 330).toFixed(2));
+        riemannHeightLabel.setAttribute("y", clamp(geometry.y - 12, 38, 185).toFixed(2));
+        riemannWidthLabel.setAttribute("x", (geometry.x + geometry.width / 2 - 10).toFixed(2));
+        riemannWidthLabel.setAttribute("y", "240");
+        riemannFocus.classList.add("is-visible");
+      };
+
+      const clearRiemannFocus = () => {
+        riemannFocus.classList.remove("is-visible");
+        riemannRects.forEach((item) => item.element.classList.remove("is-focused", "is-muted"));
+      };
+
+      const scanRiemannRects = async (run) => {
+        if (reduceMotion) return;
+        for (const index of [1, 2, 3, 4, 5]) {
+          if (run !== riemannRun) return;
+          setRiemannFocus(index);
+          await wait(index === 1 ? DEMO_TIMING.focusFirst : DEMO_TIMING.focusNext);
+        }
+        clearRiemannFocus();
+        await wait(DEMO_TIMING.focusRelease);
+      };
+
+      const splitRiemann = async () => {
+        const next = [];
+        const animations = [];
+        riemannRects.forEach((item, itemIndex) => {
+          const mid = (item.a + item.b) / 2;
+          const sourceGeometry = rectGeometry(item.a, item.b);
+          const clone = item.element.cloneNode(false);
+          writeRectGeometry(clone, sourceGeometry);
+          rectLayer.appendChild(clone);
+          const left = { element: item.element, a: item.a, b: mid };
+          const right = { element: clone, a: mid, b: item.b };
+          next.push(left, right);
+          animations.push((async () => {
+            if (!reduceMotion) await wait(itemIndex * DEMO_TIMING.splitStagger);
+            await Promise.all([
+              animateRectGeometry(left.element, sourceGeometry, rectGeometry(left.a, left.b)),
+              animateRectGeometry(right.element, sourceGeometry, rectGeometry(right.a, right.b))
+            ]);
+          })());
+        });
+        riemannRects = next;
+        await Promise.all(animations);
+        riemannRects.forEach((item) => {
+          item.element.style.strokeWidth = riemannRects.length >= 32 ? "0.55px" : "0.8px";
+        });
+        riemannCount.textContent = `${riemannRects.length} 条`;
+      };
+
+      const linkRiemannRectsToSum = async (run) => {
+        if (reduceMotion || run !== riemannRun) return;
+        const sigma = proofToken(riemannFormulas.querySelector(".ams-proof-step"), "r0-sum");
+        const pulses = riemannRects.map(async (item, index) => {
+          await wait(index * DEMO_TIMING.splitStagger);
+          if (run !== riemannRun) return;
+          await item.element.animate([
+            { transform: "translateY(0)" },
+            { transform: "translateY(-5px)", offset: 0.48 },
+            { transform: "translateY(0)" }
+          ], { duration: DEMO_TIMING.rectPulse, easing: "ease-in-out" }).finished.catch(() => {});
+        });
+        const sigmaPulse = sigma ? sigma.animate([
+          { transform: "scale(1)" },
+          { transform: "scale(1.18)", offset: 0.55 },
+          { transform: "scale(1)" }
+        ], { duration: DEMO_TIMING.sigmaPulse, delay: PROOF_TIMING.phaseGap, easing: "ease-in-out" }).finished.catch(() => {}) : Promise.resolve();
+        await Promise.all([...pulses, sigmaPulse]);
+      };
+
+      const playRiemann = async () => {
+        if (riemannDemo.dataset.playing === "true") return;
+        const run = ++riemannRun;
+        riemannDemo.dataset.playing = "true";
+        clearRiemannFocus();
+        resetRiemann(8, !reduceMotion);
+        if (!reduceMotion) {
+          await wait(DEMO_TIMING.riemannLead);
+          await riseRiemannRects(run);
+          await wait(DEMO_TIMING.riemannPause);
+          await scanRiemannRects(run);
+        }
+        for (let count = 0; count < 2; count += 1) {
+          if (run !== riemannRun) break;
+          await splitRiemann();
+          if (!reduceMotion) await wait(DEMO_TIMING.splitPause);
+        }
+        if (run === riemannRun) {
+          await linkRiemannRectsToSum(run);
+          await playProof(riemannFormulas);
+        }
+        clearRiemannFocus();
+        riemannDemo.dataset.playing = "false";
+      };
+
+      riemannUpper.setAttribute("d", curvePath((x) => x, 205, 170));
+      riemannLower.setAttribute("d", curvePath((x) => x * x, 205, 170));
+      riemannArea.setAttribute("d", regionPath(1, 205, 170));
+      resetRiemann(reduceMotion ? 32 : 8);
+
+      const cutDemo = root.querySelector(".ams-cut-demo");
+      const cutVertical = root.querySelector(".ams-cut-vertical");
+      const cutHorizontal = root.querySelector(".ams-cut-horizontal");
+      const cutUpper = root.querySelector(".ams-cut-demo .ams-curve-upper");
+      const cutLower = root.querySelector(".ams-cut-demo .ams-curve-lower");
+      const cutArea = root.querySelector(".ams-cut-demo .ams-area-base");
+      let cutMode = "vertical";
+      let cutPlaying = false;
+
+      cutUpper.setAttribute("d", curvePath((x) => x, 205, 170));
+      cutLower.setAttribute("d", curvePath((x) => x * x, 205, 170));
+      cutArea.setAttribute("d", regionPath(1, 205, 170));
+
+      const animateCut = async (nextMode) => {
+        if (cutPlaying) return;
+        cutPlaying = true;
+        const from = cutMode === "vertical" ? cutVertical : cutHorizontal;
+        const to = nextMode === "vertical" ? cutVertical : cutHorizontal;
+        const fromScale = cutMode === "vertical" ? "scaleY" : "scaleX";
+        const toScale = nextMode === "vertical" ? "scaleY" : "scaleX";
+
+        if (!reduceMotion) {
+          const retract = from.animate([
+            { transform: `${fromScale}(1)`, opacity: 1 },
+            { transform: `${fromScale}(0)`, opacity: 0.15 }
+          ], { duration: DEMO_TIMING.cutRetract, easing: "ease-in", fill: "forwards" });
+          await retract.finished.catch(() => {});
+        }
+
+        from.style.opacity = "0";
+        from.style.transform = `${fromScale}(0)`;
+        to.style.opacity = "1";
+        to.style.transform = `${toScale}(1)`;
+
+        if (!reduceMotion) {
+          const grow = to.animate([
+            { transform: `${toScale}(0)`, opacity: 0.2 },
+            { transform: `${toScale}(1)`, opacity: 1 }
+          ], { duration: DEMO_TIMING.cutGrow, easing: "cubic-bezier(0.25, 0.72, 0.25, 1)", fill: "forwards" });
+          await grow.finished.catch(() => {});
+        }
+
+        cutMode = nextMode;
+        cutPlaying = false;
+      };
+
+      const playCut = async () => {
+        const next = cutMode === "vertical" ? "horizontal" : "vertical";
+        await animateCut(next);
+      };
+
+      const demos = {
+        intersection: () => playProof(intersectionDemo.querySelector(".ams-proof")),
+        probe: playProbe,
+        riemann: playRiemann,
+        evaluation: () => playProof(evaluationDemo.querySelector(".ams-proof")),
+        cut: playCut
+      };
+
+      root.querySelectorAll("[data-replay]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const name = button.getAttribute("data-replay");
+          if (demos[name]) demos[name]();
+        });
+      });
+
+      if (!reduceMotion && "IntersectionObserver" in window) {
+        const timers = new WeakMap();
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting || entry.intersectionRatio < 0.35 || entry.target.dataset.played === "true") {
+              const existing = timers.get(entry.target);
+              if (existing) window.clearTimeout(existing);
+              return;
+            }
+            const timer = window.setTimeout(() => {
+              if (entry.target.dataset.played === "true") return;
+              entry.target.dataset.played = "true";
+              const name = entry.target.getAttribute("data-auto-demo");
+              if (demos[name]) demos[name]();
+              observer.unobserve(entry.target);
+            }, DEMO_TIMING.autoStart);
+            timers.set(entry.target, timer);
+          });
+        }, { root: null, threshold: [0.35] });
+
+        root.querySelectorAll("[data-auto-demo]").forEach((demo) => observer.observe(demo));
+      }
+    })();
+  </script>
+</section>

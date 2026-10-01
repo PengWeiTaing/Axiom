@@ -138,6 +138,6 @@ export interface LayoutUpdate {
 export interface ApiResponse<T> {
   ok: boolean
   data?: T
-  error?: string
+  error?: string | { code?: string; message?: string }
   code?: string
 }
