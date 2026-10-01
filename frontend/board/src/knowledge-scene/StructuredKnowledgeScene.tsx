@@ -3,6 +3,9 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import type { KnowledgeSceneManifest } from '../api/endpoints'
 import { safeEval } from '../widgets/FunctionVizWidget'
+import ComputedIntegralPractice from '../learning/ComputedIntegralPractice'
+import { ComputedPracticeProvider } from '../learning/ComputedPracticeSession'
+import { getComputedIntegralLesson } from '../learning/computedIntegral'
 import { ConstrainedExtremum2D, type ConstrainedExtremumData } from './ConstrainedExtremum2D'
 import { ConstraintGeometry, type ConstraintGeometryData } from './ConstraintGeometry'
 import {
@@ -622,7 +625,7 @@ function DemoPrimitive({ demo }: { demo: SceneDemonstration }) {
     case 'probability_bars':
       return <ProbabilityBars data={data as unknown as { bars: Array<{ label: string; value: number }> }} />
     case 'riemann_sum':
-      return <RiemannSum data={data as unknown as RiemannSumData} semanticId={demo.id} semanticIds={demo.semantic_ids} />
+      return <RiemannSum data={data as unknown as RiemannSumData} semanticId={demo.id} semanticIds={demo.semantic_ids} domainLabels={getComputedIntegralLesson(demo)?.source.domain_labels} />
     case 'timeline':
       return <SequenceDiagram timeline items={(data.items ?? []) as SequenceItem[]} />
     case 'process':
@@ -679,6 +682,7 @@ function Demonstration({ demo, companion = false }: { demo: SceneDemonstration; 
   }, [allowedSemanticIds, semantic.activeSemanticIds])
 
   const primitive = <DemoPrimitive demo={demo} />
+  const practice = getComputedIntegralLesson(demo)
   return (
     <figure
       ref={figureRef}
@@ -688,7 +692,7 @@ function Demonstration({ demo, companion = false }: { demo: SceneDemonstration; 
       {...semantic.semanticProps}
     >
       <figcaption>{demo.title}</figcaption>
-      {demo.prediction
+      {practice ? <ComputedIntegralPractice lesson={practice}>{primitive}</ComputedIntegralPractice> : demo.prediction
         ? <PredictionFrame prediction={demo.prediction}>{primitive}</PredictionFrame>
         : primitive}
     </figure>
@@ -755,6 +759,7 @@ export default function StructuredKnowledgeScene({
   if (!content) return null
 
   return (
+    <ComputedPracticeProvider key={scene.scene_id}>
     <SceneRuntimeProvider key={scene.scene_id}>
     <article
       ref={sceneRootRef}
@@ -797,5 +802,6 @@ export default function StructuredKnowledgeScene({
       </section>
     </article>
     </SceneRuntimeProvider>
+    </ComputedPracticeProvider>
   )
 }

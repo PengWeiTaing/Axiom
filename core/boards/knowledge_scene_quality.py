@@ -16,8 +16,12 @@ import math
 import re
 from typing import Any
 
+from core.boards.knowledge_claims import (
+    NUMBER, is_affirmed_claim, polynomial_coefficients, polynomial_derivative,
+    scalar_value,
+)
 
-QUALITY_GATE_VERSION = "1.7"
+QUALITY_GATE_VERSION = "1.8"
 
 _PLACEHOLDER_RE = re.compile(
     r"(?:\bTODO\b|\bTBD\b|lorem ipsum|待补充|内容略|此处省略|示意内容|"
@@ -989,13 +993,15 @@ _SAFE_EXPRESSION_NAMES = {"x", "pi", "e", *_SAFE_EXPRESSION_FUNCTIONS}
 
 
 def _bound_value(raw: str) -> float | None:
-    token = raw.strip().replace("\\pi", "pi").replace("π", "pi")
+    token = raw.strip().replace("\\pi", "pi").replace("π", "pi").replace("−", "-")
     token = token.replace("{", "").replace("}", "").replace(" ", "")
+    if token.startswith(("*", "+*", "-*")):
+        return None
     if token in {"pi", "+pi"}:
         return math.pi
     if token == "-pi":
         return -math.pi
-    match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)?\*?pi(?:/([1-9]\d*))?", token)
+    match = re.fullmatch(r"([+-]?(?:\d+(?:\.\d+)?)?)\*?pi(?:/([1-9]\d*))?", token)
     if match:
         coefficient = float(match.group(1)) if match.group(1) not in (None, "", "+", "-") else (-1.0 if match.group(1) == "-" else 1.0)
         divisor = float(match.group(2) or 1)
@@ -1012,6 +1018,7 @@ def _normalized_simple_expression(raw: str) -> tuple[str, ast.Expression] | None
         "\\sin": "sin", "\\cos": "cos", "\\tan": "tan",
         "\\sqrt": "sqrt", "\\exp": "exp", "\\log": "log",
         "\\pi": "pi", "π": "pi", "²": "^2", "³": "^3",
+        "−": "-",
         "·": "*", "\\cdot": "*", "\\left": "", "\\right": "",
         "{": "(", "}": ")", " ": "",
     }
@@ -1063,17 +1070,26 @@ def _normalize_integral_notation(value: str) -> str:
     )
 
 
-def parse_simple_integral_source(goal: str) -> tuple[str, float, float] | None:
-    """Return a renderer-safe expression and bounds for an explicit integral."""
-    match = _INTEGRAL_RE.search(_normalize_integral_notation(goal))
-    if not match:
+def parse_simple_integral_source_details(
+    goal: str, *, require_single: bool = False,
+) -> tuple[str, float, float, str, str] | None:
+    """Preserve written bounds; numeric pi proximity is not exact provenance."""
+    matches = list(_INTEGRAL_RE.finditer(_normalize_integral_notation(goal)))
+    if not matches or (require_single and len(matches) != 1):
         return None
+    match = matches[0]
     lower = _bound_value(match.group(1))
     upper = _bound_value(match.group(2))
     normalized = _normalized_simple_expression(match.group(3))
-    if lower is None or upper is None or normalized is None or lower >= upper:
+    if lower is None or upper is None or normalized is None or not math.isfinite(lower) or not math.isfinite(upper) or lower >= upper:
         return None
-    return normalized[0], lower, upper
+    return normalized[0], lower, upper, match.group(1), match.group(2)
+
+
+def parse_simple_integral_source(goal: str) -> tuple[str, float, float] | None:
+    """Return a renderer-safe expression and numeric bounds for rendering."""
+    parsed = parse_simple_integral_source_details(goal)
+    return parsed[:3] if parsed is not None else None
 
 
 def parse_simple_integral(goal: str) -> tuple[str, float, float] | None:
@@ -1086,6 +1102,25 @@ def parse_simple_integral(goal: str) -> tuple[str, float, float] | None:
     if expression is None:
         return None
     return expression, lower, upper
+
+
+def explicit_integral_claims_match(
+    text: str, expression: str, lower: float, upper: float,
+) -> bool | None:
+    """Check every concrete integral our restricted parser recognizes.
+
+    None means no checkable claim, not agreement. Symbolic/general formulas
+    are not concrete claims. Different subinterval integrals are conservative
+    conflicts here: automatic repair must not guess which one is the main task.
+    """
+    claims = [
+        parsed for match in _INTEGRAL_RE.finditer(_normalize_integral_notation(text))
+        if (parsed := parse_simple_integral(match.group(0))) is not None
+    ]
+    if not claims:
+        return None
+    expected = (_expression_fingerprint(expression), lower, upper)
+    return all(claim == expected for claim in claims)
 
 
 def _evaluate_simple_expression_node(node: ast.AST, x: float) -> float:
@@ -1165,6 +1200,96 @@ def _demo_matches_integral(demo: dict[str, Any], expected: tuple[str, float, flo
     )
 
 
+_NEWTON_TREND_CONTRADICTIONS = (
+    re.compile(
+        r"(?:合外力|合力)(?:的大小)?(?:保持|维持)?(?:不变|一定|恒定|固定)"
+        r"[^。；;！？?\n]{0,36}?质量(?:越大|增大|增加)"
+        r"[^。；;！？?\n]{0,18}?加速度(?:的大小)?(?:也|就|反而|会|随之)?(?:越大|增大|增加)"
+    ),
+    re.compile(
+        r"(?:合外力|合力)(?:的大小)?(?:保持|维持)?(?:不变|一定|恒定|固定)"
+        r"[^。；;！？?\n]{0,36}?(?:加速度与质量|加速度和质量|质量与加速度|质量和加速度)"
+        r"(?:之间)?(?:成|呈)(?:正比|正相关)"
+    ),
+    re.compile(
+        r"质量(?:保持|维持)?(?:不变|一定|恒定|固定)"
+        r"[^。；;！？?\n]{0,36}?(?:合外力|合力)(?:越大|增大|增加)"
+        r"[^。；;！？?\n]{0,18}?加速度(?:的大小)?(?:也|就|反而|会|随之)?(?:越小|减小|减少)"
+    ),
+)
+
+
+def newton_trend_contradictions(text: str) -> list[str]:
+    """Reject explicit magnitude-law reversals, not arbitrary physics prose."""
+    compact = re.sub(r"[ \t]+", "", text)
+    violations = []
+    for pattern in _NEWTON_TREND_CONTRADICTIONS:
+        for match in pattern.finditer(compact):
+            # Signed components and explicit counterexamples need different
+            # interpretation; never equate them with a magnitude assertion.
+            if any(word in match.group() for word in ("负", "分量", "有符号", "不能", "并非", "不一定")):
+                continue
+            if is_affirmed_claim(compact, match.start(), match.end()):
+                violations.append(match.group())
+    return violations
+
+
+def audit_derivative_prediction(demo: dict[str, Any]) -> str | None:
+    """Return verified, an explicit failure code, or None for unknown semantics.
+
+    Only an explicit polynomial-at-point slope question is interpreted. The
+    derivative is computed from the renderer's expression, not from the answer
+    or explanation supplied by the model. No finite-difference approximation.
+    """
+    prediction = demo.get("prediction")
+    data = demo.get("data") or {}
+    if not isinstance(prediction, dict) or demo.get("kind") != "limit_microscope" or data.get("mode") != "derivative":
+        return None
+    prompt = re.sub(r"\s+", "", str(prediction.get("prompt") or "")).replace("²", "^2").replace("³", "^3")
+    if not any(term in prompt for term in ("导数", "割线斜率", "切线斜率", "差商")):
+        return None
+    if "导数" not in prompt and not re.search(r"h(?:接近|趋近于?|趋于|→)0", prompt):
+        return None
+    bound = re.search(
+        rf"(?P<expression>[x0-9()+*/^.-]+)在x(?:₀|_?0)?=(?P<point>{NUMBER})处", prompt,
+    )
+    if not bound:
+        return None
+    prompt_coefficients = polynomial_coefficients(bound["expression"])
+    expression = str(data.get("expression") or "")
+    coefficients = polynomial_coefficients(expression)
+    if prompt_coefficients is None or coefficients is None:
+        return None
+    x0 = data.get("x0")
+    if type(x0) not in (int, float) or not math.isfinite(x0):
+        return None
+    same_polynomial = len(prompt_coefficients) == len(coefficients) and all(
+        math.isclose(left, right, rel_tol=1e-12, abs_tol=1e-12)
+        for left, right in zip(prompt_coefficients, coefficients)
+    )
+    if not math.isclose(float(bound["point"].replace("−", "-")), x0, rel_tol=0, abs_tol=1e-9) or not same_polynomial:
+        return "prediction_problem_mismatch"
+    expected = polynomial_derivative(expression, x0)
+    if expected is None:
+        return None
+    options = prediction.get("options") or []
+    values = {}
+    for option in options:
+        label = str(option.get("label") or "").strip()
+        match = re.fullmatch(rf"(?:趋近于?|趋于|接近|等于|为|=|→)?\s*({NUMBER}(?:\s*/\s*{NUMBER})?)\s*[。]?", label)
+        if match and (value := scalar_value(match[1])) is not None:
+            values[option["id"]] = value
+    correct_ids = [key for key, value in values.items() if math.isclose(value, expected, rel_tol=1e-7, abs_tol=1e-8)]
+    if len(correct_ids) > 1:
+        return "prediction_answer_ambiguous"
+    selected = prediction.get("answer_id")
+    if selected in values:
+        return "verified" if selected in correct_ids else "prediction_answer_mismatch"
+    # A qualitative answer isn't interpreted as a number just because another
+    # option is numeric. Leave it visibly unverified instead of guessing.
+    return None
+
+
 def audit_scene_quality(
     spec: dict[str, Any],
     *,
@@ -1234,6 +1359,32 @@ def audit_scene_quality(
         ))
 
     content_text = scene_content_text(spec)
+    if any(newton_trend_contradictions(block) for block in blocks):
+        fatal.append(_issue(
+            "newton_trend_contradiction",
+            "正文把牛顿第二定律的明确正比或反比关系写反了",
+        ))
+    prediction_checked = 0
+    prediction_unverified = 0
+    for demo in demonstrations:
+        if not isinstance(demo.get("prediction"), dict):
+            continue
+        prediction_result = audit_derivative_prediction(demo)
+        if prediction_result is None:
+            prediction_unverified += 1
+        elif prediction_result == "verified":
+            prediction_checked += 1
+        else:
+            prediction_checked += 1
+            fatal.append(_issue(
+                prediction_result,
+                "预测题的函数、取点或答案与演示的独立计算结果不一致",
+            ))
+    if prediction_unverified:
+        warnings.append(_issue(
+            "prediction_not_independently_verified",
+            "部分预测题尚未经过通用答案核验，格式通过不代表答案正确",
+        ))
     goal_numbers = _numeric_anchors(goal)
     content_numbers = _numeric_anchors(content_text)
     matched_goal_numbers = goal_numbers.intersection(content_numbers)
@@ -1407,6 +1558,8 @@ def audit_scene_quality(
             "content_chars": compact_chars,
             "substantive_blocks": substantive_blocks,
             "demonstrations": len(demonstrations),
+            "prediction_checked": prediction_checked,
+            "prediction_unverified": prediction_unverified,
             "topic_coverage": round(coverage, 3),
             "topic_hit_blocks": hit_blocks,
             "topic_anchor_hits": distinctive_hits,

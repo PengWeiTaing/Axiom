@@ -3,7 +3,7 @@ import { apiRequest, firecupApiRequest } from './client'
 import type { Board, Widget, WidgetEvent, ReviewItem, BoardNode, LayoutUpdate } from '../types'
 import type { SceneRenderer, StructuredSceneContent } from '../knowledge-scene/schema'
 
-export const CURRENT_KNOWLEDGE_SCENE_QUALITY_VERSION = '1.7'
+export const CURRENT_KNOWLEDGE_SCENE_QUALITY_VERSION = '1.8'
 
 export interface KnowledgeSceneManifest {
   schema_version: string
@@ -25,6 +25,7 @@ export interface KnowledgeSceneManifest {
     quality_status: 'approved'
     quality_score: number
     quality_version: string
+    quality_warnings?: Array<{ code: string; message: string }>
   }
 }
 

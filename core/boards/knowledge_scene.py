@@ -21,6 +21,7 @@ from core.boards.knowledge_scene_fixtures import choose_offline_fixture
 from core.boards.knowledge_scene_quality import (
     QUALITY_GATE_VERSION,
     audit_scene_quality,
+    explicit_integral_claims_match,
     faraday_content_matches_problem,
     field_experiment_matches_problem,
     force_diagram_matches_problem,
@@ -351,8 +352,14 @@ def _section_supports_exact_integral(
     )
     if section is None:
         return False
+    concrete_match = explicit_integral_claims_match(
+        scene_content_text({"sections": [section]}), expression, lower, upper,
+    )
+    if concrete_match is not None:
+        # Do not let substring markers turn 2π into π or -sin(x) into sin(x).
+        return concrete_match
     text = json.dumps(section, ensure_ascii=False).casefold()
-    compact = re.sub(r"\s+", "", text).replace("\\left", "").replace("\\right", "")
+    compact = re.sub(r"\s+", "", text).replace("\\left", "").replace("\\right", "").replace("−", "-")
 
     function_aliases = {
         "sin": ("sin", "正弦"),
@@ -377,6 +384,17 @@ def _section_supports_exact_integral(
             return False
 
     def bound_markers(value: float) -> tuple[str, ...]:
+        # Match common written half-pi bounds as well as their numeric form.
+        # This only checks prose anchoring; exact practice additionally requires
+        # the original request tokens, never an inferred nearby decimal.
+        for half_units in range(-16, 17):
+            if half_units and value == half_units * math.pi / 2:
+                sign = "-" if half_units < 0 else ""
+                numerator = abs(half_units) if half_units % 2 else abs(half_units) // 2
+                coefficient = str(numerator) if numerator != 1 else ""
+                suffix = "/2" if half_units % 2 else ""
+                aliases = tuple(f"{sign}{coefficient}{pi}{suffix}" for pi in ("π", "\\pi", "pi", "*pi"))
+                return (*aliases, format(value, ".12g"))
         if math.isclose(value, math.pi, rel_tol=0.0, abs_tol=1e-9):
             return ("π", "\\pi")
         if math.isclose(value, -math.pi, rel_tol=0.0, abs_tol=1e-9):
@@ -1609,6 +1627,10 @@ def _generation(
         "quality_status": "approved" if report.get("passed") else "rejected",
         "quality_score": int(report.get("score", 0)),
         "quality_version": str(report.get("version") or QUALITY_GATE_VERSION),
+        "quality_warnings": [
+            {"code": str(issue.get("code", "")), "message": str(issue.get("message", ""))}
+            for issue in report.get("warnings", [])
+        ],
     }
 
 
@@ -1861,6 +1883,11 @@ def _build_structured_manifest(
     _append_automatic_explicit_relation_map(spec, goal=goal)
     _append_automatic_derivation_morph(spec)
 
+    # Normalization discards model-authored practice metadata. Only the bounded
+    # calculator may add questions, after any repairs to function/bounds/sample.
+    from .integral_practice import attach_integral_practice
+    attach_integral_practice(spec, request_text=f"{goal}\n{source_text}")
+
     quality_report = audit_scene_quality(
         spec,
         goal=goal,
@@ -1871,6 +1898,9 @@ def _build_structured_manifest(
             "知识场景未通过 Axiom 教学质量门："
             f"{quality_failure_message(quality_report)}"
         )
+    if quality_report["metrics"].get("prediction_unverified"):
+        note = "部分预测题尚未经过通用答案核验，可结合演示与推导对照思考。"
+        generation_note = f"{generation_note}；{note}" if generation_note else note
 
     return {
         "schema_version": "2.0",

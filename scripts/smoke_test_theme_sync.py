@@ -132,8 +132,15 @@ def assert_parent_theme_protocol() -> None:
     )
     require_regex(
         source,
-        r"<iframe.*?ref=\{sceneFrameRef\}.*?onLoad=\{\(event\)\s*=>\s*"
+        r"<iframe.*?ref=\{attachSceneFrame\}.*?onLoad=\{\(event\)\s*=>\s*"
         r"handleSceneFrameLoad\(event\.currentTarget\)\}",
+        context,
+    )
+    require_regex(
+        source,
+        r"const attachSceneFrame\s*=\s*useCallback\(.*?"
+        r"sceneFrameRef\.current\s*=\s*frame.*?"
+        r"if \(!frame\) observerRef\.current\?\.disconnect\(\)",
         context,
     )
     require_regex(

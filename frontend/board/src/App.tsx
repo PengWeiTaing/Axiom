@@ -11,6 +11,8 @@ import {
 import { ApiError } from './api/client'
 import BoardShell from './BoardShell'
 import StructuredKnowledgeScene from './knowledge-scene/StructuredKnowledgeScene'
+import IntegralLearningPath from './learning/IntegralLearningPath'
+import { supportsIntegralPractice } from './learning/integralLesson'
 import type { Board } from './types'
 
 const DEFAULT_GOAL = '理解如何用定积分表示并计算平面区域的面积'
@@ -455,6 +457,10 @@ function CompetitionBoardApp() {
   const [sceneTheme, setSceneThemeState] = useState<SceneTheme>(readSceneTheme)
   const observerRef = useRef<ResizeObserver | null>(null)
   const sceneFrameRef = useRef<HTMLIFrameElement | null>(null)
+  const attachSceneFrame = useCallback((frame: HTMLIFrameElement | null) => {
+    sceneFrameRef.current = frame
+    if (!frame) observerRef.current?.disconnect()
+  }, [])
   const generationStartedAtRef = useRef<number | null>(null)
   const progressDismissTimerRef = useRef<number | null>(null)
   const generationAbortRef = useRef<AbortController | null>(null)
@@ -1034,8 +1040,17 @@ function CompetitionBoardApp() {
         className={`knowledge-scene knowledge-scene--${scene.renderer.kind}`}
         aria-label={scene.title}
       >
-        {scene.renderer.kind === 'static_html' ? <iframe
-          ref={sceneFrameRef}
+        {scene.renderer.kind === 'static_html' && supportsIntegralPractice(scene) ? <IntegralLearningPath key={scene.scene_id}>
+          <iframe
+            ref={attachSceneFrame}
+            src={resolveStaticSceneSrc(scene.renderer.src)}
+            title={scene.title}
+            style={{ height: `${frameHeight}px` }}
+            sandbox="allow-scripts allow-same-origin"
+            onLoad={(event) => handleSceneFrameLoad(event.currentTarget)}
+          />
+        </IntegralLearningPath> : scene.renderer.kind === 'static_html' ? <iframe
+          ref={attachSceneFrame}
           key={scene.scene_id}
           src={resolveStaticSceneSrc(scene.renderer.src)}
           title={scene.title}

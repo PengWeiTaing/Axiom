@@ -87,6 +87,8 @@ export interface SceneDemonstration {
   data: Record<string, unknown>
   semantic_ids?: string[]
   prediction?: ScenePrediction
+  // Added by the backend calculator only, never taken directly from model text.
+  practice?: unknown
 }
 
 export interface StructuredSceneContent {

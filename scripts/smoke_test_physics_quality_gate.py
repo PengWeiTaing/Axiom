@@ -242,7 +242,7 @@ def check_newton_fail_closed_and_exact_repair() -> None:
         provider="coze",
     )
     assert manifest["generation"]["quality_status"] == "approved"
-    assert manifest["generation"]["quality_version"] == "1.7"
+    assert manifest["generation"]["quality_version"] == "1.8"
     force_demos = [
         demo for demo in manifest["content"]["demonstrations"]
         if demo["kind"] == "force_diagram"

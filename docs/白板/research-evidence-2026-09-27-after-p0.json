@@ -1,0 +1,246 @@
+{
+  "generated_at": "2026-09-26T17:55:53+00:00",
+  "mode": "offline_diagnostic_counterexamples",
+  "network_requests": 0,
+  "probe_modifies_production_files": false,
+  "controls_passed": true,
+  "interpretation": "Hand-picked counterexamples reveal possible gaps; they do not estimate live error rates or learning effects. Exit 0 only validates controls.",
+  "scene_probes": [
+    {
+      "id": "newton_control",
+      "goal": "解释牛顿第二定律",
+      "mutation": "none",
+      "expected_behavior": "accept",
+      "schema_accepted": true,
+      "quality_passed": true,
+      "quality_score": 86,
+      "fatal_codes": [],
+      "warning_codes": [
+        "content_depth_low",
+        "topic_coverage_low"
+      ],
+      "quality_version": "1.8"
+    },
+    {
+      "id": "frontend_default_contract_suffix",
+      "goal": "解释牛顿第二定律；重点：核心对象之间的变化、因果或约束；方式：先看直观关系，再连接关键文字或公式；学完：能用自己的话解释核心关系",
+      "mutation": "Mirrors the current buildLearningContract default suffix for this input; the scene is unchanged.",
+      "expected_behavior": "do_not_confuse_presentation_instructions_with_topic",
+      "schema_accepted": true,
+      "quality_passed": true,
+      "quality_score": 93,
+      "fatal_codes": [],
+      "warning_codes": [
+        "content_depth_low"
+      ],
+      "quality_version": "1.8"
+    },
+    {
+      "id": "contradictory_physics_claim",
+      "goal": "解释牛顿第二定律",
+      "mutation": "根据牛顿第二定律，在合外力保持不变时，质量越大，加速度也越大。",
+      "expected_behavior": "reject_or_flag_subject_contradiction",
+      "schema_accepted": true,
+      "quality_passed": false,
+      "quality_score": 65,
+      "fatal_codes": [
+        "newton_trend_contradiction"
+      ],
+      "warning_codes": [
+        "content_depth_low"
+      ],
+      "quality_version": "1.8"
+    },
+    {
+      "id": "everyday_paraphrase",
+      "goal": "同样用力推小车，为什么装满货后更难提速",
+      "mutation": "Only the request wording changes; scene remains the Newton fixture.",
+      "expected_behavior": "recognize_relevant_mechanism_or_explain_context_gap",
+      "schema_accepted": true,
+      "quality_passed": false,
+      "quality_score": 37,
+      "fatal_codes": [
+        "topic_mismatch",
+        "topic_anchor_missing"
+      ],
+      "warning_codes": [
+        "content_depth_low"
+      ],
+      "quality_version": "1.8"
+    },
+    {
+      "id": "prediction_control",
+      "goal": "观察导数和圆周角",
+      "mutation": "none",
+      "expected_behavior": "accept",
+      "schema_accepted": true,
+      "quality_passed": true,
+      "quality_score": 86,
+      "fatal_codes": [],
+      "warning_codes": [
+        "content_depth_low",
+        "prediction_not_independently_verified"
+      ],
+      "quality_version": "1.8"
+    },
+    {
+      "id": "wrong_derivative_prediction",
+      "goal": "观察导数和圆周角",
+      "mutation": "x^2 derivative at x0=1: answer_id toward-two -> toward-zero; explanation remains 2+h -> 2.",
+      "expected_behavior": "reject_or_flag_prediction_answer_mismatch",
+      "schema_accepted": true,
+      "quality_passed": false,
+      "quality_score": 58,
+      "fatal_codes": [
+        "prediction_answer_mismatch"
+      ],
+      "warning_codes": [
+        "content_depth_low",
+        "prediction_not_independently_verified"
+      ],
+      "quality_version": "1.8"
+    }
+  ],
+  "mastery_probes": [
+    {
+      "id": "wrong_fast_confident",
+      "payload": {
+        "correct": false,
+        "attempt_index": 1,
+        "hint_used": false,
+        "latency_ms": 1000,
+        "confidence": 1.0
+      },
+      "evidence_score": 0.0,
+      "update_from_zero": {
+        "old_score": 0,
+        "new_score": 0.0,
+        "delta": 0.0
+      }
+    },
+    {
+      "id": "wrong_fast_uncertain",
+      "payload": {
+        "correct": false,
+        "attempt_index": 1,
+        "hint_used": false,
+        "latency_ms": 1000,
+        "confidence": 0.0
+      },
+      "evidence_score": 0.0,
+      "update_from_zero": {
+        "old_score": 0,
+        "new_score": 0.0,
+        "delta": 0.0
+      }
+    },
+    {
+      "id": "correct_slow_third_try_with_hint",
+      "payload": {
+        "correct": true,
+        "attempt_index": 3,
+        "hint_used": true,
+        "latency_ms": 45000,
+        "confidence": 0.0
+      },
+      "evidence_score": 0.5,
+      "update_from_zero": {
+        "old_score": 0,
+        "new_score": 0.15,
+        "delta": 0.15
+      }
+    },
+    {
+      "id": "correct_first_try",
+      "payload": {
+        "correct": true,
+        "attempt_index": 1,
+        "hint_used": false,
+        "latency_ms": 10000,
+        "confidence": 0.5
+      },
+      "evidence_score": 1.0,
+      "update_from_zero": {
+        "old_score": 0,
+        "new_score": 0.3,
+        "delta": 0.3
+      }
+    }
+  ],
+  "wrong_first_attempts_on_ten_independent_questions": [
+    {
+      "independent_question": 1,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 2,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 3,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 4,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 5,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 6,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 7,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 8,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 9,
+      "score": 0.0,
+      "bucket": "weak"
+    },
+    {
+      "independent_question": 10,
+      "score": 0.0,
+      "bucket": "weak"
+    }
+  ],
+  "review_caveat": "writeback.py still schedules an explicit wrong answer for next-day review; this probe does not claim that safety path is absent.",
+  "oracle_probes": [
+    {
+      "id": "oracle_control",
+      "statement": "定积分的积分值为 2。",
+      "expected_accepted": true,
+      "actual_accepted": true,
+      "scope": "M02 integral-value item only, not the full benchmark"
+    },
+    {
+      "id": "oracle_wrong_value_control",
+      "statement": "定积分的积分值为 5。",
+      "expected_accepted": false,
+      "actual_accepted": false,
+      "scope": "M02 integral-value item only, not the full benchmark"
+    },
+    {
+      "id": "oracle_disavowed_answer",
+      "statement": "有人误以为积分值为 2，这个结论是错误的；本题正确的积分值为 5。",
+      "expected_accepted": false,
+      "actual_accepted": false,
+      "scope": "M02 integral-value item only, not the full benchmark"
+    }
+  ]
+}

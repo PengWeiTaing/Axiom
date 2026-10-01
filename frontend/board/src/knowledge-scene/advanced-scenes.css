@@ -294,6 +294,12 @@
   border-left-color: var(--advanced-yellow);
 }
 
+.riemann-sum__area[data-sign="negative"] { fill: color-mix(in srgb, var(--advanced-red) 18%, transparent); }
+.riemann-sum__sign-key { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0; font-size: 12px; line-height: 1.6; }
+.riemann-sum__sign-key span:first-child { color: var(--advanced-cyan); }
+.riemann-sum__sign-key span:last-child { color: var(--advanced-red); }
+.riemann-sum__geometric small { display: block; margin-top: 6px; color: var(--advanced-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+
 .riemann-sum__error b {
   color: var(--advanced-yellow);
 }

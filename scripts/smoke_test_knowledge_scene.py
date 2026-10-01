@@ -2016,7 +2016,7 @@ def check_simple_harmonic_premium_scene_and_scope() -> None:
     assert scene["template_id"] == "structured_scene_v2"
     assert scene["generation"]["provider"] == "demo"
     assert scene["generation"]["quality_status"] == "approved"
-    assert scene["generation"]["quality_version"] == "1.7"
+    assert scene["generation"]["quality_version"] == "1.8"
     assert scene["generation"]["quality_score"] == 100
     assert "未调用扣子" in scene["generation"]["fallback_reason"]
     kinds = {

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef } from 'react'
 import { safeEval } from '../widgets/FunctionVizWidget'
 import { KnowledgeTimelineControls, useKnowledgeTimeline } from './KnowledgeTimeline'
 import { useSceneParameter } from './SceneRuntime'
+import { isNumericalCancellation } from './numericalReadout'
 import './advanced-scenes.css'
 
 export interface RiemannSumData {
@@ -27,6 +28,7 @@ export interface RiemannSumProps {
   data: RiemannSumData
   semanticId?: string
   semanticIds?: string[]
+  domainLabels?: [string, string]
 }
 
 const WIDTH = 360
@@ -61,35 +63,48 @@ function sampleRatio(sample: RiemannSumData['sample']) {
   return 0.5
 }
 
+function formatSum(value: number | null, absoluteTotal: number | null) {
+  return isNumericalCancellation(value, absoluteTotal) ? '≈ 0' : format(value)
+}
+
 function sampleLabel(sample: RiemannSumData['sample']) {
   if (sample === 'left') return '左端点'
   if (sample === 'right') return '右端点'
   return '中点'
 }
 
-function simpsonIntegral(expression: string, domain: [number, number], intervals: number) {
+function simpsonAreas(expression: string, domain: [number, number], intervals: number) {
   const [a, b] = domain
   const step = (b - a) / intervals
   let weighted = 0
+  let positive = 0
+  let negative = 0
   for (let index = 0; index <= intervals; index += 1) {
     const value = evaluate(expression, a + index * step)
     if (value === null) return null
-    weighted += value * (index === 0 || index === intervals ? 1 : index % 2 === 0 ? 2 : 4)
+    const weight = index === 0 || index === intervals ? 1 : index % 2 === 0 ? 2 : 4
+    weighted += value * weight
+    positive += Math.max(value, 0) * weight
+    negative += Math.max(-value, 0) * weight
   }
   const result = weighted * step / 3
-  return Number.isFinite(result) ? result : null
+  const areas = { signed: result, positive: positive * step / 3, negative: negative * step / 3 }
+  return Object.values(areas).every(Number.isFinite) ? areas : null
 }
 
-function referenceIntegral(expression: string, domain: [number, number]) {
+function referenceAreas(expression: string, domain: [number, number]) {
   // A single dense sample can report a plausible but false answer across a
   // pole.  Require two deterministic resolutions to agree before presenting
   // the value as a visual reference.  This is still numerical evidence, not
   // a model-authored symbolic antiderivative.
-  const coarse = simpsonIntegral(expression, domain, 1024)
-  const fine = simpsonIntegral(expression, domain, 2048)
+  const coarse = simpsonAreas(expression, domain, 1024)
+  const fine = simpsonAreas(expression, domain, 2048)
   if (coarse === null || fine === null) return null
-  const tolerance = Math.max(5e-6, Math.abs(fine) * 2e-5)
-  return Math.abs(fine - coarse) <= tolerance ? fine : null
+  // Agreement of signed sums alone can hide opposite-sign singularities.
+  const stable = (['signed', 'positive', 'negative'] as const).every(key => (
+    Math.abs(fine[key] - coarse[key]) <= Math.max(5e-6, Math.abs(fine[key]) * 2e-5)
+  ))
+  return stable ? { ...fine, geometric: fine.positive + fine.negative } : null
 }
 
 function refinementLevels(initial: number, maximum: number) {
@@ -101,7 +116,7 @@ function refinementLevels(initial: number, maximum: number) {
   return levels
 }
 
-export function RiemannSum({ data, semanticId, semanticIds }: RiemannSumProps) {
+export function RiemannSum({ data, semanticId, semanticIds, domainLabels }: RiemannSumProps) {
   const manualOverrideRef = useRef(false)
   const timeline = useKnowledgeTimeline({
     durationMs: data.duration_ms ?? 10000,
@@ -170,10 +185,13 @@ export function RiemannSum({ data, semanticId, semanticIds }: RiemannSumProps) {
     if (rectangles.some(rectangle => rectangle.contribution === null)) return null
     return rectangles.reduce((sum, rectangle) => sum + (rectangle.contribution ?? 0), 0)
   }, [rectangles])
-  const integral = useMemo(
-    () => referenceIntegral(data.expression, data.domain),
+  const areas = useMemo(
+    () => referenceAreas(data.expression, data.domain),
     [data.domain, data.expression],
   )
+  const integral = areas?.signed ?? null
+  const absoluteRectangleSum = approximation === null ? null
+    : rectangles.reduce((sum, rectangle) => sum + Math.abs(rectangle.contribution ?? 0), 0)
   const error = approximation === null || integral === null ? null : Math.abs(approximation - integral)
 
   const curvePath = useMemo(() => {
@@ -192,17 +210,24 @@ export function RiemannSum({ data, semanticId, semanticIds }: RiemannSumProps) {
     return parts.join(' ')
   }, [data.expression, xMin, xSpan, yMax, yMin, ySpan])
 
-  const areaPath = useMemo(() => {
-    const points: string[] = [`M${xToSvg(xMin).toFixed(2)},${yZero.toFixed(2)}`]
+  const areaPaths = useMemo(() => {
+    const values: { x: number; value: number }[] = []
     for (let index = 0; index <= 180; index += 1) {
       const x = xMin + (index / 180) * xSpan
       const value = evaluate(data.expression, x)
-      if (value === null) return ''
-      const visibleY = clamp(value, yMin, yMax)
-      points.push(`L${xToSvg(x).toFixed(2)},${yToSvg(visibleY).toFixed(2)}`)
+      if (value === null) return { positive: '', negative: '' }
+      values.push({ x, value })
     }
-    points.push(`L${xToSvg(xMax).toFixed(2)},${yZero.toFixed(2)} Z`)
-    return points.join(' ')
+    const path = (positive: boolean) => {
+      const points: string[] = [`M${xToSvg(xMin).toFixed(2)},${yZero.toFixed(2)}`]
+      for (const { x, value } of values) {
+        const visibleY = clamp(positive ? Math.max(value, 0) : Math.min(value, 0), yMin, yMax)
+        points.push(`L${xToSvg(x).toFixed(2)},${yToSvg(visibleY).toFixed(2)}`)
+      }
+      points.push(`L${xToSvg(xMax).toFixed(2)},${yZero.toFixed(2)} Z`)
+      return points.join(' ')
+    }
+    return { positive: path(true), negative: path(false) }
   }, [data.expression, xMax, xMin, xSpan, yMax, yMin, yZero])
 
   const growProgress = clamp(timeline.progress / 0.3, 0, 1)
@@ -248,7 +273,8 @@ export function RiemannSum({ data, semanticId, semanticIds }: RiemannSumProps) {
     >
       <div className="advanced-scene__stage">
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="矩形逐块生长并随分割数增加逼近曲线下的积分面积">
-          {areaPath && <path className="riemann-sum__area" d={areaPath} data-semantic-id={areaSemanticId} />}
+          {areaPaths.positive && <path className="riemann-sum__area" data-sign="positive" d={areaPaths.positive} data-semantic-id={areaSemanticId} />}
+          {areaPaths.negative && <path className="riemann-sum__area" data-sign="negative" d={areaPaths.negative} data-semantic-id={areaSemanticId} />}
           <line className="advanced-scene__axis" x1={PAD.left} y1={yZero} x2={WIDTH - PAD.right} y2={yZero} />
           {xMin <= 0 && xMax >= 0 && (
             <line className="advanced-scene__axis" x1={xToSvg(0)} y1={PAD.top} x2={xToSvg(0)} y2={HEIGHT - PAD.bottom} />
@@ -294,11 +320,13 @@ export function RiemannSum({ data, semanticId, semanticIds }: RiemannSumProps) {
             </g>
           )}
 
-          <text className="riemann-sum__endpoint" x={xToSvg(xMin)} y={yZero + 13} textAnchor="middle">a={format(xMin, 3)}</text>
-          <text className="riemann-sum__endpoint" x={xToSvg(xMax)} y={yZero + 13} textAnchor="middle">b={format(xMax, 3)}</text>
+          <text className="riemann-sum__endpoint" x={xToSvg(xMin)} y={yZero + 13} textAnchor="middle">a={domainLabels?.[0] ?? format(xMin, 3)}</text>
+          <text className="riemann-sum__endpoint" x={xToSvg(xMax)} y={yZero + 13} textAnchor="middle">b={domainLabels?.[1] ?? format(xMax, 3)}</text>
           <text className="advanced-scene__caption" x={WIDTH - PAD.right} y={HEIGHT - 9} textAnchor="end">{stageCaption}</text>
         </svg>
       </div>
+
+      <p className="riemann-sum__sign-key"><span>＋ 横轴上方按正值</span><span>− 横轴下方按负值</span></p>
 
       <label className="advanced-scene__control">
         <span>分割数 n（{sampleLabel(data.sample)}取样）</span>
@@ -321,15 +349,20 @@ export function RiemannSum({ data, semanticId, semanticIds }: RiemannSumProps) {
       <div className="advanced-scene__readouts" aria-live="polite">
         <div className="advanced-scene__readout" data-semantic-id={rectangleSemanticId}>
           <span>矩形和 Sₙ = Σ f(xᵢ*)Δx</span>
-          <b>{format(approximation)}</b>
+          <b>{formatSum(approximation, absoluteRectangleSum)}</b>
         </div>
         <div className="advanced-scene__readout" data-semantic-id={areaSemanticId}>
-          <span>数值积分参考 ∫ₐᵇ f(x)dx</span>
-          <b>{integral === null ? '区间内未稳定收敛' : format(integral)}</b>
+          <span>定积分数值参考 I = ∫ₐᵇ f(x)dx</span>
+          <b>{integral === null ? '区间内未稳定收敛' : formatSum(integral, areas?.geometric ?? null)}</b>
+        </div>
+        <div className="advanced-scene__readout riemann-sum__geometric" data-semantic-id={areaSemanticId}>
+          <span>几何面积数值参考 A = ∫ₐᵇ |f(x)|dx</span>
+          <b>{areas === null ? '参考值不稳定，暂不比较' : format(areas.geometric)}</b>
+          {areas && <small>上方面积约 {format(areas.positive)}，下方面积约 {format(areas.negative)}；相减算 I，相加算 A。</small>}
         </div>
         <div className="advanced-scene__readout riemann-sum__error" data-semantic-id={limitSemanticId}>
           <span>绝对误差 |Sₙ − ∫f|</span>
-          <b>{integral === null ? '参考值不稳定，暂不比较' : format(error)}</b>
+          <b>{integral === null ? '参考值不稳定，暂不比较' : formatSum(error, areas?.geometric ?? null)}</b>
         </div>
         <div className="advanced-scene__readout" data-semantic-id={limitSemanticId}>
           <span>逼近极限</span>

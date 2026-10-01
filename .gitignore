@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 .env
 db/*.db
+db/*.db-wal
+db/*.db-shm
 data/inbox/*
 data/archive/*
 data/reviews/*

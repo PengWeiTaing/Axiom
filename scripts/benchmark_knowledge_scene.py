@@ -41,8 +41,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from core.boards.knowledge_claims import is_affirmed_claim, scalar_value
+from core.boards.knowledge_scene_quality import QUALITY_GATE_VERSION
+
 DEFAULT_CASES_PATH = Path(__file__).with_name("knowledge_scene_benchmark_cases.json")
-CURRENT_QUALITY_VERSION = "1.7"
+CURRENT_QUALITY_VERSION = QUALITY_GATE_VERSION
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "artifacts" / "knowledge-scene-benchmark"
 GENERATE_PATH = "/api/learning/knowledge-scenes/generate"
 JOBS_PATH = "/api/learning/knowledge-scenes/jobs"
@@ -58,6 +61,7 @@ SUPPORTED_ASSERTIONS = {
     "process_order",
 }
 SUPPORTED_TEXT_ASSERTIONS = {
+    "affirmed_numeric_result",
     "directed_relation",
     "expression_relation",
     "forbidden_relation",
@@ -620,10 +624,40 @@ def _check_expression_relation(
     return False, f"entity={entities}; expression={expressions}; unit={unit}"
 
 
+def _check_affirmed_numeric_result(scopes: list[str], assertion: dict[str, Any]) -> tuple[bool, str]:
+    """Bind affirmative result values, excluding explicitly disproved answers.
+
+    All affirmative results must agree: one correct fragment cannot mask an
+    incorrect conclusion elsewhere. Each pattern binds a value in one clause.
+    """
+    text = "。\n".join(scopes)
+    expected = float(assertion["expected"])
+    tolerance = float(assertion.get("tolerance", 1e-6))
+    values = []
+    for pattern in assertion.get("result_patterns") or []:
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+            if not is_affirmed_claim(text, match.start(), match.end()):
+                continue
+            if re.search(r"(?:近似|估算|估计)(?:的)?$", text[max(0, match.start() - 12):match.start()]):
+                continue  # A finite-partition estimate is not the exact limit.
+            if re.match(r"\s*(?:[+*/^×÷-]|\\(?:cdot|times|pi)|[A-Za-z])", text[match.end():]):
+                continue  # e.g. '= 2 * 3' is not a scalar result of 2.
+            before_value = match.group()[:match.start("value") - match.start()]
+            if any(before_value.count(left) > before_value.count(right) for left, right in (("{", "}"), ("(", ")"), ("[", "]"))):
+                continue  # e.g. the i=1 in a sum subscript is not its result.
+            value = scalar_value(match.group("value"))
+            if value is not None:
+                values.append(value)
+    passed = bool(values) and all(math.isclose(value, expected, rel_tol=0, abs_tol=tolerance) for value in values)
+    return passed, f"expected={expected:g}; affirmed_results={values}"
+
+
 def check_text_assertion(
     scopes: list[str], assertion: dict[str, Any]
 ) -> tuple[bool, str]:
     assertion_type = assertion.get("type")
+    if assertion_type == "affirmed_numeric_result":
+        return _check_affirmed_numeric_result(scopes, assertion)
     if assertion_type == "quantity_relation":
         return _check_quantity_relation(scopes, assertion)
     if assertion_type == "scoped_relation":
@@ -735,7 +769,7 @@ def _text_assertion_patterns(assertion: dict[str, Any]) -> Iterable[tuple[str, s
         "actor_patterns", "connector_patterns", "direction_patterns",
         "entity_patterns", "expression_patterns", "forbidden_any",
         "object_patterns", "predicate_patterns", "required_all",
-        "source_patterns", "subject_patterns", "target_patterns",
+        "source_patterns", "subject_patterns", "target_patterns", "result_patterns",
     ):
         for index, pattern in enumerate(assertion.get(key) or []):
             yield f"{key}[{index}]", pattern
@@ -840,7 +874,19 @@ def validate_catalog(catalog: dict[str, Any]) -> list[dict[str, Any]]:
                     assertion_type = assertion.get("type")
                     if assertion_type not in SUPPORTED_TEXT_ASSERTIONS:
                         errors.append(f"{assertion_prefix}.type 不受支持：{assertion_type}")
-                    if assertion_type == "quantity_relation":
+                    if assertion_type == "affirmed_numeric_result":
+                        if type(assertion.get("expected")) not in (int, float) or not math.isfinite(assertion["expected"]):
+                            errors.append(f"{assertion_prefix}.expected 必须是有限数值")
+                        patterns = assertion.get("result_patterns") or []
+                        if not patterns:
+                            errors.append(f"{assertion_prefix}.result_patterns 不能为空")
+                        for pattern in patterns:
+                            try:
+                                if "value" not in re.compile(pattern).groupindex:
+                                    errors.append(f"{assertion_prefix}.result_patterns 必须捕获 value")
+                            except (re.error, TypeError):
+                                pass  # Normal catalog regex validation reports this.
+                    elif assertion_type == "quantity_relation":
                         if not isinstance(assertion.get("expected"), (int, float)):
                             errors.append(f"{assertion_prefix}.expected 必须是数值")
                         unit = str(assertion.get("unit") or "")
